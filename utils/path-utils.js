@@ -1,6 +1,7 @@
 // utils/path-utils.js - Cross-platform path handling utilities
 const path = require('path');
 const fs = require('fs');
+const url = require('url');
 
 class PathUtils {
   /**
@@ -48,20 +49,11 @@ class PathUtils {
   static toFileUrl(filePath) {
     try {
       const normalizedPath = this.normalize(filePath);
-      
-      // Ensure absolute path
-      const absolutePath = path.isAbsolute(normalizedPath) 
-        ? normalizedPath 
+      const absolutePath = path.isAbsolute(normalizedPath)
+        ? normalizedPath
         : path.resolve(normalizedPath);
-      
-      if (process.platform === 'win32') {
-        // Windows: Convert C:\path\file.html to file:///C:/path/file.html
-        const windowsPath = absolutePath.replace(/\\/g, '/');
-        return 'file:///' + windowsPath;
-      } else {
-        // Unix-like: Convert /path/file.html to file:///path/file.html
-        return 'file://' + absolutePath;
-      }
+        
+      return url.pathToFileURL(absolutePath).href;
     } catch (error) {
       throw new Error(`Failed to convert path to file URL: ${error.message}`);
     }

@@ -1,103 +1,20 @@
-ipcMain.handle('extract-scorm', async (event, zipPath) => {
-  let extractPath = null;
-  
-  try {
-    const StreamZip = require('node-stream-zip');
-    const tempDir = path.join(__dirname, 'temp');
-    extractPath = path.join(tempDir, 'scorm_' + Date.now());
-    
-    // BUG FIX: Ensure temp directory exists
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    
-    // BUG FIX: Check available disk space before extraction
-    const stats = fs.statSync(zipPath);
-    const zipSize = stats.size;
-    const estimatedExtractedSize = zipSize * 3; // Rough estimate
-    
-    try {
-      const fsStats = fs.statSync(tempDir);
-      // This is a simplified check - in production you'd want to check actual free space
-      console.log(`Extracting ${formatBytes(zipSize)} ZIP file to ${extractPath}`);
-    } catch (error) {
-      console.warn('Could not check disk space:', error.message);
-    }
-    
-    fs.mkdirSync(extractPath, { recursive: true });
-    
-    const zip = new StreamZip.async({ file: zipPath });
-    
-    // BUG FIX: Get list of entries first to validate
-    const entries = await zip.entries();
-    const entryCount = Object.keys(entries).length;
-    
-    if (entryCount === 0) {
-      await zip.close();
-      throw new Error('ZIP file is empty');
-    }
-    
-    if (entryCount > 10000) { // Reasonable limit for SCORM packages
-      await zip.close();
-      throw new Error('ZIP file contains too many files (>10,000)');
-    }
-    
-    // BUG FIX: Extract with progress tracking and size limits
-    let extractedSize = 0;
-    const maxExtractedSize = 500 * 1024 * 1024; // 500MB limit
-    
-    for (const [entryName, entry] of Object.entries(entries)) {
-      // BUG FIX: Validate entry name for security
-      if (entryName.includes('..') || entryName.includes('~')) {
-        console.warn(`Skipping suspicious entry: ${entryName}`);
-        continue;
-      }
-      
-      extractedSize += entry.size || 0;
-      if (extractedSize > maxExtractedSize) {
-        await zip.close();
-        throw new Error('Extracted content would exceed size limit (500MB)');
-      }
-    }
-    
-    await zip.extract(null, extractPath);
-    await zip.close();
-    
-    // BUG FIX: Register for cleanup tracking
-    if (resourceMonitor) {
-      resourceMonitor.trackExtractedFolder(extractPath);
-    }
-    
-    // BUG FIX: Set up automatic cleanup timer
-    setTimeout(() => {
-      cleanupExtractedFolder(extractPath);
-    }, 24 * 60 * 60 * 1000); // 24 hours
-    
-    monitor.log('INFO', 'SCORM package extracted successfully', {
-      zipPath: path.basename(zipPath),
-      extractPath,
-      fileCount: entryCount,
-      estimatedSize: formatBytes(extractedSize)
-    });
-    
-    return extractPath;
-    
-  } catch (error) {
-    console.error('Extraction failed:', error);
-    
-    // BUG FIX: Clean up failed extraction
-    if (extractPath && fs.existsSync(extractPath)) {
-      try {
-        fs.rmSync(extractPath, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error('Failed to cleanup failed extraction:', cleanupError);
-      }
-    }
-    
-    monitor.trackError(error, 'extract-scorm');
-    return null;
-  }
-});
+// main.js - Fixed version with bug corrections
+const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const StreamZip = require('node-stream-zip');
+const { ProductionConfig } = require('./config/production.js');
+const { PerformanceMonitor, ResourceMonitor } = require('./monitoring/index.js');
+
+const config = new ProductionConfig();
+const monitor = new PerformanceMonitor();
+const resourceMonitor = new ResourceMonitor(monitor);
+
+let mainWindow;
+let debugWindow;
+
+// SCORM session storage
+const scormSessions = new Map();
 
 // BUG FIX: Helper function for cleanup
 function cleanupExtractedFolder(folderPath) {
@@ -109,7 +26,7 @@ function cleanupExtractedFolder(folderPath) {
       // Only cleanup if folder is older than 1 hour
       if (ageHours > 1) {
         fs.rmSync(folderPath, { recursive: true, force: true });
-        monitor.log('INFO', 'Cleaned up old extracted folder', { 
+        monitor.log('INFO', 'Cleaned up old extracted folder', {
           folderPath: path.basename(folderPath),
           ageHours: Math.round(ageHours)
         });
@@ -129,16 +46,7 @@ function formatBytes(bytes) {
   if (bytes === 0) return '0 Bytes';
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-}// main.js - Fixed version with bug corrections
-const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
-const path = require('path');
-const fs = require('fs');
-
-let mainWindow;
-let debugWindow;
-
-// SCORM session storage
-const scormSessions = new Map();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -995,19 +903,36 @@ async function exportSessionData() {
 }
 
 // Other existing handlers
-ipcMain.handle('select-scorm-package', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    filters: [
-      { name: 'SCORM Packages', extensions: ['zip'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  });
+ipcMain.handle('select-scorm-package', async (event) => {
+  console.log('select-scorm-package: IPC call received');
+  const webContents = event.sender;
+  const browserWindow = BrowserWindow.fromWebContents(webContents);
   
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
+  if (!browserWindow) {
+    console.error('select-scorm-package: BrowserWindow not found from webContents');
+    return null;
   }
-  return null;
+
+  try {
+    const result = await dialog.showOpenDialog(browserWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'SCORM Packages', extensions: ['zip'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      console.log(`select-scorm-package: File selected: ${result.filePaths[0]}`);
+      return result.filePaths[0];
+    } else {
+      console.log('select-scorm-package: File selection canceled');
+      return null;
+    }
+  } catch (error) {
+    console.error('select-scorm-package: Error showing open dialog:', error);
+    return null;
+  }
 });
 
 ipcMain.handle('select-scorm-folder', async () => {
@@ -1022,53 +947,159 @@ ipcMain.handle('select-scorm-folder', async () => {
 });
 
 ipcMain.handle('extract-scorm', async (event, zipPath) => {
+  console.log('extract-scorm: Starting extraction');
+  let extractPath = null;
+  
   try {
-    const StreamZip = require('node-stream-zip');
-    const extractPath = path.join(__dirname, 'temp', 'scorm_' + Date.now());
-    
-    // Ensure temp directory exists
     const tempDir = path.join(__dirname, 'temp');
+    extractPath = path.join(tempDir, 'scorm_' + Date.now());
+    console.log(`extract-scorm: Creating temp directory: ${extractPath}`);
+    
+    // BUG FIX: Ensure temp directory exists
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    // BUG FIX: Check available disk space before extraction
+    const stats = fs.statSync(zipPath);
+    const zipSize = stats.size;
+    const estimatedExtractedSize = zipSize * 3; // Rough estimate
+    
+    try {
+      const fsStats = fs.statSync(tempDir);
+      // This is a simplified check - in production you'd want to check actual free space
+      console.log(`Extracting ${formatBytes(zipSize)} ZIP file to ${extractPath}`);
+    } catch (error) {
+      console.warn('Could not check disk space:', error.message);
     }
     
     fs.mkdirSync(extractPath, { recursive: true });
     
     const zip = new StreamZip.async({ file: zipPath });
+    
+    // BUG FIX: Get list of entries first to validate
+    const entries = await zip.entries();
+    const entryCount = Object.keys(entries).length;
+    console.log(`extract-scorm: Found ${entryCount} entries in zip`);
+    
+    if (entryCount === 0) {
+      await zip.close();
+      throw new Error('ZIP file is empty');
+    }
+    
+    if (entryCount > 10000) { // Reasonable limit for SCORM packages
+      await zip.close();
+      throw new Error('ZIP file contains too many files (>10,000)');
+    }
+    
+    // BUG FIX: Extract with progress tracking and size limits
+    let extractedSize = 0;
+    const maxExtractedSize = 500 * 1024 * 1024; // 500MB limit
+    
+    for (const [entryName, entry] of Object.entries(entries)) {
+      // BUG FIX: Validate entry name for security
+      if (entryName.includes('..') || entryName.includes('~')) {
+        console.warn(`Skipping suspicious entry: ${entryName}`);
+        continue;
+      }
+      
+      extractedSize += entry.size || 0;
+      if (extractedSize > maxExtractedSize) {
+        await zip.close();
+        throw new Error('Extracted content would exceed size limit (500MB)');
+      }
+    }
+    
     await zip.extract(null, extractPath);
     await zip.close();
+    console.log('extract-scorm: Extraction complete');
+    
+    // BUG FIX: Register for cleanup tracking
+    if (resourceMonitor) {
+      resourceMonitor.trackExtractedFolder(extractPath);
+    }
+    
+    // BUG FIX: Set up automatic cleanup timer
+    setTimeout(() => {
+      cleanupExtractedFolder(extractPath);
+    }, 24 * 60 * 60 * 1000); // 24 hours
+    
+    monitor.log('INFO', 'SCORM package extracted successfully', {
+      zipPath: path.basename(zipPath),
+      extractPath,
+      fileCount: entryCount,
+      estimatedSize: formatBytes(extractedSize)
+    });
     
     return extractPath;
+    
   } catch (error) {
     console.error('Extraction failed:', error);
+    
+    // BUG FIX: Clean up failed extraction
+    if (extractPath && fs.existsSync(extractPath)) {
+      try {
+        fs.rmSync(extractPath, { recursive: true, force: true });
+      } catch (cleanupError) {
+        console.error('Failed to cleanup failed extraction:', cleanupError);
+      }
+    }
+    
+    monitor.trackError(error, 'extract-scorm');
     return null;
   }
 });
 
 ipcMain.handle('find-scorm-entry', async (event, folderPath) => {
+  console.log(`find-scorm-entry: Searching for entry point in: ${folderPath}`);
   try {
     const manifestPath = path.join(folderPath, 'imsmanifest.xml');
     if (fs.existsSync(manifestPath)) {
+      console.log('find-scorm-entry: Found imsmanifest.xml');
       const manifestContent = fs.readFileSync(manifestPath, 'utf8');
       
+      // Find the resource element defined as a Sharable Content Object (SCO)
+      const scoResourceMatch = manifestContent.match(/<resource[^>]+adlcp:scormtype="sco"[^>]*>/i);
+      if (scoResourceMatch) {
+        console.log('find-scorm-entry: Found SCO resource');
+        const resourceBlock = scoResourceMatch[0];
+        const hrefMatch = resourceBlock.match(/href="([^"]+)"/i);
+        if (hrefMatch && hrefMatch[1]) {
+          const launchFile = hrefMatch[1].split('?')[0];
+          console.log(`find-scorm-entry: SCO entry point: ${launchFile}`);
+          const fullPath = path.join(folderPath, launchFile);
+          if (fs.existsSync(fullPath)) {
+            console.log(`find-scorm-entry: Found SCO entry point at: ${fullPath}`);
+            return fullPath;
+          }
+        }
+      }
+
+      // Fallback for manifests that don't explicitly declare a SCO
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
-      if (launchMatch) {
-        const launchFile = launchMatch[1];
+      if (launchMatch && launchMatch[1]) {
+        console.log('find-scorm-entry: Found fallback href');
+        const launchFile = launchMatch[1].split('?')[0];
+        console.log(`find-scorm-entry: Fallback entry point: ${launchFile}`);
         const fullPath = path.join(folderPath, launchFile);
         if (fs.existsSync(fullPath)) {
+          console.log(`find-scorm-entry: Found fallback entry point at: ${fullPath}`);
           return fullPath;
         }
       }
     }
     
+    console.log('find-scorm-entry: No manifest entry point found, checking common files');
     const commonFiles = ['index.html', 'launch.html', 'start.html', 'main.html'];
     for (const file of commonFiles) {
       const filePath = path.join(folderPath, file);
       if (fs.existsSync(filePath)) {
+        console.log(`find-scorm-entry: Found common file entry point: ${filePath}`);
         return filePath;
       }
     }
     
+    console.log('find-scorm-entry: No entry point found, returning null');
     return null;
   } catch (error) {
     console.error('Error finding SCORM entry:', error);
@@ -1102,7 +1133,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
 
     // BUG FIX: Check file size before reading to prevent memory issues
     const stats = await fs.promises.stat(manifestPath);
-    const maxManifestSize = config?.get('security.maxManifestSizeKB') * 1024 || 1024 * 1024; // 1MB default
+    const maxManifestSize = config.get('security.maxManifestSizeKB') * 1024 || 1024 * 1024; // 1MB default
     
     if (stats.size > maxManifestSize) {
       monitor.log('WARN', 'Manifest file too large', {
