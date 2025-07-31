@@ -1006,11 +1006,40 @@ async function parseManifestStructureXml2js(manifestContent) {
       logger.info('NAVIGATION DEBUG: Organization.item structure:', JSON.stringify(organization.item, null, 2));
     }
 
-    const isFlowOnlyMatch = organization['imsss:sequencing'] && organization['imsss:sequencing']['imsss:controlMode'] &&
-                            organization['imsss:sequencing']['imsss:controlMode'].flow === 'true' &&
-                            organization['imsss:sequencing']['imsss:controlMode'].choice === 'false';
-    const isFlowOnly = !!isFlowOnlyMatch;
-    logger.info('NAVIGATION DEBUG: Flow-only detection:', { isFlowOnly, hasSequencing: !!organization['imsss:sequencing'] });
+    // NAVIGATION FIX: Enhanced flow-only detection for SequencingSimpleRemediation
+    let isFlowOnly = false;
+    
+    // Check organization-level sequencing
+    if (organization['imsss:sequencing'] && organization['imsss:sequencing']['imsss:controlMode']) {
+        const controlMode = organization['imsss:sequencing']['imsss:controlMode'];
+        isFlowOnly = controlMode.flow === 'true' && controlMode.choice === 'false';
+        logger.info('NAVIGATION DEBUG: Organization-level flow-only detection:', {
+            isFlowOnly,
+            flow: controlMode.flow,
+            choice: controlMode.choice
+        });
+    }
+    
+    // Also check if any items have flow-only sequencing (fallback detection)
+    if (!isFlowOnly && organization.item) {
+        const items = Array.isArray(organization.item) ? organization.item : [organization.item];
+        for (const item of items) {
+            if (item['imsss:sequencing'] && item['imsss:sequencing']['imsss:controlMode']) {
+                const controlMode = item['imsss:sequencing']['imsss:controlMode'];
+                if (controlMode.flow === 'true' && controlMode.choice === 'false') {
+                    isFlowOnly = true;
+                    logger.info('NAVIGATION DEBUG: Item-level flow-only detection found:', {
+                        itemTitle: item.title,
+                        flow: controlMode.flow,
+                        choice: controlMode.choice
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    
+    logger.info('NAVIGATION DEBUG: Final flow-only detection:', { isFlowOnly, hasSequencing: !!organization['imsss:sequencing'] });
 
     logger.info('NAVIGATION DEBUG: About to call parseItemsRecursiveXml2js with:', organization.item || []);
     const items = parseItemsRecursiveXml2js(organization.item || []);

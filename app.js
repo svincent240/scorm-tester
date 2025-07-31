@@ -1,5 +1,6 @@
 class EnhancedScormPreview {
     constructor() {
+        
         this.currentSessionId = null;
         this.currentCoursePath = null;
         this.sessionStartTime = null;
@@ -252,6 +253,7 @@ class EnhancedScormPreview {
             
             this.currentSessionId = 'session_' + Date.now();
             this.currentCoursePath = coursePath;
+            this.currentCourseInfo = courseInfo; // NAVIGATION FIX: Store course info for flow-only detection
             this.sessionStartTime = new Date();
             
             await window.electronAPI.scormInitialize(this.currentSessionId);
@@ -856,19 +858,35 @@ class EnhancedScormPreview {
         const frame = this.elements.previewFrame;
         if (!frame || !frame.contentWindow) {
             console.log('No course loaded for navigation');
+            window.electronAPI?.log('warn', 'NAVIGATION FIX: No course loaded for Previous navigation');
             return;
         }
 
+        const isFlowOnly = this.isFlowOnlyCourse();
+        window.electronAPI?.log('info', `NAVIGATION FIX: Previous navigation requested - Flow-only: ${isFlowOnly}`);
+
         try {
-            // Try multiple navigation approaches
-            const success = this.tryNavigationMethods(frame, 'previous');
-            if (!success) {
-                console.log('Previous navigation not available in this course');
-                // Try keyboard navigation as a last resort
-                this.sendKeyboardNavigation(frame, 'ArrowLeft');
+            // SCORM COMPLIANCE FIX: For flow-only courses, let the course handle navigation
+            if (isFlowOnly) {
+                window.electronAPI?.log('info', 'NAVIGATION FIX: Flow-only course - delegating to course content navigation');
+                // Try to find and click the course's own previous button
+                const success = this.tryNavigationMethods(frame, 'previous');
+                if (!success) {
+                    window.electronAPI?.log('info', 'NAVIGATION FIX: No course navigation found - trying keyboard fallback');
+                    this.sendKeyboardNavigation(frame, 'ArrowLeft');
+                }
+            } else {
+                // For choice navigation courses, LMS can control navigation
+                window.electronAPI?.log('info', 'NAVIGATION FIX: Choice navigation course - LMS can control navigation');
+                const success = this.tryNavigationMethods(frame, 'previous');
+                if (!success) {
+                    console.log('Previous navigation not available in this course');
+                    this.sendKeyboardNavigation(frame, 'ArrowLeft');
+                }
             }
         } catch (error) {
             console.log('Navigation error:', error.message);
+            window.electronAPI?.log('error', `NAVIGATION FIX: Previous navigation error: ${error.message}`);
         }
     }
 
@@ -876,19 +894,35 @@ class EnhancedScormPreview {
         const frame = this.elements.previewFrame;
         if (!frame || !frame.contentWindow) {
             console.log('No course loaded for navigation');
+            window.electronAPI?.log('warn', 'NAVIGATION FIX: No course loaded for Next navigation');
             return;
         }
 
+        const isFlowOnly = this.isFlowOnlyCourse();
+        window.electronAPI?.log('info', `NAVIGATION FIX: Next navigation requested - Flow-only: ${isFlowOnly}`);
+
         try {
-            // Try multiple navigation approaches
-            const success = this.tryNavigationMethods(frame, 'next');
-            if (!success) {
-                console.log('Next navigation not available in this course');
-                // Try keyboard navigation as a last resort
-                this.sendKeyboardNavigation(frame, 'ArrowRight');
+            // SCORM COMPLIANCE FIX: For flow-only courses, let the course handle navigation
+            if (isFlowOnly) {
+                window.electronAPI?.log('info', 'NAVIGATION FIX: Flow-only course - delegating to course content navigation');
+                // Try to find and click the course's own next button
+                const success = this.tryNavigationMethods(frame, 'next');
+                if (!success) {
+                    window.electronAPI?.log('info', 'NAVIGATION FIX: No course navigation found - trying keyboard fallback');
+                    this.sendKeyboardNavigation(frame, 'ArrowRight');
+                }
+            } else {
+                // For choice navigation courses, LMS can control navigation
+                window.electronAPI?.log('info', 'NAVIGATION FIX: Choice navigation course - LMS can control navigation');
+                const success = this.tryNavigationMethods(frame, 'next');
+                if (!success) {
+                    console.log('Next navigation not available in this course');
+                    this.sendKeyboardNavigation(frame, 'ArrowRight');
+                }
             }
         } catch (error) {
             console.log('Navigation error:', error.message);
+            window.electronAPI?.log('error', `NAVIGATION FIX: Next navigation error: ${error.message}`);
         }
     }
 
@@ -896,48 +930,102 @@ class EnhancedScormPreview {
         const contentWindow = frame.contentWindow;
         const contentDocument = frame.contentDocument;
         
-        // Method 1: Try Storyline 360 specific navigation
-        if (this.tryStorylineNavigation(contentWindow, direction)) {
-            console.log(`Storyline navigation - ${direction}`);
-            return true;
-        }
+        // NAVIGATION FIX: For flow-only courses, prioritize course content navigation
+        const isFlowOnly = this.isFlowOnlyCourse();
+        
+        if (isFlowOnly) {
+            window.electronAPI.log('info', `NAVIGATION FIX: Flow-only course - trying course content navigation first`);
+            
+            // Method 1: Try generic button selectors FIRST for flow-only courses
+            const buttonSelectors = direction === 'next' ? [
+                'input[type="button"][value*="next" i]', 'button[title*="next" i]', 'button[aria-label*="next" i]',
+                'button[id*="next" i]', 'button[class*="next" i]', '.next-btn', '.btn-next', '.continue', '.forward',
+                'button[title*="continue" i]', 'button[aria-label*="continue" i]',
+                'a[title*="next" i]', '.nav-next', '[data-action="next"]', '[data-nav="next"]', '#nextBtn', '#next-button'
+            ] : [
+                'input[type="button"][value*="previous" i]', 'button[title*="previous" i]', 'button[aria-label*="previous" i]',
+                'button[id*="prev" i]', 'button[class*="prev" i]', '.prev-btn', '.btn-prev', '.previous', '.back',
+                'button[title*="back" i]', 'button[aria-label*="back" i]',
+                'a[title*="previous" i]', '.nav-prev', '[data-action="previous"]', '[data-nav="previous"]', '#prevBtn', '#prev-button'
+            ];
 
-        // Method 2: Try Captivate navigation
-        if (this.tryCaptivateNavigation(contentWindow, direction)) {
-            console.log(`Captivate navigation - ${direction}`);
-            return true;
-        }
-
-        // Method 3: Try generic button selectors (expanded list)
-        const buttonSelectors = direction === 'next' ? [
-            'button[title*="next" i]', 'button[aria-label*="next" i]', 'button[id*="next" i]',
-            'button[class*="next" i]', '.next-btn', '.btn-next', '.continue', '.forward',
-            'button[title*="continue" i]', 'button[aria-label*="continue" i]',
-            'input[type="button"][value*="next" i]', 'a[title*="next" i]', '.nav-next',
-            '[data-action="next"]', '[data-nav="next"]', '#nextBtn', '#next-button'
-        ] : [
-            'button[title*="previous" i]', 'button[aria-label*="previous" i]', 'button[id*="prev" i]',
-            'button[class*="prev" i]', '.prev-btn', '.btn-prev', '.previous', '.back',
-            'button[title*="back" i]', 'button[aria-label*="back" i]',
-            'input[type="button"][value*="previous" i]', 'a[title*="previous" i]', '.nav-prev',
-            '[data-action="previous"]', '[data-nav="previous"]', '#prevBtn', '#prev-button'
-        ];
-
-        for (const selector of buttonSelectors) {
-            try {
-                const button = contentDocument?.querySelector(selector);
-                if (button && !button.disabled && button.offsetParent !== null) {
-                    button.click();
-                    console.log(`Generic navigation - ${direction} via ${selector}`);
-                    return true;
+            for (const selector of buttonSelectors) {
+                try {
+                    const button = contentDocument?.querySelector(selector);
+                    if (button && !button.disabled && button.offsetParent !== null) {
+                        button.click();
+                        console.log(`NAVIGATION FIX: Flow-only course navigation - ${direction} via ${selector}`);
+                        window.electronAPI.log('info', `NAVIGATION FIX: Successfully clicked course button: ${selector}`);
+                        return true;
+                    }
+                } catch (e) {
+                    // Continue to next selector
                 }
-            } catch (e) {
-                // Continue to next selector
             }
-        }
+            
+            // Method 2: Try Storyline navigation for flow-only
+            if (this.tryStorylineNavigation(contentWindow, direction)) {
+                console.log(`NAVIGATION FIX: Flow-only Storyline navigation - ${direction}`);
+                return true;
+            }
 
-        // Method 4: Try SCORM navigation request
-        return this.tryScormNavigation(contentWindow, direction);
+            // Method 3: Try Captivate navigation for flow-only
+            if (this.tryCaptivateNavigation(contentWindow, direction)) {
+                console.log(`NAVIGATION FIX: Flow-only Captivate navigation - ${direction}`);
+                return true;
+            }
+            
+            // DO NOT try SCORM navigation requests for flow-only courses
+            window.electronAPI.log('info', `NAVIGATION FIX: Flow-only course - skipping SCORM navigation requests`);
+            return false;
+            
+        } else {
+            // For choice-enabled courses, use the original order
+            window.electronAPI.log('info', `NAVIGATION FIX: Choice navigation course - using LMS navigation`);
+            
+            // Method 1: Try Storyline 360 specific navigation
+            if (this.tryStorylineNavigation(contentWindow, direction)) {
+                console.log(`Storyline navigation - ${direction}`);
+                return true;
+            }
+
+            // Method 2: Try Captivate navigation
+            if (this.tryCaptivateNavigation(contentWindow, direction)) {
+                console.log(`Captivate navigation - ${direction}`);
+                return true;
+            }
+
+            // Method 3: Try generic button selectors
+            const buttonSelectors = direction === 'next' ? [
+                'button[title*="next" i]', 'button[aria-label*="next" i]', 'button[id*="next" i]',
+                'button[class*="next" i]', '.next-btn', '.btn-next', '.continue', '.forward',
+                'button[title*="continue" i]', 'button[aria-label*="continue" i]',
+                'input[type="button"][value*="next" i]', 'a[title*="next" i]', '.nav-next',
+                '[data-action="next"]', '[data-nav="next"]', '#nextBtn', '#next-button'
+            ] : [
+                'button[title*="previous" i]', 'button[aria-label*="previous" i]', 'button[id*="prev" i]',
+                'button[class*="prev" i]', '.prev-btn', '.btn-prev', '.previous', '.back',
+                'button[title*="back" i]', 'button[aria-label*="back" i]',
+                'input[type="button"][value*="previous" i]', 'a[title*="previous" i]', '.nav-prev',
+                '[data-action="previous"]', '[data-nav="previous"]', '#prevBtn', '#prev-button'
+            ];
+
+            for (const selector of buttonSelectors) {
+                try {
+                    const button = contentDocument?.querySelector(selector);
+                    if (button && !button.disabled && button.offsetParent !== null) {
+                        button.click();
+                        console.log(`Generic navigation - ${direction} via ${selector}`);
+                        return true;
+                    }
+                } catch (e) {
+                    // Continue to next selector
+                }
+            }
+
+            // Method 4: Try SCORM navigation request for choice courses
+            return this.tryScormNavigation(contentWindow, direction);
+        }
     }
 
     tryStorylineNavigation(contentWindow, direction) {
@@ -993,15 +1081,27 @@ class EnhancedScormPreview {
         try {
             const scormApi = contentWindow.API || contentWindow.API_1484_11;
             if (scormApi) {
-                // SCORM 2004 navigation request
-                const navRequest = direction === 'next' ? 'continue' : 'previous';
-                scormApi.SetValue('adl.nav.request', navRequest);
-                scormApi.Commit('');
-                console.log(`SCORM API navigation request - ${navRequest}`);
-                return true;
+                // CRITICAL FIX: Check if this is a flow-only course first
+                const isFlowOnly = this.isFlowOnlyCourse();
+                
+                if (isFlowOnly) {
+                    // For flow-only courses, navigation should be handled by the course content itself
+                    // The LMS navigation buttons should NOT send SCORM navigation requests
+                    console.log(`SCORM Navigation: Flow-only course detected - navigation handled by course content`);
+                    window.electronAPI.log('info', `NAVIGATION FIX: Flow-only course - LMS buttons should not override course navigation`);
+                    return false; // Let the course handle its own navigation
+                } else {
+                    // For choice-enabled courses, LMS can send navigation requests
+                    const navRequest = direction === 'next' ? 'continue' : 'previous';
+                    scormApi.SetValue('adl.nav.request', navRequest);
+                    scormApi.Commit('');
+                    console.log(`SCORM API navigation request - ${navRequest} (choice navigation)`);
+                    window.electronAPI.log('info', `NAVIGATION FIX: Choice navigation - sent ${navRequest} request`);
+                    return true;
+                }
             }
         } catch (e) {
-            // Continue to other methods
+            window.electronAPI.log('error', `NAVIGATION FIX: SCORM navigation error: ${e.message}`);
         }
         return false;
     }
@@ -1023,6 +1123,28 @@ class EnhancedScormPreview {
             console.log(`Keyboard navigation attempted - ${keyCode}`);
         } catch (e) {
             console.log('Keyboard navigation failed:', e.message);
+        }
+    }
+
+    // NAVIGATION FIX: Helper method to detect flow-only courses
+    isFlowOnlyCourse() {
+        try {
+            // Check if we have course structure information
+            const courseInfo = this.currentCourseInfo;
+            if (courseInfo && courseInfo.courseStructure) {
+                const isFlowOnly = courseInfo.courseStructure.isFlowOnly;
+                window.electronAPI.log('info', `NAVIGATION FIX: Flow-only detection from courseStructure: ${isFlowOnly}`);
+                return isFlowOnly;
+            }
+            
+            // Fallback: Check if course outline has flow-only indicators
+            const outlineItems = document.querySelectorAll('.lms-outline-item.flow-only');
+            const hasFlowOnlyItems = outlineItems.length > 0;
+            window.electronAPI.log('info', `NAVIGATION FIX: Flow-only detection from DOM: ${hasFlowOnlyItems}`);
+            return hasFlowOnlyItems;
+        } catch (e) {
+            window.electronAPI.log('warn', `NAVIGATION FIX: Error detecting flow-only course: ${e.message}`);
+            return false; // Default to choice navigation if uncertain
         }
     }
 
@@ -1118,6 +1240,8 @@ class EnhancedScormPreview {
             } else {
                 window.electronAPI.log('info', 'NAVIGATION DEBUG: Using actual course structure with', courseStructure.items.length, 'items');
                 window.electronAPI.log('info', 'NAVIGATION DEBUG: Item titles:', courseStructure.items.map(i => i.title));
+                window.electronAPI.log('info', 'NAVIGATION DEBUG: Item identifiers:', courseStructure.items.map(i => i.identifier));
+                window.electronAPI.log('info', 'NAVIGATION DEBUG: Item visibility:', courseStructure.items.map(i => ({ title: i.title, isVisible: i.isVisible })));
             }
 
             // Determine which structure to use for population
@@ -1125,6 +1249,9 @@ class EnhancedScormPreview {
             window.electronAPI.log('info', 'NAVIGATION DEBUG: Items to populate:', itemsToPopulate.length, 'items');
             window.electronAPI.log('info', 'NAVIGATION DEBUG: Items details:', JSON.stringify(itemsToPopulate, null, 2));
 
+            // Check if this is a flow-only course for styling
+            const isFlowOnly = courseInfo.courseStructure && courseInfo.courseStructure.isFlowOnly;
+            
             // Populate the outline
             itemsToPopulate.forEach((item, index) => {
                 window.electronAPI.log('info', `NAVIGATION DEBUG: Creating outline item ${index + 1}: ${item.title}`);
@@ -1139,16 +1266,33 @@ class EnhancedScormPreview {
                 if (item.completed === true) {
                     outlineItem.classList.add('completed');
                 }
+                
+                // Add flow-only styling if applicable
+                if (isFlowOnly) {
+                    outlineItem.classList.add('flow-only');
+                    outlineItem.title = 'Sequential navigation course - use Previous/Next buttons to navigate';
+                }
 
                 // Use clean titles without icons or generic labels to match real LMS behavior
+                const navigationIcon = isFlowOnly ? '🔒' : '';
                 outlineItem.innerHTML = `
-                    <div class="lms-outline-item-title">${this.escapeHtml(item.title)}</div>
-                    <div class="lms-outline-item-meta">${this.detectItemType(item.title) === 'assessment' ? 'Quiz' : 'Lesson'}</div>
+                    <div class="lms-outline-item-title">${navigationIcon} ${this.escapeHtml(item.title)}</div>
+                    <div class="lms-outline-item-meta">${this.detectItemType(item.title) === 'assessment' ? 'Quiz' : 'Lesson'}${isFlowOnly ? ' • Sequential' : ''}</div>
                 `;
 
                 // Add click handler for navigation
                 outlineItem.addEventListener('click', () => {
-                    this.navigateToOutlineItem(item.id);
+                    window.electronAPI.log('info', `NAVIGATION DEBUG: Outline item clicked - ID: ${item.identifier || item.id}, Title: ${item.title}`);
+                    
+                    if (isFlowOnly) {
+                        // Show user-friendly notification for flow-only courses
+                        this.showNavigationNotification(item.title);
+                        window.electronAPI.log('info', `NAVIGATION DEBUG: Flow-only course - showing notification instead of navigating`);
+                    } else {
+                        // For courses that support choice navigation, attempt navigation
+                        window.electronAPI.log('info', `NAVIGATION DEBUG: Choice navigation supported - attempting navigation`);
+                        this.navigateToOutlineItem(item.identifier || item.id);
+                    }
                 });
 
                 outlineContent.appendChild(outlineItem);
@@ -1179,22 +1323,146 @@ class EnhancedScormPreview {
         return (lowerTitle.includes('quiz') || lowerTitle.includes('test') || lowerTitle.includes('assessment')) ? 'assessment' : 'sco';
     }
 
+    showNavigationNotification(itemTitle) {
+        // Create and show a user-friendly notification
+        const notification = document.createElement('div');
+        notification.className = 'navigation-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">ℹ️</div>
+                <div class="notification-text">
+                    <strong>Sequential Navigation Course</strong><br>
+                    "${itemTitle}" will be available when you reach it in sequence.<br>
+                    Use the Previous/Next buttons to navigate through the course.
+                </div>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        // Add notification styles if not already present
+        if (!document.getElementById('navigationNotificationStyles')) {
+            const styles = document.createElement('style');
+            styles.id = 'navigationNotificationStyles';
+            styles.textContent = `
+                .navigation-notification {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #fff3cd;
+                    border: 1px solid #ffeaa7;
+                    border-radius: 8px;
+                    padding: 0;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                    max-width: 350px;
+                    animation: slideInRight 0.3s ease-out;
+                }
+                
+                .notification-content {
+                    display: flex;
+                    align-items: flex-start;
+                    padding: 15px;
+                    gap: 12px;
+                }
+                
+                .notification-icon {
+                    font-size: 20px;
+                    flex-shrink: 0;
+                }
+                
+                .notification-text {
+                    flex: 1;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: #856404;
+                }
+                
+                .notification-close {
+                    background: none;
+                    border: none;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: #856404;
+                    padding: 0;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                
+                .notification-close:hover {
+                    background: rgba(133, 100, 4, 0.1);
+                    border-radius: 50%;
+                }
+                
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
     navigateToOutlineItem(itemId) {
+        window.electronAPI.log('info', `NAVIGATION DEBUG: navigateToOutlineItem called with itemId: ${itemId}`);
+        
         // Update active state in outline
         const outlineItems = document.querySelectorAll('.lms-outline-item');
+        window.electronAPI.log('info', `NAVIGATION DEBUG: Found ${outlineItems.length} outline items in DOM`);
+        
         outlineItems.forEach(item => {
-            if (item.dataset.itemId === itemId) {
+            const currentItemId = item.dataset.itemId;
+            window.electronAPI.log('info', `NAVIGATION DEBUG: Checking item with dataset.itemId: ${currentItemId}`);
+            
+            if (currentItemId === itemId) {
                 item.classList.add('active');
+                window.electronAPI.log('info', `NAVIGATION DEBUG: Set item ${currentItemId} as active`);
             } else {
                 item.classList.remove('active');
             }
         });
 
-        // For now, just log the navigation
-        console.log(`Navigate to course item: ${itemId}`);
+        // For courses that support choice navigation, implement actual navigation
+        window.electronAPI.log('info', `NAVIGATION DEBUG: Attempting navigation to item: ${itemId}`);
         
-        // This could be expanded to actually navigate within the course
-        // For example, calling Storyline navigation APIs, etc.
+        // Try to navigate using SCORM navigation request
+        const frame = this.elements.previewFrame;
+        if (frame && frame.contentWindow) {
+            try {
+                const contentWindow = frame.contentWindow;
+                const scormApi = contentWindow.API || contentWindow.API_1484_11;
+                
+                if (scormApi) {
+                    // For SCORM 2004, try navigation request
+                    scormApi.SetValue('adl.nav.request', `choice.{target=${itemId}}`);
+                    scormApi.Commit('');
+                    window.electronAPI.log('info', `NAVIGATION DEBUG: SCORM navigation request sent for ${itemId}`);
+                } else {
+                    window.electronAPI.log('warn', `NAVIGATION DEBUG: No SCORM API found in course frame`);
+                }
+            } catch (error) {
+                window.electronAPI.log('error', `NAVIGATION DEBUG: Navigation error: ${error.message}`);
+            }
+        }
+        
+        // CRITICAL FIX: Instantiate the EnhancedScormPreview and assign to window.scormPreview
+        document.addEventListener('DOMContentLoaded', function() {
+            window.scormPreview = new EnhancedScormPreview();
+        });
+        
+        console.log(`Navigate to course item: ${itemId}`);
     }
 
     updateCourseProgress(courseStructure) {
