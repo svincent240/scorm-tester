@@ -1,0 +1,56 @@
+{
+  "name": "scorm-testing-tool",
+  "version": "2.0.0",
+  "description": "A comprehensive Windows app for testing and previewing SCORM courses with full LMS simulation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dev": "electron .",
+    "dev-debug": "set NODE_ENV=development && electron .",
+    "dist": "electron-builder --publish=never",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "build": {
+    "appId": "com.yourcompany.scorm-testing-tool",
+    "productName": "SCORM Testing & Preview Tool",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "node_modules/electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  },
+  "dependencies": {
+    "node-stream-zip": "^1.15.0"
+  },
+  "keywords": [
+    "scorm",
+    "elearning",
+    "lms",
+    "testing",
+    "preview",
+    "education"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
