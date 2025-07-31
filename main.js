@@ -1042,6 +1042,196 @@ function extractTitle(content) {
   return titleMatch ? titleMatch[1].trim() : 'Course';
 }
 
+async function extractCourseContentStructure(coursePath) {
+  try {
+    console.log('Attempting to extract course structure from content files...');
+    
+    // Look for common course structure files
+    const potentialFiles = [
+      'story_content/frame.json',
+      'story_content/story.js', 
+      'story_content/user.js',
+      'data.js',
+      'config.js',
+      'navigation.js'
+    ];
+    
+    for (const file of potentialFiles) {
+      const filePath = path.join(coursePath, file);
+      
+      try {
+        await fs.promises.access(filePath, fs.constants.F_OK);
+        console.log(`Found potential structure file: ${file}`);
+        
+        // Read and parse the file
+        const content = await fs.promises.readFile(filePath, 'utf8');
+        const structure = parseContentFile(content, file);
+        
+        if (structure.length > 0) {
+          console.log(`Extracted ${structure.length} items from ${file}`);
+          return structure;
+        }
+        
+      } catch (err) {
+        // File doesn't exist or can't be read, continue to next
+        continue;
+      }
+    }
+    
+    console.log('No course structure found in content files');
+    return [];
+    
+  } catch (error) {
+    console.error('Error extracting course content structure:', error);
+    return [];
+  }
+}
+
+function parseContentFile(content, filename) {
+  const structure = [];
+  
+  try {
+    if (filename.endsWith('.json')) {
+      // Parse JSON files (like Storyline's frame.json)
+      const data = JSON.parse(content);
+      
+      // Look for slide/page/section information
+      if (data.slides) {
+        data.slides.forEach((slide, index) => {
+          if (slide.title || slide.name) {
+            structure.push({
+              id: slide.id || `slide_${index}`,
+              title: slide.title || slide.name,
+              type: 'sco',
+              completed: false,
+              active: index === 0
+            });
+          }
+        });
+      }
+      
+      // Look for course outline/navigation structure
+      if (data.navigation || data.outline || data.menu) {
+        const nav = data.navigation || data.outline || data.menu;
+        if (Array.isArray(nav)) {
+          nav.forEach((item, index) => {
+            if (item.title || item.name || item.label) {
+              structure.push({
+                id: item.id || `nav_${index}`,
+                title: item.title || item.name || item.label,
+                type: item.type === 'quiz' || item.type === 'test' ? 'assessment' : 'sco',
+                completed: false,
+                active: index === 0
+              });
+            }
+          });
+        }
+      }
+      
+    } else {
+      // Parse JavaScript files for navigation arrays or objects
+      
+      // Look for navigation arrays
+      const navArrayMatch = content.match(/(?:navigation|menu|slides|pages|sections)\s*[=:]\s*\[([\s\S]*?)\]/i);
+      if (navArrayMatch) {
+        // Try to extract titles from the array
+        const titleMatches = navArrayMatch[1].match(/["']([^"']+)["']/g);
+        if (titleMatches) {
+          titleMatches.forEach((titleMatch, index) => {
+            const title = titleMatch.replace(/["']/g, '');
+            if (title.length > 0 && !title.includes('function')) {
+              structure.push({
+                id: `item_${index}`,
+                title: title,
+                type: title.toLowerCase().includes('quiz') || title.toLowerCase().includes('test') ? 'assessment' : 'sco',
+                completed: false,
+                active: index === 0
+              });
+            }
+          });
+        }
+      }
+      
+      // Look for slide titles or page names
+      const titleMatches = content.match(/(?:title|name|label)\s*[=:]\s*["']([^"']+)["']/gi);
+      if (titleMatches && titleMatches.length > 1) {
+        titleMatches.forEach((match, index) => {
+          const titleMatch = match.match(/["']([^"']+)["']/);
+          if (titleMatch) {
+            const title = titleMatch[1];
+            if (title.length > 2 && !title.includes('function')) {
+              structure.push({
+                id: `content_${index}`,
+                title: title,
+                type: title.toLowerCase().includes('quiz') || title.toLowerCase().includes('test') ? 'assessment' : 'sco',
+                completed: false,
+                active: index === 0
+              });
+            }
+          }
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.log(`Error parsing ${filename}:`, error.message);
+  }
+  
+  return structure;
+}
+
+function parseManifestStructure(manifestContent) {
+  try {
+    // Parse the course structure from SCORM manifest
+    const structure = [];
+    
+    // Find the organization section
+    const orgMatch = manifestContent.match(/<organization[^>]*>([\s\S]*?)<\/organization>/i);
+    if (!orgMatch) {
+      console.log('No organization found in manifest');
+      return [];
+    }
+    
+    const orgContent = orgMatch[1];
+    
+    // Find all item elements (including nested ones)
+    const itemRegex = /<item[^>]*identifier=["']([^"']+)["'][^>]*(?:identifierref=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/item>/gi;
+    let match;
+    
+    while ((match = itemRegex.exec(orgContent)) !== null) {
+      const identifier = match[1];
+      const identifierref = match[2];
+      const itemContent = match[3];
+      
+      // Extract title from the item
+      const titleMatch = itemContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : `Item ${identifier}`;
+      
+      // Skip empty or whitespace-only titles and organization-level titles
+      if (title && title.trim() && title.trim() !== '' && !title.includes('SCORM 2004')) {
+        structure.push({
+          id: identifier,
+          identifierref: identifierref,
+          title: title,
+          type: 'sco',
+          completed: false,
+          active: structure.length === 0
+        });
+      }
+    }
+    
+    // For single SCO courses, we need to actually inspect the course content
+    // to find the real navigation structure, not fake it
+    
+    console.log('Parsed course structure from manifest:', structure);
+    return structure;
+    
+  } catch (error) {
+    console.error('Error parsing manifest structure:', error);
+    return [];
+  }
+}
+
 ipcMain.handle('get-course-info', async (event, folderPath) => {
   try {
     // BUG FIX: Validate folder path first
@@ -1205,6 +1395,17 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         manifestSize: stats.size
       });
       
+      // Parse course structure from manifest
+      let courseStructure = parseManifestStructure(manifestContent);
+      
+      // If manifest parsing didn't yield detailed structure, try to extract from course content
+      if (courseStructure.length <= 1) {
+        const contentStructure = await extractCourseContentStructure(normalizedPath);
+        if (contentStructure.length > 0) {
+          courseStructure = contentStructure;
+        }
+      }
+      
       return {
         title,
         version,
@@ -1213,7 +1414,8 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         defaultOrganization: defaultOrg,
         resourceCount,
         launchFile,
-        manifestSize: stats.size
+        manifestSize: stats.size,
+        courseStructure: courseStructure // Add the actual course structure
       };
       
     } catch (parseError) {

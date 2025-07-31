@@ -263,6 +263,8 @@ class EnhancedScormPreview {
             this.enableControls();
             this.setupScormAPI();
             this.updateNavigationStatus(); // Update LMS navigation bar
+            this.populateCourseOutline(courseInfo); // Populate LMS course outline
+            this.showCourseOutlineByDefault(); // Show outline by default like real LMS
             
             // Wait for course to fully load before enabling navigation
             setTimeout(() => {
@@ -1140,6 +1142,289 @@ class EnhancedScormPreview {
         };
 
         checkReady();
+    }
+
+    populateCourseOutline(courseInfo) {
+        const outlineContent = document.getElementById('lmsOutlineContent');
+        if (!outlineContent) return;
+
+        try {
+            // Clear existing content
+            outlineContent.innerHTML = '';
+
+            // Try to get course structure from different sources
+            let courseStructure = this.extractCourseStructure(courseInfo);
+            
+            if (!courseStructure || courseStructure.length === 0) {
+                // Create a default structure for single SCO courses
+                courseStructure = [{
+                    id: 'main',
+                    title: courseInfo.title || 'Main Course',
+                    type: 'sco',
+                    completed: false,
+                    active: true
+                }];
+            }
+
+            // Populate the outline
+            courseStructure.forEach((item, index) => {
+                const outlineItem = document.createElement('div');
+                outlineItem.className = 'lms-outline-item';
+                outlineItem.dataset.itemId = item.id;
+                
+                if (item.active) {
+                    outlineItem.classList.add('active');
+                }
+                if (item.completed) {
+                    outlineItem.classList.add('completed');
+                }
+
+                const icon = item.type === 'assessment' ? '📝' : item.type === 'sco' ? '📄' : '📚';
+                const typeLabel = item.type === 'assessment' ? 'Assessment' : item.type === 'sco' ? 'SCORM Activity' : 'Module';
+                
+                outlineItem.innerHTML = `
+                    <div class="lms-outline-item-title">${icon} ${this.escapeHtml(item.title)}</div>
+                    <div class="lms-outline-item-meta">${typeLabel}</div>
+                `;
+
+                // Add click handler for navigation
+                outlineItem.addEventListener('click', () => {
+                    this.navigateToOutlineItem(item.id);
+                });
+
+                outlineContent.appendChild(outlineItem);
+            });
+
+            // Update progress
+            this.updateCourseProgress(courseStructure);
+
+        } catch (error) {
+            console.log('Error populating course outline:', error);
+            // Fallback display
+            outlineContent.innerHTML = `
+                <div class="lms-outline-item active">
+                    <div class="lms-outline-item-title">${this.escapeHtml(courseInfo.title || 'Course Content')}</div>
+                    <div class="lms-outline-item-meta">SCORM Package</div>
+                </div>
+            `;
+        }
+    }
+
+    extractCourseStructure(courseInfo) {
+        // First, try to use the actual course structure from the SCORM manifest
+        if (courseInfo.courseStructure && courseInfo.courseStructure.length > 0) {
+            console.log('Using actual course structure from manifest:', courseInfo.courseStructure);
+            return courseInfo.courseStructure;
+        }
+        
+        // Fallback: Try to parse from manifest if available
+        if (courseInfo.manifest && courseInfo.manifest.organizations) {
+            const structure = this.parseManifestStructure(courseInfo.manifest);
+            if (structure.length > 0) {
+                console.log('Parsed structure from manifest object:', structure);
+                return structure;
+            }
+        }
+        
+        // Last resort: Create a basic single-item structure
+        console.log('Creating fallback single-item structure');
+        return [{
+            id: 'main',
+            title: courseInfo.title || 'Course Content',
+            type: 'sco',
+            completed: false,
+            active: true
+        }];
+    }
+
+    parseManifestStructure(manifest) {
+        const structure = [];
+        
+        try {
+            // Parse SCORM manifest for course structure
+            const org = manifest.organizations?.organization;
+            if (org && org.item) {
+                const items = Array.isArray(org.item) ? org.item : [org.item];
+                
+                items.forEach((item, index) => {
+                    structure.push({
+                        id: item.identifier || `item_${index}`,
+                        title: item.title || `Module ${index + 1}`,
+                        type: 'sco',
+                        completed: false,
+                        active: index === 0
+                    });
+                });
+            }
+        } catch (error) {
+            console.log('Error parsing manifest structure:', error);
+        }
+
+        return structure;
+    }
+
+    detectCourseModules() {
+        // This will be expanded to detect course modules from the loaded content
+        const structure = [];
+        
+        // For now, we'll detect common course patterns
+        // This could be expanded to parse Storyline slide structure, Captivate modules, etc.
+        
+        return structure;
+    }
+
+    createDefaultStructure(courseInfo) {
+        // Create a realistic LMS-style course structure
+        const title = courseInfo.title || 'Course Content';
+        
+        // Create a typical course structure similar to what you'd see in Litmos
+        // This simulates a real course with multiple sections/modules
+        const structure = [
+            { 
+                id: 'overview', 
+                title: 'Course Overview', 
+                type: 'sco', 
+                completed: false, 
+                active: true 
+            },
+            { 
+                id: 'module1', 
+                title: 'Module 1: Getting Started', 
+                type: 'sco', 
+                completed: false, 
+                active: false 
+            },
+            { 
+                id: 'module2', 
+                title: 'Module 2: Core Concepts', 
+                type: 'sco', 
+                completed: false, 
+                active: false 
+            },
+            { 
+                id: 'module3', 
+                title: 'Module 3: Advanced Topics', 
+                type: 'sco', 
+                completed: false, 
+                active: false 
+            },
+            { 
+                id: 'assessment', 
+                title: 'Final Assessment', 
+                type: 'assessment', 
+                completed: false, 
+                active: false 
+            },
+            { 
+                id: 'conclusion', 
+                title: 'Course Conclusion', 
+                type: 'sco', 
+                completed: false, 
+                active: false 
+            }
+        ];
+
+        // For Storyline courses, customize the structure
+        if (title.includes('SL360') || title.includes('Storyline')) {
+            return [
+                { 
+                    id: 'slide1', 
+                    title: 'Introduction Slide', 
+                    type: 'sco', 
+                    completed: false, 
+                    active: true 
+                },
+                { 
+                    id: 'slide2', 
+                    title: 'Content Slides', 
+                    type: 'sco', 
+                    completed: false, 
+                    active: false 
+                },
+                { 
+                    id: 'slide3', 
+                    title: 'Interactive Activities', 
+                    type: 'sco', 
+                    completed: false, 
+                    active: false 
+                },
+                { 
+                    id: 'slide4', 
+                    title: 'Knowledge Check', 
+                    type: 'assessment', 
+                    completed: false, 
+                    active: false 
+                },
+                { 
+                    id: 'slide5', 
+                    title: 'Summary & Resources', 
+                    type: 'sco', 
+                    completed: false, 
+                    active: false 
+                }
+            ];
+        }
+
+        // Always return the multi-module structure for better LMS simulation
+        // Real LMS environments typically show course outline even for single SCO packages
+        return structure;
+    }
+
+    navigateToOutlineItem(itemId) {
+        // Update active state in outline
+        const outlineItems = document.querySelectorAll('.lms-outline-item');
+        outlineItems.forEach(item => {
+            if (item.dataset.itemId === itemId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        // For now, just log the navigation
+        console.log(`Navigate to course item: ${itemId}`);
+        
+        // This could be expanded to actually navigate within the course
+        // For example, calling Storyline navigation APIs, etc.
+    }
+
+    updateCourseProgress(courseStructure) {
+        const totalItems = courseStructure.length;
+        const completedItems = courseStructure.filter(item => item.completed).length;
+        const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+        const progressFill = document.getElementById('lmsProgressFill');
+        const progressText = document.getElementById('lmsProgressText');
+
+        if (progressFill) {
+            progressFill.style.width = `${progressPercent}%`;
+            progressFill.textContent = `${progressPercent}%`;
+        }
+
+        if (progressText) {
+            progressText.textContent = `${completedItems} of ${totalItems} completed`;
+        }
+    }
+
+    escapeHtml(unsafe) {
+        if (typeof unsafe !== 'string') return '';
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    showCourseOutlineByDefault() {
+        // Show the course outline by default when course loads (like real LMS)
+        const lmsCourseOutline = document.getElementById('lmsCourseOutline');
+        const lmsNavMenu = document.getElementById('lmsNavMenu');
+        
+        if (lmsCourseOutline && lmsNavMenu) {
+            lmsCourseOutline.classList.add('show');
+            lmsNavMenu.textContent = '✕ Close';
+        }
     }
 }
 
