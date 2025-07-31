@@ -46,24 +46,102 @@
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
-            display: grid;
-            grid-template-columns: 1fr 300px;
+            display: flex;
+            flex-direction: column;
             min-height: 700px;
         }
 
+        .lms-navigation-bar {
+            background: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .lms-nav-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .lms-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lms-nav-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .lms-nav-button:hover {
+            background: #2980b9;
+        }
+
+        .lms-nav-button:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+
+        .lms-nav-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .lms-nav-status {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .course-container {
+            display: flex;
+            flex: 1;
+        }
+
         .course-panel {
+            flex: 1;
             display: flex;
             flex-direction: column;
         }
 
-        .toolbar {
+        .hidden-controls {
             background: #f8f9fa;
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #e9ecef;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
+            display: none;
+        }
+
+        .show-controls .hidden-controls {
+            display: block;
+        }
+
+        .dev-mode-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.1);
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            z-index: 1000;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+
+        .dev-mode-toggle:hover {
+            opacity: 0.8;
         }
 
         .btn {
@@ -175,8 +253,13 @@
         .sidebar {
             background: #f8f9fa;
             border-left: 1px solid #e9ecef;
-            display: flex;
+            display: none;
             flex-direction: column;
+            width: 300px;
+        }
+
+        .show-controls .sidebar {
+            display: flex;
         }
 
         .sidebar-header {
@@ -581,15 +664,15 @@
         }
 
         @media (max-width: 1200px) {
-            .main-content {
-                grid-template-columns: 1fr;
-                grid-template-rows: 1fr auto;
+            .course-container {
+                flex-direction: column;
             }
             
-            .sidebar {
+            .show-controls .sidebar {
                 border-left: none;
                 border-top: 1px solid #e9ecef;
                 max-height: 300px;
+                width: 100%;
             }
         }
 
@@ -613,44 +696,59 @@
         </div>
 
         <div class="main-content">
-            <div class="course-panel">
-                <div class="toolbar">
-                    <button class="btn" id="loadZipBtn">
-                        📦 Load SCORM Package
-                    </button>
-                    
-                    <button class="btn btn-secondary" id="loadFolderBtn">
-                        📁 Load Folder
-                    </button>
-
-                    <select class="btn" id="lmsProfileSelect" style="background: #17a2b8; margin: 0 10px;">
-                        <option value="">Choose LMS Profile...</option>
-                        <option value="litmos">Litmos LMS</option>
-                        <option value="moodle">Moodle</option>
-                        <option value="scormcloud">SCORM Cloud</option>
-                        <option value="generic">Generic LMS</option>
-                    </select>
-                    
-                    <button class="btn btn-success" id="resetSessionBtn" disabled>
-                        🔄 Reset Session
-                    </button>
-                    
-                    <button class="btn btn-warning" id="suspendBtn" disabled>
-                        ⏸️ Suspend
-                    </button>
-                    
-                    <button class="btn btn-danger" id="disconnectBtn" disabled>
-                        🔌 Disconnect
-                    </button>
-                    
-                    <button class="btn btn-secondary" id="validateBtn" disabled>
-                        ✅ Validate SCORM
-                    </button>
-                    
-                    <button class="btn btn-secondary" id="fullscreenBtn" disabled>
-                        ⛶ Fullscreen
-                    </button>
+            <!-- LMS-style Navigation Bar -->
+            <div class="lms-navigation-bar">
+                <div class="lms-nav-left">
+                    <div class="lms-nav-title" id="lmsNavTitle">Learning Management System</div>
+                    <div class="lms-nav-status" id="lmsNavStatus">No course loaded</div>
                 </div>
+                <div class="lms-nav-right">
+                    <button class="lms-nav-button" id="lmsNavPrev" disabled>← Previous</button>
+                    <button class="lms-nav-button" id="lmsNavNext" disabled>Next →</button>
+                    <button class="lms-nav-button" id="lmsNavMenu">☰ Menu</button>
+                </div>
+            </div>
+
+            <div class="course-container">
+                <div class="course-panel">
+                    <!-- Hidden developer controls -->
+                    <div class="hidden-controls">
+                        <button class="btn" id="loadZipBtn">
+                            📦 Load SCORM Package
+                        </button>
+                        
+                        <button class="btn btn-secondary" id="loadFolderBtn">
+                            📁 Load Folder
+                        </button>
+
+                        <select class="btn" id="lmsProfileSelect" style="background: #17a2b8; margin: 0 10px;">
+                            <option value="">Choose LMS Profile...</option>
+                            <option value="litmos">Litmos LMS</option>
+                            <option value="moodle">Moodle</option>
+                            <option value="scormcloud">SCORM Cloud</option>
+                            <option value="generic">Generic LMS</option>
+                        </select>
+                        
+                        <button class="btn btn-success" id="resetSessionBtn" disabled>
+                            🔄 Reset Session
+                        </button>
+                        
+                        <button class="btn btn-warning" id="suspendBtn" disabled>
+                            ⏸️ Suspend
+                        </button>
+                        
+                        <button class="btn btn-danger" id="disconnectBtn" disabled>
+                            🔌 Disconnect
+                        </button>
+                        
+                        <button class="btn btn-secondary" id="validateBtn" disabled>
+                            ✅ Validate SCORM
+                        </button>
+                        
+                        <button class="btn btn-secondary" id="fullscreenBtn" disabled>
+                            ⛶ Fullscreen
+                        </button>
+                    </div>
 
                 <div class="error" id="error"></div>
 
@@ -662,31 +760,32 @@
                     <p><strong>Status:</strong> <span class="status-indicator connected" id="connectionStatus"></span><span id="connectionText">Connected</span></p>
                 </div>
 
-                <div class="course-navigation-panel" id="courseNavigationPanel" style="display: none;">
-                    <div class="nav-panel-header">
-                        <h4>📚 Course Contents</h4>
-                        <div class="nav-panel-info" id="navPanelInfo"></div>
+                    <div class="course-navigation-panel" id="courseNavigationPanel" style="display: none;">
+                        <div class="nav-panel-header">
+                            <h4>📚 Course Contents</h4>
+                            <div class="nav-panel-info" id="navPanelInfo"></div>
+                        </div>
+                        <div class="nav-panel-content" id="navPanelContent">
+                            <div id="mainCourseNavigationTree">No course loaded</div>
+                        </div>
                     </div>
-                    <div class="nav-panel-content" id="navPanelContent">
-                        <div id="mainCourseNavigationTree">No course loaded</div>
+
+                    <div class="preview-area">
+                        <div class="loading" id="loading">
+                            <div class="spinner"></div>
+                            <p>Loading SCORM course...</p>
+                        </div>
+
+                        <iframe class="preview-frame" id="previewFrame" style="display: none;"></iframe>
+
+                        <div class="no-content" id="noContent">
+                            <div class="icon">🎓</div>
+                            <h3>No Course Loaded</h3>
+                            <p>Click "Load SCORM Package" in developer mode to begin testing.</p>
+                            <p style="font-size: 12px; margin-top: 10px; opacity: 0.7;">Toggle developer controls with the button in the top-right corner</p>
+                        </div>
                     </div>
                 </div>
-
-                <div class="preview-area">
-                    <div class="loading" id="loading">
-                        <div class="spinner"></div>
-                        <p>Loading SCORM course...</p>
-                    </div>
-
-                    <iframe class="preview-frame" id="previewFrame" style="display: none;"></iframe>
-
-                    <div class="no-content" id="noContent">
-                        <div class="icon">🎓</div>
-                        <h3>No Course Loaded</h3>
-                        <p>Load a SCORM package to begin testing with full LMS simulation.</p>
-                    </div>
-                </div>
-            </div>
 
             <div class="sidebar">
                 <div class="sidebar-header">
@@ -809,6 +908,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- Developer Mode Toggle -->
+        <button class="dev-mode-toggle" id="devModeToggle" onclick="toggleDevMode()">DEV</button>
     </div>
 
     <script>
@@ -822,6 +924,52 @@
                 toggle.textContent = isCollapsed ? '▼' : '▲';
             }
         }
+
+        function toggleDevMode() {
+            const container = document.querySelector('.container');
+            const button = document.getElementById('devModeToggle');
+            
+            if (container.classList.contains('show-controls')) {
+                container.classList.remove('show-controls');
+                button.textContent = 'DEV';
+                button.style.opacity = '0.3';
+            } else {
+                container.classList.add('show-controls');
+                button.textContent = 'HIDE';
+                button.style.opacity = '0.8';
+            }
+        }
+
+        // LMS Navigation handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            const lmsNavMenu = document.getElementById('lmsNavMenu');
+            const lmsNavPrev = document.getElementById('lmsNavPrev');
+            const lmsNavNext = document.getElementById('lmsNavNext');
+            
+            lmsNavMenu.addEventListener('click', function() {
+                const sidebar = document.querySelector('.sidebar');
+                const container = document.querySelector('.container');
+                
+                if (container.classList.contains('show-controls')) {
+                    container.classList.remove('show-controls');
+                } else {
+                    container.classList.add('show-controls');
+                }
+            });
+            
+            // Connect to SCORM navigation functionality
+            lmsNavPrev.addEventListener('click', function() {
+                if (window.scormPreview) {
+                    window.scormPreview.navigatePrevious();
+                }
+            });
+            
+            lmsNavNext.addEventListener('click', function() {
+                if (window.scormPreview) {
+                    window.scormPreview.navigateNext();
+                }
+            });
+        });
     </script>
     <script src="app.js" defer></script>
 </body>

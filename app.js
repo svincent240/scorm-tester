@@ -262,6 +262,12 @@ class EnhancedScormPreview {
             this.displayCourseNavigation(courseInfo);
             this.enableControls();
             this.setupScormAPI();
+            this.updateNavigationStatus(); // Update LMS navigation bar
+            
+            // Wait for course to fully load before enabling navigation
+            setTimeout(() => {
+                this.waitForCourseReady();
+            }, 2000);
             
             this.logApiCall('system', `New session initialized: ${this.currentSessionId}`);
 
@@ -310,13 +316,13 @@ class EnhancedScormPreview {
                 this.buildSimpleDebugNavigation(courseInfo);
             }
             
-            // Show the main navigation panel
-            this.elements.courseNavigationPanel.style.display = 'block';
+            // Hide the main navigation panel by default (only show in dev mode)
+            this.elements.courseNavigationPanel.style.display = 'none';
         } catch (error) {
             console.warn('Failed to get course navigation structure:', error);
             this.buildSimpleMainNavigation(courseInfo);
             this.buildSimpleDebugNavigation(courseInfo);
-            this.elements.courseNavigationPanel.style.display = 'block';
+            this.elements.courseNavigationPanel.style.display = 'none';
         }
     }
 
@@ -894,6 +900,247 @@ class EnhancedScormPreview {
         this.elements.error.classList.add('show');
     }
     clearError() { this.elements.error.classList.remove('show'); }
+
+    // LMS Navigation functionality
+    navigatePrevious() {
+        const frame = this.elements.previewFrame;
+        if (!frame || !frame.contentWindow) {
+            console.log('No course loaded for navigation');
+            return;
+        }
+
+        try {
+            // Try multiple navigation approaches
+            const success = this.tryNavigationMethods(frame, 'previous');
+            if (!success) {
+                console.log('Previous navigation not available in this course');
+                // Try keyboard navigation as a last resort
+                this.sendKeyboardNavigation(frame, 'ArrowLeft');
+            }
+        } catch (error) {
+            console.log('Navigation error:', error.message);
+        }
+    }
+
+    navigateNext() {
+        const frame = this.elements.previewFrame;
+        if (!frame || !frame.contentWindow) {
+            console.log('No course loaded for navigation');
+            return;
+        }
+
+        try {
+            // Try multiple navigation approaches
+            const success = this.tryNavigationMethods(frame, 'next');
+            if (!success) {
+                console.log('Next navigation not available in this course');
+                // Try keyboard navigation as a last resort
+                this.sendKeyboardNavigation(frame, 'ArrowRight');
+            }
+        } catch (error) {
+            console.log('Navigation error:', error.message);
+        }
+    }
+
+    tryNavigationMethods(frame, direction) {
+        const contentWindow = frame.contentWindow;
+        const contentDocument = frame.contentDocument;
+        
+        // Method 1: Try Storyline 360 specific navigation
+        if (this.tryStorylineNavigation(contentWindow, direction)) {
+            console.log(`Storyline navigation - ${direction}`);
+            return true;
+        }
+
+        // Method 2: Try Captivate navigation
+        if (this.tryCaptivateNavigation(contentWindow, direction)) {
+            console.log(`Captivate navigation - ${direction}`);
+            return true;
+        }
+
+        // Method 3: Try generic button selectors (expanded list)
+        const buttonSelectors = direction === 'next' ? [
+            'button[title*="next" i]', 'button[aria-label*="next" i]', 'button[id*="next" i]',
+            'button[class*="next" i]', '.next-btn', '.btn-next', '.continue', '.forward',
+            'button[title*="continue" i]', 'button[aria-label*="continue" i]',
+            'input[type="button"][value*="next" i]', 'a[title*="next" i]', '.nav-next',
+            '[data-action="next"]', '[data-nav="next"]', '#nextBtn', '#next-button'
+        ] : [
+            'button[title*="previous" i]', 'button[aria-label*="previous" i]', 'button[id*="prev" i]',
+            'button[class*="prev" i]', '.prev-btn', '.btn-prev', '.previous', '.back',
+            'button[title*="back" i]', 'button[aria-label*="back" i]',
+            'input[type="button"][value*="previous" i]', 'a[title*="previous" i]', '.nav-prev',
+            '[data-action="previous"]', '[data-nav="previous"]', '#prevBtn', '#prev-button'
+        ];
+
+        for (const selector of buttonSelectors) {
+            try {
+                const button = contentDocument?.querySelector(selector);
+                if (button && !button.disabled && button.offsetParent !== null) {
+                    button.click();
+                    console.log(`Generic navigation - ${direction} via ${selector}`);
+                    return true;
+                }
+            } catch (e) {
+                // Continue to next selector
+            }
+        }
+
+        // Method 4: Try SCORM navigation request
+        return this.tryScormNavigation(contentWindow, direction);
+    }
+
+    tryStorylineNavigation(contentWindow, direction) {
+        try {
+            // Storyline 360 courses often have global navigation functions
+            if (contentWindow.parent && contentWindow.parent.GetPlayer) {
+                const player = contentWindow.parent.GetPlayer();
+                if (direction === 'next' && player.NextSlide) {
+                    player.NextSlide();
+                    return true;
+                } else if (direction === 'previous' && player.PrevSlide) {
+                    player.PrevSlide();
+                    return true;
+                }
+            }
+
+            // Try Storyline's window.parent approach
+            if (contentWindow.GetPlayer) {
+                const player = contentWindow.GetPlayer();
+                if (direction === 'next' && player.NextSlide) {
+                    player.NextSlide();
+                    return true;
+                } else if (direction === 'previous' && player.PrevSlide) {
+                    player.PrevSlide();
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Continue to other methods
+        }
+        return false;
+    }
+
+    tryCaptivateNavigation(contentWindow, direction) {
+        try {
+            // Adobe Captivate navigation
+            if (contentWindow.cpAPIInterface) {
+                if (direction === 'next') {
+                    contentWindow.cpAPIInterface.next();
+                    return true;
+                } else if (direction === 'previous') {
+                    contentWindow.cpAPIInterface.previous();
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Continue to other methods
+        }
+        return false;
+    }
+
+    tryScormNavigation(contentWindow, direction) {
+        try {
+            const scormApi = contentWindow.API || contentWindow.API_1484_11;
+            if (scormApi) {
+                // SCORM 2004 navigation request
+                const navRequest = direction === 'next' ? 'continue' : 'previous';
+                scormApi.SetValue('adl.nav.request', navRequest);
+                scormApi.Commit('');
+                console.log(`SCORM API navigation request - ${navRequest}`);
+                return true;
+            }
+        } catch (e) {
+            // Continue to other methods
+        }
+        return false;
+    }
+
+    sendKeyboardNavigation(frame, keyCode) {
+        try {
+            const contentDocument = frame.contentDocument;
+            const contentWindow = frame.contentWindow;
+            
+            // Send keyboard event to the course
+            const event = new contentWindow.KeyboardEvent('keydown', {
+                key: keyCode,
+                code: keyCode,
+                bubbles: true,
+                cancelable: true
+            });
+            
+            contentDocument.dispatchEvent(event);
+            console.log(`Keyboard navigation attempted - ${keyCode}`);
+        } catch (e) {
+            console.log('Keyboard navigation failed:', e.message);
+        }
+    }
+
+    updateNavigationStatus() {
+        const lmsNavTitle = document.getElementById('lmsNavTitle');
+        const lmsNavStatus = document.getElementById('lmsNavStatus');
+        const lmsNavPrev = document.getElementById('lmsNavPrev');
+        const lmsNavNext = document.getElementById('lmsNavNext');
+
+        if (this.currentCoursePath) {
+            lmsNavTitle.textContent = 'SCORM Course Player';
+            lmsNavStatus.textContent = 'Course loaded and active';
+            lmsNavPrev.disabled = false;
+            lmsNavNext.disabled = false;
+        } else {
+            lmsNavTitle.textContent = 'Learning Management System';
+            lmsNavStatus.textContent = 'No course loaded';
+            lmsNavPrev.disabled = true;
+            lmsNavNext.disabled = true;
+        }
+    }
+
+    waitForCourseReady() {
+        const frame = this.elements.previewFrame;
+        if (!frame || !frame.contentWindow) return;
+
+        const checkReady = (attempts = 0) => {
+            if (attempts > 20) return; // Stop after 20 attempts (10 seconds)
+
+            try {
+                const contentWindow = frame.contentWindow;
+                
+                // Check if Storyline player is ready
+                if (contentWindow.GetPlayer || (contentWindow.parent && contentWindow.parent.GetPlayer)) {
+                    console.log('Storyline course detected and ready for navigation');
+                    const lmsNavStatus = document.getElementById('lmsNavStatus');
+                    lmsNavStatus.textContent = 'Storyline course ready';
+                    return;
+                }
+
+                // Check if Captivate is ready
+                if (contentWindow.cpAPIInterface) {
+                    console.log('Captivate course detected and ready for navigation');
+                    const lmsNavStatus = document.getElementById('lmsNavStatus');
+                    lmsNavStatus.textContent = 'Captivate course ready';
+                    return;
+                }
+
+                // Check if course has navigation buttons loaded
+                const contentDocument = frame.contentDocument;
+                const hasNavButtons = contentDocument?.querySelector('button, input[type="button"], .btn, [role="button"]');
+                if (hasNavButtons) {
+                    console.log('Course with navigation buttons detected');
+                    const lmsNavStatus = document.getElementById('lmsNavStatus');
+                    lmsNavStatus.textContent = 'Course navigation ready';
+                    return;
+                }
+
+                // Wait and try again
+                setTimeout(() => checkReady(attempts + 1), 500);
+            } catch (e) {
+                // Wait and try again
+                setTimeout(() => checkReady(attempts + 1), 500);
+            }
+        };
+
+        checkReady();
+    }
 }
 
 async function runTestScenario(scenarioType) {
@@ -956,5 +1203,6 @@ function toggleSection(sectionId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.scormApp = new EnhancedScormPreview();
+    window.scormPreview = new EnhancedScormPreview();
+    window.scormApp = window.scormPreview; // Keep backward compatibility
 });
