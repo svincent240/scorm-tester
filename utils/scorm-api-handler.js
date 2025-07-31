@@ -162,6 +162,7 @@ class ScormApiHandler {
       this.lastError = '301'; // General failure
     }
 
+    console.log(`LMSGetValue: Requested element: ${element}, Returned value: ${value}`); // Added log
     this.logger('get', 'LMSGetValue', element, value);
     
     // BUG FIX: Trigger background sync for fresh data (non-blocking)

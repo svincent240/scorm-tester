@@ -3,8 +3,10 @@ const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron')
 const path = require('path');
 const fs = require('fs');
 const StreamZip = require('node-stream-zip');
+const PathUtils = require('./utils/path-utils.js');
 const { ProductionConfig } = require('./config/production.js');
 const { PerformanceMonitor, ResourceMonitor } = require('./monitoring/index.js');
+const ScormApiHandler = require('./utils/scorm-api-handler.js');
 
 const config = new ProductionConfig();
 const monitor = new PerformanceMonitor();
@@ -170,6 +172,12 @@ function createMenu() {
           label: 'Reset Zoom',
           accelerator: 'CmdOrCtrl+0',
           click: () => mainWindow.webContents.send('menu-zoom', 'reset')
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => mainWindow.webContents.toggleDevTools()
         }
       ]
     }
@@ -195,340 +203,110 @@ app.on('activate', () => {
 
 // SCORM API handlers
 ipcMain.handle('scorm-initialize', (event, sessionId) => {
-  const session = {
-    id: sessionId,
-    startTime: new Date(),
-    initialized: true,
-    data: {
-      // SCORM 1.2 data model
-      'cmi.core.student_id': 'test_user_001',
-      'cmi.core.student_name': 'Test User',
-      'cmi.core.lesson_location': '',
-      'cmi.core.credit': 'credit',
-      'cmi.core.lesson_status': 'incomplete',
-      'cmi.core.entry': 'ab-initio',
-      'cmi.core.score.raw': '',
-      'cmi.core.score.max': '',
-      'cmi.core.score.min': '',
-      'cmi.core.total_time': '0000:00:00.00',
-      'cmi.core.lesson_mode': 'normal',
-      'cmi.core.exit': '',
-      'cmi.core.session_time': '0000:00:00.00',
-      'cmi.suspend_data': '',
-      'cmi.launch_data': '',
-      'cmi.comments': '',
-      'cmi.comments_from_lms': 'Welcome to the course!',
-      
-      // SCORM 2004 equivalents
-      'cmi.learner_id': 'test_user_001',
-      'cmi.learner_name': 'Test User',
-      'cmi.location': '',
-      'cmi.completion_status': 'incomplete',
-      'cmi.success_status': 'unknown',
-      'cmi.score.scaled': '',
-      'cmi.score.raw': '',
-      'cmi.score.min': '',
-      'cmi.score.max': '',
-      'cmi.progress_measure': '',
-      'cmi.mode': 'normal',
-      'cmi.exit': '',
-      'cmi.session_time': 'PT0H0M0S',
-      'cmi.total_time': 'PT0H0M0S',
-      'cmi.suspend_data': '',
-      'cmi.launch_data': '',
-      'cmi.learner_preference.audio_level': '1',
-      'cmi.learner_preference.language': 'en-US',
-      'cmi.learner_preference.delivery_speed': '1',
-      'cmi.learner_preference.audio_captioning': '0'
-    },
-    interactions: [],
-    objectives: [],
-    apiCalls: [],
-    errors: [],
-    lmsProfile: null
+  let session = scormSessions.get(sessionId);
+  if (!session) {
+    session = {
+      id: sessionId,
+      startTime: new Date(),
+      apiCalls: [],
+      errors: [],
+      lmsProfile: null,
+      scormApi: null, // Will store the ScormApiHandler instance
+      data: {} // ScormApiHandler will initialize this
+    };
+    scormSessions.set(sessionId, session);
+  }
+
+  // Create a logger function for ScormApiHandler
+  const logger = (type, method, parameter, value, errorCode = '0') => {
+    const logEntry = {
+      timestamp: new Date(),
+      method: method,
+      parameter: parameter,
+      value: value,
+      errorCode: errorCode
+    };
+    session.apiCalls.push(logEntry); // Store in session for debug window
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scorm-api-log', {
+        method: method,
+        element: parameter,
+        value: value,
+        errorCode: errorCode
+      });
+    }
+    if (debugWindow && !debugWindow.isDestroyed()) {
+      debugWindow.webContents.send('api-call', {
+        sessionId,
+        method,
+        parameter,
+        value,
+        errorCode
+      });
+    }
   };
-  
-  scormSessions.set(sessionId, session);
-  
+
+  // Instantiate ScormApiHandler for this session
+  session.scormApi = new ScormApiHandler(
+    {
+      // These functions are called by ScormApiHandler for its internal async operations
+      scormGetValue: async (sId, el) => {
+        const currentSession = scormSessions.get(sId);
+        if (currentSession) {
+          let value = currentSession.data[el] || '';
+          let errorCode = '0';
+          if (value === '' && !currentSession.data.hasOwnProperty(el)) {
+            errorCode = '401'; // Undefined Data Model
+          }
+          return { success: errorCode === '0', value, errorCode };
+        }
+        return { success: false, value: '', errorCode: '301' };
+      },
+      scormSetValue: async (sId, el, val) => {
+        const currentSession = scormSessions.get(sId);
+        if (currentSession) {
+          currentSession.data[el] = val;
+          return { success: true, errorCode: '0' };
+        }
+        return { success: false, errorCode: '351' };
+      },
+      scormCommit: async (sId) => {
+        // Simulate commit logic here if needed, or just return success
+        return { success: true, errorCode: '0' };
+      },
+      scormTerminate: async (sId) => {
+        // Simulate terminate logic here if needed, or just return success
+        return { success: true, errorCode: '0' };
+      },
+    },
+    sessionId,
+    logger
+  );
+
+  const initResult = session.scormApi.LMSInitialize(''); // Initialize the SCORM API handler
+
   // Send to debug window if open
   if (debugWindow && !debugWindow.isDestroyed()) {
     debugWindow.webContents.send('session-initialized', session);
   }
-  
-  return { success: true, errorCode: '0' };
+
+  return { success: initResult === 'true', errorCode: session.scormApi.LMSGetLastError() };
 });
 
-ipcMain.handle('scorm-get-value', (event, sessionId, element) => {
-  const session = scormSessions.get(sessionId);
-  if (!session) {
-    return { success: false, value: '', errorCode: '301' }; // General Get Failure
-  }
-  
-  let value = '';
-  let errorCode = '0';
-  
-  try {
-    // Handle array elements (interactions, objectives)
-    if (element.startsWith('cmi.interactions.')) {
-      const match = element.match(/cmi\.interactions\.(\d+)\.(.+)/);
-      if (match) {
-        const index = parseInt(match[1]);
-        const property = match[2];
-        if (session.interactions[index] && session.interactions[index][property] !== undefined) {
-          value = session.interactions[index][property].toString();
-        }
-      } else if (element === 'cmi.interactions._count') {
-        value = session.interactions.length.toString();
-      }
-    } else if (element.startsWith('cmi.objectives.')) {
-      const match = element.match(/cmi\.objectives\.(\d+)\.(.+)/);
-      if (match) {
-        const index = parseInt(match[1]);
-        const property = match[2];
-        if (session.objectives[index] && session.objectives[index][property] !== undefined) {
-          value = session.objectives[index][property].toString();
-        }
-      } else if (element === 'cmi.objectives._count') {
-        value = session.objectives.length.toString();
-      }
-    } else {
-      value = session.data[element] || '';
-      if (value === '' && !session.data.hasOwnProperty(element)) {
-        errorCode = '401'; // Undefined Data Model
-      }
-    }
-  } catch (error) {
-    console.error('Error in scorm-get-value:', error);
-    errorCode = '301'; // General Get Failure
-  }
-  
-  // Log API call
-  session.apiCalls.push({
-    timestamp: new Date(),
-    method: 'GetValue',
-    parameter: element,
-    value: value,
-    errorCode: errorCode
-  });
-  
-  // Send to debug window (with safety check)
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    debugWindow.webContents.send('api-call', {
-      sessionId,
-      method: 'GetValue',
-      parameter: element,
-      value,
-      errorCode
-    });
-  }
-  
-  return { success: errorCode === '0', value, errorCode };
-});
 
-// FIXED: Proper scorm-set-value with LMS validation
 ipcMain.handle('scorm-set-value', (event, sessionId, element, value) => {
   const session = scormSessions.get(sessionId);
-  if (!session) {
+  if (!session || !session.scormApi) {
     return { success: false, errorCode: '301' };
   }
-  
-  let errorCode = '0';
-  
-  try {
-    // LMS-specific validation FIRST
-    if (session.lmsProfile) {
-      const profile = session.lmsProfile;
-      
-      // Check suspend data length limits
-      if (element === 'cmi.suspend_data' && profile.settings.maxSuspendDataLength) {
-        if (value && value.length > profile.settings.maxSuspendDataLength) {
-          errorCode = '405'; // Data too long
-          session.errors.push({
-            timestamp: new Date(),
-            error: `Suspend data exceeds ${profile.name} limit of ${profile.settings.maxSuspendDataLength} characters`,
-            element,
-            value: value.substring(0, 50) + '...'
-          });
-        }
-      }
-
-      // Strict validation for certain LMS
-      if (profile.settings.strictValidation) {
-        if (element === 'cmi.core.score.raw' || element === 'cmi.score.raw') {
-          const score = parseFloat(value);
-          if (isNaN(score) || score < 0 || score > 100) {
-            errorCode = '405';
-          }
-        }
-      }
-    }
-
-    // Continue with main validation if no LMS errors
-    if (errorCode === '0') {
-      if (element.startsWith('cmi.interactions.')) {
-        const match = element.match(/cmi\.interactions\.(\d+)\.(.+)/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-          
-          // Initialize interaction if it doesn't exist
-          if (!session.interactions[index]) {
-            session.interactions[index] = {
-              id: '',
-              type: '',
-              timestamp: '',
-              correct_responses: [],
-              weighting: '',
-              student_response: '',
-              result: '',
-              latency: ''
-            };
-          }
-          
-          session.interactions[index][property] = value;
-        }
-      } else if (element.startsWith('cmi.objectives.')) {
-        const match = element.match(/cmi\.objectives\.(\d+)\.(.+)/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-          
-          if (!session.objectives[index]) {
-            session.objectives[index] = {
-              id: '',
-              score: { raw: '', min: '', max: '' },
-              status: ''
-            };
-          }
-          
-          if (property.startsWith('score.')) {
-            const scoreProp = property.replace('score.', '');
-            session.objectives[index].score[scoreProp] = value;
-          } else {
-            session.objectives[index][property] = value;
-          }
-        }
-      } else {
-        // Validate specific elements
-        if (element === 'cmi.core.lesson_status' || element === 'cmi.completion_status') {
-          const validStatuses = ['passed', 'completed', 'failed', 'incomplete', 'browsed', 'not attempted'];
-          if (!validStatuses.includes(value)) {
-            errorCode = '405'; // Incorrect Data Type
-          }
-        } else if (element === 'cmi.core.exit' || element === 'cmi.exit') {
-          const validExits = ['time-out', 'suspend', 'logout', ''];
-          if (!validExits.includes(value)) {
-            errorCode = '405';
-          }
-        }
-        
-        if (errorCode === '0') {
-          session.data[element] = value;
-          
-          // Update related fields
-          if (element === 'cmi.core.lesson_status') {
-            session.data['cmi.completion_status'] = value === 'completed' || value === 'passed' ? 'completed' : 'incomplete';
-            session.data['cmi.success_status'] = value === 'passed' ? 'passed' : value === 'failed' ? 'failed' : 'unknown';
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error in scorm-set-value:', error);
-    errorCode = '351'; // General Set Failure
-  }
-  
-  // Log API call
-  session.apiCalls.push({
-    timestamp: new Date(),
-    method: 'SetValue',
-    parameter: element,
-    value: value,
-    errorCode: errorCode
-  });
-  
-  // Send to debug window (with safety check)
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    debugWindow.webContents.send('api-call', {
-      sessionId,
-      method: 'SetValue',
-      parameter: element,
-      value,
-      errorCode
-    });
-  }
-  
-  return { success: errorCode === '0', errorCode };
+  const result = session.scormApi.LMSSetValue(element, value);
+  const errorCode = session.scormApi.LMSGetLastError();
+  return { success: result === 'true', errorCode };
 });
 
-ipcMain.handle('scorm-commit', (event, sessionId) => {
-  const session = scormSessions.get(sessionId);
-  if (!session) {
-    return { success: false, errorCode: '301' };
-  }
-  
-  // Simulate commit delay
-  setTimeout(() => {
-    session.lastCommit = new Date();
-    
-    // Log API call
-    session.apiCalls.push({
-      timestamp: new Date(),
-      method: 'Commit',
-      parameter: '',
-      value: '',
-      errorCode: '0'
-    });
-    
-    if (debugWindow && !debugWindow.isDestroyed()) {
-      debugWindow.webContents.send('data-committed', {
-        sessionId,
-        timestamp: session.lastCommit,
-        data: session.data
-      });
-    }
-  }, Math.random() * 500 + 100); // 100-600ms delay
-  
-  return { success: true, errorCode: '0' };
-});
 
-ipcMain.handle('scorm-terminate', (event, sessionId) => {
-  const session = scormSessions.get(sessionId);
-  if (!session) {
-    return { success: false, errorCode: '301' };
-  }
-  
-  session.endTime = new Date();
-  session.terminated = true;
-  
-  // Calculate total time
-  const duration = session.endTime - session.startTime;
-  const hours = Math.floor(duration / 3600000);
-  const minutes = Math.floor((duration % 3600000) / 60000);
-  const seconds = Math.floor((duration % 60000) / 1000);
-  
-  session.data['cmi.core.total_time'] = `${hours.toString().padStart(4, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.00`;
-  session.data['cmi.total_time'] = `PT${hours}H${minutes}M${seconds}S`;
-  
-  // Log API call
-  session.apiCalls.push({
-    timestamp: new Date(),
-    method: 'Terminate',
-    parameter: '',
-    value: '',
-    errorCode: '0'
-  });
-  
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    debugWindow.webContents.send('session-terminated', {
-      sessionId,
-      duration: duration,
-      finalData: session.data
-    });
-  }
-  
-  return { success: true, errorCode: '0' };
-});
+
 
 // SCORM compliance validation
 ipcMain.handle('validate-scorm-compliance', async (event, folderPath) => {
@@ -1065,28 +843,42 @@ ipcMain.handle('find-scorm-entry', async (event, folderPath) => {
         const resourceBlock = scoResourceMatch[0];
         const hrefMatch = resourceBlock.match(/href="([^"]+)"/i);
         if (hrefMatch && hrefMatch[1]) {
-          const launchFile = hrefMatch[1].split('?')[0];
-          console.log(`find-scorm-entry: SCO entry point: ${launchFile}`);
+          const fullHref = hrefMatch[1]; // Preserve the full href
+          const launchFile = fullHref.split('?')[0]; // Get only the file path part
+          console.log(`find-scorm-entry: SCO entry point href: ${fullHref}`);
           const fullPath = path.join(folderPath, launchFile);
           if (fs.existsSync(fullPath)) {
-            console.log(`find-scorm-entry: Found SCO entry point at: ${fullPath}`);
-            return fullPath;
+            console.log(`find-scorm-entry: Found SCO entry file at: ${fullPath}`);
+            return { success: true, entryPath: fullPath, launchUrl: fullHref }; // Return launchUrl
+          } else {
+            console.warn(`find-scorm-entry: SCO entry file not found on disk: ${fullPath}`);
           }
+        } else {
+          console.warn('find-scorm-entry: SCO resource found but no href attribute.');
         }
+      } else {
+        console.warn('find-scorm-entry: No SCO resource found in manifest.');
       }
 
       // Fallback for manifests that don't explicitly declare a SCO
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
       if (launchMatch && launchMatch[1]) {
         console.log('find-scorm-entry: Found fallback href');
-        const launchFile = launchMatch[1].split('?')[0];
-        console.log(`find-scorm-entry: Fallback entry point: ${launchFile}`);
+        const fullHref = launchMatch[1]; // Preserve the full href
+        const launchFile = fullHref.split('?')[0]; // Get only the file path part
+        console.log(`find-scorm-entry: Fallback entry point href: ${fullHref}`);
         const fullPath = path.join(folderPath, launchFile);
         if (fs.existsSync(fullPath)) {
           console.log(`find-scorm-entry: Found fallback entry point at: ${fullPath}`);
-          return fullPath;
+          return { success: true, entryPath: fullPath, launchUrl: fullHref }; // Return launchUrl
+        } else {
+          console.warn(`find-scorm-entry: Fallback entry file not found on disk: ${fullPath}`);
         }
+      } else {
+        console.warn('find-scorm-entry: No fallback href found in manifest.');
       }
+    } else {
+      console.warn('find-scorm-entry: imsmanifest.xml not found.');
     }
     
     console.log('find-scorm-entry: No manifest entry point found, checking common files');
@@ -1095,15 +887,15 @@ ipcMain.handle('find-scorm-entry', async (event, folderPath) => {
       const filePath = path.join(folderPath, file);
       if (fs.existsSync(filePath)) {
         console.log(`find-scorm-entry: Found common file entry point: ${filePath}`);
-        return filePath;
+        return { success: true, entryPath: filePath };
       }
     }
     
-    console.log('find-scorm-entry: No entry point found, returning null');
-    return null;
+    console.warn('find-scorm-entry: No entry point found after all checks.');
+    return { success: false, error: 'No SCORM entry point found in the package.' };
   } catch (error) {
     console.error('Error finding SCORM entry:', error);
-    return null;
+    return { success: false, error: `Error finding SCORM entry: ${error.message}` };
   }
 });
 
@@ -1175,7 +967,10 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
     let title = 'Unknown Course';
     let version = 'Unknown Version';
     let scormVersion = 'Unknown SCORM Version';
-    
+    let defaultOrg = null;
+    let launchFile = null;
+    let resourceCount = 0;
+
     try {
       // Extract title - try multiple patterns
       const titlePatterns = [
@@ -1184,21 +979,29 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         /<adlcp:title[^>]*>([^<]+)<\/adlcp:title>/i
       ];
       
+      let titleFound = false;
       for (const pattern of titlePatterns) {
         const match = manifestContent.match(pattern);
-        if (match && match[1].trim()) {
+        if (match && match[1] && match[1].trim()) {
           title = match[1].trim();
+          titleFound = true;
           break;
         }
+      }
+      if (!titleFound) {
+        monitor.log('WARN', 'Manifest title not found or empty', { manifestPath });
       }
       
       // Extract version
       const versionMatch = manifestContent.match(/version\s*=\s*["']([^"']+)["']/i);
-      if (versionMatch && versionMatch[1].trim()) {
+      if (versionMatch && versionMatch[1] && versionMatch[1].trim()) {
         version = versionMatch[1].trim();
+      } else {
+        monitor.log('WARN', 'Manifest version not found or empty', { manifestPath });
       }
       
       // Extract SCORM version - try multiple patterns
+      let scormVersionFound = false;
       const scormPatterns = [
         /schemaversion\s*=\s*["']([^"']+)["']/i,
         /<schemaversion[^>]*>([^<]+)<\/schemaversion>/i,
@@ -1209,27 +1012,46 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       for (const pattern of scormPatterns) {
         const match = manifestContent.match(pattern);
         if (match) {
-          if (match[1]) {
+          if (match[1] && match[1].trim()) {
             scormVersion = match[1].trim();
-          } else {
-            // Pattern matched but no capture group (like SCORM version indicators)
-            scormVersion = match[0];
+          } else if (match[0]) {
+            scormVersion = match[0].trim(); // Pattern matched but no capture group
           }
+          scormVersionFound = true;
           break;
         }
       }
+      if (!scormVersionFound) {
+        monitor.log('WARN', 'SCORM version not found or empty in manifest', { manifestPath });
+      }
       
-      // BUG FIX: Additional metadata extraction
+      // Additional metadata extraction
       const organizationMatch = manifestContent.match(/<organizations[^>]*default\s*=\s*["']([^"']+)["']/i);
-      const defaultOrg = organizationMatch ? organizationMatch[1] : null;
+      defaultOrg = organizationMatch && organizationMatch[1] ? organizationMatch[1].trim() : null;
+      if (!defaultOrg) {
+        monitor.log('WARN', 'Default organization not found in manifest', { manifestPath });
+      }
+
+      // Extract the identifier of the first item
+      let contentIdentifier = null;
+      const firstItemIdentifierMatch = manifestContent.match(/<item[^>]*identifier=["']([^"']+)["']/i);
+      if (firstItemIdentifierMatch && firstItemIdentifierMatch[1]) {
+        contentIdentifier = firstItemIdentifierMatch[1].trim();
+        monitor.log('DEBUG', 'Extracted first item identifier as content identifier', { contentIdentifier });
+      } else {
+        monitor.log('WARN', 'No item identifier found in manifest for content parameter', { manifestPath });
+      }
       
       // Count resources
       const resourceMatches = manifestContent.match(/<resource[^>]*>/gi) || [];
-      const resourceCount = resourceMatches.length;
+      resourceCount = resourceMatches.length;
       
-      // BUG FIX: Check for launch file
+      // Check for launch file
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
-      const launchFile = launchMatch ? launchMatch[1] : null;
+      launchFile = launchMatch && launchMatch[1] ? launchMatch[1].trim() : null;
+      if (!launchFile) {
+        monitor.log('WARN', 'Launch file href not found in manifest', { manifestPath });
+      }
       
       monitor.log('DEBUG', 'Parsed manifest successfully', {
         title,
@@ -1252,7 +1074,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       };
       
     } catch (parseError) {
-      monitor.log('ERROR', 'Failed to parse manifest content', {
+      monitor.log('ERROR', 'Failed to parse manifest content due to regex error', {
         error: parseError.message,
         manifestPath
       });
@@ -1262,7 +1084,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         version: 'Unknown',
         scormVersion: 'Unknown',
         hasManifest: true,
-        error: 'Failed to parse manifest content'
+        error: `Failed to parse manifest content: ${parseError.message}. Please check imsmanifest.xml for valid XML and expected SCORM structure.`
       };
     }
     
@@ -1282,4 +1104,13 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
 
 ipcMain.handle('open-external', async (event, url) => {
   shell.openExternal(url);
+  });
+  
+  ipcMain.handle('path-utils-to-file-url', (event, filePath) => {
+    try {
+      return PathUtils.toFileUrl(filePath);
+    } catch (error) {
+      console.error('Error in path-utils-to-file-url handler:', error);
+      throw error;
+    }
 });

@@ -198,6 +198,66 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   getLmsProfiles: () => safeInvoke('get-lms-profiles'),
 
+  // Path utilities
+  pathUtils: {
+    normalize: (filePath) => {
+      if (!validateString(filePath, 500)) throw new Error('Invalid file path');
+      return safeInvoke('path-utils-normalize', filePath);
+    },
+    toFileUrl: (filePath) => {
+      if (!validateString(filePath, 500)) throw new Error('Invalid file path');
+      return safeInvoke('path-utils-to-file-url', filePath);
+    },
+    join: (...segments) => {
+      if (!segments.every(s => validateString(s, 500))) throw new Error('Invalid path segments');
+      return safeInvoke('path-utils-join', ...segments);
+    },
+    isSafePath: (filePath, basePath) => {
+      if (!validateString(filePath, 500) || !validateString(basePath, 500)) throw new Error('Invalid paths');
+      return safeInvoke('path-utils-is-safe-path', filePath, basePath);
+    },
+    getRelativePath: (basePath, targetPath) => {
+      if (!validateString(basePath, 500) || !validateString(targetPath, 500)) throw new Error('Invalid paths');
+      return safeInvoke('path-utils-get-relative-path', basePath, targetPath);
+    },
+    fileExists: (filePath) => {
+      if (!validateString(filePath, 500)) throw new Error('Invalid file path');
+      return safeInvoke('path-utils-file-exists', filePath);
+    },
+    ensureDirectory: (dirPath) => {
+      if (!validateString(dirPath, 500)) throw new Error('Invalid directory path');
+      return safeInvoke('path-utils-ensure-directory', dirPath);
+    },
+    getExtension: (filePath) => {
+      if (!validateString(filePath, 500)) throw new Error('Invalid file path');
+      return safeInvoke('path-utils-get-extension', filePath);
+    },
+    generateTempPath: (baseName, extension) => {
+      if (!validateString(baseName, 255) || !validateString(extension, 10)) throw new Error('Invalid parameters');
+      return safeInvoke('path-utils-generate-temp-path', baseName, extension);
+    },
+    displayPath: (filePath, maxLength) => {
+      if (!validateString(filePath, 500) || (maxLength !== undefined && typeof maxLength !== 'number')) throw new Error('Invalid parameters');
+      return safeInvoke('path-utils-display-path', filePath, maxLength);
+    }
+  },
+
+  // Custom event for SCORM API logs from main process
+  onScormApiLog: (callback) => {
+    if (typeof callback !== 'function') {
+      throw new Error('Callback must be a function');
+    }
+    ipcRenderer.on('scorm-api-log', (event, data) => {
+      // Basic validation for the log data
+      if (data && typeof data === 'object' && data.method && data.element) {
+        callback(data);
+      }
+    });
+    return () => {
+      ipcRenderer.removeListener('scorm-api-log', callback);
+    };
+  },
+
   // Menu event handling (no validation needed for menu events)
   onMenuEvent: (callback) => {
     if (typeof callback !== 'function') {

@@ -1,4 +1,3 @@
-const PathUtils = require('./utils/path-utils.js');
 class EnhancedScormPreview {
     constructor() {
         this.currentSessionId = null;
@@ -8,6 +7,7 @@ class EnhancedScormPreview {
         this.isConnected = true;
         this.networkDelay = 0;
         this.cleanupFunctions = [];
+        this.localDataCache = new Map(); // Add local data cache
         this.initializeElements();
         this.bindEvents();
         this.startSessionTimer();
@@ -110,6 +110,16 @@ class EnhancedScormPreview {
                 this.cleanupFunctions.push(menuCleanup);
             }
         }
+
+        // Add listener for SCORM API logs from main process
+        if (window.electronAPI?.onScormApiLog) {
+            const apiLogCleanup = window.electronAPI.onScormApiLog((data) => {
+                console.log(`SCORM API Log: Method: ${data.method}, Element: ${data.element}, Value: ${data.value}, ErrorCode: ${data.errorCode}`);
+            });
+            if (typeof apiLogCleanup === 'function') {
+                this.cleanupFunctions.push(apiLogCleanup);
+            }
+        }
     }
 
     cleanup() {
@@ -178,7 +188,6 @@ class EnhancedScormPreview {
         try {
             this.showLoading();
             this.clearError();
-
             console.log('app.js: Calling electronAPI.selectScormPackage()');
             const zipPath = await window.electronAPI.selectScormPackage();
             if (!zipPath) {
@@ -187,14 +196,12 @@ class EnhancedScormPreview {
                 return;
             }
             console.log(`app.js: Zip path selected: ${zipPath}`);
-
             const extractedPath = await window.electronAPI.extractScorm(zipPath);
             if (!extractedPath) {
                 console.error('app.js: Failed to extract SCORM package');
                 throw new Error('Failed to extract SCORM package');
             }
             console.log(`app.js: SCORM package extracted to: ${extractedPath}`);
-
             await this.loadCourse(extractedPath);
         } catch (error) {
             console.error('app.js: Error loading SCORM package:', error);
@@ -207,13 +214,11 @@ class EnhancedScormPreview {
         try {
             this.showLoading();
             this.clearError();
-
             const folderPath = await window.electronAPI.selectScormFolder();
             if (!folderPath) {
                 this.hideLoading();
                 return;
             }
-
             await this.loadCourse(folderPath);
         } catch (error) {
             this.hideLoading();
@@ -222,13 +227,24 @@ class EnhancedScormPreview {
     }
 
     async loadCourse(coursePath) {
+        console.log(`app.js: loadCourse called with path: ${coursePath}`);
         try {
-            const entryPoint = await window.electronAPI.findScormEntry(coursePath);
-            if (!entryPoint) {
-                throw new Error('Could not find course entry point');
+            const entryPointResult = await window.electronAPI.findScormEntry(coursePath);
+            if (!entryPointResult || !entryPointResult.success) {
+                const errorMessage = entryPointResult ? entryPointResult.error : 'Unknown error finding course entry point.';
+                console.error(`app.js: Failed to find SCORM entry point: ${errorMessage}`);
+                throw new Error(`Could not find course entry point: ${errorMessage}`);
             }
-
+            const entryPoint = entryPointResult.entryPath;
+            const launchUrl = entryPointResult.launchUrl; // Get the launchUrl
+            console.log(`app.js: Found SCORM entry point: ${entryPoint}`);
+            console.log(`app.js: Launch URL from manifest: ${launchUrl}`); // Log the launchUrl
             const courseInfo = await window.electronAPI.getCourseInfo(coursePath);
+            // Check if courseInfo also indicates an error
+            if (courseInfo && courseInfo.error) {
+                console.error(`app.js: Failed to get course info: ${courseInfo.error}`);
+                throw new Error(`Failed to get course information: ${courseInfo.error}`);
+            }
             
             this.currentSessionId = 'session_' + Date.now();
             this.currentCoursePath = coursePath;
@@ -237,21 +253,31 @@ class EnhancedScormPreview {
             await window.electronAPI.scormInitialize(this.currentSessionId);
             
             this.displayCourseInfo(courseInfo);
-            this.loadCourseInFrame(entryPoint);
+            // Pass launchUrl to loadCourseInFrame
+            this.loadCourseInFrame(entryPoint, launchUrl); // Pass launchUrl instead of contentIdentifier
             this.enableControls();
             this.setupScormAPI();
             
             this.logApiCall('system', `New session initialized: ${this.currentSessionId}`);
 
         } catch (error) {
+            console.error('app.js: Error in loadCourse:', error);
             this.hideLoading();
             this.showError(`Error loading course: ${error.message}`);
         }
     }
 
-    loadCourseInFrame(entryPoint) {
-        const fileUrl = PathUtils.toFileUrl(entryPoint);
-        this.elements.previewFrame.src = fileUrl;
+    async loadCourseInFrame(entryPoint, launchUrl) { // Changed parameter name
+        // Use launchUrl directly, which already contains the query parameter
+        const finalFileUrl = await window.electronAPI.pathUtils.toFileUrl(entryPoint);
+        // Append the query string from launchUrl to finalFileUrl
+        const queryString = launchUrl.includes('?') ? launchUrl.substring(launchUrl.indexOf('?')) : '';
+        const fullUrlWithQuery = finalFileUrl + queryString;
+
+        console.log(`app.js: loadCourseInFrame - entryPoint: ${entryPoint}`);
+        console.log(`app.js: loadCourseInFrame - launchUrl (from manifest): ${launchUrl}`);
+        console.log(`app.js: loadCourseInFrame - final URL for iframe: ${fullUrlWithQuery}`);
+        this.elements.previewFrame.src = fullUrlWithQuery;
         
         this.elements.noContent.style.display = 'none';
         this.elements.previewFrame.style.display = 'block';
@@ -267,29 +293,51 @@ class EnhancedScormPreview {
 
     setupScormAPI() {
         const self = this;
-        const apiCache = new Map();
-        const cacheTimeout = 5000;
-        let commitTimer = null;
-
-        const debouncedCommit = (sessionId) => {
-            if (commitTimer) clearTimeout(commitTimer);
-            commitTimer = setTimeout(() => {
-                window.electronAPI.scormCommit(sessionId)
-                    .then(result => self.logApiCall('commit', 'LMSCommit', '', result.success ? 'SUCCESS' : 'ERROR'))
-                    .catch(() => self.logApiCall('commit', 'LMSCommit', '', 'ERROR'));
-            }, 200);
-        };
+        // No need for apiCache, cacheTimeout, commitTimer, debouncedCommit here.
+        // The main process's ScormApiHandler will handle the actual data and caching.
 
         window.API = {
             LMSInitialize: function(param) {
                 self.logApiCall('init', 'LMSInitialize', param);
-                return self.isConnected ? "true" : "false";
+                // Asynchronously initialize session in main process
+                window.electronAPI.scormInitialize(self.currentSessionId)
+                    .then(response => {
+                        if (response.success) {
+                            // On successful initialization, fetch initial data to populate local cache
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.core.lesson_status')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.core.lesson_status', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.completion_status')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.completion_status', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.core.score.raw')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.core.score.raw', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.score.raw')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.score.raw', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.core.lesson_location')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.core.lesson_location', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.location')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.location', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.suspend_data')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.suspend_data', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.core.session_time')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.core.session_time', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.session_time')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.session_time', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.core.total_time')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.core.total_time', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.total_time')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.total_time', res.value); });
+                        } else {
+                            console.error('SCORM Initialize failed:', response.errorCode);
+                        }
+                    })
+                    .catch(error => console.error('Error initializing SCORM session:', error));
+                return self.isConnected ? "true" : "false"; // Always return true for synchronous API
             },
             LMSFinish: function(param) {
                 self.logApiCall('finish', 'LMSFinish', param);
                 if (self.isConnected) {
-                    apiCache.clear();
-                    window.electronAPI.scormTerminate(self.currentSessionId);
+                    window.electronAPI.scormTerminate(self.currentSessionId)
+                        .catch(error => console.error('Error terminating SCORM session:', error));
                     return "true";
                 }
                 return "false";
@@ -299,37 +347,24 @@ class EnhancedScormPreview {
                     self.logApiCall('get', 'LMSGetValue', element, 'CONNECTION_ERROR');
                     return "";
                 }
+                
+                // Return from local cache immediately for synchronous behavior
+                let value = self.localDataCache.get(element) || "";
+                self.logApiCall('get', 'LMSGetValue', element, value);
 
-                const cacheKey = `get_${element}`;
-                const cached = apiCache.get(cacheKey);
-                if (cached && Date.now() - cached.timestamp < cacheTimeout) {
-                    return cached.value;
-                }
-                
-                let result = "";
-                try {
-                    const promise = window.electronAPI.scormGetValue(self.currentSessionId, element);
-                    let timeoutId;
-                    const timeout = new Promise((_, reject) => {
-                        timeoutId = setTimeout(() => reject(new Error('Timeout')), 100);
-                    });
-                    
-                    Promise.race([promise, timeout])
-                        .then(response => {
-                            clearTimeout(timeoutId);
-                            apiCache.set(cacheKey, { value: response.value, timestamp: Date.now() });
+                // Asynchronously request fresh data from main process
+                window.electronAPI.scormGetValue(self.currentSessionId, element)
+                    .then(response => {
+                        if (response.success) {
+                            self.localDataCache.set(element, response.value);
                             self.updateDataDisplay(element, response.value);
-                        })
-                        .catch(() => {
-                            clearTimeout(timeoutId);
-                            if (cached) result = cached.value;
-                        });
-                } catch (error) {
-                    result = cached ? cached.value : "";
-                }
+                        } else {
+                            console.warn(`LMSGetValue async update failed for ${element}:`, response.errorCode);
+                        }
+                    })
+                    .catch(error => console.error(`Error in async LMSGetValue for ${element}:`, error));
                 
-                self.logApiCall('get', 'LMSGetValue', element, result);
-                return result;
+                return value;
             },
             LMSSetValue: function(element, value) {
                 if (!self.isConnected) {
@@ -337,31 +372,43 @@ class EnhancedScormPreview {
                     return "false";
                 }
                 
-                const cacheKey = `get_${element}`;
-                apiCache.set(cacheKey, { value: value, timestamp: Date.now() });
-                
+                // Update local cache immediately for synchronous behavior
+                self.localDataCache.set(element, value);
+                self.updateDataDisplay(element, value); // Update UI immediately
+
+                // Asynchronously send value to main process
                 window.electronAPI.scormSetValue(self.currentSessionId, element, value)
                     .then(response => {
-                        self.updateDataDisplay(element, value);
                         self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, response.success ? 'SUCCESS' : 'ERROR');
-                        if (element.includes('lesson_status') || element.includes('score') || element.includes('completion_status')) {
-                            debouncedCommit(self.currentSessionId);
+                        // If main process indicates a change in related data (e.g., completion status), update local cache
+                        if (response.success && (element === 'cmi.core.lesson_status' || element === 'cmi.completion_status')) {
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.completion_status')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.completion_status', res.value); });
+                            window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.success_status')
+                                .then(res => { if (res.success) self.localDataCache.set('cmi.success_status', res.value); });
                         }
                     })
-                    .catch(() => self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, 'ERROR'));
+                    .catch(error => self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, `ERROR: ${error.message}`));
                 
-                return "true";
+                return "true"; // Always return true for synchronous API
             },
             LMSCommit: function(param) {
                 if (!self.isConnected) {
                     self.logApiCall('commit', 'LMSCommit', param, 'CONNECTION_ERROR');
                     return "false";
                 }
-                apiCache.clear();
-                debouncedCommit(self.currentSessionId);
+                // Asynchronously commit to main process
+                window.electronAPI.scormCommit(self.currentSessionId)
+                    .then(result => self.logApiCall('commit', 'LMSCommit', '', result.success ? 'SUCCESS' : 'ERROR'))
+                    .catch(() => self.logApiCall('commit', 'LMSCommit', '', 'ERROR'));
                 return "true";
             },
-            LMSGetLastError: function() { return self.isConnected ? "0" : "301"; },
+            LMSGetLastError: function() {
+                // This should ideally come from the main process, but for synchronous API,
+                // we might need to return a cached error or a generic one.
+                // For now, return a generic "No error" if connected, or "301" if disconnected.
+                return self.isConnected ? "0" : "301";
+            },
             LMSGetErrorString: function(errorCode) {
                 const errors = { "0": "No error", "301": "General Get Failure", "351": "General Set Failure", "401": "Undefined Data Model", "405": "Incorrect Data Type" };
                 return errors[errorCode] || "Unknown error";
@@ -550,17 +597,15 @@ class EnhancedScormPreview {
             const i = Math.floor(Math.log(bytes) / Math.log(1024));
             return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
         };
-
         const escapeHtml = (unsafe) => {
     if (typeof unsafe !== 'string') return '';
     return unsafe
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
+         .replace(/&/g, "&")
+         .replace(/</g, "<")
+         .replace(/>/g, ">")
+         .replace(/"/g, "\"")
          .replace(/'/g, "&#039;");
 };
-
         try {
             resultsWindow.document.write(`...`); // Content omitted for brevity, it's the same as before
             resultsWindow.document.close();
