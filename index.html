@@ -352,6 +352,200 @@
             font-size: 11px;
         }
 
+        .course-nav-tree {
+            font-size: 11px;
+        }
+
+        .nav-item {
+            padding: 4px 0;
+            margin-left: 12px;
+            border-left: 1px dotted #ccc;
+            position: relative;
+        }
+
+        .nav-item:before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: -1px;
+            width: 8px;
+            height: 1px;
+            background: #ccc;
+        }
+
+        .nav-item-title {
+            padding: 2px 4px;
+            cursor: pointer;
+            border-radius: 2px;
+            margin-left: 8px;
+        }
+
+        .nav-item-title:hover {
+            background: #e9ecef;
+        }
+
+        .nav-item-title.current {
+            background: #007bff;
+            color: white;
+        }
+
+        .nav-item-title.completed {
+            color: #28a745;
+        }
+
+        .nav-item-title.failed {
+            color: #dc3545;
+        }
+
+        .nav-item.root {
+            margin-left: 0;
+            border-left: none;
+        }
+
+        .nav-item.root:before {
+            display: none;
+        }
+
+        .nav-info {
+            font-size: 10px;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+
+        .course-navigation-panel {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin: 15px 20px;
+            overflow: hidden;
+        }
+
+        .nav-panel-header {
+            background: #e9ecef;
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .nav-panel-header h4 {
+            margin: 0;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .nav-panel-info {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .nav-panel-content {
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .main-course-nav {
+            font-size: 13px;
+        }
+
+        .main-nav-item {
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .main-nav-item:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .main-nav-item.current {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .main-nav-item.completed {
+            border-left: 4px solid #28a745;
+        }
+
+        .main-nav-item.failed {
+            border-left: 4px solid #dc3545;
+        }
+
+        .main-nav-item.locked {
+            background: #f8f9fa;
+            color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .main-nav-item.locked:hover {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+        }
+
+        .nav-item-content {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+
+        .nav-item-icon {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        .nav-item-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            background: #6c757d;
+            color: white;
+        }
+
+        .nav-item-status.completed {
+            background: #28a745;
+        }
+
+        .nav-item-status.failed {
+            background: #dc3545;
+        }
+
+        .nav-item-status.current {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .flow-navigation-info {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .flow-navigation-info .flow-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            opacity: 0.6;
+        }
+
+        .flow-navigation-info h5 {
+            margin: 10px 0 5px 0;
+            color: #495057;
+        }
+
+        .flow-navigation-info p {
+            font-size: 12px;
+            margin: 5px 0;
+        }
+
         .progress-bar {
             height: 20px;
             background: #e9ecef;
@@ -468,6 +662,16 @@
                     <p><strong>Status:</strong> <span class="status-indicator connected" id="connectionStatus"></span><span id="connectionText">Connected</span></p>
                 </div>
 
+                <div class="course-navigation-panel" id="courseNavigationPanel" style="display: none;">
+                    <div class="nav-panel-header">
+                        <h4>📚 Course Contents</h4>
+                        <div class="nav-panel-info" id="navPanelInfo"></div>
+                    </div>
+                    <div class="nav-panel-content" id="navPanelContent">
+                        <div id="mainCourseNavigationTree">No course loaded</div>
+                    </div>
+                </div>
+
                 <div class="preview-area">
                     <div class="loading" id="loading">
                         <div class="spinner"></div>
@@ -490,6 +694,16 @@
                 </div>
                 
                 <div class="sidebar-content">
+                    <div class="sidebar-section">
+                        <div class="sidebar-section-header" onclick="toggleSection('courseNavigation')">
+                            🔧 Course Structure (Debug)
+                            <span id="courseNavigationToggle">▼</span>
+                        </div>
+                        <div class="sidebar-section-content" id="courseNavigationContent">
+                            <div id="courseNavigationTree">No course loaded</div>
+                        </div>
+                    </div>
+
                     <div class="sidebar-section">
                         <div class="sidebar-section-header" onclick="toggleSection('learnerData')">
                             👤 Learner Data
@@ -597,6 +811,18 @@
         </div>
     </div>
 
+    <script>
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + 'Content');
+            const toggle = document.getElementById(sectionId + 'Toggle');
+            
+            if (content && toggle) {
+                const isCollapsed = content.classList.contains('collapsed');
+                content.classList.toggle('collapsed');
+                toggle.textContent = isCollapsed ? '▼' : '▲';
+            }
+        }
+    </script>
     <script src="app.js" defer></script>
 </body>
 </html>

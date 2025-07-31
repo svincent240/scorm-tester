@@ -351,12 +351,16 @@ class ScormApiHandler {
   // BUG FIX: Non-blocking backend synchronization
   async syncWithBackend() {
     try {
-      if (this.electronAPI && this.sessionId) {
+      // Only sync if we're in a renderer process (electronAPI available)
+      if (this.electronAPI && this.sessionId && typeof window !== 'undefined') {
         // Refresh cache from backend without blocking
         const result = await this.electronAPI.scormInitialize(this.sessionId);
         if (result.success) {
           console.debug('Backend sync completed');
         }
+      } else {
+        // We're in the main process - no need to sync with backend
+        console.debug('ScormApiHandler running in main process - no backend sync needed');
       }
     } catch (error) {
       console.warn('Backend sync failed:', error);
@@ -366,10 +370,14 @@ class ScormApiHandler {
   // BUG FIX: Non-blocking value persistence
   async persistToBackend(element, value) {
     try {
-      if (this.electronAPI && this.sessionId) {
+      // Only persist if we're in a renderer process (electronAPI available)
+      if (this.electronAPI && this.sessionId && typeof window !== 'undefined') {
         // Don't await - let it complete in background
         this.electronAPI.scormSetValue(this.sessionId, element, value)
           .catch(error => console.warn('Backend persist failed:', error));
+      } else {
+        // We're in the main process - data is already persisted locally
+        console.debug('ScormApiHandler in main process - data already persisted');
       }
     } catch (error) {
       console.warn('Persist operation failed:', error);
@@ -379,9 +387,13 @@ class ScormApiHandler {
   // BUG FIX: Non-blocking commit
   async commitToBackend() {
     try {
-      if (this.electronAPI && this.sessionId) {
+      // Only commit if we're in a renderer process (electronAPI available)
+      if (this.electronAPI && this.sessionId && typeof window !== 'undefined') {
         this.electronAPI.scormCommit(this.sessionId)
           .catch(error => console.warn('Backend commit failed:', error));
+      } else {
+        // We're in the main process - commit is handled locally
+        console.debug('ScormApiHandler in main process - commit handled locally');
       }
     } catch (error) {
       console.warn('Commit operation failed:', error);
@@ -391,9 +403,13 @@ class ScormApiHandler {
   // BUG FIX: Non-blocking session termination
   async terminateBackendSession() {
     try {
-      if (this.electronAPI && this.sessionId) {
+      // Only terminate if we're in a renderer process (electronAPI available)
+      if (this.electronAPI && this.sessionId && typeof window !== 'undefined') {
         this.electronAPI.scormTerminate(this.sessionId)
           .catch(error => console.warn('Backend terminate failed:', error));
+      } else {
+        // We're in the main process - termination is handled locally
+        console.debug('ScormApiHandler in main process - termination handled locally');
       }
     } catch (error) {
       console.warn('Terminate operation failed:', error);
@@ -403,7 +419,8 @@ class ScormApiHandler {
   // BUG FIX: Background data refresh
   async requestBackgroundSync(element) {
     try {
-      if (this.electronAPI && this.sessionId && !this.pendingOperations.has(element)) {
+      // Only sync if we're in a renderer process (electronAPI available)
+      if (this.electronAPI && this.sessionId && typeof window !== 'undefined' && !this.pendingOperations.has(element)) {
         this.pendingOperations.set(element, true);
         
         const result = await this.electronAPI.scormGetValue(this.sessionId, element);
@@ -413,6 +430,9 @@ class ScormApiHandler {
         }
         
         this.pendingOperations.delete(element);
+      } else if (typeof window === 'undefined') {
+        // We're in the main process - no background sync needed
+        console.debug('ScormApiHandler in main process - no background sync needed');
       }
     } catch (error) {
       this.pendingOperations.delete(element);
@@ -453,6 +473,17 @@ class ScormApiHandler {
         // SCORM 2004 format: PT#H#M#S
         return /^PT\d+H\d+M\d+(\.\d+)?S$/.test(value);
       }
+    }
+
+    // Validate location bookmark - can be any string or number
+    if (element === 'cmi.core.lesson_location' || element === 'cmi.location') {
+      return value.length <= 1000; // Reasonable length limit
+    }
+
+    // Validate success status for SCORM 2004
+    if (element === 'cmi.success_status') {
+      const validStatuses = ['passed', 'failed', 'unknown'];
+      return validStatuses.includes(value);
     }
 
     return true; // Default to valid for unknown elements

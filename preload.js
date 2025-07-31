@@ -11,7 +11,21 @@ const validateSessionId = (sessionId) => {
 };
 
 const validateScormElement = (element) => {
-  return validateString(element, 255) && /^cmi\.[\w\.\[\]_-]+$/.test(element);
+  // SCORM element validation - allow cmi.* and adl.* elements
+  if (!validateString(element, 255)) {
+    return false;
+  }
+  
+  // Allow standard SCORM data model elements
+  return /^(cmi|adl)\.[\w\.\[\]_-]*$/.test(element) || 
+         element === 'cmi.location' || 
+         element === 'cmi.completion_status' ||
+         element === 'cmi.success_status' ||
+         element.startsWith('cmi.core.') ||
+         element.startsWith('cmi.score.') ||
+         element.startsWith('cmi.interactions.') ||
+         element.startsWith('cmi.objectives.') ||
+         element.startsWith('adl.nav.');
 };
 
 const validateFilePath = (filePath) => {
@@ -86,6 +100,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       throw new Error('Invalid folder path');
     }
     return safeInvoke('get-course-info', folderPath);
+  },
+  
+  getCourseManifest: (folderPath) => {
+    if (!validateFilePath(folderPath)) {
+      throw new Error('Invalid folder path');
+    }
+    return safeInvoke('get-course-manifest', folderPath);
   },
   
   openExternal: (url) => {

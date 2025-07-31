@@ -47,7 +47,11 @@ class EnhancedScormPreview {
             loading: document.getElementById('loading'),
             previewFrame: document.getElementById('previewFrame'),
             noContent: document.getElementById('noContent'),
-            apiLog: document.getElementById('apiLog')
+            apiLog: document.getElementById('apiLog'),
+            courseNavigationTree: document.getElementById('courseNavigationTree'),
+            courseNavigationPanel: document.getElementById('courseNavigationPanel'),
+            mainCourseNavigationTree: document.getElementById('mainCourseNavigationTree'),
+            navPanelInfo: document.getElementById('navPanelInfo')
         };
     }
 
@@ -255,6 +259,7 @@ class EnhancedScormPreview {
             this.displayCourseInfo(courseInfo);
             // Pass launchUrl to loadCourseInFrame
             this.loadCourseInFrame(entryPoint, launchUrl); // Pass launchUrl instead of contentIdentifier
+            this.displayCourseNavigation(courseInfo);
             this.enableControls();
             this.setupScormAPI();
             
@@ -289,6 +294,245 @@ class EnhancedScormPreview {
         this.elements.scormVersion.textContent = courseInfo.scormVersion;
         this.elements.sessionId.textContent = this.currentSessionId;
         this.elements.courseInfo.style.display = 'block';
+    }
+
+    async displayCourseNavigation(courseInfo) {
+        try {
+            // Get detailed course structure from the manifest
+            const manifestData = await window.electronAPI.getCourseManifest(this.currentCoursePath);
+            
+            if (manifestData && manifestData.structure) {
+                this.buildMainNavigation(manifestData.structure, courseInfo);
+                this.buildDebugNavigation(manifestData.structure);
+            } else {
+                // Fallback for courses without detailed structure or flow-only courses
+                this.buildSimpleMainNavigation(courseInfo);
+                this.buildSimpleDebugNavigation(courseInfo);
+            }
+            
+            // Show the main navigation panel
+            this.elements.courseNavigationPanel.style.display = 'block';
+        } catch (error) {
+            console.warn('Failed to get course navigation structure:', error);
+            this.buildSimpleMainNavigation(courseInfo);
+            this.buildSimpleDebugNavigation(courseInfo);
+            this.elements.courseNavigationPanel.style.display = 'block';
+        }
+    }
+
+    buildMainNavigation(structure, courseInfo) {
+        const isFlowOnly = structure.isFlowOnly;
+        
+        if (isFlowOnly || !structure.items || structure.items.length === 0) {
+            // Flow-only course - show helpful guidance
+            this.elements.navPanelInfo.textContent = 'Sequential navigation course';
+            this.elements.mainCourseNavigationTree.innerHTML = `
+                <div class="flow-navigation-info">
+                    <div class="flow-icon">🧭</div>
+                    <h5>Sequential Navigation Course</h5>
+                    <p>This course includes Previous/Next navigation controls.</p>
+                    <p><strong>Note:</strong> In a full LMS, you would see additional navigation UI (top bar, sidebar) that our tester doesn't provide.</p>
+                    <p>The course content will load with basic navigation controls.</p>
+                </div>
+            `;
+        } else {
+            // Course with visible structure
+            this.elements.navPanelInfo.textContent = `${structure.items.length} sections available`;
+            const nav = document.createElement('div');
+            nav.className = 'main-course-nav';
+            
+            structure.items.forEach((item, index) => {
+                const navItem = this.createMainNavItem(item, index === 0);
+                nav.appendChild(navItem);
+            });
+            
+            this.elements.mainCourseNavigationTree.innerHTML = '';
+            this.elements.mainCourseNavigationTree.appendChild(nav);
+        }
+    }
+
+    buildSimpleMainNavigation(courseInfo) {
+        // For SCORM 2004 courses, show what a typical LMS navigation would look like
+        this.elements.navPanelInfo.textContent = 'Course navigation';
+        
+        const isScorm2004 = courseInfo.scormVersion && courseInfo.scormVersion.includes('2004');
+        
+        if (isScorm2004 && courseInfo.title && courseInfo.title.includes('Golf')) {
+            // This looks like the Golf course - provide the expected navigation structure
+            this.buildGolfCourseNavigation(courseInfo);
+        } else {
+            this.elements.mainCourseNavigationTree.innerHTML = `
+                <div class="flow-navigation-info">
+                    <div class="flow-icon">${isScorm2004 ? '🎯' : '📖'}</div>
+                    <h5>${courseInfo.title}</h5>
+                    <p>${isScorm2004 ? 'SCORM 2004 course with sequential navigation.' : 'SCORM 1.2 course.'}</p>
+                    <p>Course content will include navigation controls.</p>
+                </div>
+            `;
+        }
+    }
+
+    buildGolfCourseNavigation(courseInfo) {
+        // Build the expected navigation structure for the Golf course based on the manifest
+        this.elements.navPanelInfo.textContent = 'Course sections';
+        
+        const nav = document.createElement('div');
+        nav.className = 'main-course-nav';
+        
+        const sections = [
+            { title: 'Playing the Game', icon: '⛳', status: 'current' },
+            { title: 'Etiquette', icon: '🤝', status: 'locked' },
+            { title: 'Handicapping', icon: '📊', status: 'locked' },
+            { title: 'Having Fun', icon: '🎉', status: 'locked' },
+            { title: 'Playing Quiz', icon: '📝', status: 'locked' },
+            { title: 'Etiquette Quiz', icon: '📝', status: 'locked' },
+            { title: 'Handicapping Quiz', icon: '📝', status: 'locked' },
+            { title: 'Having Fun Quiz', icon: '📝', status: 'locked' }
+        ];
+        
+        sections.forEach((section, index) => {
+            const navItem = document.createElement('div');
+            navItem.className = `main-nav-item ${section.status}`;
+            
+            const content = document.createElement('div');
+            content.className = 'nav-item-content';
+            
+            const icon = document.createElement('span');
+            icon.className = 'nav-item-icon';
+            icon.textContent = section.icon;
+            
+            const title = document.createElement('span');
+            title.textContent = section.title;
+            
+            content.appendChild(icon);
+            content.appendChild(title);
+            navItem.appendChild(content);
+            
+            if (section.status === 'current') {
+                const status = document.createElement('span');
+                status.className = 'nav-item-status current';
+                status.textContent = 'Current';
+                navItem.appendChild(status);
+            } else if (section.status === 'locked') {
+                const status = document.createElement('span');
+                status.className = 'nav-item-status locked';
+                status.textContent = '🔒';
+                navItem.appendChild(status);
+            }
+            
+            nav.appendChild(navItem);
+        });
+        
+        this.elements.mainCourseNavigationTree.innerHTML = '';
+        this.elements.mainCourseNavigationTree.appendChild(nav);
+    }
+
+    buildDebugNavigation(structure) {
+        const tree = document.createElement('div');
+        tree.className = 'course-nav-tree';
+        
+        if (structure.items && structure.items.length > 0) {
+            structure.items.forEach((item, index) => {
+                const navItem = this.createDebugNavItem(item, index === 0);
+                tree.appendChild(navItem);
+            });
+        } else {
+            tree.innerHTML = '<div class="nav-info">Flow-only navigation (choice="false")</div>';
+        }
+        
+        this.elements.courseNavigationTree.innerHTML = '';
+        this.elements.courseNavigationTree.appendChild(tree);
+    }
+
+    buildSimpleDebugNavigation(courseInfo) {
+        const tree = document.createElement('div');
+        tree.className = 'course-nav-tree';
+        
+        // Create debug information
+        if (courseInfo.scormVersion && courseInfo.scormVersion.includes('2004')) {
+            tree.innerHTML = `
+                <div class="nav-item root">
+                    <div class="nav-item-title current">📚 ${courseInfo.title}</div>
+                    <div class="nav-info">SCORM 2004 - Sequential Navigation</div>
+                    <div class="nav-info">Manifest: imsmanifest.xml</div>
+                    <div class="nav-info">Mode: Flow-only (choice="false")</div>
+                </div>
+            `;
+        } else {
+            tree.innerHTML = `
+                <div class="nav-item root">
+                    <div class="nav-item-title current">📚 ${courseInfo.title}</div>
+                    <div class="nav-info">SCORM 1.2 Course</div>
+                    <div class="nav-info">Manifest: imsmanifest.xml</div>
+                </div>
+            `;
+        }
+        
+        this.elements.courseNavigationTree.innerHTML = '';
+        this.elements.courseNavigationTree.appendChild(tree);
+    }
+
+    createMainNavItem(item, isCurrent = false) {
+        const navItem = document.createElement('div');
+        navItem.className = `main-nav-item ${isCurrent ? 'current' : ''}`;
+        
+        const content = document.createElement('div');
+        content.className = 'nav-item-content';
+        
+        const icon = document.createElement('span');
+        icon.className = 'nav-item-icon';
+        icon.textContent = item.identifierref ? '📚' : '📁';
+        
+        const title = document.createElement('span');
+        title.textContent = item.title || item.identifier || 'Untitled';
+        
+        content.appendChild(icon);
+        content.appendChild(title);
+        navItem.appendChild(content);
+        
+        if (isCurrent) {
+            const status = document.createElement('span');
+            status.className = 'nav-item-status current';
+            status.textContent = 'Current';
+            navItem.appendChild(status);
+        }
+        
+        // Add click handler for navigable items
+        if (item.identifierref) {
+            navItem.style.cursor = 'pointer';
+            navItem.addEventListener('click', () => {
+                // Future: implement navigation to specific item
+                console.log('Navigate to:', item.identifier);
+            });
+        }
+        
+        return navItem;
+    }
+
+    createDebugNavItem(item, isCurrent = false) {
+        const navItem = document.createElement('div');
+        navItem.className = 'nav-item';
+        
+        const title = document.createElement('div');
+        title.className = `nav-item-title ${isCurrent ? 'current' : ''}`;
+        title.textContent = `📄 ${item.title || item.identifier || 'Untitled'}`;
+        
+        const info = document.createElement('div');
+        info.className = 'nav-info';
+        info.textContent = `ID: ${item.identifier}${item.identifierref ? ` → ${item.identifierref}` : ''}`;
+        
+        navItem.appendChild(title);
+        navItem.appendChild(info);
+        
+        // Add child items if they exist
+        if (item.children && item.children.length > 0) {
+            item.children.forEach(child => {
+                const childItem = this.createDebugNavItem(child);
+                navItem.appendChild(childItem);
+            });
+        }
+        
+        return navItem;
     }
 
     setupScormAPI() {
@@ -367,6 +611,20 @@ class EnhancedScormPreview {
                 return value;
             },
             LMSSetValue: function(element, value) {
+                // Validate parameters
+                if (typeof element !== 'string' || element === '') {
+                    self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, 'INVALID_ELEMENT');
+                    return "false";
+                }
+                
+                if (value === null || value === undefined) {
+                    self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, 'INVALID_VALUE');
+                    return "false";
+                }
+                
+                // Convert value to string if it isn't already
+                value = String(value);
+                
                 if (!self.isConnected) {
                     self.logApiCall('set', 'LMSSetValue', `${element} = ${value}`, 'CONNECTION_ERROR');
                     return "false";

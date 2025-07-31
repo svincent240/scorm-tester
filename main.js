@@ -295,6 +295,16 @@ ipcMain.handle('scorm-initialize', (event, sessionId) => {
 });
 
 
+ipcMain.handle('scorm-get-value', (event, sessionId, element) => {
+  const session = scormSessions.get(sessionId);
+  if (!session || !session.scormApi) {
+    return { success: false, value: '', errorCode: '301' };
+  }
+  const value = session.scormApi.LMSGetValue(element);
+  const errorCode = session.scormApi.LMSGetLastError();
+  return { success: errorCode === '0', value, errorCode };
+});
+
 ipcMain.handle('scorm-set-value', (event, sessionId, element, value) => {
   const session = scormSessions.get(sessionId);
   if (!session || !session.scormApi) {
@@ -302,6 +312,30 @@ ipcMain.handle('scorm-set-value', (event, sessionId, element, value) => {
   }
   const result = session.scormApi.LMSSetValue(element, value);
   const errorCode = session.scormApi.LMSGetLastError();
+  return { success: result === 'true', errorCode };
+});
+
+ipcMain.handle('scorm-commit', (event, sessionId) => {
+  const session = scormSessions.get(sessionId);
+  if (!session || !session.scormApi) {
+    return { success: false, errorCode: '301' };
+  }
+  const result = session.scormApi.LMSCommit('');
+  const errorCode = session.scormApi.LMSGetLastError();
+  return { success: result === 'true', errorCode };
+});
+
+ipcMain.handle('scorm-terminate', (event, sessionId) => {
+  const session = scormSessions.get(sessionId);
+  if (!session || !session.scormApi) {
+    return { success: false, errorCode: '301' };
+  }
+  const result = session.scormApi.LMSTerminate('');
+  const errorCode = session.scormApi.LMSGetLastError();
+  
+  // Clean up the session
+  scormSessions.delete(sessionId);
+  
   return { success: result === 'true', errorCode };
 });
 
@@ -898,6 +932,115 @@ ipcMain.handle('find-scorm-entry', async (event, folderPath) => {
     return { success: false, error: `Error finding SCORM entry: ${error.message}` };
   }
 });
+
+ipcMain.handle('get-course-manifest', async (event, folderPath) => {
+  try {
+    if (!folderPath || typeof folderPath !== 'string') {
+      throw new Error('Invalid folder path provided');
+    }
+
+    const normalizedPath = path.normalize(folderPath);
+    const manifestPath = path.join(normalizedPath, 'imsmanifest.xml');
+    
+    if (!fs.existsSync(manifestPath)) {
+      return { structure: null, error: 'Manifest not found' };
+    }
+
+    const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+    
+    // Parse the manifest to extract course structure
+    const structure = parseManifestStructure(manifestContent);
+    
+    return { structure, success: true };
+  } catch (error) {
+    monitor.log('ERROR', 'Failed to get course manifest', {
+      folderPath,
+      error: error.message
+    });
+    return { structure: null, error: error.message };
+  }
+});
+
+function parseManifestStructure(manifestContent) {
+  try {
+    // Extract organization and items
+    const orgMatch = manifestContent.match(/<organization[^>]*>([\s\S]*?)<\/organization>/i);
+    if (!orgMatch) {
+      return { items: [], isFlowOnly: true };
+    }
+
+    const orgContent = orgMatch[1];
+    
+    // Check if it's flow-only navigation
+    const controlModeMatch = manifestContent.match(/<imsss:controlMode[^>]*choice\s*=\s*["']false["'][^>]*>/i);
+    const isFlowOnly = !!controlModeMatch;
+    
+    // Extract items
+    const items = [];
+    const itemMatches = orgContent.match(/<item[^>]*>[\s\S]*?<\/item>/gi);
+    
+    if (itemMatches) {
+      itemMatches.forEach(itemMatch => {
+        const item = parseItem(itemMatch);
+        if (item && !item.isVisible === false) { // Only include visible items
+          items.push(item);
+        }
+      });
+    }
+
+    return {
+      items,
+      isFlowOnly,
+      title: extractTitle(orgContent)
+    };
+  } catch (error) {
+    monitor.log('WARN', 'Failed to parse manifest structure', { error: error.message });
+    return { items: [], isFlowOnly: true };
+  }
+}
+
+function parseItem(itemXml) {
+  try {
+    const identifierMatch = itemXml.match(/identifier\s*=\s*["']([^"']+)["']/i);
+    const identifierrefMatch = itemXml.match(/identifierref\s*=\s*["']([^"']+)["']/i);
+    const isVisibleMatch = itemXml.match(/isvisible\s*=\s*["']([^"']+)["']/i);
+    const titleMatch = itemXml.match(/<title[^>]*>([^<]+)<\/title>/i);
+    
+    // Skip invisible items (like the remediation wrapper)
+    if (isVisibleMatch && isVisibleMatch[1].toLowerCase() === 'false') {
+      return null;
+    }
+
+    const item = {
+      identifier: identifierMatch ? identifierMatch[1] : null,
+      identifierref: identifierrefMatch ? identifierrefMatch[1] : null,
+      title: titleMatch ? titleMatch[1].trim() : null,
+      isVisible: !isVisibleMatch || isVisibleMatch[1].toLowerCase() !== 'false',
+      children: []
+    };
+
+    // Extract nested items
+    const nestedItemMatches = itemXml.match(/<item[^>]*>[\s\S]*?<\/item>/gi);
+    if (nestedItemMatches && nestedItemMatches.length > 1) {
+      // Remove the outer item match and parse the rest as children
+      for (let i = 1; i < nestedItemMatches.length; i++) {
+        const childItem = parseItem(nestedItemMatches[i]);
+        if (childItem) {
+          item.children.push(childItem);
+        }
+      }
+    }
+
+    return item;
+  } catch (error) {
+    return null;
+  }
+}
+
+function extractTitle(content) {
+  const titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return titleMatch ? titleMatch[1].trim() : 'Course';
+}
 
 ipcMain.handle('get-course-info', async (event, folderPath) => {
   try {
