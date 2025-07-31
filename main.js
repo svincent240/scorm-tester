@@ -7,7 +7,8 @@ const PathUtils = require('./utils/path-utils.js');
 const { ProductionConfig } = require('./config/production.js');
 const { PerformanceMonitor, ResourceMonitor } = require('./monitoring/index.js');
 const ScormApiHandler = require('./utils/scorm-api-handler.js');
-const logger = require('./utils/logger.js');
+const Logger = require('./utils/logger.js');
+const xml2js = require('xml2js');
 
 const config = new ProductionConfig();
 const monitor = new PerformanceMonitor();
@@ -15,6 +16,7 @@ const resourceMonitor = new ResourceMonitor(monitor);
 
 let mainWindow;
 let debugWindow;
+let logger;
 
 // SCORM session storage
 const scormSessions = new Map();
@@ -188,7 +190,13 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  const logDir = app.getPath('userData');
+  logger = new Logger(logDir);
+  console.log(`Log file path: ${logger.logFile}`);
+  // Pass the logger to other modules if needed
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -343,7 +351,6 @@ ipcMain.handle('scorm-terminate', (event, sessionId) => {
   
   return { success: result === 'true', errorCode };
 });
-
 
 
 
@@ -952,9 +959,11 @@ ipcMain.handle('get-course-manifest', async (event, folderPath) => {
     }
 
     const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+    logger.debug('get-course-manifest: Manifest content read.');
     
-    // Parse the manifest to extract course structure
-    const structure = parseManifestStructure(manifestContent);
+    // Parse the manifest to extract course structure using xml2js
+    const structure = await parseManifestStructureXml2js(manifestContent);
+    logger.debug('get-course-manifest: Structure returned by parseManifestStructureXml2js:', structure);
     
     return { structure, success: true };
   } catch (error) {
@@ -966,67 +975,133 @@ ipcMain.handle('get-course-manifest', async (event, folderPath) => {
   }
 });
 
-function parseManifestStructure(manifestContent) {
+async function parseManifestStructureXml2js(manifestContent) {
   try {
-    const orgMatch = manifestContent.match(/<organization[^>]*>([\s\S]*?)<\/organization>/i);
-    if (!orgMatch) {
+    logger.info('=== NAVIGATION DEBUG: parseManifestStructureXml2js started ===');
+    
+    const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
+    const result = await parser.parseStringPromise(manifestContent);
+    logger.info('NAVIGATION DEBUG: XML parsing completed successfully');
+    logger.info('NAVIGATION DEBUG: Raw XML parse result keys:', Object.keys(result));
+    logger.info('NAVIGATION DEBUG: Manifest keys:', Object.keys(result.manifest || {}));
+    logger.info('NAVIGATION DEBUG: Organizations keys:', Object.keys(result.manifest?.organizations || {}));
+
+    const organization = result.manifest.organizations.organization;
+    if (!organization) {
+      logger.warn('NAVIGATION DEBUG: No organization found in manifest, returning empty structure.');
       return { items: [], isFlowOnly: true };
     }
+    
+    logger.info('NAVIGATION DEBUG: Organization found');
+    logger.info('NAVIGATION DEBUG: Organization title:', organization.title);
+    logger.info('NAVIGATION DEBUG: Organization identifier:', organization.identifier);
+    logger.info('NAVIGATION DEBUG: Organization keys:', Object.keys(organization));
+    logger.info('NAVIGATION DEBUG: Organization has item property:', !!organization.item);
+    
+    if (organization.item) {
+      logger.info('NAVIGATION DEBUG: Organization.item type:', Array.isArray(organization.item) ? 'array' : typeof organization.item);
+      if (Array.isArray(organization.item)) {
+        logger.info('NAVIGATION DEBUG: Organization.item array length:', organization.item.length);
+      }
+      logger.info('NAVIGATION DEBUG: Organization.item structure:', JSON.stringify(organization.item, null, 2));
+    }
 
-    const orgContent = orgMatch[1];
-    const isFlowOnlyMatch = manifestContent.match(/<imsss:controlMode[^>]*flow\s*=\s*["']true["'][^>]*choice\s*=\s*["']false["'][^>]*>/i);
+    const isFlowOnlyMatch = organization['imsss:sequencing'] && organization['imsss:sequencing']['imsss:controlMode'] &&
+                            organization['imsss:sequencing']['imsss:controlMode'].flow === 'true' &&
+                            organization['imsss:sequencing']['imsss:controlMode'].choice === 'false';
     const isFlowOnly = !!isFlowOnlyMatch;
+    logger.info('NAVIGATION DEBUG: Flow-only detection:', { isFlowOnly, hasSequencing: !!organization['imsss:sequencing'] });
 
-    const items = parseItemsRecursive(orgContent);
+    logger.info('NAVIGATION DEBUG: About to call parseItemsRecursiveXml2js with:', organization.item || []);
+    const items = parseItemsRecursiveXml2js(organization.item || []);
+    logger.info('NAVIGATION DEBUG: parseItemsRecursiveXml2js returned:', items.length, 'items');
+    logger.info('NAVIGATION DEBUG: Returned item titles:', items.map(i => i.title));
 
-    return {
+    const finalStructure = {
       items,
       isFlowOnly,
-      title: extractTitle(orgContent)
+      title: organization.title || 'Course'
     };
+    logger.info('NAVIGATION DEBUG: Final structure created:', {
+      itemCount: finalStructure.items.length,
+      isFlowOnly: finalStructure.isFlowOnly,
+      title: finalStructure.title
+    });
+    logger.info('NAVIGATION DEBUG: Final structure details:', JSON.stringify(finalStructure, null, 2));
+    logger.info('=== NAVIGATION DEBUG: parseManifestStructureXml2js finished ===');
+    
+    return finalStructure;
   } catch (error) {
-    logger.warn('Failed to parse manifest structure', { error: error.message });
+    logger.error('NAVIGATION DEBUG: Failed to parse manifest structure with xml2js', { error: error.message, stack: error.stack });
     return { items: [], isFlowOnly: true };
   }
 }
 
-function parseItemsRecursive(xmlContent) {
+function parseItemsRecursiveXml2js(xmlItems) {
+  logger.info('=== NAVIGATION DEBUG: parseItemsRecursiveXml2js called ===');
+  logger.info('NAVIGATION DEBUG: Input xmlItems type:', Array.isArray(xmlItems) ? 'array' : typeof xmlItems);
+  logger.info('NAVIGATION DEBUG: Input xmlItems:', JSON.stringify(xmlItems, null, 2));
+  
   const items = [];
-  const itemRegex = /<item([^>]*)>([\s\S]*?)<\/item>/gi;
-  let match;
+  // Ensure xmlItems is an array, even if there's only one item
+  const itemArray = Array.isArray(xmlItems) ? xmlItems : [xmlItems];
+  logger.info('NAVIGATION DEBUG: Processing', itemArray.length, 'items');
 
-  while ((match = itemRegex.exec(xmlContent)) !== null) {
-    const itemAttributes = match[1];
-    const itemInnerContent = match[2];
-
-    const identifierMatch = itemAttributes.match(/identifier\s*=\s*["']([^"']+)["']/i);
-    const identifierrefMatch = itemAttributes.match(/identifierref\s*=\s*["']([^"']+)["']/i);
-    const isVisibleMatch = itemAttributes.match(/isvisible\s*=\s*["']([^"']+)["']/i);
-    const titleMatch = itemInnerContent.match(/<title[^>]*>([^<]+)<\/title>/i);
-
-    const isVisible = !isVisibleMatch || isVisibleMatch[1].toLowerCase() !== 'false';
+  itemArray.forEach((xmlItem, index) => {
+    logger.info(`NAVIGATION DEBUG: === Processing item ${index + 1}/${itemArray.length} ===`);
+    logger.info('NAVIGATION DEBUG: Raw xmlItem:', JSON.stringify(xmlItem, null, 2));
+    
+    const isVisible = xmlItem.isvisible !== 'false';
+    const title = xmlItem.title || 'No Title';
+    logger.info('NAVIGATION DEBUG: Item details:', {
+      identifier: xmlItem.identifier,
+      identifierref: xmlItem.identifierref,
+      title: title,
+      isvisible: xmlItem.isvisible,
+      isVisible: isVisible,
+      hasChildren: !!xmlItem.item
+    });
 
     const item = {
-      identifier: identifierMatch ? identifierMatch[1] : null,
-      identifierref: identifierrefMatch ? identifierrefMatch[1] : null,
-      title: titleMatch ? titleMatch[1].trim() : null,
+      identifier: xmlItem.identifier || null,
+      identifierref: xmlItem.identifierref || null,
+      title: title,
       isVisible: isVisible,
-      children: parseItemsRecursive(itemInnerContent) // Recursively parse children
+      children: []
     };
 
-    // If an item is invisible but has visible children, promote the children
-    if (!item.isVisible && item.children.length > 0) {
-      items.push(...item.children);
-    } else if (item.isVisible) {
-      items.push(item);
+    if (xmlItem.item) {
+      logger.info('NAVIGATION DEBUG: Item has children, recursing...');
+      item.children = parseItemsRecursiveXml2js(xmlItem.item);
+      logger.info('NAVIGATION DEBUG: Item children after recursive call:', item.children.length, 'children');
+      logger.info('NAVIGATION DEBUG: Children details:', JSON.stringify(item.children, null, 2));
     }
-  }
-  return items;
-}
 
-function extractTitle(content) {
-  const titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return titleMatch ? titleMatch[1].trim() : 'Course';
+    if (!item.isVisible) {
+      logger.info('NAVIGATION DEBUG: Item is INVISIBLE');
+      if (item.children.length > 0) {
+        logger.info('NAVIGATION DEBUG: Invisible item has', item.children.length, 'children - PROMOTING CHILDREN');
+        logger.info('NAVIGATION DEBUG: Children being promoted:', item.children.map(c => c.title));
+        items.push(...item.children);
+        logger.info('NAVIGATION DEBUG: Items array after promoting children:', items.length, 'total items');
+      } else {
+        logger.info('NAVIGATION DEBUG: Invisible item has no children - SKIPPING');
+      }
+    } else {
+      logger.info('NAVIGATION DEBUG: Item is VISIBLE - ADDING TO ITEMS');
+      items.push(item);
+      logger.info('NAVIGATION DEBUG: Items array after adding visible item:', items.length, 'total items');
+    }
+    
+    logger.info(`NAVIGATION DEBUG: === Finished processing item ${index + 1} ===`);
+  });
+  
+  logger.info('NAVIGATION DEBUG: Final items array:', items.length, 'items');
+  logger.info('NAVIGATION DEBUG: Final items titles:', items.map(i => i.title));
+  logger.info('NAVIGATION DEBUG: Final items details:', JSON.stringify(items, null, 2));
+  logger.info('=== NAVIGATION DEBUG: parseItemsRecursiveXml2js finished ===');
+  
+  return items;
 }
 
 async function extractCourseContentStructure(coursePath) {
@@ -1087,7 +1162,7 @@ function parseContentFile(content, filename) {
         data.slides.forEach((slide, index) => {
           if (slide.title || slide.name) {
             structure.push({
-              id: slide.id || `slide_${index}`,
+              id: `slide_${index}`,
               title: slide.title || slide.name,
               type: 'sco',
               completed: false,
@@ -1104,7 +1179,7 @@ function parseContentFile(content, filename) {
           nav.forEach((item, index) => {
             if (item.title || item.name || item.label) {
               structure.push({
-                id: item.id || `nav_${index}`,
+                id: `nav_${index}`,
                 title: item.title || item.name || item.label,
                 type: item.type === 'quiz' || item.type === 'test' ? 'assessment' : 'sco',
                 completed: false,
@@ -1144,7 +1219,7 @@ function parseContentFile(content, filename) {
       if (titleMatches && titleMatches.length > 1) {
         titleMatches.forEach((match, index) => {
           const titleMatch = match.match(/["']([^"']+)["']/);
-          if (titleMatch) {
+          if (titleMatch) { // Added missing brace here
             const title = titleMatch[1];
             if (title.length > 2 && !title.includes('function')) {
               structure.push({
@@ -1155,7 +1230,7 @@ function parseContentFile(content, filename) {
                 active: index === 0
               });
             }
-          }
+          } // Closing brace for if (titleMatch)
         });
       }
     }
@@ -1333,17 +1408,21 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       });
       
       // Parse course structure from manifest
-      let courseStructure = parseManifestStructure(manifestContent);
+      let courseStructure = await parseManifestStructureXml2js(manifestContent);
       
       // If manifest parsing didn't yield detailed structure, try to extract from course content
-      if (courseStructure.length <= 1) {
+      // BUG FIX: Check if courseStructure.items is empty, not just length of courseStructure itself
+      if (!courseStructure.items || courseStructure.items.length === 0) {
+        logger.debug('get-course-info: Manifest parsing yielded no items, attempting content structure extraction.');
         const contentStructure = await extractCourseContentStructure(normalizedPath);
         if (contentStructure.length > 0) {
-          courseStructure = contentStructure;
+          courseStructure.items = contentStructure; // Assign to items property
+          logger.debug('get-course-info: Content structure extracted and assigned to courseStructure.items.');
         }
       }
       
       logger.info('main.js: get-course-info returning courseInfo with structure:', courseStructure); // Added log
+      logger.debug('get-course-info: Course structure before returning:', courseStructure);
       return {
         title,
         version,

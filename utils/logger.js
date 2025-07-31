@@ -1,15 +1,13 @@
 // utils/logger.js
-const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 class Logger {
-    constructor() {
+    constructor(logDir) {
         if (Logger.instance) {
             return Logger.instance;
         }
 
-        const logDir = app.getPath('userData');
         this.logFile = path.join(logDir, 'app.log');
         this.logLevel = process.env.LOG_LEVEL || 'info';
         this.initLogFile();
@@ -19,6 +17,10 @@ class Logger {
 
     initLogFile() {
         try {
+            const logDirectory = path.dirname(this.logFile);
+            if (!fs.existsSync(logDirectory)) {
+                fs.mkdirSync(logDirectory, { recursive: true });
+            }
             if (!fs.existsSync(this.logFile)) {
                 fs.writeFileSync(this.logFile, `Log file created at ${new Date().toISOString()}\n`);
             }
@@ -61,5 +63,4 @@ class Logger {
     }
 }
 
-const logger = new Logger();
-module.exports = logger;
+module.exports = Logger;

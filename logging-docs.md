@@ -4,7 +4,7 @@ This document outlines the proper use of the logging and debugging functions in 
 
 ## Centralized Logging
 
-All logging is now handled by a centralized logger that writes to a log file located at: `%APPDATA%/scorm-tool/app.log` on Windows and `~/.config/scorm-tool/app.log` on macOS/Linux.
+All logging is now handled by a centralized logger that writes to a log file located at: `%APPDATA%/scorm-testing-tool/app.log` on Windows and `~/.config/scorm-testing-tool/app.log` on macOS/Linux. The exact path to the log file is printed to the console when the application starts.
 
 ### Backend Logging (`main.js`)
 

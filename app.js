@@ -262,16 +262,16 @@ class EnhancedScormPreview {
             
             // Get detailed course structure from the manifest
             const manifestData = await window.electronAPI.getCourseManifest(this.currentCoursePath);
-            window.electronAPI.log('info', 'app.js: manifestData received:', manifestData); // Added log
-            window.electronAPI.log('info', 'app.js: courseInfo received:', courseInfo); // Added log
+            window.electronAPI.log('debug', 'app.js: manifestData received in loadCourse:', manifestData); // Added log
+            window.electronAPI.log('debug', 'app.js: courseInfo received in loadCourse:', courseInfo); // Added log
 
             const courseStructure = (manifestData && manifestData.structure && manifestData.structure.items && manifestData.structure.items.length > 0) ? manifestData.structure.items : [];
-
-            this.displayCourseNavigation(manifestData.structure, courseInfo); // Pass structure
+            
+            this.displayCourseNavigation(courseInfo); // Pass courseInfo directly
             this.enableControls();
             this.setupScormAPI();
             this.updateNavigationStatus(); // Update LMS navigation bar
-            this.populateCourseOutline(courseStructure, courseInfo); // Pass structure
+            this.populateCourseOutline(courseInfo.courseStructure, courseInfo); // Pass courseStructure and courseInfo
             this.showCourseOutlineByDefault(); // Show outline by default like real LMS
             
             // Wait for course to fully load before enabling navigation
@@ -312,12 +312,15 @@ class EnhancedScormPreview {
         this.elements.courseInfo.style.display = 'block';
     }
 
-    async displayCourseNavigation(structure, courseInfo) { // Modified signature
+    async displayCourseNavigation(courseInfo) { // Modified signature
         try {
+            const structure = courseInfo.courseStructure; // Get structure from courseInfo
             if (structure && structure.items && structure.items.length > 0) {
+                window.electronAPI.log('info', 'displayCourseNavigation: Building main navigation with detailed structure:', structure);
                 this.buildMainNavigation(structure, courseInfo);
                 this.buildDebugNavigation(structure);
             } else {
+                window.electronAPI.log('info', 'displayCourseNavigation: Building simple main navigation (flow-only or no items):', structure);
                 // Fallback for courses without detailed structure or flow-only courses
                 this.buildSimpleMainNavigation(courseInfo);
                 this.buildSimpleDebugNavigation(courseInfo);
@@ -336,19 +339,7 @@ class EnhancedScormPreview {
     buildMainNavigation(structure, courseInfo) {
         const isFlowOnly = structure.isFlowOnly;
         
-        if (isFlowOnly || !structure.items || structure.items.length === 0) {
-            // Flow-only course - show helpful guidance
-            this.elements.navPanelInfo.textContent = 'Sequential navigation course';
-            this.elements.mainCourseNavigationTree.innerHTML = `
-                <div class="flow-navigation-info">
-                    <div class="flow-icon">🧭</div>
-                    <h5>Sequential Navigation Course</h5>
-                    <p>This course includes Previous/Next navigation controls.</p>
-                    <p><strong>Note:</strong> In a full LMS, you would see additional navigation UI (top bar, sidebar) that our tester doesn't provide.</p>
-                    <p>The course content will load with basic navigation controls.</p>
-                </div>
-            `;
-        } else {
+        if (structure.items && structure.items.length > 0) {
             // Course with visible structure
             this.elements.navPanelInfo.textContent = `${structure.items.length} sections available`;
             const nav = document.createElement('div');
@@ -361,6 +352,18 @@ class EnhancedScormPreview {
             
             this.elements.mainCourseNavigationTree.innerHTML = '';
             this.elements.mainCourseNavigationTree.appendChild(nav);
+        } else {
+            // Fallback for courses without detailed structure or flow-only courses
+            this.elements.navPanelInfo.textContent = 'Sequential navigation course';
+            this.elements.mainCourseNavigationTree.innerHTML = `
+                <div class="flow-navigation-info">
+                    <div class="flow-icon">🧭</div>
+                    <h5>Sequential Navigation Course</h5>
+                    <p>This course includes Previous/Next navigation controls.</p>
+                    <p><strong>Note:</strong> In a full LMS, you would see additional navigation UI (top bar, sidebar) that our tester doesn't provide.</p>
+                    <p>The course content will load with basic navigation controls.</p>
+                </div>
+            `;
         }
     }
 
@@ -493,7 +496,6 @@ class EnhancedScormPreview {
         const self = this;
         // No need for apiCache, cacheTimeout, commitTimer, debouncedCommit here.
         // The main process's ScormApiHandler will handle the actual data and caching.
-
         window.API = {
             LMSInitialize: function(param) {
                 self.logApiCall('init', 'LMSInitialize', param);
@@ -1090,45 +1092,58 @@ class EnhancedScormPreview {
         checkReady();
     }
 
-    populateCourseOutline(courseInfo) {
+    populateCourseOutline(courseStructure, courseInfo) { // Modified signature
         const outlineContent = document.getElementById('lmsOutlineContent');
         if (!outlineContent) return;
 
         try {
+            window.electronAPI.log('info', '=== NAVIGATION DEBUG: populateCourseOutline called ===');
+            window.electronAPI.log('info', 'NAVIGATION DEBUG: courseStructure received:', JSON.stringify(courseStructure, null, 2));
+            window.electronAPI.log('info', 'NAVIGATION DEBUG: courseInfo received:', JSON.stringify(courseInfo, null, 2));
+            
             // Clear existing content
             outlineContent.innerHTML = '';
 
-            // Try to get course structure from different sources
-            let courseStructure = this.extractCourseStructure(courseInfo);
-            
-            if (!courseStructure || courseStructure.length === 0) {
+            if (!courseStructure || !courseStructure.items || courseStructure.items.length === 0) {
+                window.electronAPI.log('warn', 'NAVIGATION DEBUG: No course structure items found, creating fallback');
                 // Create a default structure for single SCO courses
                 courseStructure = [{
                     id: 'main',
-                    title: courseInfo.title || 'Main Course',
+                    title: courseInfo.title || 'Course Content',
                     type: 'sco',
                     completed: false,
                     active: true
                 }];
+                window.electronAPI.log('info', 'NAVIGATION DEBUG: Fallback structure created:', courseStructure);
+            } else {
+                window.electronAPI.log('info', 'NAVIGATION DEBUG: Using actual course structure with', courseStructure.items.length, 'items');
+                window.electronAPI.log('info', 'NAVIGATION DEBUG: Item titles:', courseStructure.items.map(i => i.title));
             }
 
+            // Determine which structure to use for population
+            const itemsToPopulate = courseStructure.items || courseStructure;
+            window.electronAPI.log('info', 'NAVIGATION DEBUG: Items to populate:', itemsToPopulate.length, 'items');
+            window.electronAPI.log('info', 'NAVIGATION DEBUG: Items details:', JSON.stringify(itemsToPopulate, null, 2));
+
             // Populate the outline
-            courseStructure.forEach((item, index) => {
+            itemsToPopulate.forEach((item, index) => {
+                window.electronAPI.log('info', `NAVIGATION DEBUG: Creating outline item ${index + 1}: ${item.title}`);
+                
                 const outlineItem = document.createElement('div');
                 outlineItem.className = 'lms-outline-item';
-                outlineItem.dataset.itemId = item.id;
+                outlineItem.dataset.itemId = item.identifier || item.id;
                 
-                if (item.active) {
+                if (item.active === true) {
                     outlineItem.classList.add('active');
                 }
-                if (item.completed) {
+                if (item.completed === true) {
                     outlineItem.classList.add('completed');
                 }
 
                 // Use clean titles without icons or generic labels to match real LMS behavior
                 outlineItem.innerHTML = `
                     <div class="lms-outline-item-title">${this.escapeHtml(item.title)}</div>
-                    <div class="lms-outline-item-meta">${item.type === 'assessment' ? 'Quiz' : 'Lesson'}</div>
+                    <div class="lms-outline-item-meta">${this.detectItemType(item.title) === 'assessment' ? 'Quiz' : 'Lesson'}</div>
                 `;
 
                 // Add click handler for navigation
@@ -1137,13 +1152,17 @@ class EnhancedScormPreview {
                 });
 
                 outlineContent.appendChild(outlineItem);
+                window.electronAPI.log('info', `NAVIGATION DEBUG: Added outline item: ${item.title}`);
             });
 
             // Update progress
-            this.updateCourseProgress(courseStructure);
+            this.updateCourseProgress(itemsToPopulate);
+            
+            window.electronAPI.log('info', 'NAVIGATION DEBUG: Course outline population completed');
+            window.electronAPI.log('info', '=== NAVIGATION DEBUG: populateCourseOutline finished ===');
 
         } catch (error) {
-            console.log('Error populating course outline:', error);
+            window.electronAPI.log('error', 'NAVIGATION DEBUG: Error populating course outline:', error);
             // Fallback display
             outlineContent.innerHTML = `
                 <div class="lms-outline-item active">
@@ -1154,177 +1173,10 @@ class EnhancedScormPreview {
         }
     }
 
-    extractCourseStructure(courseInfo) {
-        // First, try to use the actual course structure from the SCORM manifest
-        if (courseInfo.courseStructure && courseInfo.courseStructure.length > 0) {
-            console.log('Using actual course structure from manifest:', courseInfo.courseStructure);
-            // Convert the structure to match LMS display format
-            return courseInfo.courseStructure.map((item, index) => ({
-                id: item.identifier || item.id || `item_${index}`,
-                title: item.title,
-                type: this.detectItemType(item.title),
-                completed: false,
-                active: index === 0
-            }));
-        }
-        
-        // Fallback: Try to parse from manifest if available
-        if (courseInfo.manifest && courseInfo.manifest.organizations) {
-            const structure = this.parseManifestStructure(courseInfo.manifest);
-            if (structure.length > 0) {
-                console.log('Parsed structure from manifest object:', structure);
-                return structure;
-            }
-        }
-        
-        // Last resort: Create a basic single-item structure
-        console.log('Creating fallback single-item structure');
-        return [{
-            id: 'main',
-            title: courseInfo.title || 'Course Content',
-            type: 'sco',
-            completed: false,
-            active: true
-        }];
-    }
-
     detectItemType(title) {
         if (!title) return 'sco';
         const lowerTitle = title.toLowerCase();
         return (lowerTitle.includes('quiz') || lowerTitle.includes('test') || lowerTitle.includes('assessment')) ? 'assessment' : 'sco';
-    }
-
-    parseManifestStructure(manifest) {
-        const structure = [];
-        
-        try {
-            // Parse SCORM manifest for course structure
-            const org = manifest.organizations?.organization;
-            if (org && org.item) {
-                const items = Array.isArray(org.item) ? org.item : [org.item];
-                
-                items.forEach((item, index) => {
-                    structure.push({
-                        id: item.identifier || `item_${index}`,
-                        title: item.title || `Module ${index + 1}`,
-                        type: 'sco',
-                        completed: false,
-                        active: index === 0
-                    });
-                });
-            }
-        } catch (error) {
-            console.log('Error parsing manifest structure:', error);
-        }
-
-        return structure;
-    }
-
-    detectCourseModules() {
-        // This will be expanded to detect course modules from the loaded content
-        const structure = [];
-        
-        // For now, we'll detect common course patterns
-        // This could be expanded to parse Storyline slide structure, Captivate modules, etc.
-        
-        return structure;
-    }
-
-    createDefaultStructure(courseInfo) {
-        // Create a realistic LMS-style course structure
-        const title = courseInfo.title || 'Course Content';
-        
-        // Create a typical course structure similar to what you'd see in Litmos
-        // This simulates a real course with multiple sections/modules
-        const structure = [
-            { 
-                id: 'overview', 
-                title: 'Course Overview', 
-                type: 'sco', 
-                completed: false, 
-                active: true 
-            },
-            { 
-                id: 'module1', 
-                title: 'Module 1: Getting Started', 
-                type: 'sco', 
-                completed: false, 
-                active: false 
-            },
-            { 
-                id: 'module2', 
-                title: 'Module 2: Core Concepts', 
-                type: 'sco', 
-                completed: false, 
-                active: false 
-            },
-            { 
-                id: 'module3', 
-                title: 'Module 3: Advanced Topics', 
-                type: 'sco', 
-                completed: false, 
-                active: false 
-            },
-            { 
-                id: 'assessment', 
-                title: 'Final Assessment', 
-                type: 'assessment', 
-                completed: false, 
-                active: false 
-            },
-            { 
-                id: 'conclusion', 
-                title: 'Course Conclusion', 
-                type: 'sco', 
-                completed: false, 
-                active: false 
-            }
-        ];
-
-        // For Storyline courses, customize the structure
-        if (title.includes('SL360') || title.includes('Storyline')) {
-            return [
-                { 
-                    id: 'slide1', 
-                    title: 'Introduction Slide', 
-                    type: 'sco', 
-                    completed: false, 
-                    active: true 
-                },
-                { 
-                    id: 'slide2', 
-                    title: 'Content Slides', 
-                    type: 'sco', 
-                    completed: false, 
-                    active: false 
-                },
-                { 
-                    id: 'slide3', 
-                    title: 'Interactive Activities', 
-                    type: 'sco', 
-                    completed: false, 
-                    active: false 
-                },
-                { 
-                    id: 'slide4', 
-                    title: 'Knowledge Check', 
-                    type: 'assessment', 
-                    completed: false, 
-                    active: false 
-                },
-                { 
-                    id: 'slide5', 
-                    title: 'Summary & Resources', 
-                    type: 'sco', 
-                    completed: false, 
-                    active: false 
-                }
-            ];
-        }
-
-        // Always return the multi-module structure for better LMS simulation
-        // Real LMS environments typically show course outline even for single SCO packages
-        return structure;
     }
 
     navigateToOutlineItem(itemId) {
@@ -1366,9 +1218,9 @@ class EnhancedScormPreview {
     escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') return '';
         return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
+            .replace(/&/g, "&")
+            .replace(/</g, "<")
+            .replace(/>/g, ">")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }

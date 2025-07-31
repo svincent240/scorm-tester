@@ -7,7 +7,7 @@
     "start": "electron .",
     "build": "electron-builder",
     "dev": "electron .",
-    "dev-debug": "set NODE_ENV=development && electron .",
+    "dev-debug": "set NODE_ENV=development && set LOG_LEVEL=debug && electron .",
     "dist": "electron-builder --publish=never",
     "test": "jest",
     "lint": "eslint ."
@@ -41,7 +41,8 @@
     "eslint": "^8.0.0"
   },
   "dependencies": {
-    "node-stream-zip": "^1.15.0"
+    "node-stream-zip": "^1.15.0",
+    "xml2js": "^0.6.2"
   },
   "keywords": [
     "scorm",
