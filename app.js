@@ -118,7 +118,7 @@ class EnhancedScormPreview {
         // Add listener for SCORM API logs from main process
         if (window.electronAPI?.onScormApiLog) {
             const apiLogCleanup = window.electronAPI.onScormApiLog((data) => {
-                console.log(`SCORM API Log: Method: ${data.method}, Element: ${data.element}, Value: ${data.value}, ErrorCode: ${data.errorCode}`);
+                window.electronAPI.log('info', `SCORM API Log: Method: ${data.method}, Element: ${data.element}, Value: ${data.value}, ErrorCode: ${data.errorCode}`);
             });
             if (typeof apiLogCleanup === 'function') {
                 this.cleanupFunctions.push(apiLogCleanup);
@@ -156,7 +156,7 @@ class EnhancedScormPreview {
                 try {
                     cleanup();
                 } catch (error) {
-                    console.warn('Cleanup function failed:', error);
+                    window.electronAPI.log('warn', 'Cleanup function failed:', error);
                 }
             });
             this.cleanupFunctions = [];
@@ -165,12 +165,12 @@ class EnhancedScormPreview {
                 try {
                     window.API.LMSFinish('');
                 } catch (error) {
-                    console.warn('Failed to terminate SCORM session:', error);
+                    window.electronAPI.log('warn', 'Failed to terminate SCORM session:', error);
                 }
             }
-            console.log('ScormPreview cleanup completed');
+            window.electronAPI.log('info', 'ScormPreview cleanup completed');
         } catch (error) {
-            console.error('Error during cleanup:', error);
+            window.electronAPI.log('error', 'Error during cleanup:', error);
         }
     }
 
@@ -188,27 +188,27 @@ class EnhancedScormPreview {
     }
 
     async loadScormPackage() {
-        console.log('app.js: loadScormPackage called');
+        window.electronAPI.log('info', 'app.js: loadScormPackage called');
         try {
             this.showLoading();
             this.clearError();
-            console.log('app.js: Calling electronAPI.selectScormPackage()');
+            window.electronAPI.log('info', 'app.js: Calling electronAPI.selectScormPackage()');
             const zipPath = await window.electronAPI.selectScormPackage();
             if (!zipPath) {
-                console.log('app.js: No zip path returned from dialog');
+                window.electronAPI.log('info', 'app.js: No zip path returned from dialog');
                 this.hideLoading();
                 return;
             }
-            console.log(`app.js: Zip path selected: ${zipPath}`);
+            window.electronAPI.log('info', `app.js: Zip path selected: ${zipPath}`);
             const extractedPath = await window.electronAPI.extractScorm(zipPath);
             if (!extractedPath) {
-                console.error('app.js: Failed to extract SCORM package');
+                window.electronAPI.log('error', 'app.js: Failed to extract SCORM package');
                 throw new Error('Failed to extract SCORM package');
             }
-            console.log(`app.js: SCORM package extracted to: ${extractedPath}`);
+            window.electronAPI.log('info', `app.js: SCORM package extracted to: ${extractedPath}`);
             await this.loadCourse(extractedPath);
         } catch (error) {
-            console.error('app.js: Error loading SCORM package:', error);
+            window.electronAPI.log('error', 'app.js: Error loading SCORM package:', error);
             this.hideLoading();
             this.showError(`Error loading SCORM package: ${error.message}`);
         }
@@ -231,22 +231,22 @@ class EnhancedScormPreview {
     }
 
     async loadCourse(coursePath) {
-        console.log(`app.js: loadCourse called with path: ${coursePath}`);
+        window.electronAPI.log('info', `app.js: loadCourse called with path: ${coursePath}`);
         try {
             const entryPointResult = await window.electronAPI.findScormEntry(coursePath);
             if (!entryPointResult || !entryPointResult.success) {
                 const errorMessage = entryPointResult ? entryPointResult.error : 'Unknown error finding course entry point.';
-                console.error(`app.js: Failed to find SCORM entry point: ${errorMessage}`);
+                window.electronAPI.log('error', `app.js: Failed to find SCORM entry point: ${errorMessage}`);
                 throw new Error(`Could not find course entry point: ${errorMessage}`);
             }
             const entryPoint = entryPointResult.entryPath;
             const launchUrl = entryPointResult.launchUrl; // Get the launchUrl
-            console.log(`app.js: Found SCORM entry point: ${entryPoint}`);
-            console.log(`app.js: Launch URL from manifest: ${launchUrl}`); // Log the launchUrl
+            window.electronAPI.log('info', `app.js: Found SCORM entry point: ${entryPoint}`);
+            window.electronAPI.log('info', `app.js: Launch URL from manifest: ${launchUrl}`); // Log the launchUrl
             const courseInfo = await window.electronAPI.getCourseInfo(coursePath);
             // Check if courseInfo also indicates an error
             if (courseInfo && courseInfo.error) {
-                console.error(`app.js: Failed to get course info: ${courseInfo.error}`);
+                window.electronAPI.log('error', `app.js: Failed to get course info: ${courseInfo.error}`);
                 throw new Error(`Failed to get course information: ${courseInfo.error}`);
             }
             
@@ -259,11 +259,19 @@ class EnhancedScormPreview {
             this.displayCourseInfo(courseInfo);
             // Pass launchUrl to loadCourseInFrame
             this.loadCourseInFrame(entryPoint, launchUrl); // Pass launchUrl instead of contentIdentifier
-            this.displayCourseNavigation(courseInfo);
+            
+            // Get detailed course structure from the manifest
+            const manifestData = await window.electronAPI.getCourseManifest(this.currentCoursePath);
+            window.electronAPI.log('info', 'app.js: manifestData received:', manifestData); // Added log
+            window.electronAPI.log('info', 'app.js: courseInfo received:', courseInfo); // Added log
+
+            const courseStructure = (manifestData && manifestData.structure && manifestData.structure.items && manifestData.structure.items.length > 0) ? manifestData.structure.items : [];
+
+            this.displayCourseNavigation(manifestData.structure, courseInfo); // Pass structure
             this.enableControls();
             this.setupScormAPI();
             this.updateNavigationStatus(); // Update LMS navigation bar
-            this.populateCourseOutline(courseInfo); // Populate LMS course outline
+            this.populateCourseOutline(courseStructure, courseInfo); // Pass structure
             this.showCourseOutlineByDefault(); // Show outline by default like real LMS
             
             // Wait for course to fully load before enabling navigation
@@ -274,7 +282,7 @@ class EnhancedScormPreview {
             this.logApiCall('system', `New session initialized: ${this.currentSessionId}`);
 
         } catch (error) {
-            console.error('app.js: Error in loadCourse:', error);
+            window.electronAPI.log('error', 'app.js: Error in loadCourse:', error);
             this.hideLoading();
             this.showError(`Error loading course: ${error.message}`);
         }
@@ -287,9 +295,9 @@ class EnhancedScormPreview {
         const queryString = launchUrl.includes('?') ? launchUrl.substring(launchUrl.indexOf('?')) : '';
         const fullUrlWithQuery = finalFileUrl + queryString;
 
-        console.log(`app.js: loadCourseInFrame - entryPoint: ${entryPoint}`);
-        console.log(`app.js: loadCourseInFrame - launchUrl (from manifest): ${launchUrl}`);
-        console.log(`app.js: loadCourseInFrame - final URL for iframe: ${fullUrlWithQuery}`);
+        window.electronAPI.log('info', `app.js: loadCourseInFrame - entryPoint: ${entryPoint}`);
+        window.electronAPI.log('info', `app.js: loadCourseInFrame - launchUrl (from manifest): ${launchUrl}`);
+        window.electronAPI.log('info', `app.js: loadCourseInFrame - final URL for iframe: ${fullUrlWithQuery}`);
         this.elements.previewFrame.src = fullUrlWithQuery;
         
         this.elements.noContent.style.display = 'none';
@@ -304,14 +312,11 @@ class EnhancedScormPreview {
         this.elements.courseInfo.style.display = 'block';
     }
 
-    async displayCourseNavigation(courseInfo) {
+    async displayCourseNavigation(structure, courseInfo) { // Modified signature
         try {
-            // Get detailed course structure from the manifest
-            const manifestData = await window.electronAPI.getCourseManifest(this.currentCoursePath);
-            
-            if (manifestData && manifestData.structure) {
-                this.buildMainNavigation(manifestData.structure, courseInfo);
-                this.buildDebugNavigation(manifestData.structure);
+            if (structure && structure.items && structure.items.length > 0) {
+                this.buildMainNavigation(structure, courseInfo);
+                this.buildDebugNavigation(structure);
             } else {
                 // Fallback for courses without detailed structure or flow-only courses
                 this.buildSimpleMainNavigation(courseInfo);
@@ -321,7 +326,7 @@ class EnhancedScormPreview {
             // Hide the main navigation panel by default (only show in dev mode)
             this.elements.courseNavigationPanel.style.display = 'none';
         } catch (error) {
-            console.warn('Failed to get course navigation structure:', error);
+            window.electronAPI.log('warn', 'Failed to get course navigation structure:', error);
             this.buildSimpleMainNavigation(courseInfo);
             this.buildSimpleDebugNavigation(courseInfo);
             this.elements.courseNavigationPanel.style.display = 'none';
@@ -360,79 +365,17 @@ class EnhancedScormPreview {
     }
 
     buildSimpleMainNavigation(courseInfo) {
-        // For SCORM 2004 courses, show what a typical LMS navigation would look like
         this.elements.navPanelInfo.textContent = 'Course navigation';
-        
         const isScorm2004 = courseInfo.scormVersion && courseInfo.scormVersion.includes('2004');
-        
-        if (isScorm2004 && courseInfo.title && courseInfo.title.includes('Golf')) {
-            // This looks like the Golf course - provide the expected navigation structure
-            this.buildGolfCourseNavigation(courseInfo);
-        } else {
-            this.elements.mainCourseNavigationTree.innerHTML = `
-                <div class="flow-navigation-info">
-                    <div class="flow-icon">${isScorm2004 ? '🎯' : '📖'}</div>
-                    <h5>${courseInfo.title}</h5>
-                    <p>${isScorm2004 ? 'SCORM 2004 course with sequential navigation.' : 'SCORM 1.2 course.'}</p>
-                    <p>Course content will include navigation controls.</p>
-                </div>
-            `;
-        }
-    }
-
-    buildGolfCourseNavigation(courseInfo) {
-        // Build the expected navigation structure for the Golf course based on the manifest
-        this.elements.navPanelInfo.textContent = 'Course sections';
-        
-        const nav = document.createElement('div');
-        nav.className = 'main-course-nav';
-        
-        const sections = [
-            { title: 'Playing the Game', icon: '⛳', status: 'current' },
-            { title: 'Etiquette', icon: '🤝', status: 'locked' },
-            { title: 'Handicapping', icon: '📊', status: 'locked' },
-            { title: 'Having Fun', icon: '🎉', status: 'locked' },
-            { title: 'Playing Quiz', icon: '📝', status: 'locked' },
-            { title: 'Etiquette Quiz', icon: '📝', status: 'locked' },
-            { title: 'Handicapping Quiz', icon: '📝', status: 'locked' },
-            { title: 'Having Fun Quiz', icon: '📝', status: 'locked' }
-        ];
-        
-        sections.forEach((section, index) => {
-            const navItem = document.createElement('div');
-            navItem.className = `main-nav-item ${section.status}`;
-            
-            const content = document.createElement('div');
-            content.className = 'nav-item-content';
-            
-            const icon = document.createElement('span');
-            icon.className = 'nav-item-icon';
-            icon.textContent = section.icon;
-            
-            const title = document.createElement('span');
-            title.textContent = section.title;
-            
-            content.appendChild(icon);
-            content.appendChild(title);
-            navItem.appendChild(content);
-            
-            if (section.status === 'current') {
-                const status = document.createElement('span');
-                status.className = 'nav-item-status current';
-                status.textContent = 'Current';
-                navItem.appendChild(status);
-            } else if (section.status === 'locked') {
-                const status = document.createElement('span');
-                status.className = 'nav-item-status locked';
-                status.textContent = '🔒';
-                navItem.appendChild(status);
-            }
-            
-            nav.appendChild(navItem);
-        });
-        
-        this.elements.mainCourseNavigationTree.innerHTML = '';
-        this.elements.mainCourseNavigationTree.appendChild(nav);
+        this.elements.mainCourseNavigationTree.innerHTML = `
+            <div class="flow-navigation-info">
+                <div class="flow-icon">${isScorm2004 ? '🎯' : '📖'}</div>
+                <h5>${this.escapeHtml(courseInfo.title || 'Course Content')}</h5>
+                <p>${isScorm2004 ? 'SCORM 2004 course with sequential navigation.' : 'SCORM 1.2 course.'}</p>
+                <p>Course content will include navigation controls.</p>
+                <p><strong>Note:</strong> This course does not provide a detailed navigation structure in its manifest, or it is a flow-only course.</p>
+            </div>
+        `;
     }
 
     buildDebugNavigation(structure) {
@@ -510,7 +453,7 @@ class EnhancedScormPreview {
             navItem.style.cursor = 'pointer';
             navItem.addEventListener('click', () => {
                 // Future: implement navigation to specific item
-                console.log('Navigate to:', item.identifier);
+                window.electronAPI.log('info', 'Navigate to:', item.identifier);
             });
         }
         
@@ -523,11 +466,14 @@ class EnhancedScormPreview {
         
         const title = document.createElement('div');
         title.className = `nav-item-title ${isCurrent ? 'current' : ''}`;
-        title.textContent = `📄 ${item.title || item.identifier || 'Untitled'}`;
+        // Show visibility status and type in debug view
+        const visibilityIcon = item.isVisible === false ? '👁️‍🗨️' : '👁️';
+        const typeIcon = item.identifierref ? '📄' : '📁';
+        title.textContent = `${visibilityIcon}${typeIcon} ${item.title || item.identifier || 'Untitled'}`;
         
         const info = document.createElement('div');
         info.className = 'nav-info';
-        info.textContent = `ID: ${item.identifier}${item.identifierref ? ` → ${item.identifierref}` : ''}`;
+        info.textContent = `ID: ${item.identifier}${item.identifierref ? ` → ${item.identifierref}` : ''} ${item.isVisible === false ? '(invisible)' : ''}`;
         
         navItem.appendChild(title);
         navItem.appendChild(info);
@@ -579,17 +525,17 @@ class EnhancedScormPreview {
                             window.electronAPI.scormGetValue(self.currentSessionId, 'cmi.total_time')
                                 .then(res => { if (res.success) self.localDataCache.set('cmi.total_time', res.value); });
                         } else {
-                            console.error('SCORM Initialize failed:', response.errorCode);
+                            window.electronAPI.log('error', 'SCORM Initialize failed:', response.errorCode);
                         }
                     })
-                    .catch(error => console.error('Error initializing SCORM session:', error));
+                    .catch(error => window.electronAPI.log('error', 'Error initializing SCORM session:', error));
                 return self.isConnected ? "true" : "false"; // Always return true for synchronous API
             },
             LMSFinish: function(param) {
                 self.logApiCall('finish', 'LMSFinish', param);
                 if (self.isConnected) {
                     window.electronAPI.scormTerminate(self.currentSessionId)
-                        .catch(error => console.error('Error terminating SCORM session:', error));
+                        .catch(error => window.electronAPI.log('error', 'Error terminating SCORM session:', error));
                     return "true";
                 }
                 return "false";
@@ -611,10 +557,10 @@ class EnhancedScormPreview {
                             self.localDataCache.set(element, response.value);
                             self.updateDataDisplay(element, response.value);
                         } else {
-                            console.warn(`LMSGetValue async update failed for ${element}:`, response.errorCode);
+                            window.electronAPI.log('warn', `LMSGetValue async update failed for ${element}:`, response.errorCode);
                         }
                     })
-                    .catch(error => console.error(`Error in async LMSGetValue for ${element}:`, error));
+                    .catch(error => window.electronAPI.log('error', `Error in async LMSGetValue for ${element}:`, error));
                 
                 return value;
             },
@@ -1179,12 +1125,10 @@ class EnhancedScormPreview {
                     outlineItem.classList.add('completed');
                 }
 
-                const icon = item.type === 'assessment' ? '📝' : item.type === 'sco' ? '📄' : '📚';
-                const typeLabel = item.type === 'assessment' ? 'Assessment' : item.type === 'sco' ? 'SCORM Activity' : 'Module';
-                
+                // Use clean titles without icons or generic labels to match real LMS behavior
                 outlineItem.innerHTML = `
-                    <div class="lms-outline-item-title">${icon} ${this.escapeHtml(item.title)}</div>
-                    <div class="lms-outline-item-meta">${typeLabel}</div>
+                    <div class="lms-outline-item-title">${this.escapeHtml(item.title)}</div>
+                    <div class="lms-outline-item-meta">${item.type === 'assessment' ? 'Quiz' : 'Lesson'}</div>
                 `;
 
                 // Add click handler for navigation
@@ -1214,7 +1158,14 @@ class EnhancedScormPreview {
         // First, try to use the actual course structure from the SCORM manifest
         if (courseInfo.courseStructure && courseInfo.courseStructure.length > 0) {
             console.log('Using actual course structure from manifest:', courseInfo.courseStructure);
-            return courseInfo.courseStructure;
+            // Convert the structure to match LMS display format
+            return courseInfo.courseStructure.map((item, index) => ({
+                id: item.identifier || item.id || `item_${index}`,
+                title: item.title,
+                type: this.detectItemType(item.title),
+                completed: false,
+                active: index === 0
+            }));
         }
         
         // Fallback: Try to parse from manifest if available
@@ -1235,6 +1186,12 @@ class EnhancedScormPreview {
             completed: false,
             active: true
         }];
+    }
+
+    detectItemType(title) {
+        if (!title) return 'sco';
+        const lowerTitle = title.toLowerCase();
+        return (lowerTitle.includes('quiz') || lowerTitle.includes('test') || lowerTitle.includes('assessment')) ? 'assessment' : 'sco';
     }
 
     parseManifestStructure(manifest) {

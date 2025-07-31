@@ -44,7 +44,7 @@ const safeInvoke = async (channel, ...args) => {
     }
 
     // Log the call for debugging
-    console.debug(`[IPC-${callId}] Invoking ${channel}`, { args: args.length });
+    // console.debug(`[IPC-${callId}] Invoking ${channel}`, { args: args.length });
 
     const result = await Promise.race([
       ipcRenderer.invoke(channel, ...args),
@@ -54,7 +54,7 @@ const safeInvoke = async (channel, ...args) => {
     ]);
 
     const duration = Date.now() - startTime;
-    console.debug(`[IPC-${callId}] Completed in ${duration}ms`);
+    // console.debug(`[IPC-${callId}] Completed in ${duration}ms`);
 
     return result;
   } catch (error) {
@@ -70,12 +70,18 @@ const safeInvoke = async (channel, ...args) => {
     enhancedError.callId = callId;
     enhancedError.timestamp = new Date().toISOString();
 
-    console.error(`[IPC-${callId}] Failed after ${duration}ms:`, error);
+    // console.error(`[IPC-${callId}] Failed after ${duration}ms:`, error);
     throw enhancedError;
   }
 };
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  log: (level, message, ...args) => {
+      const allowedLevels = ['info', 'warn', 'error', 'debug'];
+      if (typeof message === 'string' && message.length < 2000 && allowedLevels.includes(level)) {
+          ipcRenderer.send('log-message', { level, message, args });
+      }
+  },
   // File operations with validation
   selectScormPackage: () => safeInvoke('select-scorm-package'),
   

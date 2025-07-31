@@ -7,6 +7,7 @@ const PathUtils = require('./utils/path-utils.js');
 const { ProductionConfig } = require('./config/production.js');
 const { PerformanceMonitor, ResourceMonitor } = require('./monitoring/index.js');
 const ScormApiHandler = require('./utils/scorm-api-handler.js');
+const logger = require('./utils/logger.js');
 
 const config = new ProductionConfig();
 const monitor = new PerformanceMonitor();
@@ -28,14 +29,14 @@ function cleanupExtractedFolder(folderPath) {
       // Only cleanup if folder is older than 1 hour
       if (ageHours > 1) {
         fs.rmSync(folderPath, { recursive: true, force: true });
-        monitor.log('INFO', 'Cleaned up old extracted folder', {
+        logger.info('Cleaned up old extracted folder', {
           folderPath: path.basename(folderPath),
           ageHours: Math.round(ageHours)
         });
       }
     }
   } catch (error) {
-    monitor.log('ERROR', 'Failed to cleanup extracted folder', {
+    logger.error('Failed to cleanup extracted folder', {
       folderPath: path.basename(folderPath),
       error: error.message
     });
@@ -201,6 +202,10 @@ app.on('activate', () => {
   }
 });
 
+ipcMain.on('log-message', (event, { level, message, args }) => {
+    logger.log(level, `[Renderer] ${message}`, ...args);
+});
+
 // SCORM API handlers
 ipcMain.handle('scorm-initialize', (event, sessionId) => {
   let session = scormSessions.get(sessionId);
@@ -330,7 +335,7 @@ ipcMain.handle('scorm-terminate', (event, sessionId) => {
   if (!session || !session.scormApi) {
     return { success: false, errorCode: '301' };
   }
-  const result = session.scormApi.LMSTerminate('');
+  const result = session.scormApi.LMSFinish(''); // Corrected call
   const errorCode = session.scormApi.LMSGetLastError();
   
   // Clean up the session
@@ -716,12 +721,12 @@ async function exportSessionData() {
 
 // Other existing handlers
 ipcMain.handle('select-scorm-package', async (event) => {
-  console.log('select-scorm-package: IPC call received');
+  logger.info('select-scorm-package: IPC call received');
   const webContents = event.sender;
   const browserWindow = BrowserWindow.fromWebContents(webContents);
   
   if (!browserWindow) {
-    console.error('select-scorm-package: BrowserWindow not found from webContents');
+    logger.error('select-scorm-package: BrowserWindow not found from webContents');
     return null;
   }
 
@@ -735,14 +740,14 @@ ipcMain.handle('select-scorm-package', async (event) => {
     });
     
     if (!result.canceled && result.filePaths.length > 0) {
-      console.log(`select-scorm-package: File selected: ${result.filePaths[0]}`);
+      logger.info(`select-scorm-package: File selected: ${result.filePaths[0]}`);
       return result.filePaths[0];
     } else {
-      console.log('select-scorm-package: File selection canceled');
+      logger.info('select-scorm-package: File selection canceled');
       return null;
     }
   } catch (error) {
-    console.error('select-scorm-package: Error showing open dialog:', error);
+    logger.error('select-scorm-package: Error showing open dialog:', error);
     return null;
   }
 });
@@ -759,13 +764,13 @@ ipcMain.handle('select-scorm-folder', async () => {
 });
 
 ipcMain.handle('extract-scorm', async (event, zipPath) => {
-  console.log('extract-scorm: Starting extraction');
+  logger.info('extract-scorm: Starting extraction');
   let extractPath = null;
   
   try {
     const tempDir = path.join(__dirname, 'temp');
     extractPath = path.join(tempDir, 'scorm_' + Date.now());
-    console.log(`extract-scorm: Creating temp directory: ${extractPath}`);
+    logger.info(`extract-scorm: Creating temp directory: ${extractPath}`);
     
     // BUG FIX: Ensure temp directory exists
     if (!fs.existsSync(tempDir)) {
@@ -780,9 +785,9 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
     try {
       const fsStats = fs.statSync(tempDir);
       // This is a simplified check - in production you'd want to check actual free space
-      console.log(`Extracting ${formatBytes(zipSize)} ZIP file to ${extractPath}`);
+      logger.info(`Extracting ${formatBytes(zipSize)} ZIP file to ${extractPath}`);
     } catch (error) {
-      console.warn('Could not check disk space:', error.message);
+      logger.warn('Could not check disk space:', error.message);
     }
     
     fs.mkdirSync(extractPath, { recursive: true });
@@ -792,7 +797,7 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
     // BUG FIX: Get list of entries first to validate
     const entries = await zip.entries();
     const entryCount = Object.keys(entries).length;
-    console.log(`extract-scorm: Found ${entryCount} entries in zip`);
+    logger.info(`extract-scorm: Found ${entryCount} entries in zip`);
     
     if (entryCount === 0) {
       await zip.close();
@@ -811,7 +816,7 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
     for (const [entryName, entry] of Object.entries(entries)) {
       // BUG FIX: Validate entry name for security
       if (entryName.includes('..') || entryName.includes('~')) {
-        console.warn(`Skipping suspicious entry: ${entryName}`);
+        logger.warn(`Skipping suspicious entry: ${entryName}`);
         continue;
       }
       
@@ -824,7 +829,7 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
     
     await zip.extract(null, extractPath);
     await zip.close();
-    console.log('extract-scorm: Extraction complete');
+    logger.info('extract-scorm: Extraction complete');
     
     // BUG FIX: Register for cleanup tracking
     if (resourceMonitor) {
@@ -836,7 +841,7 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
       cleanupExtractedFolder(extractPath);
     }, 24 * 60 * 60 * 1000); // 24 hours
     
-    monitor.log('INFO', 'SCORM package extracted successfully', {
+    logger.info('SCORM package extracted successfully', {
       zipPath: path.basename(zipPath),
       extractPath,
       fileCount: entryCount,
@@ -846,14 +851,14 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
     return extractPath;
     
   } catch (error) {
-    console.error('Extraction failed:', error);
+    logger.error('Extraction failed:', error);
     
     // BUG FIX: Clean up failed extraction
     if (extractPath && fs.existsSync(extractPath)) {
       try {
         fs.rmSync(extractPath, { recursive: true, force: true });
       } catch (cleanupError) {
-        console.error('Failed to cleanup failed extraction:', cleanupError);
+        logger.error('Failed to cleanup failed extraction:', cleanupError);
       }
     }
     
@@ -863,72 +868,72 @@ ipcMain.handle('extract-scorm', async (event, zipPath) => {
 });
 
 ipcMain.handle('find-scorm-entry', async (event, folderPath) => {
-  console.log(`find-scorm-entry: Searching for entry point in: ${folderPath}`);
+  logger.info(`find-scorm-entry: Searching for entry point in: ${folderPath}`);
   try {
     const manifestPath = path.join(folderPath, 'imsmanifest.xml');
     if (fs.existsSync(manifestPath)) {
-      console.log('find-scorm-entry: Found imsmanifest.xml');
+      logger.info('find-scorm-entry: Found imsmanifest.xml');
       const manifestContent = fs.readFileSync(manifestPath, 'utf8');
       
       // Find the resource element defined as a Sharable Content Object (SCO)
       const scoResourceMatch = manifestContent.match(/<resource[^>]+adlcp:scormtype="sco"[^>]*>/i);
       if (scoResourceMatch) {
-        console.log('find-scorm-entry: Found SCO resource');
+        logger.info('find-scorm-entry: Found SCO resource');
         const resourceBlock = scoResourceMatch[0];
         const hrefMatch = resourceBlock.match(/href="([^"]+)"/i);
         if (hrefMatch && hrefMatch[1]) {
           const fullHref = hrefMatch[1]; // Preserve the full href
           const launchFile = fullHref.split('?')[0]; // Get only the file path part
-          console.log(`find-scorm-entry: SCO entry point href: ${fullHref}`);
+          logger.info(`find-scorm-entry: SCO entry point href: ${fullHref}`);
           const fullPath = path.join(folderPath, launchFile);
           if (fs.existsSync(fullPath)) {
-            console.log(`find-scorm-entry: Found SCO entry file at: ${fullPath}`);
+            logger.info(`find-scorm-entry: Found SCO entry file at: ${fullPath}`);
             return { success: true, entryPath: fullPath, launchUrl: fullHref }; // Return launchUrl
           } else {
-            console.warn(`find-scorm-entry: SCO entry file not found on disk: ${fullPath}`);
+            logger.warn(`find-scorm-entry: SCO entry file not found on disk: ${fullPath}`);
           }
         } else {
-          console.warn('find-scorm-entry: SCO resource found but no href attribute.');
+          logger.warn('find-scorm-entry: SCO resource found but no href attribute.');
         }
       } else {
-        console.warn('find-scorm-entry: No SCO resource found in manifest.');
+        logger.warn('find-scorm-entry: No SCO resource found in manifest.');
       }
 
       // Fallback for manifests that don't explicitly declare a SCO
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
       if (launchMatch && launchMatch[1]) {
-        console.log('find-scorm-entry: Found fallback href');
+        logger.info('find-scorm-entry: Found fallback href');
         const fullHref = launchMatch[1]; // Preserve the full href
         const launchFile = fullHref.split('?')[0]; // Get only the file path part
-        console.log(`find-scorm-entry: Fallback entry point href: ${fullHref}`);
+        logger.info(`find-scorm-entry: Fallback entry point href: ${fullHref}`);
         const fullPath = path.join(folderPath, launchFile);
         if (fs.existsSync(fullPath)) {
-          console.log(`find-scorm-entry: Found fallback entry point at: ${fullPath}`);
+          logger.info(`find-scorm-entry: Found fallback entry point at: ${fullPath}`);
           return { success: true, entryPath: fullPath, launchUrl: fullHref }; // Return launchUrl
         } else {
-          console.warn(`find-scorm-entry: Fallback entry file not found on disk: ${fullPath}`);
+          logger.warn(`find-scorm-entry: Fallback entry file not found on disk: ${fullPath}`);
         }
       } else {
-        console.warn('find-scorm-entry: No fallback href found in manifest.');
+        logger.warn('find-scorm-entry: No fallback href found in manifest.');
       }
     } else {
-      console.warn('find-scorm-entry: imsmanifest.xml not found.');
+      logger.warn('find-scorm-entry: imsmanifest.xml not found.');
     }
     
-    console.log('find-scorm-entry: No manifest entry point found, checking common files');
+    logger.info('find-scorm-entry: No manifest entry point found, checking common files');
     const commonFiles = ['index.html', 'launch.html', 'start.html', 'main.html'];
     for (const file of commonFiles) {
       const filePath = path.join(folderPath, file);
       if (fs.existsSync(filePath)) {
-        console.log(`find-scorm-entry: Found common file entry point: ${filePath}`);
+        logger.info(`find-scorm-entry: Found common file entry point: ${filePath}`);
         return { success: true, entryPath: filePath };
       }
     }
     
-    console.warn('find-scorm-entry: No entry point found after all checks.');
+    logger.warn('find-scorm-entry: No entry point found after all checks.');
     return { success: false, error: 'No SCORM entry point found in the package.' };
   } catch (error) {
-    console.error('Error finding SCORM entry:', error);
+    logger.error('Error finding SCORM entry:', error);
     return { success: false, error: `Error finding SCORM entry: ${error.message}` };
   }
 });
@@ -953,7 +958,7 @@ ipcMain.handle('get-course-manifest', async (event, folderPath) => {
     
     return { structure, success: true };
   } catch (error) {
-    monitor.log('ERROR', 'Failed to get course manifest', {
+    logger.error('Failed to get course manifest', {
       folderPath,
       error: error.message
     });
@@ -963,30 +968,16 @@ ipcMain.handle('get-course-manifest', async (event, folderPath) => {
 
 function parseManifestStructure(manifestContent) {
   try {
-    // Extract organization and items
     const orgMatch = manifestContent.match(/<organization[^>]*>([\s\S]*?)<\/organization>/i);
     if (!orgMatch) {
       return { items: [], isFlowOnly: true };
     }
 
     const orgContent = orgMatch[1];
-    
-    // Check if it's flow-only navigation
-    const controlModeMatch = manifestContent.match(/<imsss:controlMode[^>]*choice\s*=\s*["']false["'][^>]*>/i);
-    const isFlowOnly = !!controlModeMatch;
-    
-    // Extract items
-    const items = [];
-    const itemMatches = orgContent.match(/<item[^>]*>[\s\S]*?<\/item>/gi);
-    
-    if (itemMatches) {
-      itemMatches.forEach(itemMatch => {
-        const item = parseItem(itemMatch);
-        if (item && !item.isVisible === false) { // Only include visible items
-          items.push(item);
-        }
-      });
-    }
+    const isFlowOnlyMatch = manifestContent.match(/<imsss:controlMode[^>]*flow\s*=\s*["']true["'][^>]*choice\s*=\s*["']false["'][^>]*>/i);
+    const isFlowOnly = !!isFlowOnlyMatch;
+
+    const items = parseItemsRecursive(orgContent);
 
     return {
       items,
@@ -994,47 +985,43 @@ function parseManifestStructure(manifestContent) {
       title: extractTitle(orgContent)
     };
   } catch (error) {
-    monitor.log('WARN', 'Failed to parse manifest structure', { error: error.message });
+    logger.warn('Failed to parse manifest structure', { error: error.message });
     return { items: [], isFlowOnly: true };
   }
 }
 
-function parseItem(itemXml) {
-  try {
-    const identifierMatch = itemXml.match(/identifier\s*=\s*["']([^"']+)["']/i);
-    const identifierrefMatch = itemXml.match(/identifierref\s*=\s*["']([^"']+)["']/i);
-    const isVisibleMatch = itemXml.match(/isvisible\s*=\s*["']([^"']+)["']/i);
-    const titleMatch = itemXml.match(/<title[^>]*>([^<]+)<\/title>/i);
-    
-    // Skip invisible items (like the remediation wrapper)
-    if (isVisibleMatch && isVisibleMatch[1].toLowerCase() === 'false') {
-      return null;
-    }
+function parseItemsRecursive(xmlContent) {
+  const items = [];
+  const itemRegex = /<item([^>]*)>([\s\S]*?)<\/item>/gi;
+  let match;
+
+  while ((match = itemRegex.exec(xmlContent)) !== null) {
+    const itemAttributes = match[1];
+    const itemInnerContent = match[2];
+
+    const identifierMatch = itemAttributes.match(/identifier\s*=\s*["']([^"']+)["']/i);
+    const identifierrefMatch = itemAttributes.match(/identifierref\s*=\s*["']([^"']+)["']/i);
+    const isVisibleMatch = itemAttributes.match(/isvisible\s*=\s*["']([^"']+)["']/i);
+    const titleMatch = itemInnerContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+
+    const isVisible = !isVisibleMatch || isVisibleMatch[1].toLowerCase() !== 'false';
 
     const item = {
       identifier: identifierMatch ? identifierMatch[1] : null,
       identifierref: identifierrefMatch ? identifierrefMatch[1] : null,
       title: titleMatch ? titleMatch[1].trim() : null,
-      isVisible: !isVisibleMatch || isVisibleMatch[1].toLowerCase() !== 'false',
-      children: []
+      isVisible: isVisible,
+      children: parseItemsRecursive(itemInnerContent) // Recursively parse children
     };
 
-    // Extract nested items
-    const nestedItemMatches = itemXml.match(/<item[^>]*>[\s\S]*?<\/item>/gi);
-    if (nestedItemMatches && nestedItemMatches.length > 1) {
-      // Remove the outer item match and parse the rest as children
-      for (let i = 1; i < nestedItemMatches.length; i++) {
-        const childItem = parseItem(nestedItemMatches[i]);
-        if (childItem) {
-          item.children.push(childItem);
-        }
-      }
+    // If an item is invisible but has visible children, promote the children
+    if (!item.isVisible && item.children.length > 0) {
+      items.push(...item.children);
+    } else if (item.isVisible) {
+      items.push(item);
     }
-
-    return item;
-  } catch (error) {
-    return null;
   }
+  return items;
 }
 
 function extractTitle(content) {
@@ -1044,7 +1031,7 @@ function extractTitle(content) {
 
 async function extractCourseContentStructure(coursePath) {
   try {
-    console.log('Attempting to extract course structure from content files...');
+    logger.info('Attempting to extract course structure from content files...');
     
     // Look for common course structure files
     const potentialFiles = [
@@ -1061,14 +1048,14 @@ async function extractCourseContentStructure(coursePath) {
       
       try {
         await fs.promises.access(filePath, fs.constants.F_OK);
-        console.log(`Found potential structure file: ${file}`);
+        logger.info(`Found potential structure file: ${file}`);
         
         // Read and parse the file
         const content = await fs.promises.readFile(filePath, 'utf8');
         const structure = parseContentFile(content, file);
         
         if (structure.length > 0) {
-          console.log(`Extracted ${structure.length} items from ${file}`);
+          logger.info(`Extracted ${structure.length} items from ${file}`);
           return structure;
         }
         
@@ -1078,11 +1065,11 @@ async function extractCourseContentStructure(coursePath) {
       }
     }
     
-    console.log('No course structure found in content files');
+    logger.info('No course structure found in content files');
     return [];
     
   } catch (error) {
-    console.error('Error extracting course content structure:', error);
+    logger.error('Error extracting course content structure:', error);
     return [];
   }
 }
@@ -1174,63 +1161,13 @@ function parseContentFile(content, filename) {
     }
     
   } catch (error) {
-    console.log(`Error parsing ${filename}:`, error.message);
+    logger.warn(`Error parsing ${filename}:`, error.message);
   }
   
   return structure;
 }
 
-function parseManifestStructure(manifestContent) {
-  try {
-    // Parse the course structure from SCORM manifest
-    const structure = [];
-    
-    // Find the organization section
-    const orgMatch = manifestContent.match(/<organization[^>]*>([\s\S]*?)<\/organization>/i);
-    if (!orgMatch) {
-      console.log('No organization found in manifest');
-      return [];
-    }
-    
-    const orgContent = orgMatch[1];
-    
-    // Find all item elements (including nested ones)
-    const itemRegex = /<item[^>]*identifier=["']([^"']+)["'][^>]*(?:identifierref=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/item>/gi;
-    let match;
-    
-    while ((match = itemRegex.exec(orgContent)) !== null) {
-      const identifier = match[1];
-      const identifierref = match[2];
-      const itemContent = match[3];
-      
-      // Extract title from the item
-      const titleMatch = itemContent.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : `Item ${identifier}`;
-      
-      // Skip empty or whitespace-only titles and organization-level titles
-      if (title && title.trim() && title.trim() !== '' && !title.includes('SCORM 2004')) {
-        structure.push({
-          id: identifier,
-          identifierref: identifierref,
-          title: title,
-          type: 'sco',
-          completed: false,
-          active: structure.length === 0
-        });
-      }
-    }
-    
-    // For single SCO courses, we need to actually inspect the course content
-    // to find the real navigation structure, not fake it
-    
-    console.log('Parsed course structure from manifest:', structure);
-    return structure;
-    
-  } catch (error) {
-    console.error('Error parsing manifest structure:', error);
-    return [];
-  }
-}
+// Duplicate function removed - using the improved version above
 
 ipcMain.handle('get-course-info', async (event, folderPath) => {
   try {
@@ -1261,7 +1198,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
     const maxManifestSize = config.get('security.maxManifestSizeKB') * 1024 || 1024 * 1024; // 1MB default
     
     if (stats.size > maxManifestSize) {
-      monitor.log('WARN', 'Manifest file too large', {
+      logger.warn('Manifest file too large', {
         size: stats.size,
         maxSize: maxManifestSize,
         path: manifestPath
@@ -1322,7 +1259,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         }
       }
       if (!titleFound) {
-        monitor.log('WARN', 'Manifest title not found or empty', { manifestPath });
+        logger.warn('Manifest title not found or empty', { manifestPath });
       }
       
       // Extract version
@@ -1330,7 +1267,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       if (versionMatch && versionMatch[1] && versionMatch[1].trim()) {
         version = versionMatch[1].trim();
       } else {
-        monitor.log('WARN', 'Manifest version not found or empty', { manifestPath });
+        logger.warn('Manifest version not found or empty', { manifestPath });
       }
       
       // Extract SCORM version - try multiple patterns
@@ -1355,14 +1292,14 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         }
       }
       if (!scormVersionFound) {
-        monitor.log('WARN', 'SCORM version not found or empty in manifest', { manifestPath });
+        logger.warn('SCORM version not found or empty in manifest', { manifestPath });
       }
       
       // Additional metadata extraction
       const organizationMatch = manifestContent.match(/<organizations[^>]*default\s*=\s*["']([^"']+)["']/i);
       defaultOrg = organizationMatch && organizationMatch[1] ? organizationMatch[1].trim() : null;
       if (!defaultOrg) {
-        monitor.log('WARN', 'Default organization not found in manifest', { manifestPath });
+        logger.warn('Default organization not found in manifest', { manifestPath });
       }
 
       // Extract the identifier of the first item
@@ -1370,9 +1307,9 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       const firstItemIdentifierMatch = manifestContent.match(/<item[^>]*identifier=["']([^"']+)["']/i);
       if (firstItemIdentifierMatch && firstItemIdentifierMatch[1]) {
         contentIdentifier = firstItemIdentifierMatch[1].trim();
-        monitor.log('DEBUG', 'Extracted first item identifier as content identifier', { contentIdentifier });
+        logger.debug('Extracted first item identifier as content identifier', { contentIdentifier });
       } else {
-        monitor.log('WARN', 'No item identifier found in manifest for content parameter', { manifestPath });
+        logger.warn('No item identifier found in manifest for content parameter', { manifestPath });
       }
       
       // Count resources
@@ -1383,10 +1320,10 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
       launchFile = launchMatch && launchMatch[1] ? launchMatch[1].trim() : null;
       if (!launchFile) {
-        monitor.log('WARN', 'Launch file href not found in manifest', { manifestPath });
+        logger.warn('Launch file href not found in manifest', { manifestPath });
       }
       
-      monitor.log('DEBUG', 'Parsed manifest successfully', {
+      logger.debug('Parsed manifest successfully', {
         title,
         version,
         scormVersion,
@@ -1406,6 +1343,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
         }
       }
       
+      logger.info('main.js: get-course-info returning courseInfo with structure:', courseStructure); // Added log
       return {
         title,
         version,
@@ -1419,7 +1357,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
       };
       
     } catch (parseError) {
-      monitor.log('ERROR', 'Failed to parse manifest content due to regex error', {
+      logger.error('Failed to parse manifest content due to regex error', {
         error: parseError.message,
         manifestPath
       });
@@ -1434,7 +1372,7 @@ ipcMain.handle('get-course-info', async (event, folderPath) => {
     }
     
   } catch (error) {
-    console.error('Error reading course info:', error);
+    logger.error('Error reading course info:', error);
     monitor.trackError(error, 'get-course-info');
     
     return {
@@ -1455,7 +1393,7 @@ ipcMain.handle('open-external', async (event, url) => {
     try {
       return PathUtils.toFileUrl(filePath);
     } catch (error) {
-      console.error('Error in path-utils-to-file-url handler:', error);
+      logger.error('Error in path-utils-to-file-url handler:', error);
       throw error;
     }
 });
