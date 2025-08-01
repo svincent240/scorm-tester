@@ -1,0 +1,116 @@
+{
+  "name": "scorm-tester",
+  "version": "1.0.0",
+  "description": "SCORM 2004 4th Edition compliant testing application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:scorm": "jest tests/unit/scorm tests/integration/scorm-workflow.test.js",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "scorm",
+    "e-learning",
+    "lms",
+    "scorm-2004",
+    "electron",
+    "education"
+  ],
+  "author": "SCORM Tester Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.0",
+    "electron": "^24.0.0",
+    "electron-builder": "^23.6.0",
+    "eslint": "^8.36.0",
+    "eslint-config-standard": "^17.0.0",
+    "eslint-plugin-import": "^2.27.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.1.0",
+    "jest": "^29.5.0",
+    "jest-environment-node": "^29.5.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "electron-log": "^4.4.8",
+    "electron-store": "^8.1.0",
+    "xmldom": "^0.6.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.js",
+      "**/?(*.)+(spec|test).js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js",
+      "!src/**/__tests__/**"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "testTimeout": 10000
+  },
+  "build": {
+    "appId": "com.scormtester.app",
+    "productName": "SCORM Tester",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scorm-tester/scorm-tester.git"
+  },
+  "bugs": {
+    "url": "https://github.com/scorm-tester/scorm-tester/issues"
+  },
+  "homepage": "https://github.com/scorm-tester/scorm-tester#readme"
+}
