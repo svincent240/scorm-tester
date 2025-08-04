@@ -913,6 +913,20 @@ async function loadModules() {
           // Return hardcoded fallback
           return 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
         }
+      },
+      
+      setupScormAPIForContent: function(contentFrame) {
+        console.log('CRITICAL DEBUG: setupScormAPIForContent called');
+        
+        try {
+          // Simple approach: just call the existing injectScormAPI method
+          this.injectScormAPI(contentFrame);
+          
+          console.log('CRITICAL DEBUG: SCORM API setup completed for content');
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in setupScormAPIForContent:', error);
+        }
       }
     };
     
