@@ -8,9 +8,9 @@
  * @fileoverview SCORM navigation controls component
  */
 
-const BaseComponent = require('../base-component');
-const uiState = require('../../services/ui-state');
-const scormClient = require('../../services/scorm-client');
+import { BaseComponent } from '../base-component.js';
+import { uiState } from '../../services/ui-state.js';
+import { scormClient } from '../../services/scorm-client.js';
 
 /**
  * Navigation Controls Class
@@ -642,4 +642,4 @@ class NavigationControls extends BaseComponent {
   }
 }
 
-module.exports = NavigationControls;
+export { NavigationControls };

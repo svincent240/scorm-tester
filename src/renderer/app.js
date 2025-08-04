@@ -1,11 +1,16 @@
 /**
  * SCORM Tester Application Entry Point
- * 
+ *
  * Simplified renderer entry point that orchestrates all modular components.
  * Initializes services, components, and manages application lifecycle.
- * 
+ *
  * @fileoverview Main application entry point
  */
+
+// CRITICAL DEBUG: Log immediately when script loads
+console.log('CRITICAL DEBUG: app.js script is loading...');
+console.log('CRITICAL DEBUG: window object exists:', typeof window !== 'undefined');
+console.log('CRITICAL DEBUG: document object exists:', typeof document !== 'undefined');
 
 import { EventBus } from './services/event-bus.js';
 import { UIStateManager } from './services/ui-state.js';
@@ -157,13 +162,25 @@ class ScormTesterApp {
    * Initialize UI components
    */
   async initializeComponents() {
+    console.log('DEBUG: initializeComponents called, DOM ready state:', document.readyState);
+    
     const eventBus = this.services.get('eventBus');
     const uiState = this.services.get('uiState');
     const scormClient = this.services.get('scormClient');
     
+    // Check if required elements exist
+    const requiredElements = ['content-viewer', 'navigation-controls', 'progress-tracking', 'debug-panel', 'course-outline'];
+    for (const elementId of requiredElements) {
+      const element = document.getElementById(elementId);
+      console.log(`DEBUG: Element '${elementId}' exists:`, !!element);
+      if (!element) {
+        throw new Error(`Required element '${elementId}' not found in DOM`);
+      }
+    }
+    
     // Content Viewer - SCORM content display
-    const contentViewer = new ContentViewer({
-      elementId: 'content-viewer',
+    console.log('DEBUG: Creating ContentViewer with elementId: content-viewer');
+    const contentViewer = new ContentViewer('content-viewer', {
       allowFullscreen: true,
       enableSandbox: true,
       loadTimeout: 30000,
@@ -172,8 +189,8 @@ class ScormTesterApp {
     this.components.set('contentViewer', contentViewer);
     
     // Navigation Controls - Course navigation
-    const navigationControls = new NavigationControls({
-      elementId: 'navigation-controls',
+    console.log('DEBUG: Creating NavigationControls with elementId: navigation-controls');
+    const navigationControls = new NavigationControls('navigation-controls', {
       showPrevious: true,
       showNext: true,
       showMenu: true,
@@ -183,8 +200,8 @@ class ScormTesterApp {
     this.components.set('navigationControls', navigationControls);
     
     // Progress Tracking - Learning progress display
-    const progressTracking = new ProgressTracking({
-      elementId: 'progress-tracking',
+    console.log('DEBUG: Creating ProgressTracking with elementId: progress-tracking');
+    const progressTracking = new ProgressTracking('progress-tracking', {
       showPercentage: true,
       showTimeSpent: true,
       showScore: true,
@@ -195,8 +212,8 @@ class ScormTesterApp {
     this.components.set('progressTracking', progressTracking);
     
     // Debug Panel - Development and testing tools
-    const debugPanel = new DebugPanel({
-      elementId: 'debug-panel',
+    console.log('DEBUG: Creating DebugPanel with elementId: debug-panel');
+    const debugPanel = new DebugPanel('debug-panel', {
       maxApiCalls: 1000,
       showTimestamps: true,
       showDuration: true,
@@ -207,8 +224,8 @@ class ScormTesterApp {
     this.components.set('debugPanel', debugPanel);
     
     // Course Outline - Course structure navigation
-    const courseOutline = new CourseOutline({
-      elementId: 'course-outline',
+    console.log('DEBUG: Creating CourseOutline with elementId: course-outline');
+    const courseOutline = new CourseOutline('course-outline', {
       showProgress: true,
       showIcons: true,
       enableNavigation: true,
@@ -315,9 +332,86 @@ class ScormTesterApp {
    * Handle course load request
    */
   handleCourseLoad() {
-    const fileInput = document.getElementById('file-input');
-    if (fileInput) {
-      fileInput.click();
+    console.log('DEBUG: handleCourseLoad called');
+    
+    // Check if electronAPI is available
+    if (typeof window.electronAPI === 'undefined') {
+      console.error('DEBUG: electronAPI not available in handleCourseLoad');
+      this.showError('Electron API Error', 'The application is not properly initialized. Please restart the application.');
+      return;
+    }
+    
+    console.log('DEBUG: electronAPI available, methods:', Object.keys(window.electronAPI));
+    
+    // Try to use the Electron file dialog instead of HTML file input
+    this.openScormFileDialog();
+  }
+  
+  /**
+   * Open SCORM file dialog using Electron API
+   */
+  async openScormFileDialog() {
+    console.log('DEBUG: openScormFileDialog called');
+    
+    try {
+      this.showLoading('Opening file dialog...');
+      
+      // Use Electron's native file dialog
+      const result = await window.electronAPI.selectScormPackage();
+      console.log('DEBUG: selectScormPackage result:', result);
+      
+      if (!result || !result.success) {
+        console.log('DEBUG: No file selected or operation failed:', result);
+        this.hideLoading();
+        return;
+      }
+      
+      if (result.filePath) {
+        console.log('DEBUG: File selected:', result.filePath);
+        // Process the selected file path
+        await this.loadCourseFromPath(result.filePath);
+      }
+      
+    } catch (error) {
+      console.error('DEBUG: Error in openScormFileDialog:', error);
+      this.showError('File Selection Error', `Failed to open file dialog: ${error.message}`);
+    } finally {
+      this.hideLoading();
+    }
+  }
+  
+  /**
+   * Load course from file path
+   */
+  async loadCourseFromPath(filePath) {
+    console.log('DEBUG: loadCourseFromPath called with:', filePath);
+    
+    try {
+      this.showLoading('Loading course...');
+      
+      // Extract the SCORM package if it's a ZIP file
+      if (filePath.toLowerCase().endsWith('.zip')) {
+        console.log('DEBUG: ZIP file detected, extracting...');
+        
+        const extractResult = await window.electronAPI.extractScorm(filePath);
+        console.log('DEBUG: Extract result:', extractResult);
+        
+        if (!extractResult.success) {
+          throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
+        }
+        
+        // Load the extracted course
+        await this.loadExtractedCourse(extractResult.path);
+        
+      } else {
+        throw new Error('Unsupported file type. Please select a ZIP file containing a SCORM package.');
+      }
+      
+    } catch (error) {
+      console.error('DEBUG: Error in loadCourseFromPath:', error);
+      this.showError('Course Loading Error', error.message);
+    } finally {
+      this.hideLoading();
     }
   }
   
@@ -325,8 +419,14 @@ class ScormTesterApp {
    * Handle file selection
    */
   async handleFileSelect(event) {
+    console.log('DEBUG: handleFileSelect called');
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) {
+      console.log('DEBUG: No file selected');
+      return;
+    }
+    
+    console.log('DEBUG: File selected:', file.name, file.type, file.size);
     
     try {
       this.showLoading('Loading course...');
@@ -335,7 +435,7 @@ class ScormTesterApp {
       await this.loadCourse(file);
       
     } catch (error) {
-      console.error('Failed to load course:', error);
+      console.error('DEBUG: Failed to load course:', error);
       this.showError('Failed to load course', error.message);
     } finally {
       this.hideLoading();
@@ -348,9 +448,125 @@ class ScormTesterApp {
    * Load a SCORM course
    */
   async loadCourse(file) {
-    // This would integrate with the main process to extract and validate the course
-    // For now, emit an event that components can listen to
-    this.services.get('eventBus').emit('course:load-requested', { file });
+    console.log('DEBUG: loadCourse called with file:', file.name);
+    
+    // Check if electronAPI is available
+    if (typeof window.electronAPI === 'undefined') {
+      console.error('DEBUG: electronAPI not available - this indicates a preload script issue');
+      throw new Error('Electron API not available. Please check preload script configuration.');
+    }
+    
+    console.log('DEBUG: electronAPI available, methods:', Object.keys(window.electronAPI));
+    
+    try {
+      // For ZIP files, extract them first
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        console.log('DEBUG: ZIP file detected, extracting...');
+        
+        // Create a temporary file path for the ZIP
+        const tempPath = await this.saveFileTemporarily(file);
+        console.log('DEBUG: File saved temporarily at:', tempPath);
+        
+        // Extract the SCORM package
+        const extractResult = await window.electronAPI.extractScorm(tempPath);
+        if (!extractResult.success) {
+          throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
+        }
+        
+        console.log('DEBUG: SCORM package extracted to:', extractResult.path);
+        
+        // Load the extracted course
+        await this.loadExtractedCourse(extractResult.path);
+        
+      } else {
+        throw new Error('Unsupported file type. Please select a ZIP file containing a SCORM package.');
+      }
+      
+    } catch (error) {
+      console.error('DEBUG: Error in loadCourse:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Save file temporarily for processing
+   */
+  async saveFileTemporarily(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const arrayBuffer = event.target.result;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Convert to base64 for transmission
+          const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
+          
+          // Send to main process to save temporarily
+          const result = await window.electronAPI.saveTemporaryFile(file.name, base64);
+          if (result.success) {
+            resolve(result.path);
+          } else {
+            reject(new Error(result.error));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+  /**
+   * Load extracted SCORM course
+   */
+  async loadExtractedCourse(coursePath) {
+    console.log('DEBUG: Loading extracted course from:', coursePath);
+    
+    try {
+      // Get course information
+      const courseInfo = await window.electronAPI.getCourseInfo(coursePath);
+      if (!courseInfo.success) {
+        throw new Error(`Failed to get course info: ${courseInfo.error}`);
+      }
+      
+      console.log('DEBUG: Course info retrieved:', courseInfo.data);
+      
+      // Find SCORM entry point
+      const entryResult = await window.electronAPI.findScormEntry(coursePath);
+      if (!entryResult.success) {
+        throw new Error(`Failed to find SCORM entry point: ${entryResult.error}`);
+      }
+      
+      console.log('DEBUG: SCORM entry point found:', entryResult.entryPoint);
+      
+      // Get course manifest for detailed structure
+      const manifestResult = await window.electronAPI.getCourseManifest(coursePath);
+      if (!manifestResult.success) {
+        console.warn('DEBUG: Could not load course manifest:', manifestResult.error);
+      }
+      
+      // Update UI state with course data
+      const courseData = {
+        info: courseInfo.data,
+        structure: manifestResult.success ? manifestResult.data : null,
+        path: coursePath,
+        entryPoint: entryResult.entryPoint
+      };
+      
+      // Update UI state
+      this.services.get('uiState').updateCourse(courseData);
+      
+      // Emit course loaded event
+      this.services.get('eventBus').emit('course:loaded', courseData);
+      
+      console.log('DEBUG: Course loaded successfully');
+      
+    } catch (error) {
+      console.error('DEBUG: Error loading extracted course:', error);
+      throw error;
+    }
   }
   
   /**
@@ -513,10 +729,21 @@ const app = new ScormTesterApp();
 window.scormTesterApp = app;
 
 // Start the application when DOM is ready
+function startWhenReady() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => app.start());
+  } else {
+    // DOM is already ready, start immediately
+    app.start();
+  }
+}
+
+// Always wait for DOM to be ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => app.start());
+  document.addEventListener('DOMContentLoaded', startWhenReady);
 } else {
-  app.start();
+  // DOM is already ready
+  startWhenReady();
 }
 
 // Export for module usage

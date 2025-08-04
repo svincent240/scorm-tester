@@ -8,9 +8,9 @@
  * @fileoverview SCORM content viewer component
  */
 
-const BaseComponent = require('../base-component');
-const uiState = require('../../services/ui-state');
-const scormClient = require('../../services/scorm-client');
+import { BaseComponent } from '../base-component.js';
+import { uiState } from '../../services/ui-state.js';
+import { scormClient } from '../../services/scorm-client.js';
 
 /**
  * SCORM Content Viewer Class
@@ -611,4 +611,4 @@ class ContentViewer extends BaseComponent {
   }
 }
 
-module.exports = ContentViewer;
+export { ContentViewer };

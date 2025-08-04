@@ -7,9 +7,9 @@
  * @fileoverview SCORM debug panel component
  */
 
-const BaseComponent = require('../base-component');
-const uiState = require('../../services/ui-state');
-const scormClient = require('../../services/scorm-client');
+import { BaseComponent } from '../base-component.js';
+import { uiState } from '../../services/ui-state.js';
+import { scormClient } from '../../services/scorm-client.js';
 
 /**
  * Debug Panel Class
@@ -314,4 +314,4 @@ class DebugPanel extends BaseComponent {
   }
 }
 
-module.exports = DebugPanel;
+export { DebugPanel };

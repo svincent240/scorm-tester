@@ -69,6 +69,11 @@ class IpcHandlers {
     return await fileManager.getCourseManifest(folderPath);
   }
 
+  async handleSaveTemporaryFile(event, fileName, base64Data) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.saveTemporaryFile(fileName, base64Data);
+  }
+
   // Validation handlers
   async handleValidateScormCompliance(event, folderPath) {
     const scormService = this.ipcHandler.getDependency('scormService');

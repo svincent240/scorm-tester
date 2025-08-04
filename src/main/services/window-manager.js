@@ -88,6 +88,7 @@ class WindowManager extends BaseService {
 
       this.windows.set(WINDOW_TYPES.MAIN, mainWindow);
       this.setupMainWindowEvents(mainWindow);
+      this.setupConsoleLogging(mainWindow);
       
       await mainWindow.loadFile('index.html');
       this.menuBuilder.createApplicationMenu(mainWindow);
@@ -254,6 +255,50 @@ class WindowManager extends BaseService {
       this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
       this.emit(SERVICE_EVENTS.WINDOW_CLOSED, { windowType: WINDOW_TYPES.DEBUG });
     });
+  }
+
+  /**
+   * Set up console logging redirection to main log file
+   */
+  setupConsoleLogging(window) {
+    // Capture all console messages from renderer process
+    window.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      const logLevel = this.mapConsoleLevel(level);
+      const source = sourceId ? `${sourceId}:${line}` : 'renderer';
+      this.logger?.[logLevel](`[Renderer Console] ${message} (${source})`);
+    });
+
+    // Capture JavaScript errors
+    window.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      this.logger?.error(`[Renderer Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
+    });
+
+    // Capture unhandled exceptions
+    window.webContents.on('crashed', (event, killed) => {
+      this.logger?.error(`[Renderer Crash] Renderer process crashed. Killed: ${killed}`);
+    });
+
+    // Capture DOM ready and script loading
+    window.webContents.on('dom-ready', () => {
+      this.logger?.info('[Renderer] DOM ready');
+    });
+
+    window.webContents.on('did-finish-load', () => {
+      this.logger?.info('[Renderer] Page finished loading');
+    });
+  }
+
+  /**
+   * Map Electron console levels to logger levels
+   */
+  mapConsoleLevel(level) {
+    switch (level) {
+      case 0: return 'debug';  // verbose
+      case 1: return 'info';   // info
+      case 2: return 'warn';   // warning
+      case 3: return 'error';  // error
+      default: return 'info';
+    }
   }
 }
 

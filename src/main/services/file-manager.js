@@ -107,7 +107,7 @@ class FileManager extends BaseService {
 
   /**
    * Select SCORM package file dialog
-   * @returns {Promise<string|null>} Selected file path or null
+   * @returns {Promise<Object>} Result object with success and filePath properties
    */
   async selectScormPackage() {
     try {
@@ -125,12 +125,12 @@ class FileManager extends BaseService {
         const filePath = result.filePaths[0];
         this.logger?.info(`FileManager: SCORM package selected: ${path.basename(filePath)}`);
         this.recordOperation('selectScormPackage', true);
-        return filePath;
+        return { success: true, filePath: filePath };
       }
       
       this.logger?.info('FileManager: SCORM package selection cancelled');
       this.recordOperation('selectScormPackage', true);
-      return null;
+      return { success: false, cancelled: true };
       
     } catch (error) {
       this.errorHandler?.setError(
@@ -141,14 +141,14 @@ class FileManager extends BaseService {
       
       this.logger?.error('FileManager: SCORM package selection failed:', error);
       this.recordOperation('selectScormPackage', false);
-      return null;
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Extract SCORM package
    * @param {string} zipPath - Path to ZIP file
-   * @returns {Promise<string|null>} Extraction path or null
+   * @returns {Promise<Object>} Result object with success and path properties
    */
   async extractScorm(zipPath) {
     const operationId = ++this.operationCounter;
@@ -182,7 +182,7 @@ class FileManager extends BaseService {
       this.logger?.info(`FileManager: SCORM extraction completed (${operationId}): ${path.basename(extractPath)}`);
       this.recordOperation('extractScorm', true);
       
-      return extractPath;
+      return { success: true, path: extractPath };
       
     } catch (error) {
       // Cleanup failed extraction
@@ -203,7 +203,7 @@ class FileManager extends BaseService {
       
       this.logger?.error(`FileManager: SCORM extraction failed (${operationId}):`, error);
       this.recordOperation('extractScorm', false);
-      return null;
+      return { success: false, error: error.message };
       
     } finally {
       this.activeOperations.delete(operationId);
@@ -404,6 +404,69 @@ class FileManager extends BaseService {
   }
 
   /**
+   * Save temporary file from base64 data
+   * @param {string} fileName - Original file name
+   * @param {string} base64Data - Base64 encoded file data
+   * @returns {Promise<Object>} Result with file path
+   */
+  async saveTemporaryFile(fileName, base64Data) {
+    try {
+      this.logger?.info(`FileManager: Saving temporary file: ${fileName}`);
+      
+      // Validate inputs
+      if (!fileName || !base64Data) {
+        throw new Error('Invalid file name or data');
+      }
+      
+      // Sanitize filename
+      const sanitizedName = this.sanitizeFilename(fileName);
+      if (!sanitizedName) {
+        throw new Error('Invalid filename after sanitization');
+      }
+      
+      // Create temp directory if needed
+      const tempDir = path.join(__dirname, '../../../temp');
+      await this.ensureDirectory(tempDir);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const tempFileName = `${timestamp}_${sanitizedName}`;
+      const tempFilePath = path.join(tempDir, tempFileName);
+      
+      // Convert base64 to buffer
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Check file size
+      if (buffer.length > this.config.maxPackageSize) {
+        throw new Error(`File size ${this.formatBytes(buffer.length)} exceeds limit ${this.formatBytes(this.config.maxPackageSize)}`);
+      }
+      
+      // Write file
+      fs.writeFileSync(tempFilePath, buffer);
+      
+      // Track temporary file
+      this.tempFiles.add(tempFilePath);
+      
+      this.logger?.info(`FileManager: Temporary file saved: ${tempFileName} (${this.formatBytes(buffer.length)})`);
+      this.recordOperation('saveTemporaryFile', true);
+      
+      return { success: true, path: tempFilePath };
+      
+    } catch (error) {
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
+        `Save temporary file failed: ${error.message}`,
+        'FileManager.saveTemporaryFile'
+      );
+      
+      this.logger?.error('FileManager: Save temporary file failed:', error);
+      this.recordOperation('saveTemporaryFile', false);
+      
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Extract ZIP with validation
    * @private
    * @param {string} zipPath - ZIP file path
@@ -560,6 +623,38 @@ class FileManager extends BaseService {
     });
     
     return items;
+  }
+
+  /**
+   * Sanitize filename for security
+   * @private
+   * @param {string} filename - Filename to sanitize
+   * @returns {string} Sanitized filename
+   */
+  sanitizeFilename(filename) {
+    if (!filename || typeof filename !== 'string') {
+      return null;
+    }
+    
+    // Remove path separators and dangerous characters
+    let sanitized = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '');
+    
+    // Remove leading/trailing dots and spaces
+    sanitized = sanitized.replace(/^[.\s]+|[.\s]+$/g, '');
+    
+    // Limit length
+    if (sanitized.length > 255) {
+      const ext = path.extname(sanitized);
+      const name = path.basename(sanitized, ext);
+      sanitized = name.substring(0, 255 - ext.length) + ext;
+    }
+    
+    // Ensure it's not empty
+    if (!sanitized) {
+      return null;
+    }
+    
+    return sanitized;
   }
 
   /**

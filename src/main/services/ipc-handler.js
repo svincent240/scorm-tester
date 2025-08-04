@@ -101,6 +101,7 @@ class IpcHandler extends BaseService {
       // File operation handlers
       this.registerHandler('select-scorm-package', this.handlerMethods.handleSelectScormPackage.bind(this.handlerMethods));
       this.registerHandler('extract-scorm', this.handlerMethods.handleExtractScorm.bind(this.handlerMethods));
+      this.registerHandler('save-temporary-file', this.handlerMethods.handleSaveTemporaryFile.bind(this.handlerMethods));
       this.registerHandler('find-scorm-entry', this.handlerMethods.handleFindScormEntry.bind(this.handlerMethods));
       this.registerHandler('get-course-info', this.handlerMethods.handleGetCourseInfo.bind(this.handlerMethods));
       this.registerHandler('get-course-manifest', this.handlerMethods.handleGetCourseManifest.bind(this.handlerMethods));

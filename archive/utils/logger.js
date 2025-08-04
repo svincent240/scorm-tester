@@ -21,9 +21,8 @@ class Logger {
             if (!fs.existsSync(logDirectory)) {
                 fs.mkdirSync(logDirectory, { recursive: true });
             }
-            if (!fs.existsSync(this.logFile)) {
-                fs.writeFileSync(this.logFile, `Log file created at ${new Date().toISOString()}\n`);
-            }
+            // Always clear the log file at startup for fresh debugging
+            fs.writeFileSync(this.logFile, `Log file created at ${new Date().toISOString()}\n`);
         } catch (error) {
             console.error('Failed to initialize log file:', error);
         }

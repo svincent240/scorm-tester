@@ -8,8 +8,8 @@
  * @fileoverview SCORM API client for renderer process
  */
 
-const eventBus = require('./event-bus');
-const uiState = require('./ui-state');
+import { eventBus } from './event-bus.js';
+import { uiState } from './ui-state.js';
 
 /**
  * SCORM Client Class
@@ -587,4 +587,4 @@ class ScormClient {
 // Create and export singleton instance
 const scormClient = new ScormClient();
 
-module.exports = scormClient;
+export { ScormClient, scormClient };

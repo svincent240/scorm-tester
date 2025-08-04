@@ -7,8 +7,8 @@
  * @fileoverview SCORM course outline component
  */
 
-const BaseComponent = require('../base-component');
-const uiState = require('../../services/ui-state');
+import { BaseComponent } from '../base-component.js';
+import { uiState } from '../../services/ui-state.js';
 
 /**
  * Course Outline Class
@@ -312,4 +312,4 @@ class CourseOutline extends BaseComponent {
   }
 }
 
-module.exports = CourseOutline;
+export { CourseOutline };

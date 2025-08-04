@@ -183,6 +183,7 @@ const SECURITY_CONFIG = {
       'scorm-terminate',
       'select-scorm-package',
       'extract-scorm',
+      'save-temporary-file',
       'find-scorm-entry',
       'get-course-info',
       'get-course-manifest',

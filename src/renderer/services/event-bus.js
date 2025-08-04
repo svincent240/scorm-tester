@@ -221,8 +221,7 @@ class EventBus {
 const eventBus = new EventBus();
 
 // Enable debug mode in development
-if (process.env.NODE_ENV === 'development') {
-  eventBus.setDebugMode(true);
-}
+// Note: process.env is not available in renderer, so we'll enable debug mode by default
+eventBus.setDebugMode(true);
 
-module.exports = eventBus;
+export { EventBus, eventBus };

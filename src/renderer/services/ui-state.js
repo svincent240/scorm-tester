@@ -7,7 +7,7 @@
  * @fileoverview UI state management service
  */
 
-const eventBus = require('./event-bus');
+import { eventBus } from './event-bus.js';
 
 /**
  * UI State Manager Class
@@ -485,4 +485,4 @@ class UIStateManager {
 // Create and export singleton instance
 const uiState = new UIStateManager();
 
-module.exports = uiState;
+export { UIStateManager, uiState };

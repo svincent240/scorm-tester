@@ -7,7 +7,7 @@
  * @fileoverview Base class for all renderer components
  */
 
-const eventBus = require('../services/event-bus');
+import { eventBus } from '../services/event-bus.js';
 
 /**
  * Base Component Class
@@ -373,9 +373,12 @@ class BaseComponent {
    * @private
    */
   findOrCreateElement() {
+    console.log(`DEBUG: BaseComponent.findOrCreateElement() called for elementId: '${this.elementId}'`);
     let element = document.getElementById(this.elementId);
+    console.log(`DEBUG: Element found:`, !!element);
     
     if (!element) {
+      console.log(`DEBUG: Creating new element with id: '${this.elementId}'`);
       element = document.createElement('div');
       element.id = this.elementId;
       
@@ -383,7 +386,7 @@ class BaseComponent {
       if (!this.options.parent) {
         document.body.appendChild(element);
       } else {
-        const parent = typeof this.options.parent === 'string' 
+        const parent = typeof this.options.parent === 'string'
           ? document.getElementById(this.options.parent)
           : this.options.parent;
         
@@ -395,6 +398,7 @@ class BaseComponent {
       }
     }
     
+    console.log(`DEBUG: Returning element:`, !!element, element?.id);
     return element;
   }
 
@@ -462,4 +466,4 @@ class BaseComponent {
   }
 }
 
-module.exports = BaseComponent;
+export { BaseComponent };
