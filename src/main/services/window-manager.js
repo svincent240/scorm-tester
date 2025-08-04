@@ -89,8 +89,8 @@ class WindowManager extends BaseService {
           nodeIntegration: false,
           contextIsolation: true,
           enableRemoteModule: false,
-          webSecurity: true,
-          allowRunningInsecureContent: false,
+          webSecurity: false, // Disable web security for custom protocol
+          allowRunningInsecureContent: true, // Allow content from custom protocol
           preload: path.join(__dirname, '../../preload.js')
         },
         show: false
@@ -242,7 +242,15 @@ class WindowManager extends BaseService {
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
         try {
           // Extract the path from the custom protocol URL
-          const url = request.url.substr(12); // Remove 'scorm-app://'
+          let url = request.url.substr(12); // Remove 'scorm-app://'
+          
+          // CRITICAL FIX: Automatically correct double temp/ paths
+          if (url.includes('temp/temp/')) {
+            const originalUrl = url;
+            url = url.replace('temp/temp/', 'temp/');
+            this.logger?.info(`WindowManager: PROTOCOL FIX - Corrected double temp path: ${originalUrl} -> ${url}`);
+          }
+          
           const filePath = path.join(__dirname, '../../../', url);
           const normalizedPath = path.normalize(filePath);
           

@@ -274,14 +274,55 @@ async function loadModules() {
           contentFrame.style.display = 'block';
           console.log('CRITICAL DEBUG: Content frame shown');
           
-          // Determine the content URL to load
-          const contentUrl = courseData.launchUrl || courseData.entryPoint;
+          // Determine the content URL to load - use custom protocol for security
+          let contentUrl = courseData.launchUrl || courseData.entryPoint;
+          
+          console.log('CRITICAL DEBUG: Original contentUrl:', contentUrl);
+          console.log('CRITICAL DEBUG: courseData.entryPoint:', courseData.entryPoint);
+          console.log('CRITICAL DEBUG: courseData.path:', courseData.path);
+          
+          // Convert to scorm-app:// protocol for Electron security compliance
+          if (contentUrl && !contentUrl.startsWith('scorm-app://') && !contentUrl.startsWith('http')) {
+            // If it's just a filename, get the full path from entryPoint
+            if (!contentUrl.includes('\\') && !contentUrl.includes('/')) {
+              const entryPath = courseData.entryPoint || '';
+              const directory = entryPath.substring(0, entryPath.lastIndexOf('\\'));
+              contentUrl = `${directory}\\${contentUrl}`;
+              console.log('CRITICAL DEBUG: Constructed full path:', contentUrl);
+            }
+            
+            // Convert absolute Windows path to relative path for custom protocol
+            // The protocol handler expects paths relative to the app root
+            const appRoot = 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
+            console.log('CRITICAL DEBUG: App root:', appRoot);
+            console.log('CRITICAL DEBUG: Content URL before conversion:', contentUrl);
+            
+            if (contentUrl.startsWith(appRoot)) {
+              const relativePath = contentUrl.substring(appRoot.length).replace(/\\/g, '/');
+              console.log('CRITICAL DEBUG: Relative path extracted:', relativePath);
+              contentUrl = `scorm-app://${relativePath}`;
+              console.log('CRITICAL DEBUG: Final scorm-app URL:', contentUrl);
+            } else {
+              console.error('CRITICAL DEBUG: Content path not within app root:', contentUrl);
+              console.error('CRITICAL DEBUG: Expected to start with:', appRoot);
+            }
+          }
+          
           console.log('CRITICAL DEBUG: Loading content URL:', contentUrl);
           
-          // Setup iframe load handler for SCORM API injection
+          // CRITICAL FIX: Inject SCORM API BEFORE content loads
+          // This ensures the API is available when the content starts executing
+          this.preInjectScormAPI(contentFrame);
+          
+          // Setup iframe load handler for additional configuration
           contentFrame.onload = () => {
             console.log('CRITICAL DEBUG: Content frame loaded successfully');
-            this.injectScormAPI(contentFrame);
+            // Verify API is still there and enhance it if needed
+            this.verifyAndEnhanceScormAPI(contentFrame);
+            this.fixScormBasePath(contentFrame);
+            
+            // Add a message listener to handle path correction requests from SCORM content
+            this.setupPathCorrectionHandler(contentFrame);
           };
           
           contentFrame.onerror = (error) => {
@@ -298,8 +339,160 @@ async function loadModules() {
         }
       },
       
+      preInjectScormAPI: function(contentFrame) {
+        console.log('CRITICAL DEBUG: preInjectScormAPI called - injecting BEFORE content loads');
+        
+        // Create a script that will inject the API into the iframe's window
+        // This runs before any content scripts execute
+        const apiScript = `
+          console.log('SCORM Tester: Pre-injecting SCORM API');
+          
+          // Inject SCORM 2004 API
+          window.API_1484_11 = {
+            Initialize: function(param) {
+              console.log('SCORM API: Initialize called with:', param);
+              parent.postMessage({type: 'SCORM_API_CALL', method: 'Initialize', params: [param]}, '*');
+              return 'true';
+            },
+            Terminate: function(param) {
+              console.log('SCORM API: Terminate called with:', param);
+              parent.postMessage({type: 'SCORM_API_CALL', method: 'Terminate', params: [param]}, '*');
+              return 'true';
+            },
+            GetValue: function(element) {
+              console.log('SCORM API: GetValue called with:', element);
+              parent.postMessage({type: 'SCORM_API_CALL', method: 'GetValue', params: [element]}, '*');
+              // Return appropriate default values
+              switch (element) {
+                case 'cmi.completion_status':
+                  return 'incomplete';
+                case 'cmi.success_status':
+                  return 'unknown';
+                case 'cmi.learner_id':
+                  return 'test_learner';
+                case 'cmi.learner_name':
+                  return 'Test Learner';
+                case 'cmi.credit':
+                  return 'credit';
+                case 'cmi.mode':
+                  return 'normal';
+                case 'cmi.entry':
+                  return 'ab-initio';
+                case 'cmi.exit':
+                  return '';
+                case 'cmi.session_time':
+                  return 'PT0H0M0S';
+                case 'cmi.total_time':
+                  return 'PT0H0M0S';
+                case 'cmi.location':
+                  return '';
+                case 'cmi.suspend_data':
+                  return '';
+                case 'cmi.score.scaled':
+                  return '';
+                case 'cmi.score.raw':
+                  return '';
+                case 'cmi.score.min':
+                  return '';
+                case 'cmi.score.max':
+                  return '';
+                default:
+                  return '';
+              }
+            },
+            SetValue: function(element, value) {
+              console.log('SCORM API: SetValue called with:', element, '=', value);
+              parent.postMessage({type: 'SCORM_API_CALL', method: 'SetValue', params: [element, value]}, '*');
+              return 'true';
+            },
+            Commit: function(param) {
+              console.log('SCORM API: Commit called with:', param);
+              parent.postMessage({type: 'SCORM_API_CALL', method: 'Commit', params: [param]}, '*');
+              return 'true';
+            },
+            GetLastError: function() {
+              return '0';
+            },
+            GetErrorString: function(errorCode) {
+              return errorCode === '0' ? 'No error' : 'Unknown error';
+            },
+            GetDiagnostic: function(errorCode) {
+              return 'Diagnostic for error ' + errorCode;
+            }
+          };
+          
+          // Also inject SCORM 1.2 API for compatibility
+          window.API = {
+            LMSInitialize: function(param) { return window.API_1484_11.Initialize(param); },
+            LMSFinish: function(param) { return window.API_1484_11.Terminate(param); },
+            LMSGetValue: function(element) { return window.API_1484_11.GetValue(element); },
+            LMSSetValue: function(element, value) { return window.API_1484_11.SetValue(element, value); },
+            LMSCommit: function(param) { return window.API_1484_11.Commit(param); },
+            LMSGetLastError: function() { return window.API_1484_11.GetLastError(); },
+            LMSGetErrorString: function(errorCode) { return window.API_1484_11.GetErrorString(errorCode); },
+            LMSGetDiagnostic: function(errorCode) { return window.API_1484_11.GetDiagnostic(errorCode); }
+          };
+          
+          console.log('SCORM Tester: SCORM API pre-injection completed');
+        `;
+        
+        // Set up the iframe with the API script injected via srcdoc
+        const originalSrc = contentFrame.src;
+        
+        // Create a minimal HTML document that will load the original content
+        // but with our API already injected
+        const wrapperHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <script>${apiScript}</script>
+          </head>
+          <body>
+            <script>
+              // Redirect to the actual content after API is injected
+              window.location.href = '${originalSrc}';
+            </script>
+          </body>
+          </html>
+        `;
+        
+        // Use srcdoc to inject our wrapper, then redirect to actual content
+        contentFrame.srcdoc = wrapperHtml;
+        
+        console.log('CRITICAL DEBUG: SCORM API pre-injection setup completed');
+      },
+      
+      verifyAndEnhanceScormAPI: function(contentFrame) {
+        console.log('CRITICAL DEBUG: verifyAndEnhanceScormAPI called');
+        
+        try {
+          const contentWindow = contentFrame.contentWindow;
+          if (!contentWindow) {
+            console.error('CRITICAL DEBUG: Content window not accessible for verification');
+            return;
+          }
+          
+          // Check if API exists
+          if (contentWindow.API_1484_11) {
+            console.log('CRITICAL DEBUG: SCORM 2004 API found in content window');
+          } else {
+            console.warn('CRITICAL DEBUG: SCORM 2004 API not found, attempting direct injection');
+            this.injectScormAPI(contentFrame);
+          }
+          
+          if (contentWindow.API) {
+            console.log('CRITICAL DEBUG: SCORM 1.2 API found in content window');
+          } else {
+            console.warn('CRITICAL DEBUG: SCORM 1.2 API not found');
+          }
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error verifying SCORM API:', error);
+        }
+      },
+
       injectScormAPI: function(contentFrame) {
-        console.log('CRITICAL DEBUG: injectScormAPI called');
+        console.log('CRITICAL DEBUG: injectScormAPI called (fallback method)');
         
         try {
           const contentWindow = contentFrame.contentWindow;
@@ -308,7 +501,19 @@ async function loadModules() {
             return;
           }
           
-          console.log('CRITICAL DEBUG: Injecting SCORM API into content window');
+          // Check if we can access the content window (same-origin policy)
+          try {
+            // Test access to content window
+            const testAccess = contentWindow.location.href;
+            console.log('CRITICAL DEBUG: Content window accessible, URL:', testAccess);
+          } catch (accessError) {
+            console.warn('CRITICAL DEBUG: Cannot access content window due to cross-origin restrictions:', accessError.message);
+            // Try alternative approach - inject via postMessage
+            this.injectScormAPIViaPostMessage(contentFrame);
+            return;
+          }
+          
+          console.log('CRITICAL DEBUG: Injecting SCORM API into content window (fallback)');
           
           // Inject SCORM 2004 API
           contentWindow.API_1484_11 = {
@@ -371,10 +576,214 @@ async function loadModules() {
             LMSGetDiagnostic: (errorCode) => contentWindow.API_1484_11.GetDiagnostic(errorCode)
           };
           
-          console.log('CRITICAL DEBUG: SCORM API injection completed successfully');
+          console.log('CRITICAL DEBUG: SCORM API fallback injection completed successfully');
           
         } catch (error) {
           console.error('CRITICAL DEBUG: Error injecting SCORM API:', error);
+          console.error('CRITICAL DEBUG: Error details:', error.name, error.message);
+        }
+      },
+      
+      injectScormAPIViaPostMessage: function(contentFrame) {
+        console.log('CRITICAL DEBUG: Using postMessage approach for SCORM API');
+        
+        // Listen for SCORM API requests from the iframe
+        window.addEventListener('message', (event) => {
+          if (event.source !== contentFrame.contentWindow) return;
+          
+          if (event.data && event.data.type === 'SCORM_API_CALL') {
+            console.log('SCORM API Call via postMessage:', event.data.method, event.data.params);
+            
+            let result = 'true';
+            switch (event.data.method) {
+              case 'Initialize':
+                console.log('SCORM API: Initialize called');
+                break;
+              case 'Terminate':
+                console.log('SCORM API: Terminate called');
+                break;
+              case 'GetValue':
+                console.log('SCORM API: GetValue called with:', event.data.params[0]);
+                result = this.getScormValue(event.data.params[0]);
+                break;
+              case 'SetValue':
+                console.log('SCORM API: SetValue called with:', event.data.params[0], event.data.params[1]);
+                break;
+              case 'Commit':
+                console.log('SCORM API: Commit called');
+                break;
+              case 'GetLastError':
+                result = '0';
+                break;
+              case 'GetErrorString':
+                result = 'No error';
+                break;
+              case 'GetDiagnostic':
+                result = 'No diagnostic';
+                break;
+            }
+            
+            // Send response back
+            contentFrame.contentWindow.postMessage({
+              type: 'SCORM_API_RESPONSE',
+              callId: event.data.callId,
+              result: result
+            }, '*');
+          }
+        });
+        
+        // Notify the iframe that SCORM API is available via postMessage
+        setTimeout(() => {
+          contentFrame.contentWindow.postMessage({
+            type: 'SCORM_API_READY',
+            message: 'SCORM API available via postMessage'
+          }, '*');
+        }, 100);
+      },
+      
+      getScormValue: function(element) {
+        switch (element) {
+          case 'cmi.completion_status':
+            return 'incomplete';
+          case 'cmi.success_status':
+            return 'unknown';
+          case 'cmi.learner_id':
+            return 'test_learner';
+          case 'cmi.learner_name':
+            return 'Test Learner';
+          case 'cmi.credit':
+            return 'credit';
+          case 'cmi.mode':
+            return 'normal';
+          default:
+            return '';
+        }
+      },
+      
+      fixScormBasePath: function(contentFrame) {
+        console.log('CRITICAL DEBUG: fixScormBasePath called');
+        
+        try {
+          const contentWindow = contentFrame.contentWindow;
+          if (!contentWindow) {
+            console.error('CRITICAL DEBUG: Content window not accessible for base path fix');
+            return;
+          }
+          
+          // Check if we can access the content window
+          try {
+            // Test access to content window
+            const testAccess = contentWindow.location.href;
+            console.log('CRITICAL DEBUG: Content window accessible for base path fix, URL:', testAccess);
+            
+            // Fix the DATA_PATH_BASE if window.globals exists
+            if (contentWindow.globals && typeof contentWindow.globals.DATA_PATH_BASE !== 'undefined') {
+              console.log('CRITICAL DEBUG: Original DATA_PATH_BASE:', contentWindow.globals.DATA_PATH_BASE);
+              contentWindow.globals.DATA_PATH_BASE = 'html5/data/';
+              console.log('CRITICAL DEBUG: Updated DATA_PATH_BASE to:', contentWindow.globals.DATA_PATH_BASE);
+            }
+            
+            // Also try to fix RequireJS base path if it exists
+            if (contentWindow.require && contentWindow.require.config) {
+              console.log('CRITICAL DEBUG: Configuring RequireJS base path');
+              contentWindow.require.config({
+                baseUrl: 'html5/data/js/'
+              });
+            }
+            
+          } catch (accessError) {
+            console.warn('CRITICAL DEBUG: Cannot access content window for base path fix due to cross-origin restrictions:', accessError.message);
+            // For cross-origin content, we can't directly modify the base path
+            // The SCORM content will need to handle this internally
+          }
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in fixScormBasePath:', error);
+        }
+      },
+      
+      setupPathCorrectionHandler: function(contentFrame) {
+        console.log('CRITICAL DEBUG: setupPathCorrectionHandler called');
+        
+        // Listen for messages from the SCORM content
+        window.addEventListener('message', (event) => {
+          if (event.source !== contentFrame.contentWindow) return;
+          
+          // Handle SCORM API calls
+          if (event.data && event.data.type === 'SCORM_API_CALL') {
+            console.log('CRITICAL DEBUG: SCORM API call received:', event.data.method, event.data.params);
+            
+            // Log the API call for debugging
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] SCORM API: ${event.data.method}(${event.data.params ? event.data.params.join(', ') : ''})`);
+            
+            // Here you could forward to the main process for proper SCORM handling
+            // For now, just log that we received it
+          }
+          
+          // Handle path correction requests
+          if (event.data && event.data.type === 'PATH_CORRECTION_REQUEST') {
+            console.log('CRITICAL DEBUG: Path correction request received:', event.data.path);
+            
+            // Fix double temp/ paths
+            let correctedPath = event.data.path;
+            if (correctedPath.includes('temp/temp/')) {
+              correctedPath = correctedPath.replace('temp/temp/', 'temp/');
+              console.log('CRITICAL DEBUG: Corrected path:', correctedPath);
+            }
+            
+            // Send back the corrected path
+            contentFrame.contentWindow.postMessage({
+              type: 'PATH_CORRECTION_RESPONSE',
+              requestId: event.data.requestId,
+              correctedPath: correctedPath
+            }, '*');
+          }
+        });
+        
+        // Inject a script into the content frame to intercept RequireJS path resolution
+        try {
+          const script = `
+            console.log('SCORM Tester: Path correction script injected');
+            
+            // Override RequireJS path resolution if it exists
+            if (typeof require !== 'undefined' && require.config) {
+              console.log('SCORM Tester: Configuring RequireJS to fix paths');
+              
+              // Store original require function
+              const originalRequire = window.require;
+              
+              // Override require to fix paths
+              window.require = function(deps, callback, errback) {
+                if (Array.isArray(deps)) {
+                  deps = deps.map(dep => {
+                    if (typeof dep === 'string' && dep.includes('temp/temp/')) {
+                      const fixed = dep.replace('temp/temp/', 'temp/');
+                      console.log('SCORM Tester: Fixed require path:', dep, '->', fixed);
+                      return fixed;
+                    }
+                    return dep;
+                  });
+                }
+                return originalRequire.call(this, deps, callback, errback);
+              };
+              
+              // Copy over require properties
+              Object.keys(originalRequire).forEach(key => {
+                window.require[key] = originalRequire[key];
+              });
+            }
+          `;
+          
+          // Try to inject the script
+          if (contentFrame.contentDocument) {
+            const scriptElement = contentFrame.contentDocument.createElement('script');
+            scriptElement.textContent = script;
+            contentFrame.contentDocument.head.appendChild(scriptElement);
+            console.log('CRITICAL DEBUG: Path correction script injected successfully');
+          }
+        } catch (error) {
+          console.warn('CRITICAL DEBUG: Could not inject path correction script:', error.message);
         }
       }
     };

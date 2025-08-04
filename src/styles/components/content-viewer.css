@@ -1,0 +1,305 @@
+/**
+ * Content Viewer Component Styles
+ * 
+ * Styles for the main content viewing area including the iframe
+ * that displays SCORM content and related UI components.
+ * 
+ * @fileoverview Content viewer component styles
+ */
+
+/* Content Viewer Container */
+.content-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-viewer-bg);
+  border: 1px solid var(--content-viewer-border-color);
+  border-radius: var(--content-viewer-border-radius);
+  margin: var(--spacing-md);
+  overflow: hidden;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+.content-viewer__container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+/* Welcome Screen */
+.content-viewer__welcome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  background: var(--bg-primary);
+}
+
+.welcome-content {
+  text-align: center;
+  max-width: 600px;
+}
+
+.welcome-content h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.welcome-content p {
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-bottom: var(--spacing-xl);
+  flex-wrap: wrap;
+}
+
+.welcome-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+}
+
+.feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  text-align: left;
+}
+
+.feature svg {
+  flex-shrink: 0;
+  color: var(--primary-color);
+  margin-top: var(--spacing-1);
+}
+
+.feature h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.feature p {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Content Frame (iframe) */
+.content-viewer__frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 500px; /* Minimum height for content */
+  border: none;
+  background: #ffffff;
+  display: block;
+}
+
+.content-viewer__frame.hidden {
+  display: none;
+}
+
+/* Navigation Controls */
+.navigation-controls {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nav-btn--danger {
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.nav-btn--danger:hover:not(:disabled) {
+  background: var(--danger-light);
+  border-color: var(--danger-color);
+}
+
+.nav-info {
+  flex: 1;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Progress Tracking */
+.progress-tracking {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.progress-bar__track {
+  flex: 1;
+  height: var(--progress-height);
+  background: var(--progress-bg);
+  border-radius: var(--progress-border-radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--progress-fill-bg);
+  border-radius: var(--progress-border-radius);
+  transition: width var(--transition-base) ease;
+  min-width: 0;
+}
+
+.progress-bar__info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .content-viewer {
+    margin: var(--spacing-sm);
+    border-radius: var(--border-radius);
+  }
+  
+  .content-viewer__welcome {
+    padding: var(--spacing-lg);
+  }
+  
+  .welcome-content h1 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .welcome-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .welcome-features {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  
+  .nav-controls {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+  
+  .nav-info {
+    order: -1;
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .progress-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+  
+  .progress-bar__info {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-viewer {
+    margin: var(--spacing-xs);
+  }
+  
+  .content-viewer__welcome {
+    padding: var(--spacing-md);
+  }
+  
+  .welcome-content h1 {
+    font-size: var(--font-size-xl);
+  }
+  
+  .nav-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+  }
+  
+  .nav-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .content-viewer {
+    border-width: 2px;
+  }
+  
+  .nav-btn:focus {
+    outline: 3px solid var(--focus-color);
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar__fill {
+    transition: none;
+  }
+  
+  .nav-btn {
+    transition: none;
+  }
+}

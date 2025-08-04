@@ -17,7 +17,7 @@ const ScormService = require('./services/scorm-service');
 
 // Shared utilities
 const ScormErrorHandler = require('./services/scorm/rte/error-handler');
-const Logger = require('../../archive/utils/logger');
+const Logger = require('../shared/utils/logger');
 const { SERVICE_EVENTS } = require('../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../shared/constants/error-codes');
 
