@@ -101,8 +101,13 @@
     </div>
 
     <script type="module">
-        // Import the existing DebugPanel component
-        import { DebugPanel } from './src/renderer/components/scorm/debug-panel.js';
+        // DIAGNOSTIC: Log current URL and protocol context
+        console.log('DEBUG WINDOW: Current URL:', window.location.href);
+        console.log('DEBUG WINDOW: Protocol:', window.location.protocol);
+        console.log('DEBUG WINDOW: Origin:', window.location.origin);
+        
+        // Import the existing DebugPanel component using absolute protocol path
+        import { DebugPanel } from 'scorm-app://src/renderer/components/scorm/debug-panel.js';
         
         class DebugWindow {
             constructor() {
@@ -162,18 +167,28 @@
             setupIPC() {
                 // Set up communication with main window for SCORM events
                 if (window.electronAPI) {
+                    console.log('DEBUG WINDOW: Setting up IPC listeners...');
+                    
                     // Listen for SCORM API events
                     if (window.electronAPI.onScormApiLog) {
+                        console.log('DEBUG WINDOW: Setting up SCORM API log listener');
                         window.electronAPI.onScormApiLog((data) => {
+                            console.log('DEBUG WINDOW: Received SCORM API log:', data);
                             if (this.debugPanel) {
                                 this.debugPanel.handleApiCall(data);
+                            } else {
+                                console.warn('DEBUG WINDOW: Debug panel not available for API call');
                             }
                         });
+                    } else {
+                        console.warn('DEBUG WINDOW: onScormApiLog not available');
                     }
 
                     // Listen for course loaded events
                     if (window.electronAPI.onCourseLoaded) {
+                        console.log('DEBUG WINDOW: Setting up course loaded listener');
                         window.electronAPI.onCourseLoaded((data) => {
+                            console.log('DEBUG WINDOW: Received course loaded event:', data);
                             if (this.debugPanel) {
                                 this.debugPanel.handleScormInitialized();
                             }
@@ -182,12 +197,18 @@
 
                     // Listen for session state changes
                     if (window.electronAPI.onSessionStateChanged) {
+                        console.log('DEBUG WINDOW: Setting up session state listener');
                         window.electronAPI.onSessionStateChanged((data) => {
+                            console.log('DEBUG WINDOW: Received session state change:', data);
                             if (this.debugPanel) {
                                 this.debugPanel.refreshSessionInfo();
                             }
                         });
                     }
+                    
+                    console.log('DEBUG WINDOW: IPC listeners setup complete');
+                } else {
+                    console.error('DEBUG WINDOW: electronAPI not available for IPC setup');
                 }
             }
 

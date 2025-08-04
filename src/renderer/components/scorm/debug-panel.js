@@ -150,7 +150,13 @@ class DebugPanel extends BaseComponent {
   }
 
   refreshApiCallsView() {
-    if (!this.apiLog || this.apiCalls.length === 0) {
+    // Safety check: ensure element references are available
+    if (!this.apiLog) {
+      console.log('DEBUG PANEL: apiLog element not yet available, skipping refresh');
+      return;
+    }
+    
+    if (this.apiCalls.length === 0) {
       this.apiLog.innerHTML = '<div class="debug-log__empty">No API calls recorded</div>';
       return;
     }
@@ -182,7 +188,13 @@ class DebugPanel extends BaseComponent {
   }
 
   refreshDataModelView() {
-    if (!this.dataModelView || !scormClient.getInitialized()) {
+    // Safety check: ensure element references are available
+    if (!this.dataModelView) {
+      console.log('DEBUG PANEL: dataModelView element not yet available, skipping refresh');
+      return;
+    }
+    
+    if (!scormClient.getInitialized()) {
       this.dataModelView.innerHTML = '<div class="debug-data__empty">SCORM not initialized</div>';
       return;
     }
@@ -206,7 +218,11 @@ class DebugPanel extends BaseComponent {
   }
 
   refreshSessionInfo() {
-    if (!this.sessionInfo) return;
+    // Safety check: ensure element references are available
+    if (!this.sessionInfo) {
+      console.log('DEBUG PANEL: sessionInfo element not yet available, skipping refresh');
+      return;
+    }
     
     const sessionId = scormClient.getSessionId() || '--';
     const status = scormClient.getInitialized() ? 'Connected' : 'Not Connected';
@@ -241,6 +257,12 @@ class DebugPanel extends BaseComponent {
   }
 
   refreshErrorsView() {
+    // Safety check: ensure element references are available
+    if (!this.errorLog) {
+      console.log('DEBUG PANEL: errorLog element not yet available, skipping refresh');
+      return;
+    }
+    
     const errorCalls = this.apiCalls.filter(call => call.errorCode && call.errorCode !== '0');
     
     if (errorCalls.length === 0) {

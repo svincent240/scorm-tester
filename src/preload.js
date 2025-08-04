@@ -116,6 +116,7 @@ const electronAPI = {
   // Development/Debug
   openDevTools: () => safeSend('open-dev-tools'),
   reloadWindow: () => safeSend('reload-window'),
+  emitDebugEvent: (eventType, data) => safeSend('debug-event', eventType, data),
   
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),

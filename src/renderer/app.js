@@ -313,62 +313,127 @@ async function loadModules() {
             Initialize: function(param) {
               console.log('SCORM API: Initialize called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Initialize', params: [param]}, '*');
+              // Emit IPC event for debug window
+              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Initialize',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             Terminate: function(param) {
               console.log('SCORM API: Terminate called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Terminate', params: [param]}, '*');
+              // Emit IPC event for debug window
+              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Terminate',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             GetValue: function(element) {
               console.log('SCORM API: GetValue called with:', element);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'GetValue', params: [element]}, '*');
               // Return appropriate default values
+              let result;
               switch (element) {
                 case 'cmi.completion_status':
-                  return 'incomplete';
+                  result = 'incomplete';
+                  break;
                 case 'cmi.success_status':
-                  return 'unknown';
+                  result = 'unknown';
+                  break;
                 case 'cmi.learner_id':
-                  return 'test_learner';
+                  result = 'test_learner';
+                  break;
                 case 'cmi.learner_name':
-                  return 'Test Learner';
+                  result = 'Test Learner';
+                  break;
                 case 'cmi.credit':
-                  return 'credit';
+                  result = 'credit';
+                  break;
                 case 'cmi.mode':
-                  return 'normal';
+                  result = 'normal';
+                  break;
                 case 'cmi.entry':
-                  return 'ab-initio';
+                  result = 'ab-initio';
+                  break;
                 case 'cmi.exit':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.session_time':
-                  return 'PT0H0M0S';
+                  result = 'PT0H0M0S';
+                  break;
                 case 'cmi.total_time':
-                  return 'PT0H0M0S';
+                  result = 'PT0H0M0S';
+                  break;
                 case 'cmi.location':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.suspend_data':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.score.scaled':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.score.raw':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.score.min':
-                  return '';
+                  result = '';
+                  break;
                 case 'cmi.score.max':
-                  return '';
+                  result = '';
+                  break;
                 default:
-                  return '';
+                  result = '';
               }
+              
+              // Emit IPC event for debug window
+              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'GetValue',
+                  params: [element],
+                  result: result,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              return result;
             },
             SetValue: function(element, value) {
               console.log('SCORM API: SetValue called with:', element, '=', value);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'SetValue', params: [element, value]}, '*');
+              // Emit IPC event for debug window
+              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'SetValue',
+                  params: [element, value],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             Commit: function(param) {
               console.log('SCORM API: Commit called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Commit', params: [param]}, '*');
+              // Emit IPC event for debug window
+              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Commit',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             GetLastError: function() {
@@ -493,38 +558,93 @@ async function loadModules() {
           contentWindow.API_1484_11 = {
             Initialize: (param) => {
               console.log('SCORM API: Initialize called with:', param);
+              // Emit IPC event for debug window
+              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                window.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Initialize',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             Terminate: (param) => {
               console.log('SCORM API: Terminate called with:', param);
+              // Emit IPC event for debug window
+              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                window.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Terminate',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             GetValue: (element) => {
               console.log('SCORM API: GetValue called with:', element);
               // Return appropriate default values
+              let result;
               switch (element) {
                 case 'cmi.completion_status':
-                  return 'incomplete';
+                  result = 'incomplete';
+                  break;
                 case 'cmi.success_status':
-                  return 'unknown';
+                  result = 'unknown';
+                  break;
                 case 'cmi.learner_id':
-                  return 'test_learner';
+                  result = 'test_learner';
+                  break;
                 case 'cmi.learner_name':
-                  return 'Test Learner';
+                  result = 'Test Learner';
+                  break;
                 case 'cmi.credit':
-                  return 'credit';
+                  result = 'credit';
+                  break;
                 case 'cmi.mode':
-                  return 'normal';
+                  result = 'normal';
+                  break;
                 default:
-                  return '';
+                  result = '';
               }
+              
+              // Emit IPC event for debug window
+              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                window.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'GetValue',
+                  params: [element],
+                  result: result,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              
+              return result;
             },
             SetValue: (element, value) => {
               console.log('SCORM API: SetValue called with:', element, '=', value);
+              // Emit IPC event for debug window
+              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                window.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'SetValue',
+                  params: [element, value],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             Commit: (param) => {
               console.log('SCORM API: Commit called with:', param);
+              // Emit IPC event for debug window
+              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                window.electronAPI.emitDebugEvent('scorm-api-call', {
+                  method: 'Commit',
+                  params: [param],
+                  result: 'true',
+                  timestamp: new Date().toISOString()
+                });
+              }
               return 'true';
             },
             GetLastError: () => {
@@ -583,19 +703,64 @@ async function loadModules() {
             switch (event.data.method) {
               case 'Initialize':
                 console.log('SCORM API: Initialize called');
+                // Emit IPC event for debug window
+                if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                  window.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Initialize',
+                    params: event.data.params || [],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                }
                 break;
               case 'Terminate':
                 console.log('SCORM API: Terminate called');
+                // Emit IPC event for debug window
+                if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                  window.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Terminate',
+                    params: event.data.params || [],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                }
                 break;
               case 'GetValue':
                 console.log('SCORM API: GetValue called with:', event.data.params[0]);
                 result = this.getScormValue(event.data.params[0]);
+                // Emit IPC event for debug window
+                if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                  window.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'GetValue',
+                    params: event.data.params || [],
+                    result: result,
+                    timestamp: new Date().toISOString()
+                  });
+                }
                 break;
               case 'SetValue':
                 console.log('SCORM API: SetValue called with:', event.data.params[0], event.data.params[1]);
+                // Emit IPC event for debug window
+                if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                  window.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'SetValue',
+                    params: event.data.params || [],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                }
                 break;
               case 'Commit':
                 console.log('SCORM API: Commit called');
+                // Emit IPC event for debug window
+                if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+                  window.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Commit',
+                    params: event.data.params || [],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                }
                 break;
               case 'GetLastError':
                 result = '0';

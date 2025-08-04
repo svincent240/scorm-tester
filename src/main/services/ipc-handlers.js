@@ -153,6 +153,26 @@ class IpcHandlers {
   handleLogMessage(event, { level, message, args }) {
     this.ipcHandler.logger?.log(level, `[Renderer] ${message}`, ...args);
   }
+
+  // Debug event handler
+  handleDebugEvent(event, eventType, data) {
+    try {
+      // Get the window manager to access debug window
+      const windowManager = this.ipcHandler.getDependency('windowManager');
+      if (windowManager) {
+        const debugWindow = windowManager.getWindow('debug');
+        if (debugWindow && !debugWindow.isDestroyed()) {
+          // Forward the debug event to the debug window
+          debugWindow.webContents.send('debug-event-received', eventType, data);
+          this.ipcHandler.logger?.debug(`Debug event forwarded: ${eventType}`, data);
+        } else {
+          this.ipcHandler.logger?.debug(`Debug window not available for event: ${eventType}`);
+        }
+      }
+    } catch (error) {
+      this.ipcHandler.logger?.error('Failed to handle debug event:', error);
+    }
+  }
 }
 
 module.exports = IpcHandlers;

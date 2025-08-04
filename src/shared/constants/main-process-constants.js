@@ -200,7 +200,8 @@ const SECURITY_CONFIG = {
       'resolve-scorm-url',
       'path-normalize',
       'path-join',
-      'log-message'
+      'log-message',
+      'debug-event'
     ]
   },
   

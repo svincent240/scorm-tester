@@ -19,10 +19,18 @@
     (function() {
       let savedTheme = null;
       try {
+        // DIAGNOSTIC: Log security context information
+        console.log('THEME INIT: Current URL:', window.location.href);
+        console.log('THEME INIT: Protocol:', window.location.protocol);
+        console.log('THEME INIT: Origin:', window.location.origin);
+        console.log('THEME INIT: localStorage available:', typeof localStorage !== 'undefined');
+        
         // Try to access localStorage, fallback gracefully if not available
         savedTheme = localStorage.getItem('scorm-tester-theme');
+        console.log('THEME INIT: Successfully accessed localStorage, saved theme:', savedTheme);
       } catch (error) {
-        console.warn('localStorage not available, using system theme:', error.message);
+        console.warn('THEME INIT: localStorage access failed:', error.message);
+        console.warn('THEME INIT: Error details:', error);
       }
       
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';

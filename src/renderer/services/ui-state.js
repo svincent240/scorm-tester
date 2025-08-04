@@ -372,6 +372,13 @@ class UIStateManager {
    */
   loadPersistedState() {
     try {
+      // DIAGNOSTIC: Log security context and localStorage availability
+      console.log('UI STATE: Loading persisted state...');
+      console.log('UI STATE: Current URL:', window.location.href);
+      console.log('UI STATE: Protocol:', window.location.protocol);
+      console.log('UI STATE: localStorage type:', typeof localStorage);
+      console.log('UI STATE: localStorage available:', typeof localStorage !== 'undefined');
+      
       // Check if localStorage is available
       if (typeof localStorage === 'undefined') {
         console.warn('UIStateManager: localStorage not available, skipping state restoration');
@@ -379,16 +386,21 @@ class UIStateManager {
       }
       
       const persisted = localStorage.getItem(this.persistenceKey);
+      console.log('UI STATE: Retrieved persisted data:', persisted ? 'found' : 'not found');
+      
       if (persisted) {
         const parsed = JSON.parse(persisted);
+        console.log('UI STATE: Parsed persisted data:', parsed);
         
         // Only restore UI preferences, not session data
         if (parsed.ui) {
           this.state.ui = { ...this.state.ui, ...parsed.ui };
+          console.log('UI STATE: Successfully restored UI preferences');
         }
       }
     } catch (error) {
       console.warn('UIStateManager: Failed to load persisted state:', error);
+      console.warn('UI STATE: Error details:', error.name, error.message);
     }
   }
 
@@ -412,6 +424,10 @@ class UIStateManager {
    */
   persistState() {
     try {
+      // DIAGNOSTIC: Log persistence attempt
+      console.log('UI STATE: Attempting to persist state...');
+      console.log('UI STATE: localStorage type:', typeof localStorage);
+      
       // Check if localStorage is available
       if (typeof localStorage === 'undefined') {
         console.warn('UIStateManager: localStorage not available, skipping state persistence');
@@ -428,9 +444,12 @@ class UIStateManager {
         }
       };
       
+      console.log('UI STATE: Data to persist:', toPersist);
       localStorage.setItem(this.persistenceKey, JSON.stringify(toPersist));
+      console.log('UI STATE: Successfully persisted state');
     } catch (error) {
       console.warn('UIStateManager: Failed to persist state:', error);
+      console.warn('UI STATE: Error details:', error.name, error.message);
     }
   }
 

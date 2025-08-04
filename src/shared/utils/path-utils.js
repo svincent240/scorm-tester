@@ -200,7 +200,6 @@ class PathUtils {
       if (requestedPath.includes('temp/temp/')) {
         const originalPath = requestedPath;
         requestedPath = requestedPath.replace(/temp\/temp\//g, 'temp/');
-        console.log(`PathUtils: Fixed double temp path: ${originalPath} -> ${requestedPath}`);
       }
       
       // Remove query parameters for file resolution
