@@ -66,7 +66,7 @@ class UIStateManager {
       // UI state
       ui: {
         theme: 'default',
-        debugPanelVisible: false,
+
         sidebarCollapsed: false,
         courseOutlineVisible: false,
         devModeEnabled: false,
@@ -174,6 +174,20 @@ class UIStateManager {
    * @param {Object} navData - Navigation data
    */
   updateNavigation(navData) {
+    console.log('UIState: updateNavigation called with:', navData);
+    console.log('UIState: Current navigation state:', this.state.navigationState);
+    
+    // Check if the navigation state actually changed to prevent infinite loops
+    const currentNav = this.state.navigationState;
+    const hasChanged = Object.keys(navData).some(key =>
+      currentNav[key] !== navData[key]
+    );
+    
+    if (!hasChanged) {
+      console.log('UIState: Navigation state unchanged, skipping update');
+      return;
+    }
+    
     this.setState({
       navigationState: {
         ...this.state.navigationState,
@@ -181,6 +195,7 @@ class UIStateManager {
       }
     });
     
+    console.log('UIState: Emitting navigation:updated event');
     eventBus.emit('navigation:updated', navData);
   }
 
@@ -376,6 +391,13 @@ class UIStateManager {
       console.log('UI STATE: Loading persisted state...');
       console.log('UI STATE: Current URL:', window.location.href);
       console.log('UI STATE: Protocol:', window.location.protocol);
+      
+      // Skip localStorage access in custom protocol context
+      if (window.location.protocol === 'scorm-app:') {
+        console.log('UI STATE: Custom protocol detected, skipping localStorage access');
+        return;
+      }
+      
       console.log('UI STATE: localStorage type:', typeof localStorage);
       console.log('UI STATE: localStorage available:', typeof localStorage !== 'undefined');
       
@@ -401,6 +423,7 @@ class UIStateManager {
     } catch (error) {
       console.warn('UIStateManager: Failed to load persisted state:', error);
       console.warn('UI STATE: Error details:', error.name, error.message);
+      console.log('UI STATE: Continuing with default state');
     }
   }
 
@@ -426,6 +449,13 @@ class UIStateManager {
     try {
       // DIAGNOSTIC: Log persistence attempt
       console.log('UI STATE: Attempting to persist state...');
+      
+      // Skip localStorage access in custom protocol context
+      if (window.location.protocol === 'scorm-app:') {
+        console.log('UI STATE: Custom protocol detected, skipping localStorage persistence');
+        return;
+      }
+      
       console.log('UI STATE: localStorage type:', typeof localStorage);
       
       // Check if localStorage is available
@@ -450,6 +480,7 @@ class UIStateManager {
     } catch (error) {
       console.warn('UIStateManager: Failed to persist state:', error);
       console.warn('UI STATE: Error details:', error.name, error.message);
+      console.log('UI STATE: Continuing with in-memory state only');
     }
   }
 

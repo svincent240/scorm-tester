@@ -65,51 +65,15 @@ class ContentViewer extends BaseComponent {
    * Render component content
    */
   renderContent() {
-    this.element.innerHTML = `
-      <div class="content-viewer__container">
-        <div class="content-viewer__loading" id="${this.elementId}-loading">
-          <div class="loading-spinner"></div>
-          <div class="loading-message">Loading SCORM course...</div>
-        </div>
-        
-        <div class="content-viewer__error" id="${this.elementId}-error" style="display: none;">
-          <div class="error-icon">⚠️</div>
-          <div class="error-message">Failed to load course content</div>
-          <div class="error-details"></div>
-          <button class="error-retry-btn">Retry</button>
-        </div>
-        
-        <div class="content-viewer__no-content" id="${this.elementId}-no-content">
-          <div class="no-content-icon">🎓</div>
-          <div class="no-content-title">No Course Loaded</div>
-          <div class="no-content-message">Load a SCORM package to begin testing</div>
-        </div>
-        
-        <iframe 
-          id="${this.elementId}-iframe"
-          class="content-viewer__iframe"
-          style="display: none;"
-          sandbox="${this.options.sandbox}"
-          allowfullscreen="${this.options.enableFullscreen}"
-        ></iframe>
-        
-        ${this.options.enableFullscreen ? `
-          <button class="content-viewer__fullscreen-btn" id="${this.elementId}-fullscreen" title="Fullscreen">
-            ⛶
-          </button>
-        ` : ''}
-      </div>
-    `;
-
-    // Get references to created elements
-    this.iframe = this.find('.content-viewer__iframe');
-    this.loadingElement = this.find('.content-viewer__loading');
-    this.errorElement = this.find('.content-viewer__error');
-    this.noContentElement = this.find('.content-viewer__no-content');
+    // DO NOT modify existing HTML structure - preserve welcome screen
+    console.log('ContentViewer: Preserving existing HTML structure completely');
     
-    if (this.options.enableFullscreen) {
-      this.fullscreenBtn = this.find('.content-viewer__fullscreen-btn');
-    }
+    // Find existing iframe if it exists
+    this.iframe = this.find('.content-viewer__frame') || this.find('#content-frame');
+    this.loadingElement = null;
+    this.errorElement = null;
+    this.noContentElement = null;
+    this.fullscreenBtn = null;
   }
 
   /**
@@ -183,7 +147,9 @@ class ContentViewer extends BaseComponent {
       }, this.options.loadingTimeout);
       
       // Load content in iframe
-      this.iframe.src = url;
+      if (this.iframe) {
+        this.iframe.src = url;
+      }
       
       this.emit('contentLoadStarted', { url, options });
       
@@ -211,6 +177,11 @@ class ContentViewer extends BaseComponent {
       
       // Setup SCORM API in content window
       this.setupScormAPI();
+      
+      // Apply scaling after content loads
+      setTimeout(() => {
+        this.applyContentScaling();
+      }, 100);
       
       this.emit('contentLoaded', { 
         url: this.currentUrl, 
@@ -316,13 +287,105 @@ class ContentViewer extends BaseComponent {
    */
   showContent() {
     this.hideNoContent();
+    this.hideError();
+    this.hideLoading();
     
+    // Hide the welcome screen
+    const welcomeElement = document.querySelector('.content-viewer__welcome');
+    if (welcomeElement) {
+      welcomeElement.style.display = 'none';
+    }
+    
+    // Show the iframe
     if (this.iframe) {
       this.iframe.style.display = 'block';
+      this.iframe.classList.remove('hidden');
     }
     
     if (this.fullscreenBtn) {
       this.fullscreenBtn.style.display = 'block';
+    }
+  }
+
+  /**
+   * Apply content scaling to fit iframe content properly
+   */
+  applyContentScaling() {
+    if (!this.iframe || !this.contentWindow) {
+      return;
+    }
+
+    try {
+      // Get iframe container dimensions
+      const iframeRect = this.iframe.getBoundingClientRect();
+      const containerWidth = iframeRect.width;
+      const containerHeight = iframeRect.height;
+
+      // Get content document dimensions
+      const contentDoc = this.contentWindow.document;
+      if (!contentDoc || !contentDoc.body) {
+        console.log('ContentViewer: Content document not ready for scaling');
+        return;
+      }
+
+      // Try to get the actual content dimensions
+      const contentBody = contentDoc.body;
+      const contentHtml = contentDoc.documentElement;
+      
+      // Get the larger of body scroll dimensions or html scroll dimensions
+      const contentWidth = Math.max(
+        contentBody.scrollWidth || 0,
+        contentHtml.scrollWidth || 0,
+        contentBody.offsetWidth || 0,
+        contentHtml.offsetWidth || 0
+      );
+      
+      const contentHeight = Math.max(
+        contentBody.scrollHeight || 0,
+        contentHtml.scrollHeight || 0,
+        contentBody.offsetHeight || 0,
+        contentHtml.offsetHeight || 0
+      );
+
+      console.log(`ContentViewer: Container: ${containerWidth}x${containerHeight}, Content: ${contentWidth}x${contentHeight}`);
+
+      // Calculate scale factors
+      const scaleX = containerWidth / contentWidth;
+      const scaleY = containerHeight / contentHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+
+      // Apply scaling if needed
+      if (scale < 1) {
+        console.log(`ContentViewer: Applying scale factor: ${scale}`);
+        
+        // Apply CSS transform to scale the content
+        const styleElement = contentDoc.createElement('style');
+        styleElement.textContent = `
+          html, body {
+            transform: scale(${scale});
+            transform-origin: top left;
+            width: ${100 / scale}%;
+            height: ${100 / scale}%;
+            overflow: hidden;
+          }
+        `;
+        contentDoc.head.appendChild(styleElement);
+        
+        // Also try to set viewport meta tag if it doesn't exist
+        let viewportMeta = contentDoc.querySelector('meta[name="viewport"]');
+        if (!viewportMeta) {
+          viewportMeta = contentDoc.createElement('meta');
+          viewportMeta.name = 'viewport';
+          viewportMeta.content = `width=${contentWidth}, initial-scale=${scale}, maximum-scale=${scale}, user-scalable=no`;
+          contentDoc.head.appendChild(viewportMeta);
+        }
+      } else {
+        console.log('ContentViewer: Content fits within container, no scaling needed');
+      }
+
+    } catch (error) {
+      console.error('ContentViewer: Error applying content scaling:', error);
+      // Scaling failed, but content should still be viewable
     }
   }
 
@@ -512,7 +575,14 @@ class ContentViewer extends BaseComponent {
    * Handle SCORM error event
    */
   handleScormError(data) {
-    console.warn('SCORM Error:', data);
+    console.warn('SCORM Error:', JSON.stringify(data, null, 2));
+    console.warn('SCORM Error Details:', {
+      type: typeof data,
+      message: data?.message || 'No message',
+      code: data?.code || 'No code',
+      stack: data?.stack || 'No stack trace',
+      raw: data
+    });
   }
 
   /**

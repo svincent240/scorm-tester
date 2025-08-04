@@ -111,7 +111,11 @@ class EventBus {
           }
         } catch (error) {
           console.error(`EventBus: Error in event handler for '${event}':`, error);
-          this.emit('error', { event, error, subscription: subscription.id });
+          // CRITICAL FIX: Prevent infinite recursion by not emitting 'error' event
+          // Only emit error event if it's not already an error event to prevent loops
+          if (event !== 'error') {
+            this.emit('error', { event, error, subscription: subscription.id });
+          }
         }
       });
     }

@@ -435,10 +435,12 @@ class NavigationControls extends BaseComponent {
    * Update navigation state
    */
   updateNavigationState(newState) {
+    console.log('NavigationControls: updateNavigationState called with:', newState);
     this.navigationState = { ...this.navigationState, ...newState };
     this.updateButtonStates();
     this.updateMenuButton();
     
+    console.log('NavigationControls: Calling uiState.updateNavigation');
     uiState.updateNavigation(this.navigationState);
   }
 
@@ -580,7 +582,16 @@ class NavigationControls extends BaseComponent {
    * Handle navigation updated event
    */
   handleNavigationUpdated(data) {
-    this.updateNavigationState(data);
+    console.log('NavigationControls: handleNavigationUpdated called with:', data);
+    console.log('NavigationControls: Current navigation state:', this.navigationState);
+    
+    // CRITICAL FIX: Update local state without triggering uiState.updateNavigation()
+    // to prevent infinite loop
+    this.navigationState = { ...this.navigationState, ...data };
+    this.updateButtonStates();
+    this.updateMenuButton();
+    
+    console.log('NavigationControls: Updated local navigation state without triggering event');
   }
 
   /**

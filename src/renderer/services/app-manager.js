@@ -17,7 +17,7 @@ import { BaseComponent } from '../components/base-component.js';
 import { ContentViewer } from '../components/scorm/content-viewer.js';
 import { NavigationControls } from '../components/scorm/navigation-controls.js';
 import { ProgressTracking } from '../components/scorm/progress-tracking.js';
-import { DebugPanel } from '../components/scorm/debug-panel.js';
+
 import { CourseOutline } from '../components/scorm/course-outline.js';
 
 /**
@@ -54,6 +54,10 @@ class AppManager {
       
       this.initialized = true;
       console.log('AppManager: Application initialized successfully');
+      
+      // Clear any persistent loading states from previous sessions
+      this.hideLoading();
+      uiState.setLoading(false);
       
       // Emit initialization complete event
       eventBus.emit('app:initialized');
@@ -100,21 +104,23 @@ class AppManager {
         contentViewer: { elementId: 'content-frame', service: 'contentViewer' },
         navigationControls: { elementId: 'navigation-controls', service: 'navigationControls' },
         progressTracking: { elementId: 'progress-tracking', service: 'progressTracking' },
-        debugPanel: { elementId: 'debug-panel', service: 'debugPanel' },
+
         courseOutline: { elementId: 'course-outline', service: 'courseOutline' }
       };
 
-      // Content Viewer
-      if (document.getElementById(componentConfig.contentViewer.elementId)) {
-        const contentViewer = new ContentViewer();
+      // Content Viewer - Fix: Check for correct element ID
+      if (document.getElementById('content-viewer')) {
+        const contentViewer = new ContentViewer('content-viewer');
         await contentViewer.initialize();
         this.components.set('contentViewer', contentViewer);
         console.log('AppManager: ContentViewer initialized');
+      } else {
+        console.warn('AppManager: content-viewer element not found in DOM');
       }
 
       // Navigation Controls
       if (document.getElementById(componentConfig.navigationControls.elementId)) {
-        const navigationControls = new NavigationControls();
+        const navigationControls = new NavigationControls('navigation-controls');
         await navigationControls.initialize();
         this.components.set('navigationControls', navigationControls);
         console.log('AppManager: NavigationControls initialized');
@@ -122,23 +128,15 @@ class AppManager {
 
       // Progress Tracking
       if (document.getElementById(componentConfig.progressTracking.elementId)) {
-        const progressTracking = new ProgressTracking();
+        const progressTracking = new ProgressTracking('progress-tracking');
         await progressTracking.initialize();
         this.components.set('progressTracking', progressTracking);
         console.log('AppManager: ProgressTracking initialized');
       }
 
-      // Debug Panel
-      if (document.getElementById(componentConfig.debugPanel.elementId)) {
-        const debugPanel = new DebugPanel();
-        await debugPanel.initialize();
-        this.components.set('debugPanel', debugPanel);
-        console.log('AppManager: DebugPanel initialized');
-      }
-
       // Course Outline
       if (document.getElementById(componentConfig.courseOutline.elementId)) {
-        const courseOutline = new CourseOutline();
+        const courseOutline = new CourseOutline('course-outline');
         await courseOutline.initialize();
         this.components.set('courseOutline', courseOutline);
         console.log('AppManager: CourseOutline initialized');
@@ -183,7 +181,15 @@ class AppManager {
     });
 
     eventBus.on('scorm:error', (errorData) => {
-      console.error('AppManager: SCORM error:', errorData);
+      console.error('AppManager: SCORM error:', JSON.stringify(errorData, null, 2));
+      console.error('AppManager: SCORM error details:', {
+        type: typeof errorData,
+        message: errorData?.message || 'No message',
+        code: errorData?.code || 'No code',
+        source: errorData?.source || 'No source',
+        timestamp: new Date().toISOString(),
+        raw: errorData
+      });
     });
 
     console.log('AppManager: Event handlers setup complete');
@@ -288,8 +294,13 @@ class AppManager {
   showLoading(message = 'Loading...') {
     const loadingElement = document.getElementById('loading-overlay');
     if (loadingElement) {
-      loadingElement.querySelector('.loading-message').textContent = message;
+      // FIX: Use ID selector instead of class selector
+      const messageElement = document.getElementById('loading-message');
+      if (messageElement) {
+        messageElement.textContent = message;
+      }
       loadingElement.style.display = 'flex';
+      loadingElement.classList.remove('hidden');
     }
   }
 
@@ -300,6 +311,7 @@ class AppManager {
     const loadingElement = document.getElementById('loading-overlay');
     if (loadingElement) {
       loadingElement.style.display = 'none';
+      loadingElement.classList.add('hidden');
     }
   }
 

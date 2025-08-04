@@ -33,8 +33,13 @@ class CourseLoader {
         throw new Error('Electron API not available');
       }
 
-      // Show file selection dialog
-      const result = await window.electronAPI.selectScormFile();
+      // DIAGNOSTIC: Log available API functions
+      console.log('CourseLoader: Available electronAPI functions:', Object.keys(window.electronAPI));
+      console.log('CourseLoader: Looking for selectScormFile function:', typeof window.electronAPI.selectScormFile);
+      console.log('CourseLoader: Available selectScormPackage function:', typeof window.electronAPI.selectScormPackage);
+
+      // Show file selection dialog - FIX: Use correct function name
+      const result = await window.electronAPI.selectScormPackage();
       console.log('CourseLoader: File selection result:', result);
       
       if (!result.success) {
@@ -87,15 +92,34 @@ class CourseLoader {
       const extractResult = await window.electronAPI.extractScorm(filePath);
       console.log('CourseLoader: Extract result:', extractResult);
       
+      // DIAGNOSTIC: Log extract result properties
+      console.log('CourseLoader: Extract result keys:', Object.keys(extractResult));
+      console.log('CourseLoader: Extract result.success:', extractResult.success);
+      console.log('CourseLoader: Extract result.extractedPath:', extractResult.extractedPath);
+      console.log('CourseLoader: Extract result.extractionPath:', extractResult.extractionPath);
+      console.log('CourseLoader: Extract result.path:', extractResult.path);
+      
       if (!extractResult.success) {
         throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
       }
       
-      const extractedPath = extractResult.extractedPath;
+      // FIX: Use the correct property name from the extract result
+      const extractedPath = extractResult.extractedPath || extractResult.extractionPath || extractResult.path;
+      console.log('CourseLoader: Using extractedPath:', extractedPath);
+      
+      if (!extractedPath) {
+        throw new Error('Extract result did not contain a valid path property');
+      }
       
       // Step 2: Get entry point
       console.log('CourseLoader: Step 2 - Getting entry point...');
-      const entryResult = await window.electronAPI.getCourseEntryPoint(extractedPath);
+      
+      // DIAGNOSTIC: Log available entry point functions
+      console.log('CourseLoader: Looking for getCourseEntryPoint function:', typeof window.electronAPI.getCourseEntryPoint);
+      console.log('CourseLoader: Available findScormEntry function:', typeof window.electronAPI.findScormEntry);
+      
+      // FIX: Use correct function name
+      const entryResult = await window.electronAPI.findScormEntry(extractedPath);
       console.log('CourseLoader: Entry result:', entryResult);
       
       if (!entryResult.success) {

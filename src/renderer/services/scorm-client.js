@@ -421,6 +421,7 @@ class ScormClient {
    */
   isValidElement(element) {
     const validPatterns = [
+      // Core CMI elements
       /^cmi\.completion_status$/,
       /^cmi\.success_status$/,
       /^cmi\.score\.(scaled|raw|min|max)$/,
@@ -437,11 +438,43 @@ class ScormClient {
       /^cmi\.mode$/,
       /^cmi\.launch_data$/,
       /^cmi\.scaled_passing_score$/,
+      /^cmi\.time_limit_action$/,
+      /^cmi\.max_time_allowed$/,
+      
+      // Learner preferences
+      /^cmi\.learner_preference\.(audio_level|language|delivery_speed|audio_captioning)$/,
+      
+      // Comments from learner
+      /^cmi\.comments_from_learner\._count$/,
+      /^cmi\.comments_from_learner\.\d+\.(comment|location|timestamp)$/,
+      
+      // Comments from LMS
+      /^cmi\.comments_from_lms\._count$/,
+      /^cmi\.comments_from_lms\.\d+\.(comment|location|timestamp)$/,
+      
+      // Interactions (expanded)
       /^cmi\.interactions\._count$/,
-      /^cmi\.interactions\.\d+\.(id|type|objectives\._count|correct_responses\._count|weighting|learner_response|result|latency|description)$/,
+      /^cmi\.interactions\.\d+\.(id|type|timestamp|weighting|learner_response|result|latency|description)$/,
+      /^cmi\.interactions\.\d+\.objectives\._count$/,
+      /^cmi\.interactions\.\d+\.objectives\.\d+\.id$/,
+      /^cmi\.interactions\.\d+\.correct_responses\._count$/,
+      /^cmi\.interactions\.\d+\.correct_responses\.\d+\.pattern$/,
+      
+      // Objectives (expanded)
       /^cmi\.objectives\._count$/,
-      /^cmi\.objectives\.\d+\.(id|score\.(scaled|raw|min|max)|success_status|completion_status|progress_measure|description)$/,
-      /^adl\.nav\.request$/
+      /^cmi\.objectives\.\d+\.(id|description|success_status|completion_status|progress_measure)$/,
+      /^cmi\.objectives\.\d+\.score\.(scaled|raw|min|max)$/,
+      
+      // ADL Navigation (expanded)
+      /^adl\.nav\.request$/,
+      /^adl\.nav\.request_valid\.(continue|previous|choice|jump|exit|exitAll|abandon|abandonAll)$/,
+      
+      // Additional SCORM 2004 elements that may be requested
+      /^cmi\._version$/,
+      /^cmi\.comments$/,
+      /^cmi\.core\./,  // SCORM 1.2 compatibility
+      /^cmi\.student_data\./,  // SCORM 1.2 compatibility
+      /^cmi\.student_preference\./  // SCORM 1.2 compatibility
     ];
 
     return validPatterns.some(pattern => pattern.test(element));
@@ -497,6 +530,9 @@ class ScormClient {
     };
 
     uiState.addApiCall(apiCall);
+    
+    // Emit event for debug panel
+    eventBus.emit('api:call', { data: apiCall });
   }
 
   /**

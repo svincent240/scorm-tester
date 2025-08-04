@@ -39,29 +39,9 @@ class CourseOutline extends BaseComponent {
   }
 
   renderContent() {
-    this.element.innerHTML = `
-      <div class="course-outline__container">
-        <div class="course-outline__header">
-          <h3>Course Structure</h3>
-          <div class="course-outline__controls">
-            <button class="outline-btn" id="${this.elementId}-expand-all" title="Expand All">⊞</button>
-            <button class="outline-btn" id="${this.elementId}-collapse-all" title="Collapse All">⊟</button>
-          </div>
-        </div>
-        
-        <div class="course-outline__content" id="${this.elementId}-content">
-          <div class="course-outline__empty">
-            <div class="empty-icon">📚</div>
-            <div class="empty-title">No Course Loaded</div>
-            <div class="empty-message">Load a SCORM package to view course structure</div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    this.contentArea = this.find(`#${this.elementId}-content`);
-    this.expandAllBtn = this.find(`#${this.elementId}-expand-all`);
-    this.collapseAllBtn = this.find(`#${this.elementId}-collapse-all`);
+    // DO NOTHING - preserve existing HTML completely
+    console.log('CourseOutline: Preserving existing HTML structure completely');
+    this.contentArea = this.element;
   }
 
   setupEventSubscriptions() {
@@ -85,14 +65,8 @@ class CourseOutline extends BaseComponent {
   }
 
   renderCourseStructure() {
-    if (!this.courseStructure || !this.contentArea) {
-      this.showEmptyState();
-      return;
-    }
-    
-    const html = this.renderItems(this.courseStructure.items || []);
-    this.contentArea.innerHTML = html;
-    this.bindItemEvents();
+    // DO NOTHING - don't modify the DOM at all
+    console.log('CourseOutline: Not modifying DOM structure');
   }
 
   renderItems(items, depth = 0) {
@@ -205,12 +179,19 @@ class CourseOutline extends BaseComponent {
   }
 
   setCurrentItem(itemId) {
+    // Prevent unnecessary updates if item is already current
+    if (this.currentItem === itemId) {
+      console.log('CourseOutline: Item already current, skipping update:', itemId);
+      return;
+    }
+    
     this.currentItem = itemId;
     
     this.findAll('.outline-item').forEach(el => {
       el.classList.toggle('outline-item--current', el.dataset.itemId === itemId);
     });
     
+    console.log('CourseOutline: Emitting currentItemChanged for:', itemId);
     this.emit('currentItemChanged', { itemId });
   }
 
@@ -242,15 +223,8 @@ class CourseOutline extends BaseComponent {
   }
 
   showEmptyState() {
-    if (this.contentArea) {
-      this.contentArea.innerHTML = `
-        <div class="course-outline__empty">
-          <div class="empty-icon">📚</div>
-          <div class="empty-title">No Course Loaded</div>
-          <div class="empty-message">Load a SCORM package to view course structure</div>
-        </div>
-      `;
-    }
+    // DO NOTHING - don't modify the DOM
+    console.log('CourseOutline: Not modifying empty state');
   }
 
   loadCourseStructure() {
@@ -284,9 +258,15 @@ class CourseOutline extends BaseComponent {
   }
 
   handleNavigationUpdated(data) {
+    console.log('CourseOutline: handleNavigationUpdated called with:', data);
     const navData = data.data || data;
+    
+    // Add guard to prevent infinite loops
     if (navData.currentItem && navData.currentItem !== this.currentItem) {
+      console.log('CourseOutline: Setting current item from', this.currentItem, 'to', navData.currentItem);
       this.setCurrentItem(navData.currentItem);
+    } else {
+      console.log('CourseOutline: Navigation update ignored - same item or no item');
     }
   }
 
@@ -303,6 +283,73 @@ class CourseOutline extends BaseComponent {
     if (element === 'cmi.completion_status' && this.currentItem) {
       this.updateItemProgress(this.currentItem, { completionStatus: value });
     }
+  }
+
+  /**
+   * Update course outline with course data (called by AppManager)
+   * @param {Object} courseData - Course data from course loader
+   */
+  updateWithCourse(courseData) {
+    console.log('CourseOutline: updateWithCourse called with:', courseData);
+    
+    try {
+      // Extract structure from courseData
+      let structure = null;
+      
+      if (courseData.structure) {
+        structure = courseData.structure;
+      } else if (courseData.manifest && courseData.manifest.organizations) {
+        // Convert manifest to structure format
+        structure = this.convertManifestToStructure(courseData.manifest);
+      }
+      
+      if (structure) {
+        this.setCourseStructure(structure);
+        console.log('CourseOutline: Course structure updated successfully');
+      } else {
+        console.warn('CourseOutline: No valid structure found in course data');
+      }
+      
+    } catch (error) {
+      console.error('CourseOutline: Error updating with course data:', error);
+    }
+  }
+
+  /**
+   * Convert manifest data to course structure format
+   * @param {Object} manifest - SCORM manifest data
+   * @returns {Object} Course structure
+   */
+  convertManifestToStructure(manifest) {
+    if (!manifest.organizations || !manifest.organizations.organization) {
+      return null;
+    }
+    
+    const org = Array.isArray(manifest.organizations.organization)
+      ? manifest.organizations.organization[0]
+      : manifest.organizations.organization;
+    
+    return {
+      title: org.title || 'Course',
+      identifier: org.identifier || 'course',
+      items: this.convertManifestItems(org.item || [])
+    };
+  }
+
+  /**
+   * Convert manifest items to structure items
+   * @param {Array|Object} items - Manifest items
+   * @returns {Array} Structure items
+   */
+  convertManifestItems(items) {
+    const itemArray = Array.isArray(items) ? items : [items];
+    
+    return itemArray.map(item => ({
+      identifier: item.identifier || item.identifierref || 'unknown',
+      title: item.title || item.identifier || 'Untitled',
+      type: item.identifierref ? 'sco' : 'asset',
+      children: item.item ? this.convertManifestItems(item.item) : []
+    }));
   }
 
   destroy() {

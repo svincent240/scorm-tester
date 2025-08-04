@@ -38,63 +38,90 @@ class DebugPanel extends BaseComponent {
   }
 
   renderContent() {
-    this.element.innerHTML = `
-      <div class="debug-panel__container">
-        <div class="debug-panel__header">
-          <h3>SCORM Debug Panel</h3>
-          <div class="debug-panel__controls">
-            <button class="debug-btn" id="${this.elementId}-clear" title="Clear Log">🗑️</button>
-            <button class="debug-btn" id="${this.elementId}-export" title="Export Log">📄</button>
-            <button class="debug-btn" id="${this.elementId}-close" title="Close Panel">✕</button>
-          </div>
-        </div>
-        
-        <div class="debug-panel__tabs">
-          <button class="debug-tab debug-tab--active" data-tab="api-calls">API Calls</button>
-          <button class="debug-tab" data-tab="data-model">Data Model</button>
-          <button class="debug-tab" data-tab="session">Session</button>
-          <button class="debug-tab" data-tab="errors">Errors</button>
-        </div>
-        
-        <div class="debug-panel__content">
-          <div class="debug-content debug-content--active" id="debug-api-calls">
-            <div class="debug-log" id="${this.elementId}-api-log">
-              <div class="debug-log__empty">No API calls recorded</div>
+    // Preserve existing classes (especially 'hidden' class)
+    const existingClasses = this.element.className;
+    console.log('DebugPanel: Preserving existing classes:', existingClasses);
+    
+    // Check if HTML content already exists
+    const existingContent = this.element.querySelector('.debug-panel__header');
+    
+    if (existingContent) {
+      // HTML already has debug panel content, just get references
+      console.log('DebugPanel: Using existing HTML content');
+      
+      // Get element references from existing HTML
+      this.clearBtn = this.element.querySelector('#debug-clear');
+      this.exportBtn = this.element.querySelector('#debug-export');
+      this.closeBtn = this.element.querySelector('#debug-close');
+      this.apiLog = this.element.querySelector('#api-calls-log');
+      this.dataModelView = this.element.querySelector('#data-model-view');
+      this.sessionInfo = this.element.querySelector('#session-info');
+      this.errorLog = this.element.querySelector('#errors-log');
+      
+    } else {
+      // No existing content, create our own
+      this.element.innerHTML = `
+        <div class="debug-panel__container">
+          <div class="debug-panel__header">
+            <h3>SCORM Debug Panel</h3>
+            <div class="debug-panel__controls">
+              <button class="debug-btn" id="${this.elementId}-clear" title="Clear Log">🗑️</button>
+              <button class="debug-btn" id="${this.elementId}-export" title="Export Log">📄</button>
+              <button class="debug-btn" id="${this.elementId}-close" title="Close Panel">✕</button>
             </div>
           </div>
           
-          <div class="debug-content" id="debug-data-model">
-            <div class="debug-data" id="${this.elementId}-data-model">
-              <div class="debug-data__empty">No data model loaded</div>
-            </div>
+          <div class="debug-panel__tabs">
+            <button class="debug-tab debug-tab--active" data-tab="api-calls">API Calls</button>
+            <button class="debug-tab" data-tab="data-model">Data Model</button>
+            <button class="debug-tab" data-tab="session">Session</button>
+            <button class="debug-tab" data-tab="errors">Errors</button>
           </div>
           
-          <div class="debug-content" id="debug-session">
-            <div class="debug-info" id="${this.elementId}-session-info">
-              <div class="debug-info__item">
-                <span class="debug-info__label">Status:</span>
-                <span class="debug-info__value">Not Connected</span>
+          <div class="debug-panel__content">
+            <div class="debug-content debug-content--active" id="debug-api-calls">
+              <div class="debug-log" id="${this.elementId}-api-log">
+                <div class="debug-log__empty">No API calls recorded</div>
+              </div>
+            </div>
+            
+            <div class="debug-content" id="debug-data-model">
+              <div class="debug-data" id="${this.elementId}-data-model">
+                <div class="debug-data__empty">No data model loaded</div>
+              </div>
+            </div>
+            
+            <div class="debug-content" id="debug-session">
+              <div class="debug-info" id="${this.elementId}-session-info">
+                <div class="debug-info__item">
+                  <span class="debug-info__label">Status:</span>
+                  <span class="debug-info__value">Not Connected</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="debug-content" id="debug-errors">
+              <div class="debug-log" id="${this.elementId}-error-log">
+                <div class="debug-log__empty">No errors recorded</div>
               </div>
             </div>
           </div>
-          
-          <div class="debug-content" id="debug-errors">
-            <div class="debug-log" id="${this.elementId}-error-log">
-              <div class="debug-log__empty">No errors recorded</div>
-            </div>
-          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    // Get element references
-    this.clearBtn = this.find(`#${this.elementId}-clear`);
-    this.exportBtn = this.find(`#${this.elementId}-export`);
-    this.closeBtn = this.find(`#${this.elementId}-close`);
-    this.apiLog = this.find(`#${this.elementId}-api-log`);
-    this.dataModelView = this.find(`#${this.elementId}-data-model`);
-    this.sessionInfo = this.find(`#${this.elementId}-session-info`);
-    this.errorLog = this.find(`#${this.elementId}-error-log`);
+      // Get element references
+      this.clearBtn = this.find(`#${this.elementId}-clear`);
+      this.exportBtn = this.find(`#${this.elementId}-export`);
+      this.closeBtn = this.find(`#${this.elementId}-close`);
+      this.apiLog = this.find(`#${this.elementId}-api-log`);
+      this.dataModelView = this.find(`#${this.elementId}-data-model`);
+      this.sessionInfo = this.find(`#${this.elementId}-session-info`);
+      this.errorLog = this.find(`#${this.elementId}-error-log`);
+    }
+    
+    // Restore the original classes (including 'hidden')
+    this.element.className = existingClasses;
+    console.log('DebugPanel: Restored classes:', this.element.className);
   }
 
   setupEventSubscriptions() {
