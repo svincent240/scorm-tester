@@ -86,7 +86,7 @@ class WindowManager extends BaseService {
           nodeIntegration: false,
           contextIsolation: true,
           enableRemoteModule: false,
-          webSecurity: true,
+          webSecurity: false,
           preload: path.join(__dirname, '../../preload.js')
         },
         show: false
@@ -96,34 +96,45 @@ class WindowManager extends BaseService {
       this.setupMainWindowEvents(mainWindow);
       this.setupConsoleLogging(mainWindow);
       
-      // Load the main application HTML file using proper Electron method
-      // Load the main application HTML file using a manually constructed URL
+      // Load the main application HTML file using loadURL instead of loadFile
       const indexPath = path.join(__dirname, '../../../index.html');
-      const indexUrl = url.format({
-        pathname: indexPath,
-        protocol: 'file:',
-        slashes: true
-      });
-      this.logger?.info(`WindowManager: Loading main application from: ${indexPath}`);
-      await mainWindow.loadFile(indexPath);
-      this.menuBuilder.createApplicationMenu(mainWindow);
+      const resolvedPath = path.resolve(indexPath);
       
-      mainWindow.show();
-      
-      if (process.env.NODE_ENV === 'development') {
-        mainWindow.webContents.openDevTools();
+      if (!require('fs').existsSync(resolvedPath)) {
+        throw new Error(`index.html not found at path: ${resolvedPath}`);
       }
       
-      this.setWindowState(WINDOW_TYPES.MAIN, WINDOW_STATES.READY);
-      this.emit(SERVICE_EVENTS.WINDOW_CREATED, { 
-        windowType: WINDOW_TYPES.MAIN, 
-        windowId: mainWindow.id 
-      });
+      try {
+        // Use data URL approach since file:// protocol has issues
+        const htmlContent = require('fs').readFileSync(resolvedPath, 'utf8');
+        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
+        await mainWindow.loadURL(dataUrl);
+        
+        this.menuBuilder.createApplicationMenu(mainWindow);
+        
+        if (process.env.NODE_ENV === 'development') {
+          mainWindow.webContents.openDevTools();
+        }
+        
+        mainWindow.show();
+        
+        this.setWindowState(WINDOW_TYPES.MAIN, WINDOW_STATES.READY);
+        this.emit(SERVICE_EVENTS.WINDOW_CREATED, {
+          windowType: WINDOW_TYPES.MAIN,
+          windowId: mainWindow.id
+        });
+        
+        this.logger?.info(`WindowManager: Main window created successfully (ID: ${mainWindow.id})`);
+        this.recordOperation('createMainWindow', true);
+        
+        return mainWindow;
+        
+      } catch (error) {
+        this.logger?.error('WindowManager: Failed to load main application file:', error);
+        throw error;
+      }
       
-      this.logger?.info(`WindowManager: Main window created successfully (ID: ${mainWindow.id})`);
-      this.recordOperation('createMainWindow', true);
-      
-      return mainWindow;
+      // This code is now handled in the Promise above
       
     } catch (error) {
       this.setWindowState(WINDOW_TYPES.MAIN, WINDOW_STATES.CLOSED);

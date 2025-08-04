@@ -68,12 +68,24 @@ class MainProcess {
    * Initialize core dependencies (logger, error handler)
    */
   async initializeCoreDependencies() {
-    const logDir = app.getPath('userData');
-    this.logger = new Logger(logDir);
-    console.log(`SCORM Tester: Log file path: ${this.logger.logFile}`);
-    
-    this.errorHandler = new ScormErrorHandler(this.logger);
-    this.logger?.info('SCORM Tester: Core dependencies initialized');
+    try {
+      const logDir = app.getPath('userData');
+      this.logger = new Logger(logDir);
+      console.log(`SCORM Tester: Log file path: ${this.logger.logFile}`);
+      
+      this.errorHandler = new ScormErrorHandler(this.logger);
+      this.logger?.info('SCORM Tester: Core dependencies initialized');
+    } catch (error) {
+      console.error('SCORM Tester: Failed to initialize core dependencies:', error);
+      // Continue without logger if it fails
+      this.logger = {
+        info: console.log,
+        warn: console.warn,
+        error: console.error,
+        debug: console.debug
+      };
+      this.errorHandler = new ScormErrorHandler(this.logger);
+    }
   }
 
   /**
