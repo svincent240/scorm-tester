@@ -7,9 +7,10 @@
  * @fileoverview Window management service for SCORM Tester main process
  */
 
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, protocol } = require('electron');
 const path = require('path');
 const url = require('url');
+const fs = require('fs');
 const BaseService = require('./base-service');
 const MenuBuilder = require('./menu-builder');
 const { 
@@ -33,6 +34,7 @@ class WindowManager extends BaseService {
     this.windowStates = new Map();
     this.config = { ...SERVICE_DEFAULTS.WINDOW_MANAGER, ...options };
     this.menuBuilder = new MenuBuilder(this, logger);
+    this.protocolRegistered = false;
   }
 
   /**
@@ -48,6 +50,7 @@ class WindowManager extends BaseService {
   async doInitialize() {
     this.logger?.debug('WindowManager: Starting initialization');
     this.initializeWindowStates();
+    await this.registerCustomProtocol();
     this.logger?.debug('WindowManager: Initialization completed');
   }
 
@@ -86,7 +89,8 @@ class WindowManager extends BaseService {
           nodeIntegration: false,
           contextIsolation: true,
           enableRemoteModule: false,
-          webSecurity: false,
+          webSecurity: true,
+          allowRunningInsecureContent: false,
           preload: path.join(__dirname, '../../preload.js')
         },
         show: false
@@ -96,7 +100,7 @@ class WindowManager extends BaseService {
       this.setupMainWindowEvents(mainWindow);
       this.setupConsoleLogging(mainWindow);
       
-      // Load the main application HTML file using loadURL instead of loadFile
+      // Load the main application HTML file using custom protocol
       const indexPath = path.join(__dirname, '../../../index.html');
       const resolvedPath = path.resolve(indexPath);
       
@@ -105,10 +109,11 @@ class WindowManager extends BaseService {
       }
       
       try {
-        // Use data URL approach since file:// protocol has issues
-        const htmlContent = require('fs').readFileSync(resolvedPath, 'utf8');
-        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`;
-        await mainWindow.loadURL(dataUrl);
+        // Register custom protocol before loading
+        await this.registerCustomProtocol();
+        
+        // Use custom protocol to avoid Windows file:// issues
+        await mainWindow.loadURL('scorm-app://index.html');
         
         this.menuBuilder.createApplicationMenu(mainWindow);
         
@@ -221,6 +226,63 @@ class WindowManager extends BaseService {
    */
   getWindowState(windowType) {
     return this.windowStates.get(windowType) || WINDOW_STATES.CLOSED;
+  }
+
+  /**
+   * Register custom protocol for app resources
+   * @private
+   */
+  async registerCustomProtocol() {
+    if (this.protocolRegistered) {
+      return;
+    }
+
+    try {
+      // Register the custom protocol
+      const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
+        try {
+          // Extract the path from the custom protocol URL
+          const url = request.url.substr(12); // Remove 'scorm-app://'
+          const filePath = path.join(__dirname, '../../../', url);
+          const normalizedPath = path.normalize(filePath);
+          
+          // Security check: ensure the path is within our app directory
+          const appRoot = path.resolve(__dirname, '../../../');
+          const resolvedPath = path.resolve(normalizedPath);
+          
+          if (!resolvedPath.startsWith(appRoot)) {
+            this.logger?.error('WindowManager: Security violation - path outside app directory:', resolvedPath);
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+            return;
+          }
+          
+          // Check if file exists
+          if (!fs.existsSync(resolvedPath)) {
+            this.logger?.error('WindowManager: File not found:', resolvedPath);
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+            return;
+          }
+          
+          this.logger?.debug('WindowManager: Serving file via custom protocol:', resolvedPath);
+          callback({ path: resolvedPath });
+          
+        } catch (error) {
+          this.logger?.error('WindowManager: Error in custom protocol handler:', error);
+          callback({ error: -2 }); // ERR_FAILED
+        }
+      });
+
+      if (success) {
+        this.protocolRegistered = true;
+        this.logger?.info('WindowManager: Custom protocol "scorm-app://" registered successfully');
+      } else {
+        throw new Error('Failed to register custom protocol');
+      }
+      
+    } catch (error) {
+      this.logger?.error('WindowManager: Failed to register custom protocol:', error);
+      throw error;
+    }
   }
 
   /**

@@ -303,7 +303,15 @@ class ScormTesterApp {
   setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.className = `theme-${theme}`;
-    localStorage.setItem('scorm-tester-theme', theme);
+    
+    // Save theme preference with error handling
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('scorm-tester-theme', theme);
+      }
+    } catch (error) {
+      console.warn('Failed to save theme preference:', error);
+    }
     
     this.services.get('eventBus').emit('theme:changed', { theme });
   }

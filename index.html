@@ -21,7 +21,14 @@
   <script>
     // Apply saved theme or system preference before page load
     (function() {
-      const savedTheme = localStorage.getItem('scorm-tester-theme');
+      let savedTheme = null;
+      try {
+        // Try to access localStorage, fallback gracefully if not available
+        savedTheme = localStorage.getItem('scorm-tester-theme');
+      } catch (error) {
+        console.warn('localStorage not available, using system theme:', error.message);
+      }
+      
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
       const theme = savedTheme || systemTheme;
       document.documentElement.setAttribute('data-theme', theme);
@@ -306,19 +313,11 @@
   <!-- Scripts -->
   <script src="src/renderer/app.js" type="module"></script>
   
-  <!-- Service Worker Registration -->
+  <!-- Service Worker Registration - Disabled for offline Electron app -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('SW registered: ', registration);
-          })
-          .catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
-    }
+    // Service workers are not needed in Electron offline apps
+    // All functionality is handled by the main process
+    console.log('SCORM Tester: Running in offline Electron mode');
   </script>
 </body>
 </html>

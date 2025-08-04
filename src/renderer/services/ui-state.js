@@ -372,6 +372,12 @@ class UIStateManager {
    */
   loadPersistedState() {
     try {
+      // Check if localStorage is available
+      if (typeof localStorage === 'undefined') {
+        console.warn('UIStateManager: localStorage not available, skipping state restoration');
+        return;
+      }
+      
       const persisted = localStorage.getItem(this.persistenceKey);
       if (persisted) {
         const parsed = JSON.parse(persisted);
@@ -406,6 +412,12 @@ class UIStateManager {
    */
   persistState() {
     try {
+      // Check if localStorage is available
+      if (typeof localStorage === 'undefined') {
+        console.warn('UIStateManager: localStorage not available, skipping state persistence');
+        return;
+      }
+      
       // Only persist UI preferences
       const toPersist = {
         ui: {
