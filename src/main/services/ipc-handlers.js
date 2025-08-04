@@ -125,8 +125,28 @@ class IpcHandlers {
   }
 
   async handlePathUtilsToFileUrl(event, filePath) {
-    const PathUtils = require('../../../archive/utils/path-utils.js');
-    return PathUtils.toFileUrl(filePath);
+    const PathUtils = require('../../shared/utils/path-utils');
+    const path = require('path');
+    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+    return PathUtils.toScormProtocolUrl(filePath, appRoot);
+  }
+
+  async handleResolveScormUrl(event, contentPath, extractionPath) {
+    const PathUtils = require('../../shared/utils/path-utils');
+    const path = require('path');
+    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
+  }
+
+  async handlePathNormalize(event, filePath) {
+    const PathUtils = require('../../shared/utils/path-utils');
+    return PathUtils.normalize(filePath);
+  }
+
+  async handlePathJoin(event, ...paths) {
+    const path = require('path');
+    const PathUtils = require('../../shared/utils/path-utils');
+    return PathUtils.normalize(path.join(...paths));
   }
 
   // Logging handler

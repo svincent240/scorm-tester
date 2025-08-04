@@ -16,10 +16,11 @@ const fs = require('fs');
 const StreamZip = require('node-stream-zip');
 const xml2js = require('xml2js');
 const BaseService = require('./base-service');
-const { 
-  FILE_OPERATIONS, 
+const PathUtils = require('../../shared/utils/path-utils');
+const {
+  FILE_OPERATIONS,
   SERVICE_DEFAULTS,
-  SECURITY_CONFIG 
+  SECURITY_CONFIG
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 
@@ -231,6 +232,9 @@ class FileManager extends BaseService {
       
       const manifestContent = fs.readFileSync(manifestPath, 'utf8');
       
+      // Get app root for URL resolution
+      const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+      
       // Find SCO resource
       const scoResourceMatch = manifestContent.match(/<resource[^>]+adlcp:scormtype="sco"[^>]*>/i);
       if (scoResourceMatch) {
@@ -238,14 +242,18 @@ class FileManager extends BaseService {
         const hrefMatch = resourceBlock.match(/href="([^"]+)"/i);
         
         if (hrefMatch && hrefMatch[1]) {
-          const fullHref = hrefMatch[1];
-          const launchFile = fullHref.split('?')[0];
-          const fullPath = path.join(folderPath, launchFile);
+          const contentPath = hrefMatch[1];
+          const urlResult = PathUtils.resolveScormContentUrl(contentPath, folderPath, appRoot);
           
-          if (fs.existsSync(fullPath)) {
-            this.logger?.info(`FileManager: Found SCO entry point: ${launchFile}`);
+          if (urlResult.success) {
+            this.logger?.info(`FileManager: Found SCO entry point: ${contentPath}`);
             this.recordOperation('findScormEntry', true);
-            return { success: true, entryPath: fullPath, launchUrl: fullHref };
+            return {
+              success: true,
+              entryPath: urlResult.resolvedPath,
+              launchUrl: urlResult.url,
+              originalHref: contentPath
+            };
           }
         }
       }
@@ -253,25 +261,34 @@ class FileManager extends BaseService {
       // Fallback to first href found
       const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
       if (launchMatch && launchMatch[1]) {
-        const fullHref = launchMatch[1];
-        const launchFile = fullHref.split('?')[0];
-        const fullPath = path.join(folderPath, launchFile);
+        const contentPath = launchMatch[1];
+        const urlResult = PathUtils.resolveScormContentUrl(contentPath, folderPath, appRoot);
         
-        if (fs.existsSync(fullPath)) {
-          this.logger?.info(`FileManager: Found fallback entry point: ${launchFile}`);
+        if (urlResult.success) {
+          this.logger?.info(`FileManager: Found fallback entry point: ${contentPath}`);
           this.recordOperation('findScormEntry', true);
-          return { success: true, entryPath: fullPath, launchUrl: fullHref };
+          return {
+            success: true,
+            entryPath: urlResult.resolvedPath,
+            launchUrl: urlResult.url,
+            originalHref: contentPath
+          };
         }
       }
       
       // Check common files
       const commonFiles = ['index.html', 'launch.html', 'start.html', 'main.html'];
       for (const file of commonFiles) {
-        const filePath = path.join(folderPath, file);
-        if (fs.existsSync(filePath)) {
+        const urlResult = PathUtils.resolveScormContentUrl(file, folderPath, appRoot);
+        if (urlResult.success) {
           this.logger?.info(`FileManager: Found common file entry point: ${file}`);
           this.recordOperation('findScormEntry', true);
-          return { success: true, entryPath: filePath };
+          return {
+            success: true,
+            entryPath: urlResult.resolvedPath,
+            launchUrl: urlResult.url,
+            originalHref: file
+          };
         }
       }
       

@@ -242,157 +242,67 @@ async function loadModules() {
       },
       
       loadContentIntoIframe: async function(courseData) {
-        console.log('CRITICAL DEBUG: loadContentIntoIframe called with:', courseData);
+        console.log('Loading SCORM content into iframe:', courseData.info?.title || 'Unknown');
         
         try {
           // Get the content iframe and welcome content
           const contentFrame = document.getElementById('content-frame');
           const welcomeContent = document.querySelector('.content-viewer__welcome');
           
-          console.log('CRITICAL DEBUG: Content frame found:', !!contentFrame);
-          console.log('CRITICAL DEBUG: Welcome content found:', !!welcomeContent);
-          console.log('CRITICAL DEBUG: Launch URL:', courseData.launchUrl);
-          
           if (!contentFrame) {
-            console.error('CRITICAL DEBUG: Content frame not found in DOM');
-            return;
+            throw new Error('Content frame not found in DOM');
           }
           
-          if (!courseData.launchUrl && !courseData.entryPoint) {
-            console.error('CRITICAL DEBUG: No launch URL or entry point available');
-            return;
+          if (!courseData.launchUrl) {
+            throw new Error('No launch URL available for SCORM content');
           }
           
-          // Hide welcome content
+          // Hide welcome content and show iframe
           if (welcomeContent) {
             welcomeContent.style.display = 'none';
-            console.log('CRITICAL DEBUG: Welcome content hidden');
           }
           
-          // Show content frame
           contentFrame.classList.remove('hidden');
           contentFrame.style.display = 'block';
-          console.log('CRITICAL DEBUG: Content frame shown');
           
-          // FIXED: Robust path resolution for SCORM content
-          let contentUrl = courseData.launchUrl || courseData.entryPoint;
+          // Use the launch URL directly (it's already been processed by the unified path utilities)
+          const contentUrl = courseData.launchUrl;
+          console.log('Loading SCORM content URL:', contentUrl);
           
-          console.log('CRITICAL DEBUG: Original contentUrl:', contentUrl);
-          console.log('CRITICAL DEBUG: courseData.entryPoint:', courseData.entryPoint);
-          console.log('CRITICAL DEBUG: courseData.path:', courseData.path);
-          
-          // DIAGNOSTIC: Add detailed path analysis
-          console.log('DIAGNOSTIC: Analyzing path resolution issue...');
-          console.log('DIAGNOSTIC: contentUrl type:', typeof contentUrl);
-          console.log('DIAGNOSTIC: contentUrl includes backslash:', contentUrl.includes('\\'));
-          console.log('DIAGNOSTIC: contentUrl includes forward slash:', contentUrl.includes('/'));
-          console.log('DIAGNOSTIC: courseData.path exists:', !!courseData.path);
-          console.log('DIAGNOSTIC: courseData.entryPoint exists:', !!courseData.entryPoint);
-          
-          // Convert to scorm-app:// protocol for Electron security compliance
-          if (contentUrl && !contentUrl.startsWith('scorm-app://') && !contentUrl.startsWith('http')) {
-            // FIXED: Use dynamic app root detection instead of hardcoded path
-            const appRoot = this.getAppRoot();
-            console.log('CRITICAL DEBUG: Dynamic app root:', appRoot);
-            console.log('CRITICAL DEBUG: Content URL before conversion:', contentUrl);
-            
-            // If it's just a filename, get the full path from entryPoint
-            if (!contentUrl.includes('\\') && !contentUrl.includes('/')) {
-              const entryPath = courseData.entryPoint || '';
-              const directory = entryPath.substring(0, Math.max(entryPath.lastIndexOf('\\'), entryPath.lastIndexOf('/')));
-              contentUrl = `${directory}${entryPath.includes('\\') ? '\\' : '/'}${contentUrl}`;
-              console.log('CRITICAL DEBUG: Constructed full path:', contentUrl);
-            }
-            
-            // DIAGNOSTIC: Enhanced path resolution with detailed logging
-            console.log('DIAGNOSTIC: Checking if contentUrl starts with appRoot...');
-            console.log('DIAGNOSTIC: contentUrl:', contentUrl);
-            console.log('DIAGNOSTIC: appRoot:', appRoot);
-            console.log('DIAGNOSTIC: contentUrl.startsWith(appRoot):', contentUrl.startsWith(appRoot));
-            
-            // FIXED: The issue is that contentUrl is relative, not absolute
-            // We need to construct the full path first
-            let fullContentPath = contentUrl;
-            if (!contentUrl.includes('\\') && !contentUrl.includes('/')) {
-              // It's just a filename, construct full path from courseData
-              if (courseData.path && courseData.entryPoint) {
-                const directory = courseData.entryPoint.substring(0, Math.max(courseData.entryPoint.lastIndexOf('\\'), courseData.entryPoint.lastIndexOf('/')));
-                fullContentPath = `${courseData.path}${courseData.path.endsWith('\\') || courseData.path.endsWith('/') ? '' : '\\'}${contentUrl}`;
-                console.log('DIAGNOSTIC: Constructed full path from filename:', fullContentPath);
-              }
-            } else if (!contentUrl.startsWith(appRoot) && !contentUrl.startsWith('C:') && !contentUrl.startsWith('/')) {
-              // It's a relative path, construct full path
-              if (courseData.path) {
-                fullContentPath = `${courseData.path}${courseData.path.endsWith('\\') || courseData.path.endsWith('/') ? '' : '\\'}${contentUrl}`;
-                console.log('DIAGNOSTIC: Constructed full path from relative path:', fullContentPath);
-              }
-            }
-            
-            console.log('DIAGNOSTIC: Final fullContentPath:', fullContentPath);
-            
-            // FIXED: Robust path conversion that works across platforms
-            if (fullContentPath.startsWith(appRoot)) {
-              let relativePath = fullContentPath.substring(appRoot.length);
-              // Normalize path separators to forward slashes for URL
-              relativePath = relativePath.replace(/\\/g, '/');
-              // Remove leading slash if present
-              if (relativePath.startsWith('/')) {
-                relativePath = relativePath.substring(1);
-              }
-              console.log('DIAGNOSTIC: Relative path extracted:', relativePath);
-              contentUrl = `scorm-app://${relativePath}`;
-              console.log('DIAGNOSTIC: Final scorm-app URL:', contentUrl);
-            } else {
-              console.error('DIAGNOSTIC: Content path not within app root:', fullContentPath);
-              console.error('DIAGNOSTIC: Expected to start with:', appRoot);
-              // FIXED: Fallback handling for paths outside app root
-              console.warn('DIAGNOSTIC: Attempting fallback path resolution...');
-              try {
-                // Try to extract just the temp folder portion
-                const tempMatch = fullContentPath.match(/temp[\/\\]scorm_\d+[\/\\].+$/);
-                if (tempMatch) {
-                  const tempPath = tempMatch[0].replace(/\\/g, '/');
-                  contentUrl = `scorm-app://${tempPath}`;
-                  console.log('DIAGNOSTIC: Fallback scorm-app URL:', contentUrl);
-                } else {
-                  console.error('DIAGNOSTIC: No temp folder match found in:', fullContentPath);
-                  throw new Error('Unable to resolve content path');
-                }
-              } catch (fallbackError) {
-                console.error('DIAGNOSTIC: Fallback path resolution failed:', fallbackError);
-                throw new Error(`Failed to resolve SCORM content path: ${fullContentPath}`);
-              }
-            }
-          }
-          
-          console.log('CRITICAL DEBUG: Loading content URL:', contentUrl);
-          
-          // CRITICAL FIX: Inject SCORM API BEFORE content loads
-          // This ensures the API is available when the content starts executing
-          this.preInjectScormAPI(contentFrame);
-          
-          // Setup iframe load handler for additional configuration
+          // Setup iframe handlers
           contentFrame.onload = () => {
-            console.log('CRITICAL DEBUG: Content frame loaded successfully');
-            // Verify API is still there and enhance it if needed
-            this.verifyAndEnhanceScormAPI(contentFrame);
-            this.fixScormBasePath(contentFrame);
-            
-            // Add a message listener to handle path correction requests from SCORM content
-            this.setupPathCorrectionHandler(contentFrame);
+            console.log('SCORM content loaded successfully');
+            // Setup SCORM API for the loaded content
+            this.setupScormAPIForContent(contentFrame);
           };
           
           contentFrame.onerror = (error) => {
-            console.error('CRITICAL DEBUG: Content frame load error:', error);
+            console.error('SCORM content load error:', error);
+            this.showContentLoadError('Failed to load SCORM content');
           };
           
           // Load the content
           contentFrame.src = contentUrl;
           
-          console.log('CRITICAL DEBUG: Content loading initiated');
-          
         } catch (error) {
-          console.error('CRITICAL DEBUG: Error in loadContentIntoIframe:', error);
+          console.error('Error loading SCORM content:', error);
+          this.showContentLoadError(error.message);
+        }
+      },
+      
+      setupScormAPIForContent: function(contentFrame) {
+        console.log('CRITICAL DEBUG: setupScormAPIForContent called');
+        
+        try {
+          // Use the existing comprehensive SCORM API setup methods
+          this.preInjectScormAPI(contentFrame);
+          this.verifyAndEnhanceScormAPI(contentFrame);
+          this.fixScormBasePath(contentFrame);
+          this.setupPathCorrectionHandler(contentFrame);
+          
+          console.log('CRITICAL DEBUG: SCORM API setup completed for content');
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in setupScormAPIForContent:', error);
         }
       },
       

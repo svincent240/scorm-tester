@@ -13,6 +13,7 @@ const url = require('url');
 const fs = require('fs');
 const BaseService = require('./base-service');
 const MenuBuilder = require('./menu-builder');
+const PathUtils = require('../../shared/utils/path-utils');
 const { 
   WINDOW_TYPES, 
   WINDOW_STATES, 
@@ -91,7 +92,7 @@ class WindowManager extends BaseService {
           enableRemoteModule: false,
           webSecurity: false, // Disable web security for custom protocol
           allowRunningInsecureContent: true, // Allow content from custom protocol
-          preload: path.join(__dirname, '../../preload.js')
+          preload: PathUtils.getPreloadPath(__dirname)
         },
         show: false
       });
@@ -101,11 +102,11 @@ class WindowManager extends BaseService {
       this.setupConsoleLogging(mainWindow);
       
       // Load the main application HTML file using custom protocol
-      const indexPath = path.join(__dirname, '../../../index.html');
-      const resolvedPath = path.resolve(indexPath);
+      const appRoot = PathUtils.getAppRoot(__dirname);
+      const indexPath = path.join(appRoot, 'index.html');
       
-      if (!require('fs').existsSync(resolvedPath)) {
-        throw new Error(`index.html not found at path: ${resolvedPath}`);
+      if (!PathUtils.fileExists(indexPath)) {
+        throw new Error(`index.html not found at path: ${indexPath}`);
       }
       
       try {
@@ -178,7 +179,7 @@ class WindowManager extends BaseService {
           contextIsolation: true,
           webSecurity: false, // Disable web security for custom protocol
           allowRunningInsecureContent: true, // Allow content from custom protocol
-          preload: path.join(__dirname, '../../preload.js')
+          preload: PathUtils.getPreloadPath(__dirname)
         },
         title: 'SCORM Debug Console',
         show: false
@@ -242,59 +243,24 @@ class WindowManager extends BaseService {
     }
 
     try {
-      // Register the custom protocol
+      // Register the custom protocol using consolidated PathUtils
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
-        try {
-          // Extract the path from the custom protocol URL
-          let url = request.url.substr(12); // Remove 'scorm-app://'
-          
-          // CRITICAL FIX: Automatically correct double temp/ paths
-          if (url.includes('temp/temp/')) {
-            const originalUrl = url;
-            url = url.replace('temp/temp/', 'temp/');
-            this.logger?.info(`WindowManager: PROTOCOL FIX - Corrected double temp path: ${originalUrl} -> ${url}`);
+        const appRoot = PathUtils.getAppRoot(__dirname);
+        const result = PathUtils.handleProtocolRequest(request.url, appRoot);
+        
+        this.logger?.info(`WindowManager: Protocol request - URL: ${request.url}`);
+        
+        if (result.success) {
+          this.logger?.info(`WindowManager: Protocol request - Resolved path: ${result.resolvedPath}`);
+          this.logger?.info('WindowManager: Successfully serving file via custom protocol:', result.resolvedPath);
+          callback({ path: result.resolvedPath });
+        } else {
+          this.logger?.error('WindowManager: Protocol request failed:', result.error);
+          this.logger?.error('WindowManager: Requested path:', result.requestedPath);
+          if (result.resolvedPath) {
+            this.logger?.error('WindowManager: Resolved path:', result.resolvedPath);
           }
-          
-          const filePath = path.join(__dirname, '../../../', url);
-          const normalizedPath = path.normalize(filePath);
-          
-          // Enhanced logging for debugging
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Original URL: ${request.url}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Extracted path: ${url}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - __dirname: ${__dirname}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Joined path: ${filePath}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Normalized path: ${normalizedPath}`);
-          
-          // Security check: ensure the path is within our app directory
-          const appRoot = path.resolve(__dirname, '../../../');
-          const resolvedPath = path.resolve(normalizedPath);
-          
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - App root: ${appRoot}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Resolved path: ${resolvedPath}`);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Path starts with app root: ${resolvedPath.startsWith(appRoot)}`);
-          
-          if (!resolvedPath.startsWith(appRoot)) {
-            this.logger?.error('WindowManager: Security violation - path outside app directory:', resolvedPath);
-            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
-            return;
-          }
-          
-          // Check if file exists
-          const fileExists = fs.existsSync(resolvedPath);
-          this.logger?.info(`WindowManager: PROTOCOL DEBUG - File exists: ${fileExists}`);
-          
-          if (!fileExists) {
-            this.logger?.error('WindowManager: File not found:', resolvedPath);
-            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
-            return;
-          }
-          
-          this.logger?.info('WindowManager: Successfully serving file via custom protocol:', resolvedPath);
-          callback({ path: resolvedPath });
-          
-        } catch (error) {
-          this.logger?.error('WindowManager: Error in custom protocol handler:', error);
-          callback({ error: -2 }); // ERR_FAILED
+          callback({ error: -6 }); // ERR_FILE_NOT_FOUND
         }
       });
 

@@ -196,7 +196,10 @@ const SECURITY_CONFIG = {
       'run-test-scenario',
       'get-all-sessions',
       'open-external',
-      'path-utils-to-file-url',
+      'path-to-file-url',
+      'resolve-scorm-url',
+      'path-normalize',
+      'path-join',
       'log-message'
     ]
   },

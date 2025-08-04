@@ -120,7 +120,10 @@ class IpcHandler extends BaseService {
       
       // Utility handlers
       this.registerHandler('open-external', this.handlerMethods.handleOpenExternal.bind(this.handlerMethods));
-      this.registerHandler('path-utils-to-file-url', this.handlerMethods.handlePathUtilsToFileUrl.bind(this.handlerMethods));
+      this.registerHandler('path-to-file-url', this.handlerMethods.handlePathUtilsToFileUrl.bind(this.handlerMethods));
+      this.registerHandler('resolve-scorm-url', this.handlerMethods.handleResolveScormUrl.bind(this.handlerMethods));
+      this.registerHandler('path-normalize', this.handlerMethods.handlePathNormalize.bind(this.handlerMethods));
+      this.registerHandler('path-join', this.handlerMethods.handlePathJoin.bind(this.handlerMethods));
       this.registerSyncHandler('log-message', this.handlerMethods.handleLogMessage.bind(this.handlerMethods));
       
       this.logger?.info(`IpcHandler: Registered ${this.handlers.size} IPC handlers`);
