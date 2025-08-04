@@ -134,8 +134,5 @@ contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 console.log('SCORM Tester: Preload script loaded successfully');
 console.log('SCORM Tester: electronAPI exposed with methods:', Object.keys(electronAPI));
 
-// Log when DOM is ready to verify timing
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('SCORM Tester: DOM ready, electronAPI should be available');
-  console.log('SCORM Tester: window.electronAPI exists:', typeof window.electronAPI !== 'undefined');
-});
+// Note: DOM access is not available in preload scripts
+// DOM ready logging will be handled in the renderer process

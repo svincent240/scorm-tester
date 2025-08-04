@@ -9,6 +9,7 @@
 
 const { BrowserWindow } = require('electron');
 const path = require('path');
+const url = require('url');
 const BaseService = require('./base-service');
 const MenuBuilder = require('./menu-builder');
 const { 
@@ -77,12 +78,17 @@ class WindowManager extends BaseService {
       this.setWindowState(WINDOW_TYPES.MAIN, WINDOW_STATES.CREATING);
       
       const mainWindow = new BrowserWindow({
-        ...this.config.mainWindow,
+        width: this.config.mainWindow.width,
+        height: this.config.mainWindow.height,
+        minWidth: this.config.mainWindow.minWidth,
+        minHeight: this.config.mainWindow.minHeight,
         webPreferences: {
-          ...this.config.mainWindow.webPreferences,
+          nodeIntegration: false,
+          contextIsolation: true,
+          enableRemoteModule: false,
+          webSecurity: true,
           preload: path.join(__dirname, '../../preload.js')
         },
-        icon: path.join(__dirname, '../../../assets/icon.ico'),
         show: false
       });
 
@@ -90,7 +96,16 @@ class WindowManager extends BaseService {
       this.setupMainWindowEvents(mainWindow);
       this.setupConsoleLogging(mainWindow);
       
-      await mainWindow.loadFile('index.html');
+      // Load the main application HTML file using proper Electron method
+      // Load the main application HTML file using a manually constructed URL
+      const indexPath = path.join(__dirname, '../../../index.html');
+      const indexUrl = url.format({
+        pathname: indexPath,
+        protocol: 'file:',
+        slashes: true
+      });
+      this.logger?.info(`WindowManager: Loading main application from: ${indexPath}`);
+      await mainWindow.loadFile(indexPath);
       this.menuBuilder.createApplicationMenu(mainWindow);
       
       mainWindow.show();

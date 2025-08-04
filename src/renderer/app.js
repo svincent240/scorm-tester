@@ -236,7 +236,7 @@ class ScormTesterApp {
     
     // Initialize all components
     for (const [name, component] of this.components) {
-      await component.render();
+      await component.initialize();
       console.log(`Component '${name}' initialized`);
     }
     
