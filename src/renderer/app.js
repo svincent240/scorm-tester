@@ -231,8 +231,8 @@ async function loadModules() {
           // CRITICAL FIX: Load content into iframe
           this.loadContentIntoIframe(courseData);
           
-          // Show a success message
-          alert(`Course "${courseData.info?.title || 'Unknown'}" loaded successfully!\n\nEntry point: ${courseData.entryPoint}`);
+          // Success message removed - only show dialogs on errors
+          console.log('CRITICAL DEBUG: Course loaded successfully:', courseData.info?.title || 'Unknown');
           
           console.log('CRITICAL DEBUG: UI update completed successfully');
           
@@ -281,6 +281,14 @@ async function loadModules() {
           console.log('CRITICAL DEBUG: courseData.entryPoint:', courseData.entryPoint);
           console.log('CRITICAL DEBUG: courseData.path:', courseData.path);
           
+          // DIAGNOSTIC: Add detailed path analysis
+          console.log('DIAGNOSTIC: Analyzing path resolution issue...');
+          console.log('DIAGNOSTIC: contentUrl type:', typeof contentUrl);
+          console.log('DIAGNOSTIC: contentUrl includes backslash:', contentUrl.includes('\\'));
+          console.log('DIAGNOSTIC: contentUrl includes forward slash:', contentUrl.includes('/'));
+          console.log('DIAGNOSTIC: courseData.path exists:', !!courseData.path);
+          console.log('DIAGNOSTIC: courseData.entryPoint exists:', !!courseData.entryPoint);
+          
           // Convert to scorm-app:// protocol for Electron security compliance
           if (contentUrl && !contentUrl.startsWith('scorm-app://') && !contentUrl.startsWith('http')) {
             // FIXED: Use dynamic app root detection instead of hardcoded path
@@ -296,36 +304,63 @@ async function loadModules() {
               console.log('CRITICAL DEBUG: Constructed full path:', contentUrl);
             }
             
+            // DIAGNOSTIC: Enhanced path resolution with detailed logging
+            console.log('DIAGNOSTIC: Checking if contentUrl starts with appRoot...');
+            console.log('DIAGNOSTIC: contentUrl:', contentUrl);
+            console.log('DIAGNOSTIC: appRoot:', appRoot);
+            console.log('DIAGNOSTIC: contentUrl.startsWith(appRoot):', contentUrl.startsWith(appRoot));
+            
+            // FIXED: The issue is that contentUrl is relative, not absolute
+            // We need to construct the full path first
+            let fullContentPath = contentUrl;
+            if (!contentUrl.includes('\\') && !contentUrl.includes('/')) {
+              // It's just a filename, construct full path from courseData
+              if (courseData.path && courseData.entryPoint) {
+                const directory = courseData.entryPoint.substring(0, Math.max(courseData.entryPoint.lastIndexOf('\\'), courseData.entryPoint.lastIndexOf('/')));
+                fullContentPath = `${courseData.path}${courseData.path.endsWith('\\') || courseData.path.endsWith('/') ? '' : '\\'}${contentUrl}`;
+                console.log('DIAGNOSTIC: Constructed full path from filename:', fullContentPath);
+              }
+            } else if (!contentUrl.startsWith(appRoot) && !contentUrl.startsWith('C:') && !contentUrl.startsWith('/')) {
+              // It's a relative path, construct full path
+              if (courseData.path) {
+                fullContentPath = `${courseData.path}${courseData.path.endsWith('\\') || courseData.path.endsWith('/') ? '' : '\\'}${contentUrl}`;
+                console.log('DIAGNOSTIC: Constructed full path from relative path:', fullContentPath);
+              }
+            }
+            
+            console.log('DIAGNOSTIC: Final fullContentPath:', fullContentPath);
+            
             // FIXED: Robust path conversion that works across platforms
-            if (contentUrl.startsWith(appRoot)) {
-              let relativePath = contentUrl.substring(appRoot.length);
+            if (fullContentPath.startsWith(appRoot)) {
+              let relativePath = fullContentPath.substring(appRoot.length);
               // Normalize path separators to forward slashes for URL
               relativePath = relativePath.replace(/\\/g, '/');
               // Remove leading slash if present
               if (relativePath.startsWith('/')) {
                 relativePath = relativePath.substring(1);
               }
-              console.log('CRITICAL DEBUG: Relative path extracted:', relativePath);
+              console.log('DIAGNOSTIC: Relative path extracted:', relativePath);
               contentUrl = `scorm-app://${relativePath}`;
-              console.log('CRITICAL DEBUG: Final scorm-app URL:', contentUrl);
+              console.log('DIAGNOSTIC: Final scorm-app URL:', contentUrl);
             } else {
-              console.error('CRITICAL DEBUG: Content path not within app root:', contentUrl);
-              console.error('CRITICAL DEBUG: Expected to start with:', appRoot);
+              console.error('DIAGNOSTIC: Content path not within app root:', fullContentPath);
+              console.error('DIAGNOSTIC: Expected to start with:', appRoot);
               // FIXED: Fallback handling for paths outside app root
-              console.warn('CRITICAL DEBUG: Attempting fallback path resolution...');
+              console.warn('DIAGNOSTIC: Attempting fallback path resolution...');
               try {
                 // Try to extract just the temp folder portion
-                const tempMatch = contentUrl.match(/temp[\/\\]scorm_\d+[\/\\].+$/);
+                const tempMatch = fullContentPath.match(/temp[\/\\]scorm_\d+[\/\\].+$/);
                 if (tempMatch) {
                   const tempPath = tempMatch[0].replace(/\\/g, '/');
                   contentUrl = `scorm-app://${tempPath}`;
-                  console.log('CRITICAL DEBUG: Fallback scorm-app URL:', contentUrl);
+                  console.log('DIAGNOSTIC: Fallback scorm-app URL:', contentUrl);
                 } else {
+                  console.error('DIAGNOSTIC: No temp folder match found in:', fullContentPath);
                   throw new Error('Unable to resolve content path');
                 }
               } catch (fallbackError) {
-                console.error('CRITICAL DEBUG: Fallback path resolution failed:', fallbackError);
-                throw new Error(`Failed to resolve SCORM content path: ${contentUrl}`);
+                console.error('DIAGNOSTIC: Fallback path resolution failed:', fallbackError);
+                throw new Error(`Failed to resolve SCORM content path: ${fullContentPath}`);
               }
             }
           }
