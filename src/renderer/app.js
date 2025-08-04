@@ -313,28 +313,38 @@ async function loadModules() {
             Initialize: function(param) {
               console.log('SCORM API: Initialize called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Initialize', params: [param]}, '*');
-              // Emit IPC event for debug window
-              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
-                parent.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Initialize',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                  parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Initialize',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Initialize (pre-inject)');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Initialize (pre-inject):', error);
               }
               return 'true';
             },
             Terminate: function(param) {
               console.log('SCORM API: Terminate called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Terminate', params: [param]}, '*');
-              // Emit IPC event for debug window
-              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
-                parent.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Terminate',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                  parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Terminate',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Terminate (pre-inject)');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Terminate (pre-inject):', error);
               }
               return 'true';
             },
@@ -396,14 +406,19 @@ async function loadModules() {
                   result = '';
               }
               
-              // Emit IPC event for debug window
-              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
-                parent.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'GetValue',
-                  params: [element],
-                  result: result,
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                  parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'GetValue',
+                    params: [element],
+                    result: result,
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for GetValue (pre-inject)');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for GetValue (pre-inject):', error);
               }
               
               return result;
@@ -411,28 +426,38 @@ async function loadModules() {
             SetValue: function(element, value) {
               console.log('SCORM API: SetValue called with:', element, '=', value);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'SetValue', params: [element, value]}, '*');
-              // Emit IPC event for debug window
-              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
-                parent.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'SetValue',
-                  params: [element, value],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                  parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'SetValue',
+                    params: [element, value],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for SetValue (pre-inject)');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for SetValue (pre-inject):', error);
               }
               return 'true';
             },
             Commit: function(param) {
               console.log('SCORM API: Commit called with:', param);
               parent.postMessage({type: 'SCORM_API_CALL', method: 'Commit', params: [param]}, '*');
-              // Emit IPC event for debug window
-              if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
-                parent.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Commit',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (parent.electronAPI && parent.electronAPI.emitDebugEvent) {
+                  parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Commit',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Commit (pre-inject)');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Commit (pre-inject):', error);
               }
               return 'true';
             },
@@ -558,27 +583,37 @@ async function loadModules() {
           contentWindow.API_1484_11 = {
             Initialize: (param) => {
               console.log('SCORM API: Initialize called with:', param);
-              // Emit IPC event for debug window
-              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-                window.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Initialize',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (window.parent && window.parent.electronAPI && window.parent.electronAPI.emitDebugEvent) {
+                  window.parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Initialize',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Initialize');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Initialize:', error);
               }
               return 'true';
             },
             Terminate: (param) => {
               console.log('SCORM API: Terminate called with:', param);
-              // Emit IPC event for debug window
-              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-                window.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Terminate',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (window.parent && window.parent.electronAPI && window.parent.electronAPI.emitDebugEvent) {
+                  window.parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Terminate',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Terminate');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Terminate:', error);
               }
               return 'true';
             },
@@ -609,41 +644,56 @@ async function loadModules() {
                   result = '';
               }
               
-              // Emit IPC event for debug window
-              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-                window.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'GetValue',
-                  params: [element],
-                  result: result,
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (window.parent && window.parent.electronAPI && window.parent.electronAPI.emitDebugEvent) {
+                  window.parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'GetValue',
+                    params: [element],
+                    result: result,
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for GetValue');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for GetValue:', error);
               }
               
               return result;
             },
             SetValue: (element, value) => {
               console.log('SCORM API: SetValue called with:', element, '=', value);
-              // Emit IPC event for debug window
-              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-                window.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'SetValue',
-                  params: [element, value],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (window.parent && window.parent.electronAPI && window.parent.electronAPI.emitDebugEvent) {
+                  window.parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'SetValue',
+                    params: [element, value],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for SetValue');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for SetValue:', error);
               }
               return 'true';
             },
             Commit: (param) => {
               console.log('SCORM API: Commit called with:', param);
-              // Emit IPC event for debug window
-              if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-                window.electronAPI.emitDebugEvent('scorm-api-call', {
-                  method: 'Commit',
-                  params: [param],
-                  result: 'true',
-                  timestamp: new Date().toISOString()
-                });
+              // Emit IPC event for debug window from parent window
+              try {
+                if (window.parent && window.parent.electronAPI && window.parent.electronAPI.emitDebugEvent) {
+                  window.parent.electronAPI.emitDebugEvent('scorm-api-call', {
+                    method: 'Commit',
+                    params: [param],
+                    result: 'true',
+                    timestamp: new Date().toISOString()
+                  });
+                  console.log('SCORM API: Debug event emitted for Commit');
+                }
+              } catch (error) {
+                console.warn('SCORM API: Failed to emit debug event for Commit:', error);
               }
               return 'true';
             },

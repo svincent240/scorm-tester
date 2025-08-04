@@ -44,6 +44,7 @@ class IpcHandler extends BaseService {
   validateDependencies() {
     const fileManager = this.getDependency('fileManager');
     const scormService = this.getDependency('scormService');
+    const windowManager = this.getDependency('windowManager');
     
     if (!fileManager) {
       this.logger?.error('IpcHandler: FileManager dependency missing');
@@ -52,6 +53,11 @@ class IpcHandler extends BaseService {
     
     if (!scormService) {
       this.logger?.error('IpcHandler: ScormService dependency missing');
+      return false;
+    }
+    
+    if (!windowManager) {
+      this.logger?.error('IpcHandler: WindowManager dependency missing');
       return false;
     }
     

@@ -116,7 +116,8 @@ class MainProcess {
     const ipcHandler = new IpcHandler(this.errorHandler, this.logger);
     const ipcDependencies = new Map([
       ['fileManager', fileManager],
-      ['scormService', scormService]
+      ['scormService', scormService],
+      ['windowManager', windowManager]
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');

@@ -104,6 +104,7 @@ const electronAPI = {
   onScormApiLog: (callback) => safeOn('scorm-api-log', callback),
   onCourseLoaded: (callback) => safeOn('course-loaded', callback),
   onSessionStateChanged: (callback) => safeOn('session-state-changed', callback),
+  onDebugEvent: (callback) => safeOn('debug-event-received', callback),
   
   // Utility
   pathUtils: {

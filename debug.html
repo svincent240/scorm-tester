@@ -169,11 +169,29 @@
                 if (window.electronAPI) {
                     console.log('DEBUG WINDOW: Setting up IPC listeners...');
                     
-                    // Listen for SCORM API events
+                    // Listen for debug events forwarded from main process
+                    if (window.electronAPI.onDebugEvent) {
+                        console.log('DEBUG WINDOW: Setting up debug event listener');
+                        window.electronAPI.onDebugEvent((eventType, data) => {
+                            console.log('DEBUG WINDOW: Received debug event:', eventType, data);
+                            if (this.debugPanel) {
+                                this.debugPanel.handleApiCall({
+                                    method: eventType,
+                                    ...data
+                                });
+                            } else {
+                                console.warn('DEBUG WINDOW: Debug panel not available for debug event');
+                            }
+                        });
+                    } else {
+                        console.warn('DEBUG WINDOW: onDebugEvent not available for debug events');
+                    }
+                    
+                    // Keep the legacy SCORM API log listener for backward compatibility
                     if (window.electronAPI.onScormApiLog) {
-                        console.log('DEBUG WINDOW: Setting up SCORM API log listener');
+                        console.log('DEBUG WINDOW: Setting up legacy SCORM API log listener');
                         window.electronAPI.onScormApiLog((data) => {
-                            console.log('DEBUG WINDOW: Received SCORM API log:', data);
+                            console.log('DEBUG WINDOW: Received legacy SCORM API log:', data);
                             if (this.debugPanel) {
                                 this.debugPanel.handleApiCall(data);
                             } else {
