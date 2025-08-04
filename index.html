@@ -321,10 +321,10 @@
     console.log('CRITICAL DEBUG: DOM ready state:', document.readyState);
     console.log('CRITICAL DEBUG: electronAPI available:', typeof window.electronAPI !== 'undefined');
     
-    // Load the main app script as a regular script (not module)
+    // Load the main app script as a regular script (uses dynamic imports internally)
     const script = document.createElement('script');
     script.src = 'scorm-app://src/renderer/app.js';  // Use custom protocol instead of relative path
-    // Remove type="module" to avoid ES6 module issues
+    // No type="module" needed - using dynamic imports instead of static imports
     script.onload = () => console.log('CRITICAL DEBUG: app.js loaded successfully');
     script.onerror = (error) => console.error('CRITICAL DEBUG: app.js failed to load:', error);
     document.head.appendChild(script);

@@ -36,6 +36,7 @@ This documentation is designed to provide comprehensive context for AI-driven de
 ### Development Guides
 - [`guides/development-setup.md`](guides/development-setup.md) - Development environment setup
 - [`guides/testing-strategy.md`](guides/testing-strategy.md) - Testing approach and compliance validation
+- [`guides/electron-module-loading.md`](guides/electron-module-loading.md) - Electron ES6 module loading issues and solutions
 
 ## 🎯 Current Implementation Status
 
