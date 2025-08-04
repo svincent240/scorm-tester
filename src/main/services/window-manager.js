@@ -255,12 +255,21 @@ class WindowManager extends BaseService {
           this.logger?.info('WindowManager: Successfully serving file via custom protocol:', result.resolvedPath);
           callback({ path: result.resolvedPath });
         } else {
-          this.logger?.error('WindowManager: Protocol request failed:', result.error);
-          this.logger?.error('WindowManager: Requested path:', result.requestedPath);
-          if (result.resolvedPath) {
-            this.logger?.error('WindowManager: Resolved path:', result.resolvedPath);
+          // Handle undefined path errors more gracefully
+          if (result.isUndefinedPath) {
+            this.logger?.warn('WindowManager: Undefined path blocked - SCORM content JavaScript issue');
+            this.logger?.warn('WindowManager: Requested path:', result.requestedPath);
+            // Return a 404 but don't spam the logs with errors
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+          } else {
+            // Handle other types of errors normally
+            this.logger?.error('WindowManager: Protocol request failed:', result.error);
+            this.logger?.error('WindowManager: Requested path:', result.requestedPath);
+            if (result.resolvedPath) {
+              this.logger?.error('WindowManager: Resolved path:', result.resolvedPath);
+            }
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
           }
-          callback({ error: -6 }); // ERR_FILE_NOT_FOUND
         }
       });
 

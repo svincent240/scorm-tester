@@ -183,6 +183,19 @@ class PathUtils {
       // Extract the path from the custom protocol URL
       let requestedPath = protocolUrl.substr(12); // Remove 'scorm-app://'
       
+      // CRITICAL FIX: Handle undefined paths from SCORM content JavaScript
+      if (requestedPath.includes('/undefined')) {
+        console.warn(`PathUtils: UNDEFINED PATH DETECTED - Blocking request: ${requestedPath}`);
+        console.warn(`PathUtils: This indicates SCORM content is using undefined JavaScript variables`);
+        return {
+          success: false,
+          error: 'Undefined path detected - SCORM content JavaScript variable is undefined',
+          requestedPath: requestedPath,
+          resolvedPath: null,
+          isUndefinedPath: true
+        };
+      }
+      
       // CRITICAL FIX: Handle double temp/ paths that SCORM content sometimes generates
       if (requestedPath.includes('temp/temp/')) {
         const originalPath = requestedPath;
