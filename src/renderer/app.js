@@ -290,22 +290,6 @@ async function loadModules() {
         }
       },
       
-      setupScormAPIForContent: function(contentFrame) {
-        console.log('CRITICAL DEBUG: setupScormAPIForContent called');
-        
-        try {
-          // Use the existing comprehensive SCORM API setup methods
-          this.preInjectScormAPI(contentFrame);
-          this.verifyAndEnhanceScormAPI(contentFrame);
-          this.fixScormBasePath(contentFrame);
-          this.setupPathCorrectionHandler(contentFrame);
-          
-          console.log('CRITICAL DEBUG: SCORM API setup completed for content');
-        } catch (error) {
-          console.error('CRITICAL DEBUG: Error in setupScormAPIForContent:', error);
-        }
-      },
-      
       preInjectScormAPI: function(contentFrame) {
         console.log('CRITICAL DEBUG: preInjectScormAPI called - injecting BEFORE content loads');
         
