@@ -54,8 +54,328 @@ async function loadModules() {
         document.documentElement.setAttribute('data-theme', 'default');
         document.documentElement.className = 'theme-default';
         
+        // CRITICAL: Add event listener for load course button
+        this.setupEventListeners();
+        
         console.log('CRITICAL DEBUG: Test app initialized successfully');
         return true;
+      },
+      
+      setupEventListeners: function() {
+        console.log('CRITICAL DEBUG: Setting up event listeners...');
+        
+        // Course load button
+        const courseLoadBtn = document.getElementById('course-load-btn');
+        console.log('CRITICAL DEBUG: Course load button found:', !!courseLoadBtn);
+        
+        if (courseLoadBtn) {
+          courseLoadBtn.addEventListener('click', this.handleCourseLoad.bind(this));
+          console.log('CRITICAL DEBUG: Course load button event listener attached');
+        } else {
+          console.error('CRITICAL DEBUG: Course load button not found in DOM');
+        }
+        
+        // Also handle the welcome page button
+        const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
+        console.log('CRITICAL DEBUG: Welcome buttons found:', welcomeButtons.length);
+        
+        welcomeButtons.forEach((btn, index) => {
+          btn.removeAttribute('onclick'); // Remove inline onclick
+          btn.addEventListener('click', this.handleCourseLoad.bind(this));
+          console.log(`CRITICAL DEBUG: Welcome button ${index + 1} event listener attached`);
+        });
+      },
+      
+      handleCourseLoad: async function() {
+        console.log('CRITICAL DEBUG: handleCourseLoad called - button was clicked!');
+        
+        // Check if electronAPI is available
+        if (typeof window.electronAPI === 'undefined') {
+          console.error('CRITICAL DEBUG: electronAPI not available');
+          alert('Electron API Error: The application is not properly initialized. Please restart the application.');
+          return;
+        }
+        
+        console.log('CRITICAL DEBUG: electronAPI available, methods:', Object.keys(window.electronAPI));
+        
+        try {
+          console.log('CRITICAL DEBUG: Calling selectScormPackage...');
+          const result = await window.electronAPI.selectScormPackage();
+          console.log('CRITICAL DEBUG: selectScormPackage result:', result);
+          
+          if (!result) {
+            console.log('CRITICAL DEBUG: No result returned from selectScormPackage');
+            return;
+          }
+          
+          if (!result.success) {
+            console.log('CRITICAL DEBUG: File selection was cancelled or failed:', result);
+            return;
+          }
+          
+          console.log('CRITICAL DEBUG: File selected successfully:', result.filePath);
+          
+          // Now actually process the course instead of just showing an alert
+          await this.processCourseFile(result.filePath);
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in handleCourseLoad:', error);
+          alert(`Error: ${error.message}`);
+        }
+      },
+      
+      processCourseFile: async function(filePath) {
+        console.log('CRITICAL DEBUG: processCourseFile called with:', filePath);
+        
+        try {
+          // Step 1: Extract the SCORM package
+          console.log('CRITICAL DEBUG: Step 1 - Extracting SCORM package...');
+          const extractResult = await window.electronAPI.extractScorm(filePath);
+          console.log('CRITICAL DEBUG: Extract result:', extractResult);
+          
+          if (!extractResult.success) {
+            throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
+          }
+          
+          const extractedPath = extractResult.path;
+          console.log('CRITICAL DEBUG: Package extracted to:', extractedPath);
+          
+          // Step 2: Find SCORM entry point
+          console.log('CRITICAL DEBUG: Step 2 - Finding SCORM entry point...');
+          const entryResult = await window.electronAPI.findScormEntry(extractedPath);
+          console.log('CRITICAL DEBUG: Entry result:', entryResult);
+          
+          if (!entryResult.success) {
+            throw new Error(`Failed to find SCORM entry point: ${entryResult.error}`);
+          }
+          
+          console.log('CRITICAL DEBUG: Entry point found:', entryResult.entryPath);
+          
+          // Step 3: Get course information
+          console.log('CRITICAL DEBUG: Step 3 - Getting course info...');
+          const courseInfo = await window.electronAPI.getCourseInfo(extractedPath);
+          console.log('CRITICAL DEBUG: Course info:', courseInfo);
+          
+          // Step 4: Get course manifest
+          console.log('CRITICAL DEBUG: Step 4 - Getting course manifest...');
+          const manifestResult = await window.electronAPI.getCourseManifest(extractedPath);
+          console.log('CRITICAL DEBUG: Manifest result:', manifestResult);
+          
+          // Step 5: Update UI to show course is loaded
+          console.log('CRITICAL DEBUG: Step 5 - Updating UI...');
+          this.updateUIWithCourse({
+            info: courseInfo,
+            structure: manifestResult.success ? manifestResult.structure : null,
+            path: extractedPath,
+            entryPoint: entryResult.entryPath,
+            launchUrl: entryResult.launchUrl
+          });
+          
+          console.log('CRITICAL DEBUG: Course processing completed successfully!');
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in processCourseFile:', error);
+          alert(`Course Loading Error: ${error.message}`);
+        }
+      },
+      
+      updateUIWithCourse: function(courseData) {
+        console.log('CRITICAL DEBUG: updateUIWithCourse called with:', courseData);
+        
+        try {
+          // Update course outline
+          const courseOutline = document.getElementById('course-outline');
+          if (courseOutline) {
+            const emptyState = courseOutline.querySelector('.course-outline__empty');
+            if (emptyState) {
+              emptyState.style.display = 'none';
+            }
+            
+            // Add course title and basic structure
+            const courseTitle = courseData.info?.title || 'Loaded Course';
+            courseOutline.innerHTML = `
+              <div class="course-outline__loaded">
+                <h3>${courseTitle}</h3>
+                <p>Course loaded successfully!</p>
+                <p>Entry point: ${courseData.entryPoint || 'Unknown'}</p>
+                ${courseData.structure ? `<p>Items: ${courseData.structure.items?.length || 0}</p>` : ''}
+              </div>
+            `;
+            console.log('CRITICAL DEBUG: Course outline updated');
+          }
+          
+          // Update navigation controls
+          const navCurrent = document.getElementById('nav-current');
+          if (navCurrent) {
+            navCurrent.textContent = courseData.info?.title || 'Course Loaded';
+            console.log('CRITICAL DEBUG: Navigation updated');
+          }
+          
+          // Update progress summary
+          const progressSummary = document.getElementById('progress-summary');
+          if (progressSummary) {
+            const statusValue = progressSummary.querySelector('.progress-summary__value');
+            if (statusValue) {
+              statusValue.textContent = 'Course Loaded';
+            }
+            console.log('CRITICAL DEBUG: Progress summary updated');
+          }
+          
+          // Hide welcome content and show course content
+          const welcomeContent = document.querySelector('.content-viewer__welcome');
+          if (welcomeContent) {
+            welcomeContent.style.display = 'none';
+            console.log('CRITICAL DEBUG: Welcome content hidden');
+          }
+          
+          // CRITICAL FIX: Load content into iframe
+          this.loadContentIntoIframe(courseData);
+          
+          // Show a success message
+          alert(`Course "${courseData.info?.title || 'Unknown'}" loaded successfully!\n\nEntry point: ${courseData.entryPoint}`);
+          
+          console.log('CRITICAL DEBUG: UI update completed successfully');
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error updating UI:', error);
+        }
+      },
+      
+      loadContentIntoIframe: function(courseData) {
+        console.log('CRITICAL DEBUG: loadContentIntoIframe called with:', courseData);
+        
+        try {
+          // Get the content iframe and welcome content
+          const contentFrame = document.getElementById('content-frame');
+          const welcomeContent = document.querySelector('.content-viewer__welcome');
+          
+          console.log('CRITICAL DEBUG: Content frame found:', !!contentFrame);
+          console.log('CRITICAL DEBUG: Welcome content found:', !!welcomeContent);
+          console.log('CRITICAL DEBUG: Launch URL:', courseData.launchUrl);
+          
+          if (!contentFrame) {
+            console.error('CRITICAL DEBUG: Content frame not found in DOM');
+            return;
+          }
+          
+          if (!courseData.launchUrl && !courseData.entryPoint) {
+            console.error('CRITICAL DEBUG: No launch URL or entry point available');
+            return;
+          }
+          
+          // Hide welcome content
+          if (welcomeContent) {
+            welcomeContent.style.display = 'none';
+            console.log('CRITICAL DEBUG: Welcome content hidden');
+          }
+          
+          // Show content frame
+          contentFrame.classList.remove('hidden');
+          contentFrame.style.display = 'block';
+          console.log('CRITICAL DEBUG: Content frame shown');
+          
+          // Determine the content URL to load
+          const contentUrl = courseData.launchUrl || courseData.entryPoint;
+          console.log('CRITICAL DEBUG: Loading content URL:', contentUrl);
+          
+          // Setup iframe load handler for SCORM API injection
+          contentFrame.onload = () => {
+            console.log('CRITICAL DEBUG: Content frame loaded successfully');
+            this.injectScormAPI(contentFrame);
+          };
+          
+          contentFrame.onerror = (error) => {
+            console.error('CRITICAL DEBUG: Content frame load error:', error);
+          };
+          
+          // Load the content
+          contentFrame.src = contentUrl;
+          
+          console.log('CRITICAL DEBUG: Content loading initiated');
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error in loadContentIntoIframe:', error);
+        }
+      },
+      
+      injectScormAPI: function(contentFrame) {
+        console.log('CRITICAL DEBUG: injectScormAPI called');
+        
+        try {
+          const contentWindow = contentFrame.contentWindow;
+          if (!contentWindow) {
+            console.error('CRITICAL DEBUG: Content window not accessible');
+            return;
+          }
+          
+          console.log('CRITICAL DEBUG: Injecting SCORM API into content window');
+          
+          // Inject SCORM 2004 API
+          contentWindow.API_1484_11 = {
+            Initialize: (param) => {
+              console.log('SCORM API: Initialize called with:', param);
+              return 'true';
+            },
+            Terminate: (param) => {
+              console.log('SCORM API: Terminate called with:', param);
+              return 'true';
+            },
+            GetValue: (element) => {
+              console.log('SCORM API: GetValue called with:', element);
+              // Return appropriate default values
+              switch (element) {
+                case 'cmi.completion_status':
+                  return 'incomplete';
+                case 'cmi.success_status':
+                  return 'unknown';
+                case 'cmi.learner_id':
+                  return 'test_learner';
+                case 'cmi.learner_name':
+                  return 'Test Learner';
+                case 'cmi.credit':
+                  return 'credit';
+                case 'cmi.mode':
+                  return 'normal';
+                default:
+                  return '';
+              }
+            },
+            SetValue: (element, value) => {
+              console.log('SCORM API: SetValue called with:', element, '=', value);
+              return 'true';
+            },
+            Commit: (param) => {
+              console.log('SCORM API: Commit called with:', param);
+              return 'true';
+            },
+            GetLastError: () => {
+              return '0';
+            },
+            GetErrorString: (errorCode) => {
+              return errorCode === '0' ? 'No error' : 'Unknown error';
+            },
+            GetDiagnostic: (errorCode) => {
+              return `Diagnostic for error ${errorCode}`;
+            }
+          };
+          
+          // Also inject SCORM 1.2 API for compatibility
+          contentWindow.API = {
+            LMSInitialize: (param) => contentWindow.API_1484_11.Initialize(param),
+            LMSFinish: (param) => contentWindow.API_1484_11.Terminate(param),
+            LMSGetValue: (element) => contentWindow.API_1484_11.GetValue(element),
+            LMSSetValue: (element, value) => contentWindow.API_1484_11.SetValue(element, value),
+            LMSCommit: (param) => contentWindow.API_1484_11.Commit(param),
+            LMSGetLastError: () => contentWindow.API_1484_11.GetLastError(),
+            LMSGetErrorString: (errorCode) => contentWindow.API_1484_11.GetErrorString(errorCode),
+            LMSGetDiagnostic: (errorCode) => contentWindow.API_1484_11.GetDiagnostic(errorCode)
+          };
+          
+          console.log('CRITICAL DEBUG: SCORM API injection completed successfully');
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error injecting SCORM API:', error);
+        }
       }
     };
     
