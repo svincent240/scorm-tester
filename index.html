@@ -3,19 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: file: scorm-app:; script-src 'self' 'unsafe-inline' 'unsafe-eval' scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:;">
   <meta name="description" content="SCORM Tester - Professional SCORM 2004 4th Edition compliance testing tool">
   <meta name="author" content="SCORM Tester Team">
   <meta name="keywords" content="SCORM, e-learning, LMS, testing, compliance, SCORM 2004">
   
   <title>SCORM Tester</title>
   
-  <!-- Preload critical resources -->
-  <link rel="preload" href="src/styles/main.css" as="style">
-  <link rel="preload" href="src/renderer/app.js" as="script">
-  
   <!-- Main stylesheet -->
-  <link rel="stylesheet" href="src/styles/main.css">
+  <link rel="stylesheet" href="scorm-app://src/styles/main.css">
   
   <!-- Theme management -->
   <script>
@@ -311,7 +307,20 @@
   <input type="file" id="file-input" accept=".zip,.scorm" style="display: none;">
   
   <!-- Scripts -->
-  <script src="src/renderer/app.js" type="module"></script>
+  <script>
+    // Inline script to test if JavaScript is working
+    console.log('CRITICAL DEBUG: Inline script executing');
+    console.log('CRITICAL DEBUG: DOM ready state:', document.readyState);
+    console.log('CRITICAL DEBUG: electronAPI available:', typeof window.electronAPI !== 'undefined');
+    
+    // Load the main app script as a regular script (not module)
+    const script = document.createElement('script');
+    script.src = 'scorm-app://src/renderer/app.js';  // Use custom protocol instead of relative path
+    // Remove type="module" to avoid ES6 module issues
+    script.onload = () => console.log('CRITICAL DEBUG: app.js loaded successfully');
+    script.onerror = (error) => console.error('CRITICAL DEBUG: app.js failed to load:', error);
+    document.head.appendChild(script);
+  </script>
   
   <!-- Service Worker Registration - Disabled for offline Electron app -->
   <script>

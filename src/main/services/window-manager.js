@@ -246,9 +246,20 @@ class WindowManager extends BaseService {
           const filePath = path.join(__dirname, '../../../', url);
           const normalizedPath = path.normalize(filePath);
           
+          // Enhanced logging for debugging
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Original URL: ${request.url}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Extracted path: ${url}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - __dirname: ${__dirname}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Joined path: ${filePath}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Normalized path: ${normalizedPath}`);
+          
           // Security check: ensure the path is within our app directory
           const appRoot = path.resolve(__dirname, '../../../');
           const resolvedPath = path.resolve(normalizedPath);
+          
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - App root: ${appRoot}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Resolved path: ${resolvedPath}`);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - Path starts with app root: ${resolvedPath.startsWith(appRoot)}`);
           
           if (!resolvedPath.startsWith(appRoot)) {
             this.logger?.error('WindowManager: Security violation - path outside app directory:', resolvedPath);
@@ -257,13 +268,16 @@ class WindowManager extends BaseService {
           }
           
           // Check if file exists
-          if (!fs.existsSync(resolvedPath)) {
+          const fileExists = fs.existsSync(resolvedPath);
+          this.logger?.info(`WindowManager: PROTOCOL DEBUG - File exists: ${fileExists}`);
+          
+          if (!fileExists) {
             this.logger?.error('WindowManager: File not found:', resolvedPath);
             callback({ error: -6 }); // ERR_FILE_NOT_FOUND
             return;
           }
           
-          this.logger?.debug('WindowManager: Serving file via custom protocol:', resolvedPath);
+          this.logger?.info('WindowManager: Successfully serving file via custom protocol:', resolvedPath);
           callback({ path: resolvedPath });
           
         } catch (error) {

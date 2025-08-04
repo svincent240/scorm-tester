@@ -11,16 +11,83 @@
 console.log('CRITICAL DEBUG: app.js script is loading...');
 console.log('CRITICAL DEBUG: window object exists:', typeof window !== 'undefined');
 console.log('CRITICAL DEBUG: document object exists:', typeof document !== 'undefined');
+console.log('CRITICAL DEBUG: document.readyState:', document.readyState);
+console.log('CRITICAL DEBUG: electronAPI available:', typeof window.electronAPI !== 'undefined');
 
-import { EventBus } from './services/event-bus.js';
-import { UIStateManager } from './services/ui-state.js';
-import { ScormClient } from './services/scorm-client.js';
-import { BaseComponent } from './components/base-component.js';
-import { ContentViewer } from './components/scorm/content-viewer.js';
-import { NavigationControls } from './components/scorm/navigation-controls.js';
-import { ProgressTracking } from './components/scorm/progress-tracking.js';
-import { DebugPanel } from './components/scorm/debug-panel.js';
-import { CourseOutline } from './components/scorm/course-outline.js';
+// Add error handler for module loading
+window.addEventListener('error', (event) => {
+  console.error('CRITICAL DEBUG: Script error detected:', event.error);
+  console.error('CRITICAL DEBUG: Error source:', event.filename, 'line:', event.lineno);
+});
+
+// Add unhandled rejection handler
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('CRITICAL DEBUG: Unhandled promise rejection:', event.reason);
+});
+
+// Convert ES6 imports to dynamic imports to work around Electron custom protocol issues
+console.log('CRITICAL DEBUG: Starting dynamic imports...');
+
+// Dynamic import function
+async function loadModules() {
+  try {
+    console.log('CRITICAL DEBUG: Loading modules dynamically...');
+    
+    // For now, create a minimal app without imports to test basic functionality
+    console.log('CRITICAL DEBUG: Creating minimal app without imports...');
+    
+    // Create a simple test app
+    const testApp = {
+      initialize: async function() {
+        console.log('CRITICAL DEBUG: Test app initializing...');
+        
+        // Test basic DOM manipulation
+        const welcomeContent = document.querySelector('.content-viewer__welcome');
+        if (welcomeContent) {
+          console.log('CRITICAL DEBUG: Welcome content found, app should be visible');
+          welcomeContent.style.display = 'block';
+        } else {
+          console.log('CRITICAL DEBUG: Welcome content not found');
+        }
+        
+        // Test theme application
+        document.documentElement.setAttribute('data-theme', 'default');
+        document.documentElement.className = 'theme-default';
+        
+        console.log('CRITICAL DEBUG: Test app initialized successfully');
+        return true;
+      }
+    };
+    
+    // Initialize the test app
+    await testApp.initialize();
+    
+    // Make it globally available
+    window.scormTesterApp = testApp;
+    
+    return testApp;
+    
+  } catch (error) {
+    console.error('CRITICAL DEBUG: Module loading failed:', error);
+    throw error;
+  }
+}
+
+// Load modules and initialize
+loadModules().catch(error => {
+  console.error('CRITICAL DEBUG: Failed to load application:', error);
+});
+
+// Skip the rest of the original imports for now
+const EventBus = null;
+const UIStateManager = null;
+const ScormClient = null;
+const BaseComponent = null;
+const ContentViewer = null;
+const NavigationControls = null;
+const ProgressTracking = null;
+const DebugPanel = null;
+const CourseOutline = null;
 
 /**
  * Main SCORM Tester Application Class
@@ -730,29 +797,27 @@ class ScormTesterApp {
   }
 }
 
-// Initialize and start the application
-const app = new ScormTesterApp();
+// Disable the original ScormTesterApp for now since imports are failing
+console.log('CRITICAL DEBUG: Skipping original ScormTesterApp initialization');
 
-// Make app globally available for debugging
-window.scormTesterApp = app;
-
-// Start the application when DOM is ready
+// Simple DOM ready handler
 function startWhenReady() {
+  console.log('CRITICAL DEBUG: startWhenReady called, DOM state:', document.readyState);
+  
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => app.start());
+    console.log('CRITICAL DEBUG: DOM still loading, waiting...');
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('CRITICAL DEBUG: DOMContentLoaded fired');
+      loadModules();
+    });
   } else {
-    // DOM is already ready, start immediately
-    app.start();
+    console.log('CRITICAL DEBUG: DOM already ready, starting immediately');
+    loadModules();
   }
 }
 
-// Always wait for DOM to be ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startWhenReady);
-} else {
-  // DOM is already ready
-  startWhenReady();
-}
+// Start when ready
+startWhenReady();
 
-// Export for module usage
-export default app;
+// Script loaded as regular JavaScript, no exports needed
+console.log('CRITICAL DEBUG: app.js script loaded as regular JavaScript');
