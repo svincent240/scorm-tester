@@ -53,7 +53,48 @@ class ScormErrorHandler {
     // Diagnostic information
     this.diagnosticInfo = new Map();
     
-    this.logger?.debug('ScormErrorHandler initialized');
+    // Initialize all required SCORM 2004 4th Edition error codes
+    this.initializeErrorCodes();
+    
+    this.logger?.debug('ScormErrorHandler initialized with all SCORM error codes');
+  }
+
+  /**
+   * Initialize all required SCORM 2004 4th Edition error codes
+   * @private
+   */
+  initializeErrorCodes() {
+    // All required SCORM error codes as per specification
+    this.scormErrorCodes = {
+      '0': 'No error',
+      '101': 'General exception',
+      '102': 'General initialization failure',
+      '103': 'Already initialized',
+      '104': 'Content instance terminated',
+      '111': 'General termination failure',
+      '112': 'Termination before initialization',
+      '113': 'Termination after termination',
+      '122': 'Retrieve data before initialization',
+      '123': 'Retrieve data after termination',
+      '132': 'Store data before initialization',
+      '133': 'Store data after termination',
+      '142': 'Commit before initialization',
+      '143': 'Commit after termination',
+      '201': 'General argument error',
+      '301': 'General get failure',
+      '351': 'General set failure',
+      '391': 'General commit failure',
+      '401': 'Undefined data model element',
+      '402': 'Unimplemented data model element',
+      '403': 'Data model element value not initialized',
+      '404': 'Data model element is read only',
+      '405': 'Data model element is write only',
+      '406': 'Data model element type mismatch',
+      '407': 'Data model element value out of range',
+      '408': 'Data model dependency not established'
+    };
+    
+    this.logger?.debug('SCORM error codes initialized:', Object.keys(this.scormErrorCodes).length);
   }
 
   /**

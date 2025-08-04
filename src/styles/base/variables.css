@@ -1,0 +1,281 @@
+/**
+ * CSS Custom Properties (Variables)
+ * 
+ * Defines all CSS custom properties used throughout the application.
+ * Organized by category for easy maintenance and theming.
+ * 
+ * @fileoverview CSS custom properties and variables
+ */
+
+:root {
+  /* Color Palette */
+  --primary-color: #007bff;
+  --primary-hover: #0056b3;
+  --primary-active: #004085;
+  --primary-light: #b3d7ff;
+  --primary-dark: #003d82;
+  
+  --secondary-color: #6c757d;
+  --secondary-hover: #545b62;
+  --secondary-active: #3d4449;
+  --secondary-light: #e9ecef;
+  --secondary-dark: #495057;
+  
+  --success-color: #28a745;
+  --success-hover: #1e7e34;
+  --success-active: #155724;
+  --success-light: #d4edda;
+  --success-dark: #0f5132;
+  
+  --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --danger-active: #bd2130;
+  --danger-light: #f8d7da;
+  --danger-dark: #721c24;
+  
+  --warning-color: #ffc107;
+  --warning-hover: #e0a800;
+  --warning-active: #d39e00;
+  --warning-light: #fff3cd;
+  --warning-dark: #856404;
+  
+  --info-color: #17a2b8;
+  --info-hover: #138496;
+  --info-active: #117a8b;
+  --info-light: #d1ecf1;
+  --info-dark: #0c5460;
+  
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-quaternary: #dee2e6;
+  --bg-dark: #343a40;
+  --bg-darker: #212529;
+  
+  /* Text Colors */
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  --text-light: #f8f9fa;
+  --text-white: #ffffff;
+  --text-dark: #343a40;
+  
+  /* Border Colors */
+  --border-color: #dee2e6;
+  --border-color-light: #e9ecef;
+  --border-color-dark: #adb5bd;
+  --border-color-darker: #6c757d;
+  
+  /* Typography */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-monospace: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
+  --font-size-4xl: 2.25rem;   /* 36px */
+  
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* Spacing Scale */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;   /* 4px */
+  --spacing-2: 0.5rem;    /* 8px */
+  --spacing-3: 0.75rem;   /* 12px */
+  --spacing-4: 1rem;      /* 16px */
+  --spacing-5: 1.25rem;   /* 20px */
+  --spacing-6: 1.5rem;    /* 24px */
+  --spacing-8: 2rem;      /* 32px */
+  --spacing-10: 2.5rem;   /* 40px */
+  --spacing-12: 3rem;     /* 48px */
+  --spacing-16: 4rem;     /* 64px */
+  --spacing-20: 5rem;     /* 80px */
+  --spacing-24: 6rem;     /* 96px */
+  
+  /* Border Radius */
+  --border-radius-none: 0;
+  --border-radius-sm: 0.125rem;   /* 2px */
+  --border-radius-base: 0.25rem;  /* 4px */
+  --border-radius-md: 0.375rem;   /* 6px */
+  --border-radius-lg: 0.5rem;     /* 8px */
+  --border-radius-xl: 0.75rem;    /* 12px */
+  --border-radius-2xl: 1rem;      /* 16px */
+  --border-radius-full: 9999px;
+  
+  /* Border Width */
+  --border-width-0: 0;
+  --border-width-1: 1px;
+  --border-width-2: 2px;
+  --border-width-4: 4px;
+  --border-width-8: 8px;
+  
+  /* Shadows */
+  --shadow-xs: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease-in-out;
+  --transition-base: 0.3s ease-in-out;
+  --transition-slow: 0.5s ease-in-out;
+  
+  --transition-colors: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base);
+  --transition-opacity: opacity var(--transition-base);
+  --transition-transform: transform var(--transition-base);
+  --transition-all: all var(--transition-base);
+  
+  /* Z-Index Scale */
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-toast: 1080;
+  
+  /* Breakpoints */
+  --breakpoint-xs: 0;
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-2xl: 1400px;
+  
+  /* Component Specific Variables */
+  
+  /* Buttons */
+  --btn-padding-y: var(--spacing-2);
+  --btn-padding-x: var(--spacing-4);
+  --btn-font-size: var(--font-size-sm);
+  --btn-line-height: var(--line-height-base);
+  --btn-border-radius: var(--border-radius-md);
+  --btn-border-width: var(--border-width-1);
+  
+  --btn-sm-padding-y: var(--spacing-1);
+  --btn-sm-padding-x: var(--spacing-3);
+  --btn-sm-font-size: var(--font-size-xs);
+  
+  --btn-lg-padding-y: var(--spacing-3);
+  --btn-lg-padding-x: var(--spacing-6);
+  --btn-lg-font-size: var(--font-size-lg);
+  
+  /* Forms */
+  --input-padding-y: var(--spacing-2);
+  --input-padding-x: var(--spacing-3);
+  --input-font-size: var(--font-size-base);
+  --input-line-height: var(--line-height-base);
+  --input-border-radius: var(--border-radius-md);
+  --input-border-width: var(--border-width-1);
+  --input-border-color: var(--border-color);
+  --input-focus-border-color: var(--primary-color);
+  --input-focus-box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  
+  /* Navigation */
+  --nav-height: 60px;
+  --nav-padding: var(--spacing-4);
+  --nav-bg: var(--bg-dark);
+  --nav-color: var(--text-light);
+  
+  /* Sidebar */
+  --sidebar-width: 300px;
+  --sidebar-bg: var(--bg-secondary);
+  --sidebar-border-color: var(--border-color);
+  
+  /* Content Viewer */
+  --content-viewer-bg: var(--bg-primary);
+  --content-viewer-border-color: var(--border-color);
+  --content-viewer-border-radius: var(--border-radius-lg);
+  
+  /* Progress Bars */
+  --progress-height: 20px;
+  --progress-bg: var(--bg-tertiary);
+  --progress-border-radius: var(--border-radius-full);
+  --progress-fill-bg: linear-gradient(90deg, var(--success-color), #20c997);
+  
+  /* Debug Panel */
+  --debug-panel-bg: var(--bg-secondary);
+  --debug-panel-border-color: var(--border-color);
+  --debug-section-header-bg: var(--bg-tertiary);
+  --debug-section-header-color: var(--text-secondary);
+  
+  /* API Log */
+  --api-log-bg: var(--bg-secondary);
+  --api-log-font-family: var(--font-family-monospace);
+  --api-log-font-size: var(--font-size-xs);
+  --api-call-get-bg: #e3f2fd;
+  --api-call-set-bg: #f3e5f5;
+  --api-call-commit-bg: #e8f5e8;
+  --api-call-error-bg: #ffebee;
+  --api-call-error-color: #c62828;
+  
+  /* Loading */
+  --loading-overlay-bg: rgba(255, 255, 255, 0.95);
+  --loading-spinner-color: var(--primary-color);
+  --loading-spinner-size: 40px;
+  
+  /* Notifications */
+  --notification-width: 350px;
+  --notification-bg: var(--bg-primary);
+  --notification-border-radius: var(--border-radius-lg);
+  --notification-shadow: var(--shadow-lg);
+  
+  /* Error Display */
+  --error-bg: var(--danger-light);
+  --error-color: var(--danger-dark);
+  --error-border-color: var(--danger-color);
+  
+  /* Course Outline */
+  --outline-item-padding: var(--spacing-3);
+  --outline-item-border-color: var(--border-color-light);
+  --outline-item-hover-bg: var(--bg-tertiary);
+  --outline-item-active-bg: var(--primary-color);
+  --outline-item-active-color: var(--text-white);
+  --outline-item-completed-bg: var(--success-light);
+  --outline-item-completed-border-color: var(--success-color);
+}
+
+/* Dark theme variables (can be applied via class or media query) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #404040;
+    --bg-quaternary: #525252;
+    
+    --text-primary: #ffffff;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    
+    --border-color: #404040;
+    --border-color-light: #525252;
+    --border-color-dark: #262626;
+    
+    --input-bg: var(--bg-secondary);
+    --input-border-color: var(--border-color);
+    
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  }
+}

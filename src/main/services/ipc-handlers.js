@@ -1,0 +1,133 @@
+/**
+ * IPC Handler Methods
+ * 
+ * Extracted from IpcHandler to maintain file size limits.
+ * Contains all individual IPC message handler implementations.
+ * 
+ * @fileoverview IPC handler method implementations
+ */
+
+/**
+ * IPC Handler Methods Class
+ * 
+ * Contains all individual handler method implementations.
+ */
+class IpcHandlers {
+  constructor(ipcHandler) {
+    this.ipcHandler = ipcHandler;
+  }
+
+  // SCORM API handlers
+  async handleScormInitialize(event, sessionId) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.initializeSession(sessionId);
+  }
+
+  async handleScormGetValue(event, sessionId, element) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.getValue(sessionId, element);
+  }
+
+  async handleScormSetValue(event, sessionId, element, value) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.setValue(sessionId, element, value);
+  }
+
+  async handleScormCommit(event, sessionId) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.commit(sessionId);
+  }
+
+  async handleScormTerminate(event, sessionId) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.terminate(sessionId);
+  }
+
+  // File operation handlers
+  async handleSelectScormPackage(event) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.selectScormPackage();
+  }
+
+  async handleExtractScorm(event, zipPath) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.extractScorm(zipPath);
+  }
+
+  async handleFindScormEntry(event, folderPath) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.findScormEntry(folderPath);
+  }
+
+  async handleGetCourseInfo(event, folderPath) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.getCourseInfo(folderPath);
+  }
+
+  async handleGetCourseManifest(event, folderPath) {
+    const fileManager = this.ipcHandler.getDependency('fileManager');
+    return await fileManager.getCourseManifest(folderPath);
+  }
+
+  // Validation handlers
+  async handleValidateScormCompliance(event, folderPath) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.validateCompliance(folderPath);
+  }
+
+  async handleAnalyzeScormContent(event, folderPath) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.analyzeContent(folderPath);
+  }
+
+  // Session management handlers
+  async handleGetSessionData(event, sessionId) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.getSessionData(sessionId);
+  }
+
+  async handleResetSession(event, sessionId) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.resetSession(sessionId);
+  }
+
+  async handleGetAllSessions(event) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.getAllSessions();
+  }
+
+  // LMS profile handlers
+  async handleApplyLmsProfile(event, sessionId, profileName) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.applyLmsProfile(sessionId, profileName);
+  }
+
+  async handleGetLmsProfiles(event) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.getLmsProfiles();
+  }
+
+  // Testing handlers
+  async handleRunTestScenario(event, sessionId, scenarioType) {
+    const scormService = this.ipcHandler.getDependency('scormService');
+    return await scormService.runTestScenario(sessionId, scenarioType);
+  }
+
+  // Utility handlers
+  async handleOpenExternal(event, url) {
+    const { shell } = require('electron');
+    return await shell.openExternal(url);
+  }
+
+  async handlePathUtilsToFileUrl(event, filePath) {
+    const PathUtils = require('../../../archive/utils/path-utils.js');
+    return PathUtils.toFileUrl(filePath);
+  }
+
+  // Logging handler
+  handleLogMessage(event, { level, message, args }) {
+    this.ipcHandler.logger?.log(level, `[Renderer] ${message}`, ...args);
+  }
+}
+
+module.exports = IpcHandlers;

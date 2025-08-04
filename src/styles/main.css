@@ -1,0 +1,218 @@
+/**
+ * SCORM Tester Main Stylesheet
+ * 
+ * Main entry point for all application styles. Imports all component
+ * and theme stylesheets in the correct order.
+ * 
+ * @fileoverview Main stylesheet entry point
+ */
+
+/* Base Styles */
+@import url('./base/reset.css');
+@import url('./base/variables.css');
+@import url('./base/typography.css');
+
+/* Component Styles */
+@import url('./components/buttons.css');
+@import url('./components/forms.css');
+@import url('./components/layout.css');
+
+/* Theme Styles */
+@import url('./themes/default.css');
+@import url('./themes/dark.css');
+
+/* Utility Classes */
+.hidden { display: none !important; }
+.invisible { visibility: hidden !important; }
+.sr-only { 
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Application Root Styles */
+.scorm-tester-app {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--text-color);
+  background: var(--bg-color);
+  min-height: 100vh;
+  
+  /* Ensure proper box-sizing */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  
+  /* Focus management */
+  :focus {
+    outline: 2px solid var(--focus-color);
+    outline-offset: 2px;
+  }
+  
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+  
+  /* Selection styling */
+  ::selection {
+    background: var(--primary-color-alpha);
+    color: var(--text-color);
+  }
+}
+
+/* State Classes */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: wait;
+}
+
+.error {
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.success {
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.warning {
+  color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.disabled,
+[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Developer Mode Styles */
+body:not(.dev-mode) .dev-controls {
+  display: none;
+}
+
+body:not(.dev-mode) .debug-sidebar {
+  display: none;
+}
+
+body.dev-mode .dev-mode-toggle {
+  opacity: 0.8;
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  
+  .scorm-tester-app {
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop { display: none !important; }
+}
+
+/* Animation Utilities */
+.fade-in {
+  animation: fadeIn var(--transition-base) ease-in-out;
+}
+
+.fade-out {
+  animation: fadeOut var(--transition-base) ease-in-out;
+}
+
+.slide-in-right {
+  animation: slideInRight var(--transition-base) ease-out;
+}
+
+.slide-out-right {
+  animation: slideOutRight var(--transition-base) ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Focus Management */
+.focus-trap {
+  position: relative;
+}
+
+.focus-trap:focus-within {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-width: 2px;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .scorm-tester-app {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .no-print,
+  .dev-controls,
+  .debug-sidebar,
+  .dev-mode-toggle,
+  .notifications-container {
+    display: none !important;
+  }
+  
+  .app-container {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .preview-area {
+    border: 1px solid black !important;
+  }
+}

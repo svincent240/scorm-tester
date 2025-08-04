@@ -1,0 +1,475 @@
+/**
+ * Dark Theme
+ * 
+ * Dark theme with professional color scheme optimized for low-light environments.
+ * Provides excellent contrast and reduced eye strain for extended use.
+ * 
+ * @fileoverview Dark theme styles
+ */
+
+:root {
+  /* Theme Identity */
+  --theme-name: 'dark';
+  --theme-type: 'dark';
+  
+  /* Primary Colors - Adjusted for dark backgrounds */
+  --primary-50: #1e3a8a;
+  --primary-100: #1e40af;
+  --primary-200: #1d4ed8;
+  --primary-300: #2563eb;
+  --primary-400: #3b82f6;
+  --primary-500: #60a5fa;
+  --primary-600: #93c5fd;
+  --primary-700: #bfdbfe;
+  --primary-800: #dbeafe;
+  --primary-900: #eff6ff;
+  
+  --primary-color: var(--primary-500);
+  --primary-hover: var(--primary-400);
+  --primary-active: var(--primary-300);
+  --primary-text: var(--neutral-900);
+  --primary-color-alpha: rgba(96, 165, 250, 0.15);
+  
+  /* Secondary Colors */
+  --secondary-50: #0f172a;
+  --secondary-100: #1e293b;
+  --secondary-200: #334155;
+  --secondary-300: #475569;
+  --secondary-400: #64748b;
+  --secondary-500: #94a3b8;
+  --secondary-600: #cbd5e1;
+  --secondary-700: #e2e8f0;
+  --secondary-800: #f1f5f9;
+  --secondary-900: #f8fafc;
+  
+  --secondary-color: var(--secondary-600);
+  --secondary-hover: var(--secondary-700);
+  --secondary-active: var(--secondary-800);
+  --secondary-text: var(--neutral-900);
+  
+  /* Success Colors */
+  --success-50: #14532d;
+  --success-100: #166534;
+  --success-200: #15803d;
+  --success-300: #16a34a;
+  --success-400: #22c55e;
+  --success-500: #4ade80;
+  --success-600: #86efac;
+  --success-700: #bbf7d0;
+  --success-800: #dcfce7;
+  --success-900: #f0fdf4;
+  
+  --success-color: var(--success-500);
+  --success-hover: var(--success-400);
+  --success-active: var(--success-300);
+  --success-text: var(--neutral-900);
+  --success-color-alpha: rgba(74, 222, 128, 0.15);
+  
+  /* Warning Colors */
+  --warning-50: #78350f;
+  --warning-100: #92400e;
+  --warning-200: #b45309;
+  --warning-300: #d97706;
+  --warning-400: #f59e0b;
+  --warning-500: #fbbf24;
+  --warning-600: #fcd34d;
+  --warning-700: #fde68a;
+  --warning-800: #fef3c7;
+  --warning-900: #fffbeb;
+  
+  --warning-color: var(--warning-500);
+  --warning-hover: var(--warning-400);
+  --warning-active: var(--warning-300);
+  --warning-text: var(--neutral-900);
+  --warning-color-alpha: rgba(251, 191, 36, 0.15);
+  
+  /* Danger Colors */
+  --danger-50: #7f1d1d;
+  --danger-100: #991b1b;
+  --danger-200: #b91c1c;
+  --danger-300: #dc2626;
+  --danger-400: #ef4444;
+  --danger-500: #f87171;
+  --danger-600: #fca5a5;
+  --danger-700: #fecaca;
+  --danger-800: #fee2e2;
+  --danger-900: #fef2f2;
+  
+  --danger-color: var(--danger-500);
+  --danger-hover: var(--danger-400);
+  --danger-active: var(--danger-300);
+  --danger-text: var(--neutral-900);
+  --danger-color-alpha: rgba(248, 113, 113, 0.15);
+  
+  /* Info Colors */
+  --info-50: #0c4a6e;
+  --info-100: #075985;
+  --info-200: #0369a1;
+  --info-300: #0284c7;
+  --info-400: #0ea5e9;
+  --info-500: #38bdf8;
+  --info-600: #7dd3fc;
+  --info-700: #bae6fd;
+  --info-800: #e0f2fe;
+  --info-900: #f0f9ff;
+  
+  --info-color: var(--info-500);
+  --info-hover: var(--info-400);
+  --info-active: var(--info-300);
+  --info-text: var(--neutral-900);
+  --info-color-alpha: rgba(56, 189, 248, 0.15);
+  
+  /* Neutral Colors - Inverted for dark theme */
+  --neutral-50: #171717;
+  --neutral-100: #262626;
+  --neutral-200: #404040;
+  --neutral-300: #525252;
+  --neutral-400: #737373;
+  --neutral-500: #a3a3a3;
+  --neutral-600: #d4d4d4;
+  --neutral-700: #e5e5e5;
+  --neutral-800: #f5f5f5;
+  --neutral-900: #fafafa;
+  
+  /* Background Colors */
+  --bg-color: #0f0f0f;
+  --bg-secondary: var(--neutral-100);
+  --bg-tertiary: var(--neutral-200);
+  --bg-hover: var(--neutral-200);
+  --bg-active: var(--neutral-300);
+  --bg-disabled: var(--neutral-100);
+  --bg-overlay: rgba(0, 0, 0, 0.8);
+  
+  /* Text Colors */
+  --text-color: var(--neutral-800);
+  --text-secondary: var(--neutral-600);
+  --text-muted: var(--neutral-500);
+  --text-disabled: var(--neutral-400);
+  --text-inverse: var(--neutral-100);
+  
+  /* Border Colors */
+  --border-color: var(--neutral-200);
+  --border-secondary: var(--neutral-300);
+  --border-focus: var(--primary-color);
+  --border-hover: var(--neutral-300);
+  --border-active: var(--primary-color);
+  
+  /* Focus Colors */
+  --focus-color: var(--primary-color);
+  --focus-ring: 0 0 0 2px var(--primary-color-alpha);
+  
+  /* Shadow Colors - Darker for dark theme */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-color-strong: rgba(0, 0, 0, 0.6);
+  
+  /* SCORM-specific Colors */
+  --scorm-sco-color: var(--primary-500);
+  --scorm-asset-color: var(--secondary-500);
+  --scorm-completed-color: var(--success-500);
+  --scorm-incomplete-color: var(--warning-500);
+  --scorm-failed-color: var(--danger-500);
+  --scorm-passed-color: var(--success-500);
+  --scorm-unknown-color: var(--neutral-400);
+  
+  /* Status Colors */
+  --status-online: var(--success-500);
+  --status-offline: var(--neutral-400);
+  --status-error: var(--danger-500);
+  --status-warning: var(--warning-500);
+  --status-info: var(--info-500);
+  
+  /* Component-specific Colors */
+  --header-bg: var(--bg-secondary);
+  --header-border: var(--border-color);
+  --header-text: var(--text-color);
+  
+  --sidebar-bg: var(--bg-color);
+  --sidebar-border: var(--border-color);
+  --sidebar-text: var(--text-color);
+  
+  --content-bg: var(--bg-color);
+  --content-text: var(--text-color);
+  
+  --footer-bg: var(--bg-secondary);
+  --footer-border: var(--border-color);
+  --footer-text: var(--text-muted);
+  
+  --nav-link-hover: var(--bg-hover);
+  --nav-link-active: var(--primary-color);
+  --nav-link-active-text: var(--neutral-900);
+  
+  --card-bg: var(--bg-secondary);
+  --card-border: var(--border-color);
+  --card-shadow: var(--shadow-md);
+  
+  --modal-bg: var(--bg-secondary);
+  --modal-overlay: var(--bg-overlay);
+  --modal-border: var(--border-color);
+  
+  --tooltip-bg: var(--neutral-700);
+  --tooltip-text: var(--neutral-100);
+  --tooltip-shadow: var(--shadow-lg);
+  
+  --progress-bg: var(--neutral-200);
+  --progress-fill: var(--primary-color);
+  --progress-text: var(--text-color);
+  
+  --code-bg: var(--neutral-100);
+  --code-text: var(--neutral-700);
+  --code-border: var(--border-color);
+  
+  --table-bg: var(--bg-color);
+  --table-border: var(--border-color);
+  --table-header-bg: var(--bg-secondary);
+  --table-row-hover: var(--bg-hover);
+  --table-row-selected: rgba(96, 165, 250, 0.1);
+  
+  /* Debug Panel Colors - Optimized for dark theme */
+  --debug-bg: var(--neutral-50);
+  --debug-text: var(--neutral-700);
+  --debug-border: var(--neutral-200);
+  --debug-success: var(--success-400);
+  --debug-error: var(--danger-400);
+  --debug-warning: var(--warning-400);
+  --debug-info: var(--info-400);
+  
+  /* Syntax Highlighting - Dark theme optimized */
+  --syntax-keyword: var(--primary-400);
+  --syntax-string: var(--success-400);
+  --syntax-number: var(--warning-400);
+  --syntax-comment: var(--neutral-400);
+  --syntax-operator: var(--secondary-400);
+  --syntax-function: var(--info-400);
+  --syntax-variable: var(--danger-400);
+  
+  /* Animation Colors */
+  --loading-color: var(--primary-color);
+  --loading-bg: var(--neutral-200);
+  
+  --pulse-color: var(--primary-color);
+  --pulse-bg: rgba(96, 165, 250, 0.1);
+  
+  --skeleton-base: var(--neutral-200);
+  --skeleton-highlight: var(--neutral-300);
+}
+
+/* Dark theme specific component overrides */
+.theme-dark {
+  /* Ensure proper contrast ratios for dark theme */
+  --min-contrast-ratio: 7;
+  
+  /* Adjust colors for better accessibility in dark mode */
+  --text-on-primary: var(--neutral-900);
+  --text-on-secondary: var(--neutral-900);
+  --text-on-success: var(--neutral-900);
+  --text-on-warning: var(--neutral-900);
+  --text-on-danger: var(--neutral-900);
+  --text-on-info: var(--neutral-900);
+  
+  /* High contrast variants for dark theme */
+  --primary-high-contrast: var(--primary-300);
+  --secondary-high-contrast: var(--secondary-700);
+  --success-high-contrast: var(--success-300);
+  --warning-high-contrast: var(--warning-300);
+  --danger-high-contrast: var(--danger-300);
+  --info-high-contrast: var(--info-300);
+}
+
+/* Dark theme specific adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Enhanced shadows for dark backgrounds */
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --shadow-color-strong: rgba(0, 0, 0, 0.7);
+    
+    /* Stronger overlay for dark theme */
+    --bg-overlay: rgba(0, 0, 0, 0.9);
+    
+    /* Adjust scrollbar colors for dark theme */
+    --scrollbar-track: var(--neutral-100);
+    --scrollbar-thumb: var(--neutral-300);
+    --scrollbar-thumb-hover: var(--neutral-400);
+  }
+}
+
+/* High contrast mode adjustments for dark theme */
+@media (prefers-contrast: high) {
+  .theme-dark {
+    /* Use high contrast variants */
+    --primary-color: var(--primary-high-contrast);
+    --secondary-color: var(--secondary-high-contrast);
+    --success-color: var(--success-high-contrast);
+    --warning-color: var(--warning-high-contrast);
+    --danger-color: var(--danger-high-contrast);
+    --info-color: var(--info-high-contrast);
+    
+    /* Increase border contrast */
+    --border-color: var(--neutral-400);
+    --border-secondary: var(--neutral-500);
+    
+    /* Increase text contrast */
+    --text-color: var(--neutral-900);
+    --text-secondary: var(--neutral-700);
+    --text-muted: var(--neutral-600);
+    
+    /* Stronger shadows */
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --shadow-color-strong: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Scrollbar styling for dark theme */
+.theme-dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-dark ::-webkit-scrollbar-track {
+  background: var(--scrollbar-track, var(--neutral-100));
+  border-radius: 4px;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, var(--neutral-300));
+  border-radius: 4px;
+  
+  &:hover {
+    background: var(--scrollbar-thumb-hover, var(--neutral-400));
+  }
+}
+
+.theme-dark ::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track, var(--neutral-100));
+}
+
+/* Firefox scrollbar styling */
+.theme-dark {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb, var(--neutral-300)) var(--scrollbar-track, var(--neutral-100));
+}
+
+/* Selection colors for dark theme */
+.theme-dark ::selection {
+  background: var(--primary-color-alpha);
+  color: var(--text-color);
+}
+
+.theme-dark ::-moz-selection {
+  background: var(--primary-color-alpha);
+  color: var(--text-color);
+}
+
+/* Form elements adjustments for dark theme */
+.theme-dark input,
+.theme-dark textarea,
+.theme-dark select {
+  color-scheme: dark;
+}
+
+.theme-dark input[type="checkbox"],
+.theme-dark input[type="radio"] {
+  accent-color: var(--primary-color);
+}
+
+/* Image and media adjustments for dark theme */
+.theme-dark img {
+  opacity: 0.9;
+  transition: opacity var(--transition-fast) ease;
+  
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.theme-dark video {
+  opacity: 0.95;
+}
+
+/* Code block adjustments for dark theme */
+.theme-dark pre,
+.theme-dark code {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--code-border);
+}
+
+.theme-dark .hljs {
+  background: var(--code-bg) !important;
+  color: var(--code-text) !important;
+}
+
+/* Table adjustments for dark theme */
+.theme-dark table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.theme-dark th,
+.theme-dark td {
+  border-color: var(--table-border);
+}
+
+.theme-dark th {
+  background: var(--table-header-bg);
+}
+
+.theme-dark tr:hover {
+  background: var(--table-row-hover);
+}
+
+/* Modal and overlay adjustments */
+.theme-dark .modal-backdrop {
+  background: var(--modal-overlay);
+  backdrop-filter: blur(4px);
+}
+
+/* Notification adjustments for dark theme */
+.theme-dark .notification {
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+}
+
+/* Loading and skeleton adjustments */
+.theme-dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Print mode adjustments for dark theme */
+@media print {
+  .theme-dark {
+    /* Force light colors for printing */
+    --bg-color: #ffffff !important;
+    --bg-secondary: #ffffff !important;
+    --text-color: #000000 !important;
+    --text-secondary: #333333 !important;
+    --border-color: #cccccc !important;
+  }
+}
+
+/* Reduced motion adjustments */
+@media (prefers-reduced-motion: reduce) {
+  .theme-dark .skeleton {
+    animation: none;
+    background: var(--skeleton-base);
+  }
+  
+  .theme-dark img {
+    transition: none;
+  }
+}

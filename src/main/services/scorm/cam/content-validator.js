@@ -84,6 +84,8 @@ class ContentValidator {
     // Metadata validation
     if (manifest.metadata) {
       this.validateMetadataStructure(manifest.metadata);
+    } else {
+      this.addWarning('Package missing recommended metadata section');
     }
 
     // Version validation
@@ -117,7 +119,7 @@ class ContentValidator {
     if (resource.href) {
       const filePath = path.resolve(resourceBase, resource.href);
       if (!(await this.fileExists(filePath))) {
-        this.addError(`Resource file not found: ${resource.href} (Resource: ${resource.identifier})`);
+        this.addError(`File not found: ${resource.href} (Resource: ${resource.identifier})`);
       }
     }
 

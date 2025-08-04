@@ -32,9 +32,20 @@ class ManifestParser {
     this.errorHandler = errorHandler;
     this.parser = new DOMParser({
       errorHandler: {
-        warning: (msg) => console.warn('XML Warning:', msg),
-        error: (msg) => this.errorHandler?.setError('301', `XML Error: ${msg}`, 'ManifestParser'),
-        fatalError: (msg) => this.errorHandler?.setError('301', `XML Fatal Error: ${msg}`, 'ManifestParser')
+        warning: (msg) => {
+          console.warn('XML Warning:', msg);
+          // Treat warnings as errors for strict parsing
+          this.errorHandler?.setError('301', `XML Warning: ${msg}`, 'ManifestParser');
+          throw new Error(`XML Warning: ${msg}`);
+        },
+        error: (msg) => {
+          this.errorHandler?.setError('301', `XML Error: ${msg}`, 'ManifestParser');
+          throw new Error(`XML Error: ${msg}`);
+        },
+        fatalError: (msg) => {
+          this.errorHandler?.setError('301', `XML Fatal Error: ${msg}`, 'ManifestParser');
+          throw new Error(`XML Fatal Error: ${msg}`);
+        }
       }
     });
     
@@ -72,8 +83,21 @@ class ManifestParser {
    */
   parseManifestXML(xmlContent, basePath = '') {
     try {
+      // Check for null or empty content
+      if (!xmlContent || xmlContent.trim() === '') {
+        this.errorHandler?.setError('301', 'Empty or null XML content', 'parseManifestXML');
+        throw new Error('Empty or null XML content');
+      }
+
       const doc = this.parser.parseFromString(xmlContent, 'text/xml');
       const manifestElement = doc.documentElement;
+
+      // Check for XML parsing errors
+      const parserError = doc.getElementsByTagName('parsererror');
+      if (parserError.length > 0) {
+        this.errorHandler?.setError('301', 'XML parsing error', 'parseManifestXML');
+        throw new Error('XML parsing error');
+      }
 
       if (!manifestElement || manifestElement.tagName !== 'manifest') {
         this.errorHandler?.setError('301', 'Invalid manifest: root element must be <manifest>', 'parseManifestXML');
@@ -128,6 +152,11 @@ class ManifestParser {
     const orgElements = this.getChildElements(organizationsElement, 'organization');
     for (const orgElement of orgElements) {
       organizations.push(this.parseOrganization(orgElement, basePath));
+    }
+
+    // Return null if no organizations found (to match test expectations)
+    if (organizations.length === 0 && !defaultOrg) {
+      return null;
     }
 
     return {

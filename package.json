@@ -11,13 +11,29 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
-    "test:scorm": "jest tests/unit/scorm tests/integration/scorm-workflow.test.js",
+    "test:scorm": "jest tests/unit/scorm tests/integration/scorm-compliance.test.js tests/integration/phase-integration.test.js",
+    "test:cam": "jest tests/unit/scorm/cam tests/integration/cam-workflow.test.js",
+    "test:sn": "jest tests/unit/scorm/sn tests/integration/sn-workflow.test.js",
+    "test:compliance": "jest tests/integration/scorm-compliance.test.js",
+    "test:performance": "jest tests/integration/performance-benchmark.test.js",
+    "test:error-handling": "jest tests/integration/error-handling.test.js",
+    "test:phase-integration": "jest tests/integration/phase-integration.test.js",
+    "test:renderer": "jest tests/integration/renderer-integration.test.js",
+    "test:phase6": "npm run test:renderer && npm run test:compliance && npm run validate:scorm",
+    "test:all": "jest tests/unit tests/integration",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "validate:architecture": "node scripts/validate-architecture.js",
+    "validate:scorm": "node scripts/validate-scorm-compliance.js",
+    "validate:renderer": "node scripts/validate-renderer-integration.js",
+    "validate:all": "npm run validate:architecture && npm run validate:scorm && npm run validate:renderer",
+    "build:validate": "npm run validate:all && npm run test:phase6",
+    "build": "npm run build:validate && electron-builder",
+    "build:win": "npm run build:validate && electron-builder --win",
+    "build:mac": "npm run build:validate && electron-builder --mac",
+    "build:linux": "npm run build:validate && electron-builder --linux",
+    "build:dev": "electron-builder --dir",
+    "prebuild": "npm run lint && npm run test:all"
   },
   "keywords": [
     "scorm",
@@ -46,6 +62,8 @@
   "dependencies": {
     "electron-log": "^4.4.8",
     "electron-store": "^8.1.0",
+    "node-stream-zip": "^1.15.0",
+    "xml2js": "^0.6.2",
     "xmldom": "^0.6.0"
   },
   "jest": {

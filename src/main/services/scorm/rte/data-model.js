@@ -160,13 +160,39 @@ class ScormDataModel {
       }
     }
 
-    // Initialize collection counts
+    // Initialize all required SCORM 2004 4th Edition data model elements
+    // Core CMI elements
+    this.data.set('cmi.completion_status', 'unknown');
+    this.data.set('cmi.success_status', 'unknown');
+    this.data.set('cmi.score.scaled', '');
+    this.data.set('cmi.score.raw', '');
+    this.data.set('cmi.score.max', '');
+    this.data.set('cmi.score.min', '');
+    this.data.set('cmi.location', '');
+    this.data.set('cmi.suspend_data', '');
+    this.data.set('cmi.entry', 'ab-initio');
+    this.data.set('cmi.exit', '');
+    this.data.set('cmi.session_time', 'PT0H0M0S');
+    this.data.set('cmi.total_time', 'PT0H0M0S');
+    
+    // Collection counts
     this.data.set('cmi.interactions._count', '0');
     this.data.set('cmi.objectives._count', '0');
     this.data.set('cmi.comments_from_learner._count', '0');
     this.data.set('cmi.comments_from_lms._count', '0');
+    
+    // Navigation elements
+    this.data.set('adl.nav.request', '_none_');
+    
+    // Learner information (read-only, set during initialization)
+    this.data.set('cmi.learner_id', '');
+    this.data.set('cmi.learner_name', '');
+    this.data.set('cmi.credit', 'credit');
+    this.data.set('cmi.mode', 'normal');
+    this.data.set('cmi.launch_data', '');
+    this.data.set('cmi.scaled_passing_score', '');
 
-    this.logger?.debug('Data model initialized with defaults');
+    this.logger?.debug('Data model initialized with all SCORM 2004 4th Edition elements');
   }
 
   /**

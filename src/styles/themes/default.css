@@ -1,0 +1,360 @@
+/**
+ * Default Theme
+ * 
+ * Light theme with professional blue color scheme.
+ * Provides the base color palette and styling for the SCORM Tester application.
+ * 
+ * @fileoverview Default theme styles
+ */
+
+:root {
+  /* Theme Identity */
+  --theme-name: 'default';
+  --theme-type: 'light';
+  
+  /* Primary Colors */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+  
+  --primary-color: var(--primary-600);
+  --primary-hover: var(--primary-700);
+  --primary-active: var(--primary-800);
+  --primary-text: #ffffff;
+  --primary-color-alpha: rgba(37, 99, 235, 0.1);
+  
+  /* Secondary Colors */
+  --secondary-50: #f8fafc;
+  --secondary-100: #f1f5f9;
+  --secondary-200: #e2e8f0;
+  --secondary-300: #cbd5e1;
+  --secondary-400: #94a3b8;
+  --secondary-500: #64748b;
+  --secondary-600: #475569;
+  --secondary-700: #334155;
+  --secondary-800: #1e293b;
+  --secondary-900: #0f172a;
+  
+  --secondary-color: var(--secondary-500);
+  --secondary-hover: var(--secondary-600);
+  --secondary-active: var(--secondary-700);
+  --secondary-text: #ffffff;
+  
+  /* Success Colors */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
+  --success-400: #4ade80;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-800: #166534;
+  --success-900: #14532d;
+  
+  --success-color: var(--success-600);
+  --success-hover: var(--success-700);
+  --success-active: var(--success-800);
+  --success-text: #ffffff;
+  --success-color-alpha: rgba(22, 163, 74, 0.1);
+  
+  /* Warning Colors */
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-200: #fde68a;
+  --warning-300: #fcd34d;
+  --warning-400: #fbbf24;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+  --warning-800: #92400e;
+  --warning-900: #78350f;
+  
+  --warning-color: var(--warning-500);
+  --warning-hover: var(--warning-600);
+  --warning-active: var(--warning-700);
+  --warning-text: #ffffff;
+  --warning-color-alpha: rgba(245, 158, 11, 0.1);
+  
+  /* Danger Colors */
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-300: #fca5a5;
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --danger-800: #991b1b;
+  --danger-900: #7f1d1d;
+  
+  --danger-color: var(--danger-600);
+  --danger-hover: var(--danger-700);
+  --danger-active: var(--danger-800);
+  --danger-text: #ffffff;
+  --danger-color-alpha: rgba(220, 38, 38, 0.1);
+  
+  /* Info Colors */
+  --info-50: #f0f9ff;
+  --info-100: #e0f2fe;
+  --info-200: #bae6fd;
+  --info-300: #7dd3fc;
+  --info-400: #38bdf8;
+  --info-500: #0ea5e9;
+  --info-600: #0284c7;
+  --info-700: #0369a1;
+  --info-800: #075985;
+  --info-900: #0c4a6e;
+  
+  --info-color: var(--info-600);
+  --info-hover: var(--info-700);
+  --info-active: var(--info-800);
+  --info-text: #ffffff;
+  --info-color-alpha: rgba(2, 132, 199, 0.1);
+  
+  /* Neutral Colors */
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-400: #a3a3a3;
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
+  
+  /* Background Colors */
+  --bg-color: #ffffff;
+  --bg-secondary: var(--neutral-50);
+  --bg-tertiary: var(--neutral-100);
+  --bg-hover: var(--neutral-100);
+  --bg-active: var(--neutral-200);
+  --bg-disabled: var(--neutral-100);
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+  
+  /* Text Colors */
+  --text-color: var(--neutral-900);
+  --text-secondary: var(--neutral-700);
+  --text-muted: var(--neutral-500);
+  --text-disabled: var(--neutral-400);
+  --text-inverse: #ffffff;
+  
+  /* Border Colors */
+  --border-color: var(--neutral-200);
+  --border-secondary: var(--neutral-300);
+  --border-focus: var(--primary-color);
+  --border-hover: var(--neutral-300);
+  --border-active: var(--primary-color);
+  
+  /* Focus Colors */
+  --focus-color: var(--primary-color);
+  --focus-ring: 0 0 0 2px var(--primary-color-alpha);
+  
+  /* Shadow Colors */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color-strong: rgba(0, 0, 0, 0.25);
+  
+  /* SCORM-specific Colors */
+  --scorm-sco-color: var(--primary-600);
+  --scorm-asset-color: var(--secondary-500);
+  --scorm-completed-color: var(--success-600);
+  --scorm-incomplete-color: var(--warning-500);
+  --scorm-failed-color: var(--danger-600);
+  --scorm-passed-color: var(--success-600);
+  --scorm-unknown-color: var(--neutral-400);
+  
+  /* Status Colors */
+  --status-online: var(--success-500);
+  --status-offline: var(--neutral-400);
+  --status-error: var(--danger-500);
+  --status-warning: var(--warning-500);
+  --status-info: var(--info-500);
+  
+  /* Component-specific Colors */
+  --header-bg: var(--bg-color);
+  --header-border: var(--border-color);
+  --header-text: var(--text-color);
+  
+  --sidebar-bg: var(--bg-secondary);
+  --sidebar-border: var(--border-color);
+  --sidebar-text: var(--text-color);
+  
+  --content-bg: var(--bg-color);
+  --content-text: var(--text-color);
+  
+  --footer-bg: var(--bg-secondary);
+  --footer-border: var(--border-color);
+  --footer-text: var(--text-muted);
+  
+  --nav-link-hover: var(--bg-hover);
+  --nav-link-active: var(--primary-color);
+  --nav-link-active-text: var(--primary-text);
+  
+  --card-bg: var(--bg-color);
+  --card-border: var(--border-color);
+  --card-shadow: var(--shadow-sm);
+  
+  --modal-bg: var(--bg-color);
+  --modal-overlay: var(--bg-overlay);
+  --modal-border: var(--border-color);
+  
+  --tooltip-bg: var(--neutral-800);
+  --tooltip-text: #ffffff;
+  --tooltip-shadow: var(--shadow-md);
+  
+  --progress-bg: var(--neutral-200);
+  --progress-fill: var(--primary-color);
+  --progress-text: var(--text-color);
+  
+  --code-bg: var(--neutral-100);
+  --code-text: var(--neutral-800);
+  --code-border: var(--border-color);
+  
+  --table-bg: var(--bg-color);
+  --table-border: var(--border-color);
+  --table-header-bg: var(--bg-secondary);
+  --table-row-hover: var(--bg-hover);
+  --table-row-selected: var(--primary-50);
+  
+  /* Debug Panel Colors */
+  --debug-bg: var(--neutral-900);
+  --debug-text: var(--neutral-100);
+  --debug-border: var(--neutral-700);
+  --debug-success: var(--success-400);
+  --debug-error: var(--danger-400);
+  --debug-warning: var(--warning-400);
+  --debug-info: var(--info-400);
+  
+  /* Syntax Highlighting */
+  --syntax-keyword: var(--primary-600);
+  --syntax-string: var(--success-600);
+  --syntax-number: var(--warning-600);
+  --syntax-comment: var(--neutral-500);
+  --syntax-operator: var(--secondary-600);
+  --syntax-function: var(--info-600);
+  --syntax-variable: var(--danger-600);
+  
+  /* Animation Colors */
+  --loading-color: var(--primary-color);
+  --loading-bg: var(--neutral-200);
+  
+  --pulse-color: var(--primary-color);
+  --pulse-bg: var(--primary-50);
+  
+  --skeleton-base: var(--neutral-200);
+  --skeleton-highlight: var(--neutral-100);
+}
+
+/* Theme-specific Component Overrides */
+.theme-default {
+  /* Ensure proper contrast ratios */
+  --min-contrast-ratio: 4.5;
+  
+  /* Adjust colors for better accessibility */
+  --text-on-primary: #ffffff;
+  --text-on-secondary: #ffffff;
+  --text-on-success: #ffffff;
+  --text-on-warning: #000000;
+  --text-on-danger: #ffffff;
+  --text-on-info: #ffffff;
+  
+  /* High contrast variants */
+  --primary-high-contrast: var(--primary-800);
+  --secondary-high-contrast: var(--secondary-800);
+  --success-high-contrast: var(--success-800);
+  --warning-high-contrast: var(--warning-700);
+  --danger-high-contrast: var(--danger-800);
+  --info-high-contrast: var(--info-800);
+}
+
+/* Light theme specific adjustments */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Ensure colors work well in light mode */
+    --shadow-color: rgba(0, 0, 0, 0.08);
+    --shadow-color-strong: rgba(0, 0, 0, 0.2);
+    
+    /* Adjust overlay opacity for light backgrounds */
+    --bg-overlay: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+  :root {
+    /* Use high contrast variants */
+    --primary-color: var(--primary-high-contrast);
+    --secondary-color: var(--secondary-high-contrast);
+    --success-color: var(--success-high-contrast);
+    --warning-color: var(--warning-high-contrast);
+    --danger-color: var(--danger-high-contrast);
+    --info-color: var(--info-high-contrast);
+    
+    /* Increase border contrast */
+    --border-color: var(--neutral-400);
+    --border-secondary: var(--neutral-500);
+    
+    /* Increase text contrast */
+    --text-muted: var(--neutral-600);
+    --text-disabled: var(--neutral-500);
+    
+    /* Stronger shadows */
+    --shadow-color: rgba(0, 0, 0, 0.2);
+    --shadow-color-strong: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Print mode adjustments */
+@media print {
+  :root {
+    /* Use print-friendly colors */
+    --bg-color: #ffffff;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #ffffff;
+    
+    --text-color: #000000;
+    --text-secondary: #333333;
+    --text-muted: #666666;
+    
+    --border-color: #cccccc;
+    --border-secondary: #999999;
+    
+    /* Remove shadows and effects */
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+  }
+}
+
+/* Theme transition animations */
+.theme-transition {
+  transition: 
+    background-color var(--transition-normal) ease,
+    color var(--transition-normal) ease,
+    border-color var(--transition-normal) ease,
+    box-shadow var(--transition-normal) ease;
+}
+
+/* Apply transition to common elements */
+*,
+*::before,
+*::after {
+  transition: 
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease;
+}
+
+/* Disable transitions during theme changes */
+.theme-changing * {
+  transition: none !important;
+}
