@@ -245,6 +245,7 @@ class ContentViewer extends BaseComponent {
     try {
       // Inject SCORM API objects
       this.contentWindow.API = {
+        // LMS-prefixed methods (SCORM 1.2 standard)
         LMSInitialize: (param) => scormClient.Initialize(scormClient.getSessionId() || 'default'),
         LMSFinish: (param) => scormClient.Terminate(param),
         LMSGetValue: (element) => scormClient.GetValue(element),
@@ -252,7 +253,17 @@ class ContentViewer extends BaseComponent {
         LMSCommit: (param) => scormClient.Commit(param),
         LMSGetLastError: () => scormClient.GetLastError(),
         LMSGetErrorString: (errorCode) => scormClient.GetErrorString(errorCode),
-        LMSGetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode)
+        LMSGetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode),
+        
+        // Direct methods (for content that expects API.Commit instead of API.LMSCommit)
+        Initialize: (param) => scormClient.Initialize(scormClient.getSessionId() || 'default'),
+        Finish: (param) => scormClient.Terminate(param),
+        GetValue: (element) => scormClient.GetValue(element),
+        SetValue: (element, value) => scormClient.SetValue(element, value),
+        Commit: (param) => scormClient.Commit(param),
+        GetLastError: () => scormClient.GetLastError(),
+        GetErrorString: (errorCode) => scormClient.GetErrorString(errorCode),
+        GetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode)
       };
       
       // SCORM 2004 API

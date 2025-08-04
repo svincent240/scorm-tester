@@ -384,6 +384,7 @@ async function loadModules() {
           
           // Also inject SCORM 1.2 API for compatibility
           window.API = {
+            // LMS-prefixed methods (SCORM 1.2 standard)
             LMSInitialize: function(param) { return window.API_1484_11.Initialize(param); },
             LMSFinish: function(param) { return window.API_1484_11.Terminate(param); },
             LMSGetValue: function(element) { return window.API_1484_11.GetValue(element); },
@@ -391,7 +392,17 @@ async function loadModules() {
             LMSCommit: function(param) { return window.API_1484_11.Commit(param); },
             LMSGetLastError: function() { return window.API_1484_11.GetLastError(); },
             LMSGetErrorString: function(errorCode) { return window.API_1484_11.GetErrorString(errorCode); },
-            LMSGetDiagnostic: function(errorCode) { return window.API_1484_11.GetDiagnostic(errorCode); }
+            LMSGetDiagnostic: function(errorCode) { return window.API_1484_11.GetDiagnostic(errorCode); },
+            
+            // Direct methods (for content that expects API.Commit instead of API.LMSCommit)
+            Initialize: function(param) { return window.API_1484_11.Initialize(param); },
+            Finish: function(param) { return window.API_1484_11.Terminate(param); },
+            GetValue: function(element) { return window.API_1484_11.GetValue(element); },
+            SetValue: function(element, value) { return window.API_1484_11.SetValue(element, value); },
+            Commit: function(param) { return window.API_1484_11.Commit(param); },
+            GetLastError: function() { return window.API_1484_11.GetLastError(); },
+            GetErrorString: function(errorCode) { return window.API_1484_11.GetErrorString(errorCode); },
+            GetDiagnostic: function(errorCode) { return window.API_1484_11.GetDiagnostic(errorCode); }
           };
           
           console.log('SCORM Tester: SCORM API pre-injection completed');
@@ -529,6 +540,7 @@ async function loadModules() {
           
           // Also inject SCORM 1.2 API for compatibility
           contentWindow.API = {
+            // LMS-prefixed methods (SCORM 1.2 standard)
             LMSInitialize: (param) => contentWindow.API_1484_11.Initialize(param),
             LMSFinish: (param) => contentWindow.API_1484_11.Terminate(param),
             LMSGetValue: (element) => contentWindow.API_1484_11.GetValue(element),
@@ -536,7 +548,17 @@ async function loadModules() {
             LMSCommit: (param) => contentWindow.API_1484_11.Commit(param),
             LMSGetLastError: () => contentWindow.API_1484_11.GetLastError(),
             LMSGetErrorString: (errorCode) => contentWindow.API_1484_11.GetErrorString(errorCode),
-            LMSGetDiagnostic: (errorCode) => contentWindow.API_1484_11.GetDiagnostic(errorCode)
+            LMSGetDiagnostic: (errorCode) => contentWindow.API_1484_11.GetDiagnostic(errorCode),
+            
+            // Direct methods (for content that expects API.Commit instead of API.LMSCommit)
+            Initialize: (param) => contentWindow.API_1484_11.Initialize(param),
+            Finish: (param) => contentWindow.API_1484_11.Terminate(param),
+            GetValue: (element) => contentWindow.API_1484_11.GetValue(element),
+            SetValue: (element, value) => contentWindow.API_1484_11.SetValue(element, value),
+            Commit: (param) => contentWindow.API_1484_11.Commit(param),
+            GetLastError: () => contentWindow.API_1484_11.GetLastError(),
+            GetErrorString: (errorCode) => contentWindow.API_1484_11.GetErrorString(errorCode),
+            GetDiagnostic: (errorCode) => contentWindow.API_1484_11.GetDiagnostic(errorCode)
           };
           
           console.log('CRITICAL DEBUG: SCORM API fallback injection completed successfully');
