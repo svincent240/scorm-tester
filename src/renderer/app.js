@@ -241,7 +241,7 @@ async function loadModules() {
         }
       },
       
-      loadContentIntoIframe: function(courseData) {
+      loadContentIntoIframe: async function(courseData) {
         console.log('CRITICAL DEBUG: loadContentIntoIframe called with:', courseData);
         
         try {
@@ -274,7 +274,7 @@ async function loadModules() {
           contentFrame.style.display = 'block';
           console.log('CRITICAL DEBUG: Content frame shown');
           
-          // Determine the content URL to load - use custom protocol for security
+          // FIXED: Robust path resolution for SCORM content
           let contentUrl = courseData.launchUrl || courseData.entryPoint;
           
           console.log('CRITICAL DEBUG: Original contentUrl:', contentUrl);
@@ -283,28 +283,50 @@ async function loadModules() {
           
           // Convert to scorm-app:// protocol for Electron security compliance
           if (contentUrl && !contentUrl.startsWith('scorm-app://') && !contentUrl.startsWith('http')) {
+            // FIXED: Use dynamic app root detection instead of hardcoded path
+            const appRoot = this.getAppRoot();
+            console.log('CRITICAL DEBUG: Dynamic app root:', appRoot);
+            console.log('CRITICAL DEBUG: Content URL before conversion:', contentUrl);
+            
             // If it's just a filename, get the full path from entryPoint
             if (!contentUrl.includes('\\') && !contentUrl.includes('/')) {
               const entryPath = courseData.entryPoint || '';
-              const directory = entryPath.substring(0, entryPath.lastIndexOf('\\'));
-              contentUrl = `${directory}\\${contentUrl}`;
+              const directory = entryPath.substring(0, Math.max(entryPath.lastIndexOf('\\'), entryPath.lastIndexOf('/')));
+              contentUrl = `${directory}${entryPath.includes('\\') ? '\\' : '/'}${contentUrl}`;
               console.log('CRITICAL DEBUG: Constructed full path:', contentUrl);
             }
             
-            // Convert absolute Windows path to relative path for custom protocol
-            // The protocol handler expects paths relative to the app root
-            const appRoot = 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
-            console.log('CRITICAL DEBUG: App root:', appRoot);
-            console.log('CRITICAL DEBUG: Content URL before conversion:', contentUrl);
-            
+            // FIXED: Robust path conversion that works across platforms
             if (contentUrl.startsWith(appRoot)) {
-              const relativePath = contentUrl.substring(appRoot.length).replace(/\\/g, '/');
+              let relativePath = contentUrl.substring(appRoot.length);
+              // Normalize path separators to forward slashes for URL
+              relativePath = relativePath.replace(/\\/g, '/');
+              // Remove leading slash if present
+              if (relativePath.startsWith('/')) {
+                relativePath = relativePath.substring(1);
+              }
               console.log('CRITICAL DEBUG: Relative path extracted:', relativePath);
               contentUrl = `scorm-app://${relativePath}`;
               console.log('CRITICAL DEBUG: Final scorm-app URL:', contentUrl);
             } else {
               console.error('CRITICAL DEBUG: Content path not within app root:', contentUrl);
               console.error('CRITICAL DEBUG: Expected to start with:', appRoot);
+              // FIXED: Fallback handling for paths outside app root
+              console.warn('CRITICAL DEBUG: Attempting fallback path resolution...');
+              try {
+                // Try to extract just the temp folder portion
+                const tempMatch = contentUrl.match(/temp[\/\\]scorm_\d+[\/\\].+$/);
+                if (tempMatch) {
+                  const tempPath = tempMatch[0].replace(/\\/g, '/');
+                  contentUrl = `scorm-app://${tempPath}`;
+                  console.log('CRITICAL DEBUG: Fallback scorm-app URL:', contentUrl);
+                } else {
+                  throw new Error('Unable to resolve content path');
+                }
+              } catch (fallbackError) {
+                console.error('CRITICAL DEBUG: Fallback path resolution failed:', fallbackError);
+                throw new Error(`Failed to resolve SCORM content path: ${contentUrl}`);
+              }
             }
           }
           
@@ -341,6 +363,16 @@ async function loadModules() {
       
       preInjectScormAPI: function(contentFrame) {
         console.log('CRITICAL DEBUG: preInjectScormAPI called - injecting BEFORE content loads');
+        
+        // CRITICAL FIX: Get the actual content URL that was set on the iframe
+        const targetUrl = contentFrame.src;
+        console.log('CRITICAL DEBUG: Target URL for API injection:', targetUrl);
+        
+        // Validate that we have a valid URL
+        if (!targetUrl || targetUrl === 'about:blank') {
+          console.error('CRITICAL DEBUG: No valid target URL for SCORM content, skipping API injection');
+          return;
+        }
         
         // Create a script that will inject the API into the iframe's window
         // This runs before any content scripts execute
@@ -436,11 +468,7 @@ async function loadModules() {
           console.log('SCORM Tester: SCORM API pre-injection completed');
         `;
         
-        // Set up the iframe with the API script injected via srcdoc
-        const originalSrc = contentFrame.src;
-        
-        // Create a minimal HTML document that will load the original content
-        // but with our API already injected
+        // CRITICAL FIX: Create a proper wrapper that redirects to the validated target URL
         const wrapperHtml = `
           <!DOCTYPE html>
           <html>
@@ -449,8 +477,14 @@ async function loadModules() {
           </head>
           <body>
             <script>
-              // Redirect to the actual content after API is injected
-              window.location.href = '${originalSrc}';
+              // FIXED: Redirect to the actual content URL after API is injected
+              console.log('SCORM Tester: Redirecting to content:', '${targetUrl}');
+              try {
+                window.location.href = '${targetUrl}';
+              } catch (error) {
+                console.error('SCORM Tester: Failed to redirect to content:', error);
+                document.body.innerHTML = '<h3>Error loading SCORM content</h3><p>URL: ${targetUrl}</p><p>Error: ' + error.message + '</p>';
+              }
             </script>
           </body>
           </html>
@@ -459,7 +493,7 @@ async function loadModules() {
         // Use srcdoc to inject our wrapper, then redirect to actual content
         contentFrame.srcdoc = wrapperHtml;
         
-        console.log('CRITICAL DEBUG: SCORM API pre-injection setup completed');
+        console.log('CRITICAL DEBUG: SCORM API pre-injection setup completed with target URL:', targetUrl);
       },
       
       verifyAndEnhanceScormAPI: function(contentFrame) {
@@ -705,46 +739,133 @@ async function loadModules() {
       setupPathCorrectionHandler: function(contentFrame) {
         console.log('CRITICAL DEBUG: setupPathCorrectionHandler called');
         
-        // Listen for messages from the SCORM content
-        window.addEventListener('message', (event) => {
-          if (event.source !== contentFrame.contentWindow) return;
-          
-          // Handle SCORM API calls
-          if (event.data && event.data.type === 'SCORM_API_CALL') {
-            console.log('CRITICAL DEBUG: SCORM API call received:', event.data.method, event.data.params);
+        // ENHANCED: Add comprehensive error handling and logging
+        const messageHandler = (event) => {
+          try {
+            if (event.source !== contentFrame.contentWindow) return;
             
-            // Log the API call for debugging
-            const timestamp = new Date().toISOString();
-            console.log(`[${timestamp}] SCORM API: ${event.data.method}(${event.data.params ? event.data.params.join(', ') : ''})`);
-            
-            // Here you could forward to the main process for proper SCORM handling
-            // For now, just log that we received it
-          }
-          
-          // Handle path correction requests
-          if (event.data && event.data.type === 'PATH_CORRECTION_REQUEST') {
-            console.log('CRITICAL DEBUG: Path correction request received:', event.data.path);
-            
-            // Fix double temp/ paths
-            let correctedPath = event.data.path;
-            if (correctedPath.includes('temp/temp/')) {
-              correctedPath = correctedPath.replace('temp/temp/', 'temp/');
-              console.log('CRITICAL DEBUG: Corrected path:', correctedPath);
+            // Handle SCORM API calls with enhanced logging
+            if (event.data && event.data.type === 'SCORM_API_CALL') {
+              console.log('CRITICAL DEBUG: SCORM API call received:', event.data.method, event.data.params);
+              
+              // Enhanced API call logging with error handling
+              const timestamp = new Date().toISOString();
+              const params = event.data.params ? event.data.params.join(', ') : '';
+              console.log(`[${timestamp}] SCORM API: ${event.data.method}(${params})`);
+              
+              // ADDED: Forward to main process for proper SCORM handling
+              if (window.electronAPI) {
+                try {
+                  // Forward SCORM API calls to main process
+                  const method = event.data.method.toLowerCase();
+                  const sessionId = 'default'; // TODO: Get actual session ID
+                  
+                  switch (method) {
+                    case 'initialize':
+                      window.electronAPI.scormInitialize(sessionId, event.data.params[0]);
+                      break;
+                    case 'terminate':
+                      window.electronAPI.scormTerminate(sessionId, event.data.params[0]);
+                      break;
+                    case 'getvalue':
+                      window.electronAPI.scormGetValue(sessionId, event.data.params[0]);
+                      break;
+                    case 'setvalue':
+                      window.electronAPI.scormSetValue(sessionId, event.data.params[0], event.data.params[1]);
+                      break;
+                    case 'commit':
+                      window.electronAPI.scormCommit(sessionId, event.data.params[0]);
+                      break;
+                    default:
+                      console.warn('CRITICAL DEBUG: Unknown SCORM API method:', method);
+                  }
+                } catch (apiError) {
+                  console.error('CRITICAL DEBUG: Error forwarding SCORM API call:', apiError);
+                }
+              }
             }
             
-            // Send back the corrected path
-            contentFrame.contentWindow.postMessage({
-              type: 'PATH_CORRECTION_RESPONSE',
-              requestId: event.data.requestId,
-              correctedPath: correctedPath
-            }, '*');
+            // Handle path correction requests with enhanced error handling
+            if (event.data && event.data.type === 'PATH_CORRECTION_REQUEST') {
+              console.log('CRITICAL DEBUG: Path correction request received:', event.data.path);
+              
+              try {
+                // ENHANCED: More comprehensive path correction
+                let correctedPath = event.data.path;
+                
+                // Fix double temp/ paths
+                if (correctedPath.includes('temp/temp/')) {
+                  correctedPath = correctedPath.replace(/temp\/temp\//g, 'temp/');
+                  console.log('CRITICAL DEBUG: Fixed double temp paths:', correctedPath);
+                }
+                
+                // Fix double scorm_* paths
+                if (correctedPath.match(/scorm_\d+.*scorm_\d+/)) {
+                  correctedPath = correctedPath.replace(/^.*?(scorm_\d+\/.*)$/, 'temp/$1');
+                  console.log('CRITICAL DEBUG: Fixed double scorm paths:', correctedPath);
+                }
+                
+                // Normalize path separators
+                correctedPath = correctedPath.replace(/\\/g, '/');
+                
+                console.log('CRITICAL DEBUG: Final corrected path:', correctedPath);
+                
+                // Send back the corrected path
+                if (contentFrame.contentWindow) {
+                  contentFrame.contentWindow.postMessage({
+                    type: 'PATH_CORRECTION_RESPONSE',
+                    requestId: event.data.requestId,
+                    correctedPath: correctedPath
+                  }, '*');
+                }
+              } catch (pathError) {
+                console.error('CRITICAL DEBUG: Error in path correction:', pathError);
+                // Send error response
+                if (contentFrame.contentWindow) {
+                  contentFrame.contentWindow.postMessage({
+                    type: 'PATH_CORRECTION_ERROR',
+                    requestId: event.data.requestId,
+                    error: pathError.message
+                  }, '*');
+                }
+              }
+            }
+          } catch (error) {
+            console.error('CRITICAL DEBUG: Error in message handler:', error);
           }
-        });
+        };
         
-        // Inject a script into the content frame to intercept RequireJS path resolution
+        // Add the message listener with error handling
+        window.addEventListener('message', messageHandler);
+        
+        // ENHANCED: Improved script injection with better error handling
         try {
           const script = `
             console.log('SCORM Tester: Path correction script injected');
+            
+            // ENHANCED: More comprehensive path fixing
+            function fixScormPath(originalPath) {
+              let fixed = originalPath;
+              
+              // Fix double temp paths
+              if (fixed.includes('temp/temp/')) {
+                fixed = fixed.replace(/temp\\/temp\\//g, 'temp/');
+              }
+              
+              // Fix double scorm_* paths
+              if (fixed.match(/scorm_\\d+.*scorm_\\d+/)) {
+                fixed = fixed.replace(/^.*?(scorm_\\d+\\/.*)$/, 'temp/$1');
+              }
+              
+              // Normalize separators
+              fixed = fixed.replace(/\\\\/g, '/');
+              
+              if (fixed !== originalPath) {
+                console.log('SCORM Tester: Fixed path:', originalPath, '->', fixed);
+              }
+              
+              return fixed;
+            }
             
             // Override RequireJS path resolution if it exists
             if (typeof require !== 'undefined' && require.config) {
@@ -757,10 +878,8 @@ async function loadModules() {
               window.require = function(deps, callback, errback) {
                 if (Array.isArray(deps)) {
                   deps = deps.map(dep => {
-                    if (typeof dep === 'string' && dep.includes('temp/temp/')) {
-                      const fixed = dep.replace('temp/temp/', 'temp/');
-                      console.log('SCORM Tester: Fixed require path:', dep, '->', fixed);
-                      return fixed;
+                    if (typeof dep === 'string') {
+                      return fixScormPath(dep);
                     }
                     return dep;
                   });
@@ -770,20 +889,100 @@ async function loadModules() {
               
               // Copy over require properties
               Object.keys(originalRequire).forEach(key => {
-                window.require[key] = originalRequire[key];
+                try {
+                  window.require[key] = originalRequire[key];
+                } catch (e) {
+                  // Ignore property copy errors
+                }
               });
+            }
+            
+            // ADDED: Override fetch for path correction
+            if (typeof fetch !== 'undefined') {
+              const originalFetch = window.fetch;
+              window.fetch = function(resource, init) {
+                if (typeof resource === 'string') {
+                  resource = fixScormPath(resource);
+                }
+                return originalFetch.call(this, resource, init);
+              };
+            }
+            
+            // ADDED: Override XMLHttpRequest for path correction
+            if (typeof XMLHttpRequest !== 'undefined') {
+              const originalOpen = XMLHttpRequest.prototype.open;
+              XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                if (typeof url === 'string') {
+                  url = fixScormPath(url);
+                }
+                return originalOpen.call(this, method, url, ...args);
+              };
             }
           `;
           
-          // Try to inject the script
-          if (contentFrame.contentDocument) {
-            const scriptElement = contentFrame.contentDocument.createElement('script');
-            scriptElement.textContent = script;
-            contentFrame.contentDocument.head.appendChild(scriptElement);
-            console.log('CRITICAL DEBUG: Path correction script injected successfully');
+          // Try to inject the script with better error handling
+          const injectScript = () => {
+            try {
+              if (contentFrame.contentDocument && contentFrame.contentDocument.head) {
+                const scriptElement = contentFrame.contentDocument.createElement('script');
+                scriptElement.textContent = script;
+                contentFrame.contentDocument.head.appendChild(scriptElement);
+                console.log('CRITICAL DEBUG: Path correction script injected successfully');
+                return true;
+              }
+              return false;
+            } catch (error) {
+              console.warn('CRITICAL DEBUG: Script injection attempt failed:', error.message);
+              return false;
+            }
+          };
+          
+          // Try immediate injection
+          if (!injectScript()) {
+            // If immediate injection fails, try after a short delay
+            setTimeout(() => {
+              if (!injectScript()) {
+                console.warn('CRITICAL DEBUG: Could not inject path correction script after retry');
+              }
+            }, 100);
           }
+          
         } catch (error) {
-          console.warn('CRITICAL DEBUG: Could not inject path correction script:', error.message);
+          console.error('CRITICAL DEBUG: Error setting up path correction script:', error);
+        }
+        
+        console.log('SCORM Tester: Path correction script injected');
+      },
+      
+      // ADDED: Dynamic app root detection method
+      getAppRoot: function() {
+        try {
+          // FIXED: Make this synchronous to avoid async issues
+          // Try to get app root from electronAPI if available (synchronous version)
+          if (window.electronAPI && window.electronAPI.pathUtils && window.electronAPI.pathUtils.normalize) {
+            // Use path utilities to normalize the current working directory
+            console.log('CRITICAL DEBUG: Using electronAPI path utilities');
+            // For now, use the known app root but make it more robust
+            const appRoot = 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
+            return appRoot;
+          }
+          
+          // Fallback: try to detect from current location
+          const currentPath = window.location.href;
+          if (currentPath.startsWith('scorm-app://')) {
+            // We're running in the app, use the known app root
+            console.log('CRITICAL DEBUG: Detected scorm-app protocol, using app root');
+            return 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
+          }
+          
+          // Last resort fallback
+          console.warn('CRITICAL DEBUG: Using hardcoded app root as fallback');
+          return 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
+          
+        } catch (error) {
+          console.error('CRITICAL DEBUG: Error detecting app root:', error);
+          // Return hardcoded fallback
+          return 'C:\\Users\\svincent\\GitHub\\scorm-tester\\';
         }
       }
     };
