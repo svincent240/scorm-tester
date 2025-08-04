@@ -75,8 +75,8 @@ global.document = {
 // Make globals available
 global.localStorage = global.window.localStorage;
 
-// Mock timers to prevent hanging
-jest.useFakeTimers();
+// Use real timers to prevent hanging issues
+jest.useRealTimers();
 
 describe('Renderer Integration Tests', () => {
   let mockIpcRenderer;
@@ -112,26 +112,62 @@ describe('Renderer Integration Tests', () => {
 
   afterEach(() => {
     // Clean up any remaining timers
-    activeTimers.forEach(timer => clearTimeout(timer));
+    activeTimers.forEach(timer => {
+      try {
+        clearTimeout(timer);
+        clearInterval(timer);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    });
     activeTimers = [];
     
     // Clean up event listeners
     activeEventListeners.forEach(cleanup => {
       if (typeof cleanup === 'function') {
-        cleanup();
+        try {
+          cleanup();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
     });
     activeEventListeners = [];
     
-    // Clear all timers and intervals
-    jest.clearAllTimers();
+    // Clean up SCORM client if it exists
+    try {
+      const scormClient = require('../../src/renderer/services/scorm-client.js');
+      if (scormClient && typeof scormClient.destroy === 'function') {
+        scormClient.destroy();
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
   });
 
   afterAll(() => {
     // Final cleanup
-    jest.clearAllTimers();
     jest.clearAllMocks();
-    jest.useRealTimers();
+    
+    // Clean up SCORM client if it exists
+    try {
+      const scormClient = require('../../src/renderer/services/scorm-client.js');
+      if (scormClient && typeof scormClient.destroy === 'function') {
+        scormClient.destroy();
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
   });
 
   describe('Service Layer Integration', () => {

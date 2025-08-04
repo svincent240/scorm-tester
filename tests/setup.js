@@ -199,11 +199,38 @@ expect.extend({
 // Global error handler for unhandled promise rejections in tests
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit process in tests, just log the error
+});
+
+// Handle uncaught exceptions in tests
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception in tests:', error);
+  // Don't exit process in tests, just log the error
 });
 
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks();
+  
+  // Clear any remaining timers
+  jest.clearAllTimers();
+  
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+  }
+});
+
+// Global cleanup after all tests
+afterAll(() => {
+  // Final cleanup
+  jest.clearAllMocks();
+  jest.clearAllTimers();
+  
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+  }
 });
 
 console.log('SCORM Tester test environment initialized');

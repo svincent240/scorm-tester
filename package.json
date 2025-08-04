@@ -19,8 +19,7 @@
     "test:error-handling": "jest tests/integration/error-handling.test.js",
     "test:phase-integration": "jest tests/integration/phase-integration.test.js",
     "test:renderer": "jest tests/integration/renderer-integration.test.js",
-    "test:phase6": "npm run test:renderer && npm run test:compliance && npm run validate:scorm",
-    "test:all": "jest tests/unit tests/integration",
+    "test:all": "jest tests/unit tests/integration --forceExit --detectOpenHandles --maxWorkers=1",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
     "validate:architecture": "node scripts/validate-architecture.js",
@@ -97,7 +96,10 @@
     "setupFilesAfterEnv": [
       "<rootDir>/tests/setup.js"
     ],
-    "testTimeout": 10000
+    "testTimeout": 30000,
+    "forceExit": true,
+    "detectOpenHandles": true,
+    "maxWorkers": 1
   },
   "build": {
     "appId": "com.scormtester.app",

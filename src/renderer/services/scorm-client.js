@@ -25,6 +25,7 @@ class ScormClient {
     this.lastError = '0';
     this.apiCallQueue = [];
     this.isProcessingQueue = false;
+    this.sessionTimer = null;
     
     this.setupEventListeners();
   }
@@ -504,7 +505,7 @@ class ScormClient {
    */
   setupEventListeners() {
     // Listen for session timer updates
-    setInterval(() => {
+    this.sessionTimer = setInterval(() => {
       if (this.isInitialized && this.sessionId) {
         this.updateSessionTime();
       }
@@ -570,6 +571,12 @@ class ScormClient {
   destroy() {
     if (this.isInitialized) {
       this.Terminate('');
+    }
+    
+    // Clear the session timer
+    if (this.sessionTimer) {
+      clearInterval(this.sessionTimer);
+      this.sessionTimer = null;
     }
     
     this.clearCache();
