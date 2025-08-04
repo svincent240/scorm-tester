@@ -176,6 +176,8 @@ class WindowManager extends BaseService {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
+          webSecurity: false, // Disable web security for custom protocol
+          allowRunningInsecureContent: true, // Allow content from custom protocol
           preload: path.join(__dirname, '../../preload.js')
         },
         title: 'SCORM Debug Console',
@@ -184,8 +186,10 @@ class WindowManager extends BaseService {
 
       this.windows.set(WINDOW_TYPES.DEBUG, debugWindow);
       this.setupDebugWindowEvents(debugWindow);
+      this.setupConsoleLogging(debugWindow);
       
-      await debugWindow.loadFile('debug.html');
+      // Use custom protocol like main window
+      await debugWindow.loadURL('scorm-app://debug.html');
       debugWindow.show();
       
       this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.READY);

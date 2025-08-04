@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCORM Debug Console</title>
+    
+    <!-- Import the existing styles -->
+    <link rel="stylesheet" href="scorm-app://src/styles/main.css">
+    
+    <style>
+        /* Debug window specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-primary, #1e1e1e);
+            color: var(--text-primary, #d4d4d4);
+        }
+
+        .debug-window {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .debug-window-header {
+            background: var(--bg-secondary, #2d2d30);
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .debug-window-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary, #cccccc);
+            margin: 0;
+        }
+
+        .debug-window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .debug-window-btn {
+            background: var(--btn-primary-bg, #0e639c);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: background-color 0.2s;
+        }
+
+        .debug-window-btn:hover {
+            background: var(--btn-primary-hover, #1177bb);
+        }
+
+        .debug-panel-container {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Override debug panel styles for window mode */
+        .debug-panel__container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .debug-panel__header {
+            display: none; /* Hide the component header since we have window header */
+        }
+
+        .debug-panel__content {
+            flex: 1;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-window">
+        <div class="debug-window-header">
+            <h1 class="debug-window-title">🔍 SCORM Debug Console</h1>
+            <div class="debug-window-controls">
+                <button class="debug-window-btn" id="refresh-btn" title="Refresh">🔄</button>
+                <button class="debug-window-btn" id="always-on-top-btn" title="Always on Top">📌</button>
+            </div>
+        </div>
+        
+        <div class="debug-panel-container">
+            <!-- The DebugPanel component will be rendered here -->
+            <div id="debug-panel"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the existing DebugPanel component
+        import { DebugPanel } from './src/renderer/components/scorm/debug-panel.js';
+        
+        class DebugWindow {
+            constructor() {
+                this.debugPanel = null;
+                this.init();
+            }
+
+            async init() {
+                try {
+                    console.log('Debug Window: Initializing...');
+                    
+                    // Create the debug panel component
+                    this.debugPanel = new DebugPanel('debug-panel', {
+                        showTimestamps: true,
+                        enableExport: true
+                    });
+
+                    // Initialize the component
+                    await this.debugPanel.initialize();
+                    
+                    this.setupWindowControls();
+                    this.setupIPC();
+                    
+                    console.log('Debug Window: Initialized successfully');
+                    
+                } catch (error) {
+                    console.error('Debug Window: Initialization failed:', error);
+                    this.showError('Failed to initialize debug panel: ' + error.message);
+                }
+            }
+
+            setupWindowControls() {
+                const refreshBtn = document.getElementById('refresh-btn');
+                const alwaysOnTopBtn = document.getElementById('always-on-top-btn');
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => {
+                        if (this.debugPanel) {
+                            this.debugPanel.refreshActiveTab();
+                        }
+                    });
+                }
+
+                if (alwaysOnTopBtn) {
+                    let isAlwaysOnTop = false;
+                    alwaysOnTopBtn.addEventListener('click', () => {
+                        isAlwaysOnTop = !isAlwaysOnTop;
+                        if (window.electronAPI && window.electronAPI.setAlwaysOnTop) {
+                            window.electronAPI.setAlwaysOnTop(isAlwaysOnTop);
+                        }
+                        alwaysOnTopBtn.textContent = isAlwaysOnTop ? '📍' : '📌';
+                        alwaysOnTopBtn.title = isAlwaysOnTop ? 'Disable Always on Top' : 'Always on Top';
+                    });
+                }
+            }
+
+            setupIPC() {
+                // Set up communication with main window for SCORM events
+                if (window.electronAPI) {
+                    // Listen for SCORM API events
+                    if (window.electronAPI.onScormApiLog) {
+                        window.electronAPI.onScormApiLog((data) => {
+                            if (this.debugPanel) {
+                                this.debugPanel.handleApiCall(data);
+                            }
+                        });
+                    }
+
+                    // Listen for course loaded events
+                    if (window.electronAPI.onCourseLoaded) {
+                        window.electronAPI.onCourseLoaded((data) => {
+                            if (this.debugPanel) {
+                                this.debugPanel.handleScormInitialized();
+                            }
+                        });
+                    }
+
+                    // Listen for session state changes
+                    if (window.electronAPI.onSessionStateChanged) {
+                        window.electronAPI.onSessionStateChanged((data) => {
+                            if (this.debugPanel) {
+                                this.debugPanel.refreshSessionInfo();
+                            }
+                        });
+                    }
+                }
+            }
+
+            showError(message) {
+                const container = document.querySelector('.debug-panel-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="padding: 20px; text-align: center; color: #f48771;">
+                            <h3>Debug Panel Error</h3>
+                            <p>${message}</p>
+                            <button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #0e639c; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                                Retry
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+
+            destroy() {
+                if (this.debugPanel) {
+                    this.debugPanel.destroy();
+                    this.debugPanel = null;
+                }
+            }
+        }
+
+        // Initialize debug window when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            window.debugWindow = new DebugWindow();
+        });
+
+        // Cleanup on window close
+        window.addEventListener('beforeunload', () => {
+            if (window.debugWindow) {
+                window.debugWindow.destroy();
+            }
+        });
+    </script>
+</body>
+</html>
