@@ -12,12 +12,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--content-viewer-bg);
-  border: 1px solid var(--content-viewer-border-color);
-  border-radius: var(--content-viewer-border-radius);
+  position: relative;
   margin: 0;
   overflow: hidden;
   min-height: 0;  /* Allow flex shrinking */
+  height: 100%;  /* Ensure full height utilization */
+  /* Ensure content viewer takes full available height in scrollable parent */
+  min-height: calc(100vh - var(--header-height) - var(--footer-height) - 2 * var(--spacing-xs));
 }
 
 .content-viewer__container {
@@ -27,6 +28,9 @@
   position: relative;
   min-height: 0;  /* Allow flex shrinking */
   height: 100%;
+  /* Ensure container provides proper positioning context for iframe */
+  /* Force minimum height to ensure iframe gets proper space */
+  min-height: 500px;
 }
 
 /* Welcome Screen */
@@ -106,19 +110,13 @@
 
 /* Content Frame (iframe) */
 .content-viewer__frame {
-  flex: 1;  /* Take all available space */
+  flex: 1;
   width: 100%;
-  min-height: 400px;  /* Reduced minimum height for better responsiveness */
+  height: 100%;  /* Force full height */
   border: none;
   background: #ffffff;
   display: block;
-  
-  /* Ensure proper scaling and containment */
-  object-fit: contain;
-  
-  /* Fix for iframe scaling issues */
-  transform-origin: top left;
-  position: relative;
+  min-height: 0;  /* Remove min-height constraint */
 }
 
 .content-viewer__frame.hidden {
@@ -188,25 +186,56 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* Progress Tracking - Sticky Footer */
-#progress-tracking {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: calc(var(--sidebar-width) + var(--spacing-sm)) !important;
-  right: var(--spacing-sm) !important;
-  background: var(--bg-secondary) !important;
-  border-top: 1px solid var(--border-color) !important;
-  border-radius: 0 !important;
-  padding: var(--spacing-md) var(--spacing-lg) !important;
-  margin: 0 !important;
-  z-index: var(--z-index-fixed) !important;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
-  transition: left var(--transition-normal) ease !important;
+/* Footer Styles */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 var(--spacing-md);
+  gap: var(--spacing-md);
 }
 
-/* Responsive behavior for sidebar collapse */
-.app-sidebar--collapsed ~ .app-content #progress-tracking {
-  left: calc(var(--sidebar-width-collapsed) + var(--spacing-sm)) !important;
+.footer__progress {
+  flex: 1;
+  max-width: 400px;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.progress-info__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.footer__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+}
+
+.stat-label {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.stat-value {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  min-width: 60px;
 }
 
 /* Progress Tracking Container */
@@ -348,10 +377,18 @@
     justify-content: space-between;
   }
   
-  /* Mobile progress tracking positioning */
-  #progress-tracking {
-    left: 0 !important;  /* Full width on mobile */
-    padding: var(--spacing-sm) var(--spacing-md) !important;
+  /* Mobile footer adjustments */
+  .footer {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+  
+  .footer__stats {
+    gap: var(--spacing-md);
+  }
+  
+  .stat-item {
+    font-size: var(--font-size-xs);
   }
 }
 

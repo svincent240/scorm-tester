@@ -264,14 +264,14 @@ class ScormSNService {
       if (!postConditionResult.action && activity.parent) {
         postConditionResult = this.sequencingEngine.evaluatePostConditionRules(activity.parent);
       }
-
-      this.logger?.debug(`Activity progress updated: ${activityId}`, progressData);
-
-      return {
-        success: true,
-        reason: 'Activity progress updated',
-        rollup: rollupResult,
-        postCondition: postConditionResult
+ 
+       this.logger?.debug(`Activity progress updated: ${activityId}`, progressData);
+ 
+       return {
+         success: true,
+         reason: 'Activity progress updated',
+         rollup: rollupResult,
+         postCondition: postConditionResult
       };
 
     } catch (error) {

@@ -107,18 +107,7 @@
             </div>
           </div>
           
-          <div class="sidebar__footer">
-            <div id="progress-summary" class="progress-summary">
-              <div class="progress-summary__item">
-                <span class="progress-summary__label">Progress:</span>
-                <span class="progress-summary__value">0%</span>
-              </div>
-              <div class="progress-summary__item">
-                <span class="progress-summary__label">Status:</span>
-                <span class="progress-summary__value">Not Started</span>
-              </div>
-            </div>
-          </div>
+
         </div>
       </aside>
       
@@ -215,19 +204,40 @@
             <iframe id="content-frame" class="content-viewer__frame hidden" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-top-navigation allow-top-navigation-by-user-activation"></iframe>
           </div>
         </div>
-        
-        <!-- Progress Tracking -->
-        <div id="progress-tracking" class="progress-tracking">
-          <div class="progress-bar__track">
-            <div id="progress-fill" class="progress-bar__fill" style="width: 0%"></div>
+      </div>
+    </main>
+    
+    <!-- Progress Footer -->
+    <footer id="app-footer" class="app-footer">
+      <div class="footer">
+        <div class="footer__progress">
+          <div class="progress-info">
+            <span class="progress-info__label">Learning Progress</span>
+            <div class="progress-bar">
+              <div class="progress-bar__track">
+                <div id="footer-progress-fill" class="progress-bar__fill" style="width: 0%"></div>
+              </div>
+              <span id="footer-progress-percentage" class="progress-bar__label">0%</span>
+            </div>
           </div>
-          <div class="progress-bar__info">
-            <span id="progress-text">Ready</span>
-            <span id="progress-percentage">0%</span>
+        </div>
+        
+        <div class="footer__stats">
+          <div class="stat-item">
+            <span class="stat-label">Status:</span>
+            <span id="footer-status" class="stat-value">Not Started</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Score:</span>
+            <span id="footer-score" class="stat-value">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Time:</span>
+            <span id="footer-time" class="stat-value">00:00:00</span>
           </div>
         </div>
       </div>
-    </main>
+    </footer>
     
     <!-- Debug Panel -->
     <div id="debug-panel" class="debug-panel hidden">

@@ -295,6 +295,7 @@
   --z-overlay: 1000;
   
   --header-height: 56px;  /* Reduced from 60px for more content space */
+  --footer-height: 56px;  /* Compact height matching header for progress footer */
   --navigation-controls-height: 48px;  /* Height for navigation controls bar */
   --progress-tracking-height: 32px;   /* Height for progress tracking bar */
   --transition-normal: var(--transition-base);

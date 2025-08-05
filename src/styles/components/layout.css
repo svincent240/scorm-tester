@@ -57,11 +57,22 @@
   width: 100%;
 }
 
+.app-footer {
+  flex-shrink: 0;
+  height: var(--footer-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  z-index: var(--z-header);
+  position: relative;
+  width: 100%;
+}
+
 .app-main {
   flex: 1;
   display: flex;
   overflow: hidden;
-  height: calc(100vh - var(--header-height));  /* Calculate available height */
+  height: calc(100vh - var(--header-height) - var(--footer-height));  /* Calculate available height */
   min-height: 0;  /* Allow flex shrinking */
 }
 
@@ -89,8 +100,7 @@
   overflow-y: auto;  /* Enable vertical scrolling */
   overflow-x: hidden;  /* Prevent horizontal overflow */
   background: var(--bg-color);
-  padding: var(--spacing-sm);  /* Reduced padding for more content space */
-  padding-bottom: calc(var(--spacing-sm) + 120px);  /* Add space for fixed progress footer */
+  padding: var(--spacing-xs);  /* Minimal padding to maximize content space */
   min-width: 0;  /* Allow flex shrinking */
   min-height: 0;  /* Allow proper flex shrinking */
 }

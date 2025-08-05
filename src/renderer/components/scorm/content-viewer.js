@@ -23,6 +23,9 @@ class ContentViewer extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
     
+    // Logger will be initialized dynamically when needed
+    this.logger = null;
+    
     this.iframe = null;
     this.currentUrl = null;
     this.loadingTimeout = null;
@@ -41,7 +44,7 @@ class ContentViewer extends BaseComponent {
       loadingTimeout: 30000,
       showLoadingIndicator: true,
       enableFullscreen: true,
-      enableContentScaling: false, // Disabled by default to avoid issues
+      enableContentScaling: true, // Enable to make SCORM content responsive
       sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
       attributes: {
         'data-component': 'content-viewer'
@@ -430,8 +433,15 @@ class ContentViewer extends BaseComponent {
    * Apply content scaling to fit iframe content properly (optimized)
    */
   applyContentScaling() {
+    console.log('ContentViewer: Content scaling check started', {
+      enableContentScaling: this.options.enableContentScaling,
+      hasIframe: !!this.iframe,
+      hasContentWindow: !!this.contentWindow
+    });
+    
     // Skip scaling if disabled or content window not available
     if (!this.options.enableContentScaling || !this.iframe || !this.contentWindow) {
+      console.log('ContentViewer: Content scaling skipped - requirements not met');
       return;
     }
 
@@ -443,47 +453,47 @@ class ContentViewer extends BaseComponent {
         return;
       }
 
-      // Check if content already has responsive design
-      const viewport = contentDoc.querySelector('meta[name="viewport"]');
-      const hasResponsiveCSS = contentDoc.querySelector('style, link[rel="stylesheet"]');
-      
-      if (viewport && hasResponsiveCSS) {
-        console.log('ContentViewer: Content appears responsive, skipping scaling');
-        return;
-      }
-
-      // Get dimensions efficiently
+      // Get dimensions to check if scaling is needed
       const iframeRect = this.iframe.getBoundingClientRect();
       const contentBody = contentDoc.body;
       
-      // Only scale if content significantly overflows
+      // Check actual content dimensions vs iframe size
       const contentWidth = Math.max(contentBody.scrollWidth, contentBody.offsetWidth);
       const contentHeight = Math.max(contentBody.scrollHeight, contentBody.offsetHeight);
       
+      console.log('ContentViewer: Dimension check - iframe:', iframeRect.width + 'x' + iframeRect.height, 'content:', contentWidth + 'x' + contentHeight);
+      
+      // Calculate scaling ratios
       const scaleX = iframeRect.width / contentWidth;
       const scaleY = iframeRect.height / contentHeight;
       const scale = Math.min(scaleX, scaleY, 1);
-
-      // Only apply scaling if significant size difference (more than 20% overflow)
-      if (scale < 0.8) {
-        console.log(`ContentViewer: Applying content scaling: ${Math.round(scale * 100)}%`);
-        
-        // Use a non-intrusive scaling approach
-        const scaleStyle = contentDoc.createElement('style');
-        scaleStyle.id = 'scorm-tester-scaling';
-        scaleStyle.textContent = `
-          body {
-            transform: scale(${scale}) !important;
-            transform-origin: top left !important;
-            width: ${100 / scale}% !important;
-            height: ${100 / scale}% !important;
-          }
-        `;
-        contentDoc.head.appendChild(scaleStyle);
-        
-        // Store scaling info for cleanup
-        this.appliedScaling = { scale, styleElement: scaleStyle };
+      
+      console.log('ContentViewer: Scale calculation - scaleX:', scaleX, 'scaleY:', scaleY, 'final scale:', scale);
+      
+      // Apply scaling more aggressively - if content is smaller than iframe, scale it up
+      if (scale >= 1.0) {
+        console.log('ContentViewer: Content is smaller than iframe, no scaling needed');
+        return;
       }
+
+      // Apply scaling for content that needs it
+      console.log(`ContentViewer: Applying content scaling: ${Math.round(scale * 100)}%`);
+      
+      // Use a non-intrusive scaling approach
+      const scaleStyle = contentDoc.createElement('style');
+      scaleStyle.id = 'scorm-tester-scaling';
+      scaleStyle.textContent = `
+        body {
+          transform: scale(${scale}) !important;
+          transform-origin: top left !important;
+          width: ${100 / scale}% !important;
+          height: ${100 / scale}% !important;
+        }
+      `;
+      contentDoc.head.appendChild(scaleStyle);
+      
+      // Store scaling info for cleanup
+      this.appliedScaling = { scale, styleElement: scaleStyle };
 
     } catch (error) {
       console.warn('ContentViewer: Content scaling failed:', error.message);
