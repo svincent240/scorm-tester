@@ -41,6 +41,7 @@ class ContentViewer extends BaseComponent {
       loadingTimeout: 30000,
       showLoadingIndicator: true,
       enableFullscreen: true,
+      enableContentScaling: false, // Disabled by default to avoid issues
       sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
       attributes: {
         'data-component': 'content-viewer'
@@ -67,15 +68,69 @@ class ContentViewer extends BaseComponent {
    * Render component content
    */
   renderContent() {
-    // DO NOT modify existing HTML structure - preserve welcome screen
-    console.log('ContentViewer: Preserving existing HTML structure completely');
-    
-    // Find existing iframe if it exists
+    // Find existing iframe first to preserve existing HTML
     this.iframe = this.find('.content-viewer__frame') || this.find('#content-frame');
-    this.loadingElement = null;
-    this.errorElement = null;
-    this.noContentElement = null;
-    this.fullscreenBtn = null;
+    
+    // If no iframe exists, create minimal structure
+    if (!this.iframe) {
+      console.log('ContentViewer: Creating content viewer structure');
+      this.element.innerHTML = `
+        <div class="content-viewer__container">
+          <div class="content-viewer__welcome">
+            <div class="welcome-screen">
+              <div class="welcome-screen__icon">🎓</div>
+              <div class="welcome-screen__title">SCORM Content Viewer</div>
+              <div class="welcome-screen__message">Load a SCORM course to begin</div>
+            </div>
+          </div>
+          
+          <iframe 
+            id="content-frame" 
+            class="content-viewer__frame hidden"
+            sandbox="${this.options.sandbox}"
+            style="width: 100%; height: 100%; border: none;"
+          ></iframe>
+          
+          <div class="content-viewer__loading hidden">
+            <div class="loading-spinner">
+              <div class="spinner"></div>
+              <div class="loading-message">Loading course content...</div>
+            </div>
+          </div>
+          
+          <div class="content-viewer__error hidden">
+            <div class="error-display">
+              <div class="error-icon">⚠️</div>
+              <div class="error-message">Failed to load content</div>
+              <div class="error-details"></div>
+              <button class="error-retry-btn">Retry</button>
+            </div>
+          </div>
+          
+          <div class="content-viewer__no-content hidden">
+            <div class="no-content-display">
+              <div class="no-content-icon">📄</div>
+              <div class="no-content-message">No content available</div>
+            </div>
+          </div>
+          
+          ${this.options.enableFullscreen ? `
+            <button class="content-viewer__fullscreen-btn" title="Fullscreen">⛶</button>
+          ` : ''}
+        </div>
+      `;
+      
+      // Update references after creating structure
+      this.iframe = this.find('#content-frame');
+    }
+    
+    // Get references to elements (existing or newly created)
+    this.loadingElement = this.find('.content-viewer__loading');
+    this.errorElement = this.find('.content-viewer__error');
+    this.noContentElement = this.find('.content-viewer__no-content');
+    this.fullscreenBtn = this.find('.content-viewer__fullscreen-btn');
+    
+    console.log('ContentViewer: Content structure ready');
   }
 
   /**
@@ -145,7 +200,7 @@ class ContentViewer extends BaseComponent {
       }
       
       this.loadingTimeout = setTimeout(() => {
-        this.showError('Content loading timeout', 'The course took too long to load. Please check your connection and try again.');
+        this.handleLoadTimeout();
       }, this.options.loadingTimeout);
       
       // Load content in iframe
@@ -213,141 +268,26 @@ class ContentViewer extends BaseComponent {
    * Setup SCORM API in content window
    */
   setupScormAPI() {
-    if (!this.contentWindow) return;
+    if (!this.contentWindow) {
+      this.showError('Content Setup Error', 'Content window not available for SCORM API setup');
+      return;
+    }
+    
+    // Check if SCORM client is available
+    if (!scormClient) {
+      this.showError('SCORM Client Error', 'SCORM client service not available');
+      return;
+    }
     
     try {
-      console.log('ContentViewer: Setting up SCORM API with debug logging');
+      console.log('ContentViewer: Setting up SCORM API');
       
-      // Inject SCORM API objects with logging wrappers
-      this.contentWindow.API = {
-        // LMS-prefixed methods (SCORM 1.2 standard)
-        LMSInitialize: (param) => {
-          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
-          this.logApiCall('LMSInitialize', param, result);
-          return result;
-        },
-        LMSFinish: (param) => {
-          const result = scormClient.Terminate(param);
-          this.logApiCall('LMSFinish', param, result);
-          return result;
-        },
-        LMSGetValue: (element) => {
-          const result = scormClient.GetValue(element);
-          this.logApiCall('LMSGetValue', element, result);
-          return result;
-        },
-        LMSSetValue: (element, value) => {
-          const result = scormClient.SetValue(element, value);
-          this.logApiCall('LMSSetValue', `${element} = ${value}`, result);
-          return result;
-        },
-        LMSCommit: (param) => {
-          const result = scormClient.Commit(param);
-          this.logApiCall('LMSCommit', param, result);
-          return result;
-        },
-        LMSGetLastError: () => {
-          const result = scormClient.GetLastError();
-          this.logApiCall('LMSGetLastError', '', result);
-          return result;
-        },
-        LMSGetErrorString: (errorCode) => {
-          const result = scormClient.GetErrorString(errorCode);
-          this.logApiCall('LMSGetErrorString', errorCode, result);
-          return result;
-        },
-        LMSGetDiagnostic: (errorCode) => {
-          const result = scormClient.GetDiagnostic(errorCode);
-          this.logApiCall('LMSGetDiagnostic', errorCode, result);
-          return result;
-        },
-        
-        // Direct methods (for content that expects API.Commit instead of API.LMSCommit)
-        Initialize: (param) => {
-          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
-          this.logApiCall('Initialize', param, result);
-          return result;
-        },
-        Finish: (param) => {
-          const result = scormClient.Terminate(param);
-          this.logApiCall('Finish', param, result);
-          return result;
-        },
-        GetValue: (element) => {
-          const result = scormClient.GetValue(element);
-          this.logApiCall('GetValue', element, result);
-          return result;
-        },
-        SetValue: (element, value) => {
-          const result = scormClient.SetValue(element, value);
-          this.logApiCall('SetValue', `${element} = ${value}`, result);
-          return result;
-        },
-        Commit: (param) => {
-          const result = scormClient.Commit(param);
-          this.logApiCall('Commit', param, result);
-          return result;
-        },
-        GetLastError: () => {
-          const result = scormClient.GetLastError();
-          this.logApiCall('GetLastError', '', result);
-          return result;
-        },
-        GetErrorString: (errorCode) => {
-          const result = scormClient.GetErrorString(errorCode);
-          this.logApiCall('GetErrorString', errorCode, result);
-          return result;
-        },
-        GetDiagnostic: (errorCode) => {
-          const result = scormClient.GetDiagnostic(errorCode);
-          this.logApiCall('GetDiagnostic', errorCode, result);
-          return result;
-        }
-      };
+      // Create optimized SCORM API wrapper
+      const apiWrapper = this.createOptimizedAPIWrapper();
       
-      // SCORM 2004 API
-      this.contentWindow.API_1484_11 = {
-        Initialize: (param) => {
-          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
-          this.logApiCall('Initialize', param, result);
-          return result;
-        },
-        Terminate: (param) => {
-          const result = scormClient.Terminate(param);
-          this.logApiCall('Terminate', param, result);
-          return result;
-        },
-        GetValue: (element) => {
-          const result = scormClient.GetValue(element);
-          this.logApiCall('GetValue', element, result);
-          return result;
-        },
-        SetValue: (element, value) => {
-          const result = scormClient.SetValue(element, value);
-          this.logApiCall('SetValue', `${element} = ${value}`, result);
-          return result;
-        },
-        Commit: (param) => {
-          const result = scormClient.Commit(param);
-          this.logApiCall('Commit', param, result);
-          return result;
-        },
-        GetLastError: () => {
-          const result = scormClient.GetLastError();
-          this.logApiCall('GetLastError', '', result);
-          return result;
-        },
-        GetErrorString: (errorCode) => {
-          const result = scormClient.GetErrorString(errorCode);
-          this.logApiCall('GetErrorString', errorCode, result);
-          return result;
-        },
-        GetDiagnostic: (errorCode) => {
-          const result = scormClient.GetDiagnostic(errorCode);
-          this.logApiCall('GetDiagnostic', errorCode, result);
-          return result;
-        }
-      };
+      // Inject SCORM APIs
+      this.contentWindow.API = apiWrapper.scorm12;           // SCORM 1.2
+      this.contentWindow.API_1484_11 = apiWrapper.scorm2004; // SCORM 2004
       
       this.emit('scormApiInjected', { contentWindow: this.contentWindow });
       
@@ -357,24 +297,81 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Log API call for debug panel
+   * Create optimized SCORM API wrapper
+   * @private
+   */
+  createOptimizedAPIWrapper() {
+    const sessionId = scormClient.getSessionId() || 'default';
+    
+    // Common API methods with optimized logging
+    const createAPIMethod = (methodName, clientMethod) => {
+      return (...args) => {
+        const result = clientMethod.apply(scormClient, args);
+        this.logApiCall(methodName, args.join(', '), result);
+        return result;
+      };
+    };
+    
+    // SCORM 2004 API methods
+    const scorm2004Methods = {
+      Initialize: createAPIMethod('Initialize', () => scormClient.Initialize(sessionId)),
+      Terminate: createAPIMethod('Terminate', scormClient.Terminate),
+      GetValue: createAPIMethod('GetValue', scormClient.GetValue),
+      SetValue: createAPIMethod('SetValue', scormClient.SetValue),
+      Commit: createAPIMethod('Commit', scormClient.Commit),
+      GetLastError: createAPIMethod('GetLastError', scormClient.GetLastError),
+      GetErrorString: createAPIMethod('GetErrorString', scormClient.GetErrorString),
+      GetDiagnostic: createAPIMethod('GetDiagnostic', scormClient.GetDiagnostic)
+    };
+    
+    // SCORM 1.2 API methods (with LMS prefix)
+    const scorm12Methods = {
+      ...scorm2004Methods, // Include direct methods for compatibility
+      LMSInitialize: scorm2004Methods.Initialize,
+      LMSFinish: scorm2004Methods.Terminate,
+      LMSGetValue: scorm2004Methods.GetValue,
+      LMSSetValue: scorm2004Methods.SetValue,
+      LMSCommit: scorm2004Methods.Commit,
+      LMSGetLastError: scorm2004Methods.GetLastError,
+      LMSGetErrorString: scorm2004Methods.GetErrorString,
+      LMSGetDiagnostic: scorm2004Methods.GetDiagnostic,
+      // Add legacy aliases
+      Finish: scorm2004Methods.Terminate
+    };
+    
+    return {
+      scorm12: scorm12Methods,
+      scorm2004: scorm2004Methods
+    };
+  }
+
+  /**
+   * Log API call for debug panel (optimized)
    * @private
    */
   logApiCall(method, parameter, result) {
-    const apiCall = {
-      method,
-      parameter: String(parameter || ''),
-      result: String(result),
-      errorCode: scormClient.GetLastError(),
-      timestamp: Date.now()
-    };
-
-    console.log('ContentViewer: API call:', apiCall);
+    // Only create full log object if debug is enabled or if there's an error
+    const errorCode = scormClient.GetLastError();
+    const hasError = errorCode && errorCode !== '0';
     
-    // Emit via IPC for debug window
-    if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      console.log('ContentViewer: Emitting debug event via IPC:', apiCall);
-      window.electronAPI.emitDebugEvent('api:call', apiCall);
+    if (hasError || window.scormDebug) {
+      const apiCall = {
+        method,
+        parameter: String(parameter || ''),
+        result: String(result),
+        errorCode,
+        timestamp: Date.now()
+      };
+
+      // Only log to console in debug mode or on errors
+      if (window.scormDebug || hasError) {
+        console.log('ContentViewer: API call:', apiCall);
+      }
+      
+      // Emit via IPC for debug window (throttled)
+      if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+        window.electronAPI.emitDebugEvent('api:call', apiCall);
+      }
     }
   }
 
@@ -430,84 +427,85 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Apply content scaling to fit iframe content properly
+   * Apply content scaling to fit iframe content properly (optimized)
    */
   applyContentScaling() {
-    if (!this.iframe || !this.contentWindow) {
+    // Skip scaling if disabled or content window not available
+    if (!this.options.enableContentScaling || !this.iframe || !this.contentWindow) {
       return;
     }
 
     try {
-      // Get iframe container dimensions
-      const iframeRect = this.iframe.getBoundingClientRect();
-      const containerWidth = iframeRect.width;
-      const containerHeight = iframeRect.height;
-
-      // Get content document dimensions
       const contentDoc = this.contentWindow.document;
-      if (!contentDoc || !contentDoc.body) {
-        console.log('ContentViewer: Content document not ready for scaling');
+      if (!contentDoc || !contentDoc.body || contentDoc.readyState !== 'complete') {
+        // Retry after content is fully loaded
+        setTimeout(() => this.applyContentScaling(), 500);
         return;
       }
 
-      // Try to get the actual content dimensions
+      // Check if content already has responsive design
+      const viewport = contentDoc.querySelector('meta[name="viewport"]');
+      const hasResponsiveCSS = contentDoc.querySelector('style, link[rel="stylesheet"]');
+      
+      if (viewport && hasResponsiveCSS) {
+        console.log('ContentViewer: Content appears responsive, skipping scaling');
+        return;
+      }
+
+      // Get dimensions efficiently
+      const iframeRect = this.iframe.getBoundingClientRect();
       const contentBody = contentDoc.body;
-      const contentHtml = contentDoc.documentElement;
       
-      // Get the larger of body scroll dimensions or html scroll dimensions
-      const contentWidth = Math.max(
-        contentBody.scrollWidth || 0,
-        contentHtml.scrollWidth || 0,
-        contentBody.offsetWidth || 0,
-        contentHtml.offsetWidth || 0
-      );
+      // Only scale if content significantly overflows
+      const contentWidth = Math.max(contentBody.scrollWidth, contentBody.offsetWidth);
+      const contentHeight = Math.max(contentBody.scrollHeight, contentBody.offsetHeight);
       
-      const contentHeight = Math.max(
-        contentBody.scrollHeight || 0,
-        contentHtml.scrollHeight || 0,
-        contentBody.offsetHeight || 0,
-        contentHtml.offsetHeight || 0
-      );
+      const scaleX = iframeRect.width / contentWidth;
+      const scaleY = iframeRect.height / contentHeight;
+      const scale = Math.min(scaleX, scaleY, 1);
 
-      console.log(`ContentViewer: Container: ${containerWidth}x${containerHeight}, Content: ${contentWidth}x${contentHeight}`);
-
-      // Calculate scale factors
-      const scaleX = containerWidth / contentWidth;
-      const scaleY = containerHeight / contentHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
-
-      // Apply scaling if needed
-      if (scale < 1) {
-        console.log(`ContentViewer: Applying scale factor: ${scale}`);
+      // Only apply scaling if significant size difference (more than 20% overflow)
+      if (scale < 0.8) {
+        console.log(`ContentViewer: Applying content scaling: ${Math.round(scale * 100)}%`);
         
-        // Apply CSS transform to scale the content
-        const styleElement = contentDoc.createElement('style');
-        styleElement.textContent = `
-          html, body {
-            transform: scale(${scale});
-            transform-origin: top left;
-            width: ${100 / scale}%;
-            height: ${100 / scale}%;
-            overflow: hidden;
+        // Use a non-intrusive scaling approach
+        const scaleStyle = contentDoc.createElement('style');
+        scaleStyle.id = 'scorm-tester-scaling';
+        scaleStyle.textContent = `
+          body {
+            transform: scale(${scale}) !important;
+            transform-origin: top left !important;
+            width: ${100 / scale}% !important;
+            height: ${100 / scale}% !important;
           }
         `;
-        contentDoc.head.appendChild(styleElement);
+        contentDoc.head.appendChild(scaleStyle);
         
-        // Also try to set viewport meta tag if it doesn't exist
-        let viewportMeta = contentDoc.querySelector('meta[name="viewport"]');
-        if (!viewportMeta) {
-          viewportMeta = contentDoc.createElement('meta');
-          viewportMeta.name = 'viewport';
-          viewportMeta.content = `width=${contentWidth}, initial-scale=${scale}, maximum-scale=${scale}, user-scalable=no`;
-          contentDoc.head.appendChild(viewportMeta);
-        }
-      } else {
-        console.log('ContentViewer: Content fits within container, no scaling needed');
+        // Store scaling info for cleanup
+        this.appliedScaling = { scale, styleElement: scaleStyle };
       }
 
     } catch (error) {
-      console.error('ContentViewer: Error applying content scaling:', error);
-      // Scaling failed, but content should still be viewable
+      console.warn('ContentViewer: Content scaling failed:', error.message);
+      // Content should still be viewable without scaling
+    }
+  }
+
+  /**
+   * Remove applied content scaling
+   */
+  removeContentScaling() {
+    if (this.appliedScaling && this.contentWindow) {
+      try {
+        const { styleElement } = this.appliedScaling;
+        if (styleElement && styleElement.parentNode) {
+          styleElement.parentNode.removeChild(styleElement);
+        }
+        this.appliedScaling = null;
+        console.log('ContentViewer: Content scaling removed');
+      } catch (error) {
+        console.warn('ContentViewer: Failed to remove scaling:', error.message);
+      }
     }
   }
 
@@ -590,8 +588,108 @@ class ContentViewer extends BaseComponent {
    */
   retryLoad() {
     if (this.currentUrl) {
+      console.log('ContentViewer: Retrying content load:', this.currentUrl);
+      this.clearError();
       this.loadContent(this.currentUrl);
+    } else {
+      this.showError('Retry Failed', 'No content URL available for retry');
     }
+  }
+
+  /**
+   * Handle content load timeout with user options
+   */
+  handleLoadTimeout() {
+    this.showError(
+      'Content Load Timeout', 
+      'The course took too long to load. This may be due to network issues or large content files.',
+      {
+        showRetry: true,
+        showReload: true,
+        showDetails: true
+      }
+    );
+  }
+
+  /**
+   * Show enhanced error with recovery options
+   */
+  showEnhancedError(title, message, options = {}) {
+    this.hideLoading();
+    this.hideContent();
+    this.hideNoContent();
+    
+    if (this.errorElement) {
+      const errorHtml = `
+        <div class="error-display">
+          <div class="error-icon">⚠️</div>
+          <div class="error-title">${title}</div>
+          <div class="error-message">${message}</div>
+          
+          ${options.details ? `<div class="error-details">${options.details}</div>` : ''}
+          
+          <div class="error-actions">
+            ${options.showRetry ? '<button class="error-btn error-retry-btn">Retry Loading</button>' : ''}
+            ${options.showReload ? '<button class="error-btn error-reload-btn">Reload Page</button>' : ''}
+            ${options.showReset ? '<button class="error-btn error-reset-btn">Reset Content</button>' : ''}
+          </div>
+          
+          ${options.showHelp ? `
+            <div class="error-help">
+              <details>
+                <summary>Troubleshooting Help</summary>
+                <ul>
+                  <li>Check your internet connection</li>
+                  <li>Verify the SCORM package is valid</li>
+                  <li>Try refreshing the application</li>
+                  <li>Contact support if the problem persists</li>
+                </ul>
+              </details>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      
+      this.errorElement.innerHTML = errorHtml;
+      this.errorElement.style.display = 'flex';
+      
+      // Bind enhanced error actions
+      this.bindErrorActions();
+    }
+    
+    this.uiState.setError(title + ': ' + message);
+    this.emit('errorShown', { title, message, options });
+  }
+
+  /**
+   * Bind error action buttons
+   */
+  bindErrorActions() {
+    const retryBtn = this.errorElement?.querySelector('.error-retry-btn');
+    const reloadBtn = this.errorElement?.querySelector('.error-reload-btn');
+    const resetBtn = this.errorElement?.querySelector('.error-reset-btn');
+    
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => this.retryLoad());
+    }
+    
+    if (reloadBtn) {
+      reloadBtn.addEventListener('click', () => location.reload());
+    }
+    
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => this.resetContent());
+    }
+  }
+
+  /**
+   * Reset content viewer to initial state
+   */
+  resetContent() {
+    this.clearContent();
+    this.clearError();
+    this.showNoContent();
+    this.emit('contentReset');
   }
 
   /**
@@ -744,6 +842,9 @@ class ContentViewer extends BaseComponent {
    * Clear content
    */
   clearContent() {
+    // Clean up any applied scaling
+    this.removeContentScaling();
+    
     this.currentUrl = null;
     this.contentWindow = null;
     

@@ -65,14 +65,25 @@ class NavigationControls extends BaseComponent {
       const initResult = await snBridge.initialize();
       if (initResult.success) {
         this.snService = snBridge;
-        this.logger?.debug('NavigationControls: SN service bridge initialized');
+        this.updateNavigationState({ 
+          snServiceAvailable: true,
+          snServiceError: null 
+        });
       } else {
-        this.logger?.warn('NavigationControls: Failed to initialize SN bridge:', initResult.error);
         this.snService = null;
+        this.updateNavigationState({ 
+          snServiceAvailable: false,
+          snServiceError: initResult.error || 'Failed to initialize SN service'
+        });
+        this.showFallbackMode('SN service unavailable - using simplified navigation');
       }
     } catch (error) {
-      this.logger?.error('NavigationControls: SN bridge initialization error:', error);
       this.snService = null;
+      this.updateNavigationState({ 
+        snServiceAvailable: false,
+        snServiceError: error.message 
+      });
+      this.showFallbackMode('Navigation service error - using basic controls');
     }
   }
 
@@ -442,26 +453,44 @@ class NavigationControls extends BaseComponent {
    * Update navigation state (simplified to prevent infinite loops)
    */
   updateNavigationState(newState) {
-    this.logger?.debug('NavigationControls: updateNavigationState called with:', newState);
-    
-    // Only update if state actually changed to prevent infinite loops
-    const hasChanged = Object.keys(newState).some(key => 
-      this.navigationState[key] !== newState[key]
-    );
-    
-    if (!hasChanged) {
-      this.logger?.debug('NavigationControls: Navigation state unchanged, skipping update');
+    // Skip empty or invalid updates
+    if (!newState || Object.keys(newState).length === 0) {
       return;
     }
     
-    this.navigationState = { ...this.navigationState, ...newState };
+    // Remove internal flags before comparison
+    const cleanNewState = { ...newState };
+    delete cleanNewState._fromUIState;
+    delete cleanNewState._internal;
+    
+    // Only update if state actually changed to prevent infinite loops
+    const hasChanged = Object.keys(cleanNewState).some(key => 
+      this.navigationState[key] !== cleanNewState[key]
+    );
+    
+    if (!hasChanged) {
+      return;
+    }
+    
+    // Update state with change tracking
+    const prevState = { ...this.navigationState };
+    this.navigationState = { ...this.navigationState, ...cleanNewState };
+    
+    // Update UI elements
     this.updateButtonStates();
     this.updateMenuButton();
     
-    // Only emit to UI state if this isn't from UI state to prevent loops
-    if (!newState._fromUIState) {
-      this.logger?.debug('NavigationControls: Updating UI state navigation');
-      this.uiState.updateNavigation(this.navigationState);
+    // Emit state change event (but not back to UI state if it came from there)
+    if (!newState._fromUIState && this.uiState) {
+      try {
+        this.uiState.updateNavigation(this.navigationState);
+      } catch (error) {
+        console.warn('NavigationControls: Failed to update UI state:', error);
+        // Revert state on error
+        this.navigationState = prevState;
+        this.updateButtonStates();
+        this.updateMenuButton();
+      }
     }
   }
 
@@ -514,6 +543,48 @@ class NavigationControls extends BaseComponent {
     
     if (isFlowOnly) {
       this.statusElement.textContent = 'Sequential navigation course';
+    }
+  }
+
+  /**
+   * Show fallback mode notification
+   */
+  showFallbackMode(message) {
+    if (this.statusElement) {
+      this.statusElement.textContent = message;
+      this.statusElement.classList.add('navigation-controls__status--warning');
+    }
+    
+    // Add visual indicator for fallback mode
+    this.element.classList.add('navigation-controls--fallback');
+    
+    // Create error indicator if it doesn't exist
+    if (!this.errorIndicator) {
+      this.errorIndicator = document.createElement('div');
+      this.errorIndicator.className = 'navigation-controls__error-indicator';
+      this.errorIndicator.innerHTML = `
+        <span class="error-icon">⚠️</span>
+        <span class="error-text">Fallback Mode</span>
+      `;
+      this.element.appendChild(this.errorIndicator);
+    }
+    
+    console.warn('NavigationControls: Operating in fallback mode:', message);
+  }
+
+  /**
+   * Hide fallback mode notification
+   */
+  hideFallbackMode() {
+    if (this.statusElement) {
+      this.statusElement.classList.remove('navigation-controls__status--warning');
+    }
+    
+    this.element.classList.remove('navigation-controls--fallback');
+    
+    if (this.errorIndicator) {
+      this.errorIndicator.remove();
+      this.errorIndicator = null;
     }
   }
 
@@ -650,13 +721,16 @@ class NavigationControls extends BaseComponent {
    * Handle navigation updated event from UI state
    */
   handleNavigationUpdated(data) {
-    this.logger?.debug('NavigationControls: handleNavigationUpdated called with:', data);
+    // Prevent recursive updates
+    if (data._fromNavigationControls) {
+      return;
+    }
     
-    // Mark as coming from UI state to prevent loops
-    const stateUpdate = { ...data, _fromUIState: true };
+    // Extract actual data and mark as from UI state
+    const navData = data.data || data;
+    const stateUpdate = { ...navData, _fromUIState: true };
+    
     this.updateNavigationState(stateUpdate);
-    
-    this.logger?.debug('NavigationControls: Navigation state updated from UI state');
   }
 
   /**

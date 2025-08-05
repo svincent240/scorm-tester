@@ -47,9 +47,59 @@ class DebugPanel extends BaseComponent {
   }
 
   renderContent() {
-    // Use existing HTML structure and just get references to elements
-    // This eliminates conflicts between HTML and component-generated content
+    // Create the debug panel HTML structure if elements don't exist
+    if (!this.element.querySelector('.debug-tabs')) {
+      this.element.innerHTML = `
+        <div class="debug-panel__container">
+          <div class="debug-panel__header">
+            <h3>SCORM Debug Panel</h3>
+            <div class="debug-panel__controls">
+              <button id="debug-clear" class="debug-btn debug-btn--secondary">Clear</button>
+              <button id="debug-export" class="debug-btn debug-btn--secondary">Export</button>
+              <button id="debug-close" class="debug-btn debug-btn--close">×</button>
+            </div>
+          </div>
+          
+          <div class="debug-tabs">
+            <button class="debug-tab debug-tab--active" data-tab="api-calls">API Calls</button>
+            <button class="debug-tab" data-tab="data-model">Data Model</button>
+            <button class="debug-tab" data-tab="session">Session</button>
+            <button class="debug-tab" data-tab="errors">Errors</button>
+          </div>
+          
+          <div class="debug-content-area">
+            <div id="debug-api-calls" class="debug-content debug-content--active">
+              <div id="api-calls-log" class="debug-log">
+                <div class="debug-log__empty">No API calls recorded</div>
+              </div>
+            </div>
+            
+            <div id="debug-data-model" class="debug-content">
+              <div id="data-model-view" class="debug-data">
+                <div class="debug-data__empty">SCORM not initialized</div>
+              </div>
+            </div>
+            
+            <div id="debug-session" class="debug-content">
+              <div id="session-info" class="debug-info">
+                <div class="debug-info__item">
+                  <span class="debug-info__label">Status:</span>
+                  <span class="debug-info__value">Not Connected</span>
+                </div>
+              </div>
+            </div>
+            
+            <div id="debug-errors" class="debug-content">
+              <div id="errors-log" class="debug-log">
+                <div class="debug-log__empty">No errors recorded</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
     
+    // Get references to elements
     this.clearBtn = this.element.querySelector('#debug-clear');
     this.exportBtn = this.element.querySelector('#debug-export');
     this.closeBtn = this.element.querySelector('#debug-close');
@@ -60,11 +110,11 @@ class DebugPanel extends BaseComponent {
     
     // Verify we have the elements we need
     if (!this.clearBtn || !this.exportBtn || !this.closeBtn) {
-      console.warn('DebugPanel: Some control buttons not found in HTML structure');
+      console.warn('DebugPanel: Some control buttons not found after creation');
     }
     
     if (!this.apiLog || !this.dataModelView || !this.sessionInfo || !this.errorLog) {
-      console.warn('DebugPanel: Some content areas not found in HTML structure');
+      console.warn('DebugPanel: Some content areas not found after creation');
     }
     
     // Initialize the panel with empty state

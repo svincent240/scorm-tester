@@ -40,9 +40,36 @@ class CourseOutline extends BaseComponent {
   }
 
   renderContent() {
-    // DO NOTHING - preserve existing HTML completely
-    console.log('CourseOutline: Preserving existing HTML structure completely');
-    this.contentArea = this.element;
+    // Create course outline HTML structure if it doesn't exist
+    if (!this.element.querySelector('.course-outline__container')) {
+      this.element.innerHTML = `
+        <div class="course-outline__container">
+          <div class="course-outline__header">
+            <h3>Course Structure</h3>
+            <div class="course-outline__controls">
+              <button class="outline-btn outline-btn--expand" title="Expand All">⊞</button>
+              <button class="outline-btn outline-btn--collapse" title="Collapse All">⊟</button>
+            </div>
+          </div>
+          
+          <div class="course-outline__content">
+            <div class="course-outline__empty">
+              <div class="empty-state">
+                <div class="empty-state__icon">📚</div>
+                <div class="empty-state__title">No Course Loaded</div>
+                <div class="empty-state__message">Load a SCORM course to view its structure</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    this.contentArea = this.element.querySelector('.course-outline__content');
+    this.expandAllBtn = this.element.querySelector('.outline-btn--expand');
+    this.collapseAllBtn = this.element.querySelector('.outline-btn--collapse');
+    
+    console.log('CourseOutline: HTML structure created successfully');
   }
 
   setupEventSubscriptions() {
@@ -66,8 +93,26 @@ class CourseOutline extends BaseComponent {
   }
 
   renderCourseStructure() {
-    // DO NOTHING - don't modify the DOM at all
-    console.log('CourseOutline: Not modifying DOM structure');
+    if (!this.contentArea) {
+      console.warn('CourseOutline: Content area not available for rendering');
+      return;
+    }
+    
+    if (!this.courseStructure || !this.courseStructure.items) {
+      this.showEmptyState();
+      return;
+    }
+    
+    const html = `
+      <div class="course-outline__tree">
+        ${this.renderItems(this.courseStructure.items)}
+      </div>
+    `;
+    
+    this.contentArea.innerHTML = html;
+    this.bindItemEvents();
+    
+    console.log('CourseOutline: Course structure rendered successfully');
   }
 
   renderItems(items, depth = 0) {
@@ -182,18 +227,21 @@ class CourseOutline extends BaseComponent {
   setCurrentItem(itemId) {
     // Prevent unnecessary updates if item is already current
     if (this.currentItem === itemId) {
-      console.log('CourseOutline: Item already current, skipping update:', itemId);
       return;
     }
     
     this.currentItem = itemId;
     
+    // Update UI to show current item
     this.findAll('.outline-item').forEach(el => {
       el.classList.toggle('outline-item--current', el.dataset.itemId === itemId);
     });
     
-    console.log('CourseOutline: Emitting currentItemChanged for:', itemId);
-    this.emit('currentItemChanged', { itemId });
+    // Emit event with flag to prevent recursive updates
+    this.emit('currentItemChanged', { 
+      itemId, 
+      _fromCourseOutline: true 
+    });
   }
 
   expandAll() {
@@ -224,8 +272,22 @@ class CourseOutline extends BaseComponent {
   }
 
   showEmptyState() {
-    // DO NOTHING - don't modify the DOM
-    console.log('CourseOutline: Not modifying empty state');
+    if (!this.contentArea) {
+      console.warn('CourseOutline: Content area not available for empty state');
+      return;
+    }
+    
+    this.contentArea.innerHTML = `
+      <div class="course-outline__empty">
+        <div class="empty-state">
+          <div class="empty-state__icon">📚</div>
+          <div class="empty-state__title">No Course Loaded</div>
+          <div class="empty-state__message">Load a SCORM course to view its structure</div>
+        </div>
+      </div>
+    `;
+    
+    console.log('CourseOutline: Empty state displayed');
   }
 
   loadCourseStructure() {
@@ -259,15 +321,16 @@ class CourseOutline extends BaseComponent {
   }
 
   handleNavigationUpdated(data) {
-    console.log('CourseOutline: handleNavigationUpdated called with:', data);
+    // Prevent recursive updates
+    if (data._fromCourseOutline) {
+      return;
+    }
+    
     const navData = data.data || data;
     
-    // Add guard to prevent infinite loops
+    // Only update if current item actually changed
     if (navData.currentItem && navData.currentItem !== this.currentItem) {
-      console.log('CourseOutline: Setting current item from', this.currentItem, 'to', navData.currentItem);
       this.setCurrentItem(navData.currentItem);
-    } else {
-      console.log('CourseOutline: Navigation update ignored - same item or no item');
     }
   }
 
