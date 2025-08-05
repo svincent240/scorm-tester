@@ -244,6 +244,8 @@ class ContentViewer extends BaseComponent {
       // Apply scaling after content loads
       setTimeout(() => {
         this.applyContentScaling();
+        // Begin observing size changes to keep fit without inner scrollbars
+        this.startResizeObserver();
       }, 100);
       
       this.emit('contentLoaded', {
@@ -819,6 +821,50 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
+   * Start ResizeObserver to re-apply scaling on container size changes
+   */
+  startResizeObserver() {
+    try {
+      if (!this.element) return;
+      // Clean up previous observer
+      this.stopResizeObserver();
+
+      // Prefer native ResizeObserver if available
+      if (typeof ResizeObserver === 'function') {
+        this.resizeObserver = new ResizeObserver(() => {
+          // Re-apply scaling when container size changes
+          this.applyContentScaling();
+        });
+        this.resizeObserver.observe(this.element);
+      } else {
+        // Fallback: listen to window resize
+        this._resizeHandler = () => this.applyContentScaling();
+        window.addEventListener('resize', this._resizeHandler);
+      }
+    } catch (_) {
+      // Non-fatal
+    }
+  }
+
+  /**
+   * Stop ResizeObserver/listeners
+   */
+  stopResizeObserver() {
+    try {
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+        this.resizeObserver = null;
+      }
+      if (this._resizeHandler) {
+        window.removeEventListener('resize', this._resizeHandler);
+        this._resizeHandler = null;
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /**
    * Verify SCORM API presence and establish fallback if needed
    * - Prefer direct API injection (API_1484_11 or API with Initialize())
    * - If unavailable, attempt bridge-based postMessage path
@@ -927,6 +973,9 @@ class ContentViewer extends BaseComponent {
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
     }
+
+    // Stop observers/listeners
+    this.stopResizeObserver();
     
     // Remove fullscreen event listeners
     document.removeEventListener('fullscreenchange', this.handleFullscreenChange);

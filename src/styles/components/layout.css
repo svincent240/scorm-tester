@@ -72,7 +72,7 @@
   flex: 1;
   display: flex;
   overflow: hidden;
-  height: calc(100vh - var(--header-height) - var(--footer-height));  /* Calculate available height */
+  /* Rely on flex sizing instead of calc to avoid rounding gaps and black bars */
   min-height: 0;  /* Allow flex shrinking */
 }
 
@@ -97,8 +97,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;  /* Enable vertical scrolling */
-  overflow-x: hidden;  /* Prevent horizontal overflow */
+  /* Prevent double vertical scrollbars so the viewer can fully occupy space */
+  overflow: hidden;
   background: var(--bg-color);
   padding: var(--spacing-xs);  /* Minimal padding to maximize content space */
   min-width: 0;  /* Allow flex shrinking */
@@ -526,6 +526,11 @@
 @media (max-width: 768px) {
   .app-main {
     flex-direction: column;
+  }
+
+  /* Keep main content from creating page-level scroll on mobile too */
+  .app-content {
+    overflow: hidden;
   }
   
   .app-sidebar {
