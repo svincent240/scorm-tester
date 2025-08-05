@@ -661,9 +661,38 @@ class ScormService extends BaseService {
    */
   async processSpecialElement(session, element, value) {
     // Handle special elements like completion status, score, etc.
-    if (element === 'cmi.core.lesson_status' && this.snService) {
-      // Update activity progress in SN service if available
-      // This would integrate with the sequencing engine
+    if (this.snService) {
+      const currentActivityId = this.snService.getSequencingState().currentActivity?.identifier;
+
+      if (currentActivityId) {
+        let progressData = {};
+        switch (element) {
+          case 'cmi.completion_status':
+            progressData.completed = (value === 'completed');
+            break;
+          case 'cmi.success_status':
+            progressData.satisfied = (value === 'passed');
+            break;
+          case 'cmi.progress_measure':
+            progressData.measure = parseFloat(value);
+            break;
+          case 'cmi.score.raw':
+            // Assuming raw score can influence satisfaction, or is just reported
+            // For now, just report, more complex logic would be in SN's rollup
+            break;
+          // Add other relevant CMI elements that affect SN
+        }
+
+        if (Object.keys(progressData).length > 0) {
+          this.logger?.debug(`ScormService: Updating SN activity progress for ${currentActivityId} with ${element}=${value}`);
+          const snUpdateResult = this.snService.updateActivityProgress(currentActivityId, progressData);
+          if (!snUpdateResult.success) {
+            this.logger?.warn(`ScormService: SN activity progress update failed: ${snUpdateResult.reason}`);
+          }
+        }
+      } else {
+        this.logger?.warn(`ScormService: No current activity found in SN service to update for element: ${element}`);
+      }
     }
   }
 

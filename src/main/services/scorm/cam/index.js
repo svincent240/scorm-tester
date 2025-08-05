@@ -24,85 +24,113 @@ const PackageAnalyzer = require('./package-analyzer');
  * Provides unified interface for Content Aggregation Model operations
  */
 class ScormCAMService {
-  constructor(errorHandler) {
+  constructor(errorHandler, logger) {
     this.errorHandler = errorHandler;
+    this.logger = logger;
+
+    // Initialize CAM sub-components
     this.manifestParser = new ManifestParser(errorHandler);
     this.contentValidator = new ContentValidator(errorHandler);
     this.metadataHandler = new MetadataHandler(errorHandler);
     this.packageAnalyzer = new PackageAnalyzer(errorHandler);
+    
+    this.logger?.debug('ScormCAMService initialized');
   }
 
   /**
-   * Process complete SCORM package
-   * @param {string} packagePath - Path to SCORM package directory
-   * @returns {Promise<Object>} Complete package processing result
+   * Process a complete SCORM package
+   * @param {string} packagePath - Path to the extracted SCORM package directory
+   * @param {string} manifestContent - Content of the imsmanifest.xml file
+   * @returns {Promise<Object>} Comprehensive package processing result
    */
-  async processPackage(packagePath) {
+  async processPackage(packagePath, manifestContent) {
     try {
-      // Step 1: Parse manifest
-      const manifestPath = require('path').join(packagePath, 'imsmanifest.xml');
-      const manifest = await this.manifestParser.parseManifestFile(manifestPath);
+      this.logger?.info(`ScormCAMService: Starting package processing for ${packagePath}`);
 
-      // Step 2: Validate package
+      // 1. Parse Manifest
+      const manifest = this.manifestParser.parseManifestXML(manifestContent, packagePath);
+      this.logger?.debug('ScormCAMService: Manifest parsed successfully');
+
+      // 2. Validate Package
       const validation = await this.contentValidator.validatePackage(packagePath, manifest);
+      this.logger?.debug('ScormCAMService: Package validation completed', { isValid: validation.isValid });
 
-      // Step 3: Analyze package structure
+      // 3. Analyze Package
       const analysis = this.packageAnalyzer.analyzePackage(packagePath, manifest);
+      this.logger?.debug('ScormCAMService: Package analysis completed');
 
-      // Step 4: Extract metadata (skip for now since manifest.metadata is already parsed)
-      const metadata = manifest.metadata;
+      // 4. Extract Metadata (if any)
+      const metadata = this.metadataHandler.extractMetadata(manifest.metadata);
+      this.logger?.debug('ScormCAMService: Metadata extracted');
 
       return {
+        success: true,
         manifest,
         validation,
         analysis,
-        metadata,
-        packagePath,
-        processedAt: new Date().toISOString()
+        metadata
       };
+
     } catch (error) {
-      this.errorHandler?.setError('301', `Package processing failed: ${error.message}`, 'processPackage');
+      this.errorHandler?.setError('301', `SCORM package processing failed: ${error.message}`, 'ScormCAMService.processPackage');
+      this.logger?.error('ScormCAMService: Package processing error:', error);
+      return { success: false, error: error.message, reason: error.message };
+    }
+  }
+
+  /**
+   * Validate a SCORM package (delegates to ContentValidator)
+   * @param {string} packagePath - Path to the extracted SCORM package directory
+   * @param {string} manifestContent - Content of the imsmanifest.xml file
+   * @returns {Promise<Object>} Validation result
+   */
+  async validatePackage(packagePath, manifestContent) {
+    try {
+      const manifest = this.manifestParser.parseManifestXML(manifestContent, packagePath);
+      const validationResult = await this.contentValidator.validatePackage(packagePath, manifest);
+      return validationResult;
+    } catch (error) {
+      this.errorHandler?.setError('301', `SCORM package validation failed: ${error.message}`, 'ScormCAMService.validatePackage');
+      this.logger?.error('ScormCAMService: Package validation error:', error);
       throw error;
     }
   }
 
   /**
-   * Parse manifest file only
-   * @param {string} manifestPath - Path to imsmanifest.xml
-   * @returns {Promise<Object>} Parsed manifest
+   * Analyze a SCORM package (delegates to PackageAnalyzer)
+   * @param {string} packagePath - Path to the extracted SCORM package directory
+   * @param {string} manifestContent - Content of the imsmanifest.xml file
+   * @returns {Promise<Object>} Analysis result
    */
-  async parseManifest(manifestPath) {
-    return this.manifestParser.parseManifestFile(manifestPath);
+  async analyzePackage(packagePath, manifestContent) {
+    try {
+      const manifest = this.manifestParser.parseManifestXML(manifestContent, packagePath);
+      const analysisResult = this.packageAnalyzer.analyzePackage(packagePath, manifest);
+      return analysisResult;
+    } catch (error) {
+      this.errorHandler?.setError('301', `SCORM package analysis failed: ${error.message}`, 'ScormCAMService.analyzePackage');
+      this.logger?.error('ScormCAMService: Package analysis error:', error);
+      throw error;
+    }
   }
 
   /**
-   * Validate package only
-   * @param {string} packagePath - Package directory path
-   * @param {Object} manifest - Parsed manifest object
-   * @returns {Promise<Object>} Validation result
+   * Parse a SCORM manifest (delegates to ManifestParser)
+   * @param {string} manifestContent - Content of the imsmanifest.xml file
+   * @param {string} basePath - Base path for resolving relative URLs
+   * @returns {Object} Parsed manifest object
    */
-  async validatePackage(packagePath, manifest) {
-    return this.contentValidator.validatePackage(packagePath, manifest);
+  parseManifest(manifestContent, basePath) {
+    return this.manifestParser.parseManifestXML(manifestContent, basePath);
   }
 
   /**
-   * Analyze package only
-   * @param {string} packagePath - Package directory path
-   * @param {Object} manifest - Parsed manifest object
-   * @returns {Object} Analysis result
+   * Extract metadata from a manifest (delegates to MetadataHandler)
+   * @param {Object} metadataElement - Metadata DOM element or parsed metadata object
+   * @returns {Object} Extracted metadata object
    */
-  analyzePackage(packagePath, manifest) {
-    return this.packageAnalyzer.analyzePackage(packagePath, manifest);
-  }
-
-  /**
-   * Extract metadata only
-   * @param {Element} metadataElement - Metadata DOM element
-   * @param {string} basePath - Base path for resolving URLs
-   * @returns {Object} Extracted metadata
-   */
-  extractMetadata(metadataElement, basePath) {
-    return this.metadataHandler.extractMetadata(metadataElement, basePath);
+  extractMetadata(metadataElement) {
+    return this.metadataHandler.extractMetadata(metadataElement);
   }
 
   /**

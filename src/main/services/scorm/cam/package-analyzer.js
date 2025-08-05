@@ -19,16 +19,18 @@
 
 const path = require('path');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
+const ContentValidator = require('./content-validator'); // Import ContentValidator
 
 /**
  * SCORM Package Analyzer
- * 
+ *
  * Analyzes SCORM packages to extract structural information,
  * dependencies, and launch sequences for content delivery.
  */
 class PackageAnalyzer {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
+    this.contentValidator = new ContentValidator(errorHandler); // Initialize ContentValidator
   }
 
   /**
@@ -88,7 +90,7 @@ class PackageAnalyzer {
       organizations: organizations.map(org => this.analyzeOrganization(org)),
       maxDepth: this.calculateMaxDepth(organizations),
       totalItems: this.countTotalItems(organizations),
-      itemTypes: this.classifyItemTypes(organizations)
+      itemTypes: this.classifyItemTypes(organizations, manifest.resources || [])
     };
   }
 
@@ -182,22 +184,32 @@ class PackageAnalyzer {
   }
 
   /**
-   * Check SCORM compliance
+   * Check SCORM compliance (delegated to ContentValidator)
+   * @param {string} packagePath - Path to SCORM package directory
    * @param {Object} manifest - Parsed manifest object
-   * @returns {Object} Compliance check result
+   * @returns {Promise<Object>} Compliance check result
    */
-  checkCompliance(manifest) {
-    return {
-      hasRequiredElements: this.checkRequiredElements(manifest),
-      validScormTypes: this.validateScormTypes(manifest.resources || []),
-      validIdentifiers: this.validateIdentifiers(manifest),
-      sequencingCompliance: this.checkSequencingCompliance(manifest),
-      metadataCompliance: this.checkMetadataCompliance(manifest.metadata),
-      overallCompliance: this.calculateOverallCompliance(manifest)
-    };
+  async checkCompliance(packagePath, manifest) {
+    try {
+      const validationResult = await this.contentValidator.validatePackage(packagePath, manifest);
+      return {
+        hasRequiredElements: validationResult.summary.hasRequiredElements,
+        validScormTypes: validationResult.summary.validScormTypes,
+        validIdentifiers: validationResult.summary.validIdentifiers,
+        sequencingCompliance: validationResult.summary.sequencingCompliance,
+        metadataCompliance: validationResult.summary.metadataCompliance,
+        overallCompliance: validationResult.summary.overallCompliance,
+        isValid: validationResult.isValid,
+        errors: validationResult.errors,
+        warnings: validationResult.warnings
+      };
+    } catch (error) {
+      this.errorHandler?.setError('301', `Compliance check failed: ${error.message}`, 'checkCompliance');
+      throw error;
+    }
   }
 
-  // Helper methods for analysis
+  // Helper methods for analysis (retained for analysis, not validation)
 
   extractPackageTitle(manifest) {
     const defaultOrg = this.getDefaultOrganization(manifest);
@@ -225,8 +237,9 @@ class PackageAnalyzer {
   }
 
   hasNavigationControls(manifest) {
-    // Check for navigation-related elements in manifest
-    return this.hasSequencingRules(manifest); // Simplified check
+    // This check indicates the *potential* for navigation controls based on sequencing rules.
+    // A deeper analysis would involve the SN module.
+    return this.hasSequencingRules(manifest);
   }
 
   calculateMaxDepth(organizations) {
@@ -255,26 +268,38 @@ class PackageAnalyzer {
     );
   }
 
-  classifyItemTypes(organizations) {
+  classifyItemTypes(organizations, resources) {
     const types = { sco: 0, asset: 0, aggregation: 0 };
     
     organizations.forEach(org => {
-      this.classifyItemsRecursive(org.items || [], types);
+      this.classifyItemsRecursive(org.items || [], types, resources);
     });
     
     return types;
   }
 
-  classifyItemsRecursive(items, types) {
+  classifyItemsRecursive(items, types, resources) {
     items.forEach(item => {
       if (item.identifierref) {
-        // Item references a resource - determine type from resource
-        types.sco++; // Simplified - would need resource lookup
+        const referencedResource = resources.find(res => res.identifier === item.identifierref);
+        if (referencedResource) {
+          if (referencedResource.scormType === 'sco') {
+            types.sco++;
+          } else if (referencedResource.scormType === 'asset') {
+            types.asset++;
+          } else {
+            // Default to asset if scormType is missing or unknown
+            types.asset++;
+          }
+        } else {
+          // If resource not found, it's an error, but for classification, treat as asset
+          types.asset++;
+        }
       } else if (item.children && item.children.length > 0) {
         types.aggregation++;
       }
       
-      this.classifyItemsRecursive(item.children || [], types);
+      this.classifyItemsRecursive(item.children || [], types, resources);
     });
   }
 
@@ -513,81 +538,6 @@ class PackageAnalyzer {
     return score;
   }
 
-  checkRequiredElements(manifest) {
-    return {
-      hasIdentifier: !!manifest.identifier,
-      hasOrganizations: !!manifest.organizations,
-      hasResources: !!manifest.resources,
-      hasMetadata: !!manifest.metadata
-    };
-  }
-
-  validateScormTypes(resources) {
-    const validTypes = Object.values(SCORM_CONSTANTS.CAM.SCORM_TYPES);
-    return resources.every(resource => 
-      !resource.scormType || validTypes.includes(resource.scormType)
-    );
-  }
-
-  validateIdentifiers(manifest) {
-    const identifiers = new Set();
-    let duplicates = false;
-    
-    // Check manifest identifier
-    if (manifest.identifier) {
-      identifiers.add(manifest.identifier);
-    }
-    
-    // Check organization identifiers
-    manifest.organizations?.organizations?.forEach(org => {
-      if (org.identifier) {
-        if (identifiers.has(org.identifier)) {
-          duplicates = true;
-        }
-        identifiers.add(org.identifier);
-      }
-    });
-    
-    // Check resource identifiers
-    manifest.resources?.forEach(resource => {
-      if (resource.identifier) {
-        if (identifiers.has(resource.identifier)) {
-          duplicates = true;
-        }
-        identifiers.add(resource.identifier);
-      }
-    });
-    
-    return !duplicates;
-  }
-
-  checkSequencingCompliance(manifest) {
-    // Simplified sequencing compliance check
-    return this.hasSequencingRules(manifest);
-  }
-
-  checkMetadataCompliance(metadata) {
-    if (!metadata) return false;
-    
-    return metadata.schema === 'ADL SCORM' && 
-           metadata.schemaversion?.includes('2004');
-  }
-
-  calculateOverallCompliance(manifest) {
-    // Calculate compliance without calling checkCompliance to avoid recursion
-    const checks = {
-      hasRequiredElements: this.checkRequiredElements(manifest),
-      validScormTypes: this.validateScormTypes(manifest.resources || []),
-      validIdentifiers: this.validateIdentifiers(manifest),
-      sequencingCompliance: this.checkSequencingCompliance(manifest),
-      metadataCompliance: this.checkMetadataCompliance(manifest.metadata)
-    };
-    
-    const totalChecks = Object.keys(checks).length;
-    const passedChecks = Object.values(checks).filter(Boolean).length;
-    
-    return totalChecks > 0 ? (passedChecks / totalChecks) * 100 : 0;
-  }
 
   analyzeSequencingRules(sequencing) {
     if (!sequencing) return null;

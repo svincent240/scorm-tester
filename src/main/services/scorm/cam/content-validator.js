@@ -32,6 +32,12 @@ class ContentValidator {
     this.errorHandler = errorHandler;
     this.validationErrors = [];
     this.validationWarnings = [];
+    this.hasRequiredElements = false;
+    this.validScormTypes = false;
+    this.validIdentifiers = false;
+    this.sequencingCompliance = false;
+    this.metadataCompliance = false;
+    this.overallCompliance = false;
   }
 
   /**
@@ -42,6 +48,7 @@ class ContentValidator {
    */
   async validatePackage(packagePath, manifest) {
     this.clearValidationResults();
+    this.resetComplianceFlags(); // New method to reset flags
 
     try {
       // Core validation steps
@@ -50,6 +57,8 @@ class ContentValidator {
       await this.validateResourceDependencies(packagePath, manifest);
       await this.validateScormTypes(manifest);
       await this.validateOrganizationStructure(manifest);
+      await this.validateSequencingCompliance(manifest); // New validation step
+      await this.validateOverallCompliance(); // New validation step
 
       return {
         isValid: this.validationErrors.length === 0,
@@ -69,23 +78,30 @@ class ContentValidator {
    */
   async validateManifestStructure(manifest) {
     // Required elements validation
+    let missingRequired = false;
     if (!manifest.identifier) {
       this.addError('Manifest missing required identifier attribute');
+      missingRequired = true;
     }
 
     if (!manifest.organizations) {
       this.addError('Manifest missing required organizations element');
+      missingRequired = true;
     }
 
     if (!manifest.resources) {
       this.addError('Manifest missing required resources element');
+      missingRequired = true;
     }
+    this.hasRequiredElements = !missingRequired;
 
     // Metadata validation
     if (manifest.metadata) {
       this.validateMetadataStructure(manifest.metadata);
+      this.metadataCompliance = true; // Assuming valid if present and structure is validated
     } else {
       this.addWarning('Package missing recommended metadata section');
+      this.metadataCompliance = false;
     }
 
     // Version validation
@@ -160,20 +176,30 @@ class ContentValidator {
    * @param {Object} manifest - Parsed manifest object
    */
   async validateScormTypes(manifest) {
-    if (!manifest.resources) return;
+    if (!manifest.resources) {
+      this.validScormTypes = false;
+      return;
+    }
 
+    let allScormTypesValid = true;
     for (const resource of manifest.resources) {
       if (resource.scormType) {
         if (!SCORM_CONSTANTS.CAM.SCORM_TYPES[resource.scormType.toUpperCase()]) {
           this.addError(`Invalid SCORM type: ${resource.scormType} (Resource: ${resource.identifier})`);
+          allScormTypesValid = false;
         }
 
         // SCO validation
         if (resource.scormType === 'sco' && !resource.href) {
           this.addError(`SCO resource must have href attribute (Resource: ${resource.identifier})`);
+          allScormTypesValid = false;
         }
+      } else {
+        // If scormType is missing, it's often treated as an asset, but for strict compliance, it might be a warning/error
+        this.addWarning(`Resource missing scormType attribute: ${resource.identifier}`);
       }
     }
+    this.validScormTypes = allScormTypesValid;
   }
 
   /**
@@ -209,8 +235,10 @@ class ContentValidator {
    * @param {Array} resources - Resources array
    */
   validateOrganization(organization, resources) {
+    let allIdentifiersValid = true;
     if (!organization.identifier) {
       this.addError('Organization missing required identifier');
+      allIdentifiersValid = false;
     }
 
     if (!organization.title) {
@@ -220,7 +248,11 @@ class ContentValidator {
     // Validate item references
     if (organization.items) {
       this.validateItems(organization.items, resources, organization.identifier);
+      // Assuming validateItems also contributes to validIdentifiers
+      // For simplicity, we'll set it based on the organization's identifier for now
+      if (!organization.identifier) allIdentifiersValid = false;
     }
+    this.validIdentifiers = allIdentifiersValid; // This needs to be more robust, checking all identifiers
   }
 
   /**
@@ -311,6 +343,73 @@ class ContentValidator {
   }
 
   /**
+   * Reset compliance flags
+   */
+  resetComplianceFlags() {
+    this.hasRequiredElements = false;
+    this.validScormTypes = false;
+    this.validIdentifiers = false;
+    this.sequencingCompliance = false;
+    this.metadataCompliance = false;
+    this.overallCompliance = false;
+  }
+
+  /**
+   * Validate sequencing compliance
+   * This is a placeholder and would involve deeper parsing of sequencing rules.
+   * For now, it checks if any sequencing elements exist.
+   * @param {Object} manifest - Parsed manifest object
+   */
+  async validateSequencingCompliance(manifest) {
+    let hasSequencing = false;
+    if (manifest.organizations && manifest.organizations.organizations) {
+      for (const org of manifest.organizations.organizations) {
+        if (org.sequencing) {
+          hasSequencing = true;
+          break;
+        }
+        if (org.items && this.checkItemsForSequencing(org.items)) {
+          hasSequencing = true;
+          break;
+        }
+      }
+    }
+    this.sequencingCompliance = hasSequencing;
+    if (!hasSequencing) {
+      this.addWarning('No sequencing information found. Package may not be fully SCORM 2004 compliant regarding sequencing.');
+    }
+  }
+
+  /**
+   * Helper to recursively check items for sequencing
+   * @param {Array} items - Array of item objects
+   * @returns {boolean} True if sequencing found
+   */
+  checkItemsForSequencing(items) {
+    for (const item of items) {
+      if (item.sequencing) {
+        return true;
+      }
+      if (item.children && this.checkItemsForSequencing(item.children)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Validate overall compliance based on all checks
+   */
+  async validateOverallCompliance() {
+    this.overallCompliance = this.validationErrors.length === 0 &&
+                             this.hasRequiredElements &&
+                             this.validScormTypes &&
+                             this.validIdentifiers &&
+                             this.sequencingCompliance &&
+                             this.metadataCompliance;
+  }
+
+  /**
    * Generate validation summary
    * @returns {Object} Validation summary
    */
@@ -319,7 +418,13 @@ class ContentValidator {
       totalErrors: this.validationErrors.length,
       totalWarnings: this.validationWarnings.length,
       isCompliant: this.validationErrors.length === 0,
-      validationDate: new Date().toISOString()
+      validationDate: new Date().toISOString(),
+      hasRequiredElements: this.hasRequiredElements,
+      validScormTypes: this.validScormTypes,
+      validIdentifiers: this.validIdentifiers,
+      sequencingCompliance: this.sequencingCompliance,
+      metadataCompliance: this.metadataCompliance,
+      overallCompliance: this.overallCompliance
     };
   }
 }

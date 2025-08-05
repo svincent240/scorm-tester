@@ -11,10 +11,10 @@ The Content Aggregation Model (CAM) module provides comprehensive SCORM 2004 4th
 ```
 src/main/services/scorm/cam/
 ├── index.js                 # Main CAM service entry point
-├── manifest-parser.js       # XML manifest parsing (199 lines)
-├── content-validator.js     # Package validation (199 lines)
-├── metadata-handler.js      # LOM metadata processing (199 lines)
-└── package-analyzer.js      # Structure analysis (199 lines)
+├── manifest-parser.js       # XML manifest parsing
+├── content-validator.js     # Package validation
+├── metadata-handler.js      # LOM metadata processing
+└── package-analyzer.js      # Structure analysis
 ```
 
 ### Supporting Files
@@ -28,9 +28,9 @@ src/shared/types/
 
 tests/
 ├── unit/scorm/cam/
-│   └── manifest-parser.test.js  # Comprehensive unit tests (199 lines)
+│   └── manifest-parser.test.js  # Comprehensive unit tests
 └── integration/
-    └── cam-workflow.test.js      # End-to-end integration tests (199 lines)
+    └── cam-workflow.test.js      # End-to-end integration tests
 ```
 
 ## Core Components
@@ -78,6 +78,7 @@ console.log('Package processed:', result.manifest.identifier);
 - Resource dependency validation
 - SCORM type validation
 - Manifest structure validation
+- Detailed compliance reporting (required elements, SCORM types, identifiers, sequencing, metadata)
 
 **Key Methods**:
 - [`validatePackage(packagePath, manifest)`](../src/main/services/scorm/cam/content-validator.js:32) - Complete validation
@@ -99,13 +100,13 @@ console.log('Package processed:', result.manifest.identifier);
 
 ### 5. PackageAnalyzer
 
-**Purpose**: Analyze SCORM package structure and generate insights
+**Purpose**: Analyze SCORM package structure and generate insights, delegating all compliance validation to ContentValidator.
 
 **Key Features**:
 - Dependency graph construction
 - Launch sequence determination
 - Complexity scoring
-- Compliance analysis
+- Structural compliance analysis (delegates all detailed validation to ContentValidator)
 
 **Key Methods**:
 - [`analyzePackage(packagePath, manifest)`](../src/main/services/scorm/cam/package-analyzer.js:32) - Complete analysis
@@ -357,7 +358,7 @@ const camService = new ScormCAMService(errorHandler, { debug: true });
 
 ### Development Guidelines
 
-1. Follow the 200-line file limit
+1. Adhere to file size guidelines as defined in `dev_docs/style.md` (prioritizing logical cohesion over strict line count).
 2. Maintain 90%+ test coverage
 3. Update TypeScript definitions
 4. Document all public APIs

@@ -187,11 +187,31 @@ class CourseLoader {
 
   /**
    * Create temporary file from File object
+   * @param {File} file - File object from drag and drop
+   * @returns {Promise<string>} Path to the temporary file
    */
   async createTempFileFromBlob(file) {
-    // This would typically use electron's file system APIs
-    // For now, we'll assume the file path is handled by the caller
-    throw new Error('Drag and drop file loading not yet implemented');
+    try {
+      if (!window.electronAPI || !window.electronAPI.saveTemporaryFile) {
+        throw new Error('Electron API for saving temporary files not available');
+      }
+
+      // Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      // Convert ArrayBuffer to Base64 string
+      const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+      const result = await window.electronAPI.saveTemporaryFile(file.name, base64Data);
+
+      if (!result.success) {
+        throw new Error(`Failed to save temporary file: ${result.error}`);
+      }
+
+      return result.path;
+    } catch (error) {
+      console.error('CourseLoader: Error creating temporary file from blob:', error);
+      throw error;
+    }
   }
 
   /**

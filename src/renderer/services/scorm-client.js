@@ -10,6 +10,7 @@
 
 import { eventBus } from './event-bus.js';
 import { uiState } from './ui-state.js';
+import { isValidElement, isValidValue } from '../../shared/utils/scorm-data-model-validator.js'; // Import shared validation utilities
 
 /**
  * SCORM Client Class
@@ -415,97 +416,6 @@ class ScormClient {
     }
   }
 
-  /**
-   * Validate SCORM element name
-   * @private
-   */
-  isValidElement(element) {
-    const validPatterns = [
-      // Core CMI elements
-      /^cmi\.completion_status$/,
-      /^cmi\.success_status$/,
-      /^cmi\.score\.(scaled|raw|min|max)$/,
-      /^cmi\.progress_measure$/,
-      /^cmi\.location$/,
-      /^cmi\.suspend_data$/,
-      /^cmi\.session_time$/,
-      /^cmi\.total_time$/,
-      /^cmi\.exit$/,
-      /^cmi\.entry$/,
-      /^cmi\.learner_id$/,
-      /^cmi\.learner_name$/,
-      /^cmi\.credit$/,
-      /^cmi\.mode$/,
-      /^cmi\.launch_data$/,
-      /^cmi\.scaled_passing_score$/,
-      /^cmi\.time_limit_action$/,
-      /^cmi\.max_time_allowed$/,
-      
-      // Learner preferences
-      /^cmi\.learner_preference\.(audio_level|language|delivery_speed|audio_captioning)$/,
-      
-      // Comments from learner
-      /^cmi\.comments_from_learner\._count$/,
-      /^cmi\.comments_from_learner\.\d+\.(comment|location|timestamp)$/,
-      
-      // Comments from LMS
-      /^cmi\.comments_from_lms\._count$/,
-      /^cmi\.comments_from_lms\.\d+\.(comment|location|timestamp)$/,
-      
-      // Interactions (expanded)
-      /^cmi\.interactions\._count$/,
-      /^cmi\.interactions\.\d+\.(id|type|timestamp|weighting|learner_response|result|latency|description)$/,
-      /^cmi\.interactions\.\d+\.objectives\._count$/,
-      /^cmi\.interactions\.\d+\.objectives\.\d+\.id$/,
-      /^cmi\.interactions\.\d+\.correct_responses\._count$/,
-      /^cmi\.interactions\.\d+\.correct_responses\.\d+\.pattern$/,
-      
-      // Objectives (expanded)
-      /^cmi\.objectives\._count$/,
-      /^cmi\.objectives\.\d+\.(id|description|success_status|completion_status|progress_measure)$/,
-      /^cmi\.objectives\.\d+\.score\.(scaled|raw|min|max)$/,
-      
-      // ADL Navigation (expanded)
-      /^adl\.nav\.request$/,
-      /^adl\.nav\.request_valid\.(continue|previous|choice|jump|exit|exitAll|abandon|abandonAll)$/,
-      
-      // Additional SCORM 2004 elements that may be requested
-      /^cmi\._version$/,
-      /^cmi\.comments$/,
-      /^cmi\.core\./,  // SCORM 1.2 compatibility
-      /^cmi\.student_data\./,  // SCORM 1.2 compatibility
-      /^cmi\.student_preference\./  // SCORM 1.2 compatibility
-    ];
-
-    return validPatterns.some(pattern => pattern.test(element));
-  }
-
-  /**
-   * Validate SCORM element value
-   * @private
-   */
-  isValidValue(element, value) {
-    // Basic validation - could be expanded
-    if (element.includes('score.scaled')) {
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= -1 && num <= 1;
-    }
-
-    if (element === 'cmi.completion_status') {
-      return ['completed', 'incomplete', 'not attempted', 'unknown'].includes(value);
-    }
-
-    if (element === 'cmi.success_status') {
-      return ['passed', 'failed', 'unknown'].includes(value);
-    }
-
-    if (element === 'cmi.progress_measure') {
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0 && num <= 1;
-    }
-
-    return true; // Default to valid
-  }
 
   /**
    * Set last error code
