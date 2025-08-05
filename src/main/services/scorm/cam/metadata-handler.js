@@ -67,26 +67,25 @@ class MetadataHandler {
    * @param {string} basePath - Base path for resolving metadata files
    * @returns {Object} Extracted metadata object
    */
-  extractMetadata(metadataElement, basePath = '') {
-    if (!metadataElement) return null;
+  extractMetadata(parsedMetadataObject) {
+    if (!parsedMetadataObject) return null;
 
     try {
       const metadata = {
-        schema: this.getElementText(metadataElement, 'schema'),
-        schemaversion: this.getElementText(metadataElement, 'schemaversion'),
-        location: this.getElementText(metadataElement, 'location'),
+        schema: parsedMetadataObject.schema,
+        schemaversion: parsedMetadataObject.schemaversion,
+        location: parsedMetadataObject.location,
         lom: null,
-        custom: {}
+        custom: {} // Custom metadata is not directly parsed by ManifestParser, so it remains empty for now
       };
 
       // Extract LOM metadata
-      const lomElement = this.getChildElementNS(metadataElement, 'lom', 'lom');
-      if (lomElement) {
-        metadata.lom = this.extractLOMMetadata(lomElement);
+      if (parsedMetadataObject.lom) {
+        metadata.lom = this.extractLOMMetadata(parsedMetadataObject.lom);
       }
 
-      // Extract custom metadata elements
-      metadata.custom = this.extractCustomMetadata(metadataElement);
+      // Custom metadata extraction would require re-parsing the original XML or a different approach
+      // For now, we'll assume custom metadata is not passed in the parsed object.
 
       return metadata;
     } catch (error) {
@@ -97,17 +96,16 @@ class MetadataHandler {
 
   /**
    * Extract LOM metadata
-   * @param {Element} lomElement - LOM root element
+   * @param {Object} parsedLOMObject - Parsed LOM object from ManifestParser
    * @returns {Object} LOM metadata object
    */
-  extractLOMMetadata(lomElement) {
+  extractLOMMetadata(parsedLOMObject) {
     const lom = {};
 
     // Extract each LOM category
     for (const [key, category] of Object.entries(this.lomCategories)) {
-      const categoryElement = this.getChildElement(lomElement, category);
-      if (categoryElement) {
-        lom[category] = this.extractLOMCategory(categoryElement, category);
+      if (parsedLOMObject[category]) {
+        lom[category] = this.extractLOMCategory(parsedLOMObject[category], category);
       }
     }
 
@@ -116,264 +114,142 @@ class MetadataHandler {
 
   /**
    * Extract LOM category data
-   * @param {Element} categoryElement - Category DOM element
+   * @param {Object} parsedCategoryObject - Parsed category object from ManifestParser
    * @param {string} categoryName - Category name
    * @returns {Object} Category data
    */
-  extractLOMCategory(categoryElement, categoryName) {
+  extractLOMCategory(parsedCategoryObject, categoryName) {
     switch (categoryName) {
       case 'general':
-        return this.extractGeneralMetadata(categoryElement);
+        return this.extractGeneralMetadata(parsedCategoryObject);
       case 'lifecycle':
-        return this.extractLifecycleMetadata(categoryElement);
+        return this.extractLifecycleMetadata(parsedCategoryObject);
       case 'technical':
-        return this.extractTechnicalMetadata(categoryElement);
+        return this.extractTechnicalMetadata(parsedCategoryObject);
       case 'educational':
-        return this.extractEducationalMetadata(categoryElement);
+        return this.extractEducationalMetadata(parsedCategoryObject);
       case 'rights':
-        return this.extractRightsMetadata(categoryElement);
+        return this.extractRightsMetadata(parsedCategoryObject);
       default:
-        return this.extractGenericCategory(categoryElement);
+        // For other categories, return the object as is if it's already parsed
+        return parsedCategoryObject;
     }
   }
 
   /**
    * Extract general metadata
-   * @param {Element} generalElement - General category element
+   * @param {Object} generalObject - General category object
    * @returns {Object} General metadata
    */
-  extractGeneralMetadata(generalElement) {
+  extractGeneralMetadata(generalObject) {
     return {
-      identifier: this.extractIdentifier(generalElement),
-      title: this.extractLangString(generalElement, 'title'),
-      language: this.extractLanguages(generalElement),
-      description: this.extractLangString(generalElement, 'description'),
-      keyword: this.extractKeywords(generalElement),
-      coverage: this.extractLangString(generalElement, 'coverage'),
-      structure: this.extractVocabulary(generalElement, 'structure'),
-      aggregationLevel: this.extractVocabulary(generalElement, 'aggregationLevel')
+      identifier: generalObject.identifier,
+      title: generalObject.title,
+      language: generalObject.language,
+      description: generalObject.description,
+      keyword: generalObject.keyword,
+      coverage: generalObject.coverage,
+      structure: generalObject.structure,
+      aggregationLevel: generalObject.aggregationLevel
     };
   }
 
   /**
    * Extract lifecycle metadata
-   * @param {Element} lifecycleElement - Lifecycle category element
+   * @param {Object} lifecycleObject - Lifecycle category object
    * @returns {Object} Lifecycle metadata
    */
-  extractLifecycleMetadata(lifecycleElement) {
+  extractLifecycleMetadata(lifecycleObject) {
     return {
-      version: this.extractLangString(lifecycleElement, 'version'),
-      status: this.extractVocabulary(lifecycleElement, 'status'),
-      contribute: this.extractContributions(lifecycleElement)
+      version: lifecycleObject.version,
+      status: lifecycleObject.status,
+      contribute: lifecycleObject.contribute
     };
   }
 
   /**
    * Extract technical metadata
-   * @param {Element} technicalElement - Technical category element
+   * @param {Object} technicalObject - Technical category object
    * @returns {Object} Technical metadata
    */
-  extractTechnicalMetadata(technicalElement) {
+  extractTechnicalMetadata(technicalObject) {
     return {
-      format: this.extractMultipleValues(technicalElement, 'format'),
-      size: this.getElementText(technicalElement, 'size'),
-      location: this.extractMultipleValues(technicalElement, 'location'),
-      requirement: this.extractRequirements(technicalElement),
-      installationRemarks: this.extractLangString(technicalElement, 'installationRemarks'),
-      otherPlatformRequirements: this.extractLangString(technicalElement, 'otherPlatformRequirements'),
-      duration: this.extractDuration(technicalElement)
+      format: technicalObject.format,
+      size: technicalObject.size,
+      location: technicalObject.location,
+      requirement: technicalObject.requirement,
+      installationRemarks: technicalObject.installationRemarks,
+      otherPlatformRequirements: technicalObject.otherPlatformRequirements,
+      duration: technicalObject.duration
     };
   }
 
   /**
    * Extract educational metadata
-   * @param {Element} educationalElement - Educational category element
+   * @param {Object} educationalObject - Educational category object
    * @returns {Object} Educational metadata
    */
-  extractEducationalMetadata(educationalElement) {
+  extractEducationalMetadata(educationalObject) {
     return {
-      interactivityType: this.extractVocabulary(educationalElement, 'interactivityType'),
-      learningResourceType: this.extractVocabularyArray(educationalElement, 'learningResourceType'),
-      interactivityLevel: this.extractVocabulary(educationalElement, 'interactivityLevel'),
-      semanticDensity: this.extractVocabulary(educationalElement, 'semanticDensity'),
-      intendedEndUserRole: this.extractVocabularyArray(educationalElement, 'intendedEndUserRole'),
-      context: this.extractVocabularyArray(educationalElement, 'context'),
-      typicalAgeRange: this.extractLangStringArray(educationalElement, 'typicalAgeRange'),
-      difficulty: this.extractVocabulary(educationalElement, 'difficulty'),
-      typicalLearningTime: this.extractDuration(educationalElement),
-      description: this.extractLangString(educationalElement, 'description'),
-      language: this.extractLanguages(educationalElement)
+      interactivityType: educationalObject.interactivityType,
+      learningResourceType: educationalObject.learningResourceType,
+      interactivityLevel: educationalObject.interactivityLevel,
+      semanticDensity: educationalObject.semanticDensity,
+      intendedEndUserRole: educationalObject.intendedEndUserRole,
+      context: educationalObject.context,
+      typicalAgeRange: educationalObject.typicalAgeRange,
+      difficulty: educationalObject.difficulty,
+      typicalLearningTime: educationalObject.typicalLearningTime,
+      description: educationalObject.description,
+      language: educationalObject.language
     };
   }
 
   /**
    * Extract rights metadata
-   * @param {Element} rightsElement - Rights category element
+   * @param {Object} rightsObject - Rights category object
    * @returns {Object} Rights metadata
    */
-  extractRightsMetadata(rightsElement) {
+  extractRightsMetadata(rightsObject) {
     return {
-      cost: this.extractVocabulary(rightsElement, 'cost'),
-      copyrightAndOtherRestrictions: this.extractVocabulary(rightsElement, 'copyrightAndOtherRestrictions'),
-      description: this.extractLangString(rightsElement, 'description')
+      cost: rightsObject.cost,
+      copyrightAndOtherRestrictions: rightsObject.copyrightAndOtherRestrictions,
+      description: rightsObject.description
     };
   }
 
   /**
-   * Extract custom metadata elements
-   * @param {Element} metadataElement - Metadata root element
-   * @returns {Object} Custom metadata
+   * Extract custom metadata elements (not applicable for already parsed object)
+   * @param {Object} parsedMetadataObject - Parsed metadata object
+   * @returns {Object} Custom metadata (empty for now)
    */
-  extractCustomMetadata(metadataElement) {
-    const custom = {};
-    
-    // Extract any non-standard metadata elements
-    const children = Array.from(metadataElement.childNodes);
-    for (const child of children) {
-      if (child.nodeType === 1 && // Element node
-          !['schema', 'schemaversion', 'location', 'lom'].includes(child.localName)) {
-        custom[child.localName] = this.extractElementValue(child);
-      }
-    }
-
-    return custom;
+  extractCustomMetadata(parsedMetadataObject) {
+    // Custom metadata is not directly parsed by ManifestParser, so it remains empty for now
+    return {};
   }
 
-  // Helper methods for metadata extraction
-  getChildElement(parent, tagName) {
-    const children = parent.getElementsByTagName(tagName);
-    return children.length > 0 ? children[0] : null;
-  }
+  // Helper methods for metadata extraction (no longer needed as we work with parsed objects)
+  // These methods were for DOM manipulation and are now obsolete.
+  // Keeping them commented out for reference during refactoring.
 
-  getChildElementNS(parent, namespace, tagName) {
-    const children = parent.getElementsByTagNameNS(namespace, tagName);
-    return children.length > 0 ? children[0] : null;
-  }
-
-  getElementText(parent, tagName) {
-    const element = this.getChildElement(parent, tagName);
-    return element ? element.textContent.trim() : null;
-  }
-
-  extractLangString(parent, tagName) {
-    const element = this.getChildElement(parent, tagName);
-    if (!element) return null;
-    
-    return {
-      value: element.textContent.trim(),
-      language: element.getAttribute('xml:lang') || element.getAttribute('lang') || 'en'
-    };
-  }
-
-  extractVocabulary(parent, tagName) {
-    const element = this.getChildElement(parent, tagName);
-    if (!element) return null;
-    
-    const sourceElement = this.getChildElement(element, 'source');
-    const valueElement = this.getChildElement(element, 'value');
-    
-    return {
-      source: sourceElement ? sourceElement.textContent.trim() : null,
-      value: valueElement ? valueElement.textContent.trim() : null
-    };
-  }
-
-  extractIdentifier(parent) {
-    const identifierElement = this.getChildElement(parent, 'identifier');
-    if (!identifierElement) return null;
-    
-    return {
-      catalog: this.getElementText(identifierElement, 'catalog'),
-      entry: this.getElementText(identifierElement, 'entry')
-    };
-  }
-
-  extractLanguages(parent) {
-    const elements = parent.getElementsByTagName('language');
-    return Array.from(elements).map(el => el.textContent.trim());
-  }
-
-  extractKeywords(parent) {
-    const elements = parent.getElementsByTagName('keyword');
-    return Array.from(elements).map(el => this.extractLangString(el.parentNode, 'keyword'));
-  }
-
-  extractMultipleValues(parent, tagName) {
-    const elements = parent.getElementsByTagName(tagName);
-    return Array.from(elements).map(el => el.textContent.trim());
-  }
-
-  extractVocabularyArray(parent, tagName) {
-    const elements = parent.getElementsByTagName(tagName);
-    return Array.from(elements).map(el => this.extractVocabulary(el.parentNode, tagName));
-  }
-
-  extractLangStringArray(parent, tagName) {
-    const elements = parent.getElementsByTagName(tagName);
-    return Array.from(elements).map(el => this.extractLangString(el.parentNode, tagName));
-  }
-
-  extractContributions(parent) {
-    const elements = parent.getElementsByTagName('contribute');
-    return Array.from(elements).map(el => ({
-      role: this.extractVocabulary(el, 'role'),
-      entity: this.extractMultipleValues(el, 'entity'),
-      date: this.extractDateTime(el)
-    }));
-  }
-
-  extractRequirements(parent) {
-    const elements = parent.getElementsByTagName('requirement');
-    return Array.from(elements).map(el => ({
-      orComposite: this.extractOrComposite(el)
-    }));
-  }
-
-  extractOrComposite(parent) {
-    return {
-      type: this.extractVocabulary(parent, 'type'),
-      name: this.extractVocabulary(parent, 'name'),
-      minimumVersion: this.getElementText(parent, 'minimumVersion'),
-      maximumVersion: this.getElementText(parent, 'maximumVersion')
-    };
-  }
-
-  extractDuration(parent) {
-    const durationElement = this.getChildElement(parent, 'typicalLearningTime') || 
-                           this.getChildElement(parent, 'duration');
-    if (!durationElement) return null;
-    
-    return {
-      duration: this.getElementText(durationElement, 'duration'),
-      description: this.extractLangString(durationElement, 'description')
-    };
-  }
-
-  extractDateTime(parent) {
-    const dateElement = this.getChildElement(parent, 'date');
-    if (!dateElement) return null;
-    
-    return {
-      dateTime: this.getElementText(dateElement, 'dateTime'),
-      description: this.extractLangString(dateElement, 'description')
-    };
-  }
-
-  extractElementValue(element) {
-    if (element.children.length === 0) {
-      return element.textContent.trim();
-    }
-    
-    const result = {};
-    for (const child of element.children) {
-      result[child.localName] = this.extractElementValue(child);
-    }
-    return result;
-  }
-
-  extractGenericCategory(categoryElement) {
-    return this.extractElementValue(categoryElement);
-  }
+  // getChildElement(parent, tagName) { /* ... */ }
+  // getChildElementNS(parent, namespace, tagName) { /* ... */ }
+  // getElementText(parent, tagName) { /* ... */ }
+  // extractLangString(parent, tagName) { /* ... */ }
+  // extractVocabulary(parent, tagName) { /* ... */ }
+  // extractIdentifier(parent) { /* ... */ }
+  // extractLanguages(parent) { /* ... */ }
+  // extractKeywords(parent) { /* ... */ }
+  // extractMultipleValues(parent, tagName) { /* ... */ }
+  // extractVocabularyArray(parent, tagName) { /* ... */ }
+  // extractLangStringArray(parent, tagName) { /* ... */ }
+  // extractContributions(parent) { /* ... */ }
+  // extractRequirements(parent) { /* ... */ }
+  // extractOrComposite(parent) { /* ... */ }
+  // extractDuration(parent) { /* ... */ }
+  // extractDateTime(parent) { /* ... */ }
+  // extractElementValue(element) { /* ... */ }
+  // extractGenericCategory(categoryElement) { /* ... */ }
 }
 
 module.exports = MetadataHandler;

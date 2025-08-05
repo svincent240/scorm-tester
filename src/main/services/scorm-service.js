@@ -387,7 +387,7 @@ class ScormService extends BaseService {
         throw new Error('CAM Service not initialized');
       }
       const result = await this.camService.processPackage(folderPath, manifestContent);
-      this.recordOperation('processScormManifest', result.validation.isValid);
+      this.recordOperation('processScormManifest', result.success && result.validation?.isValid);
       return { success: true, ...result };
     } catch (error) {
       this.errorHandler?.setError(

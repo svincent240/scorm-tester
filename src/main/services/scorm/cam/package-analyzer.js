@@ -48,7 +48,7 @@ class PackageAnalyzer {
         dependencies: this.analyzeDependencies(manifest),
         launchSequence: this.determineLaunchSequence(manifest),
         statistics: this.generateStatistics(manifest),
-        compliance: this.checkCompliance(manifest)
+        compliance: this.checkComplianceSync(packagePath, manifest)
       };
 
       return analysis;
@@ -184,7 +184,7 @@ class PackageAnalyzer {
   }
 
   /**
-   * Check SCORM compliance (delegated to ContentValidator)
+   * Check SCORM compliance (delegated to ContentValidator) - Async version
    * @param {string} packagePath - Path to SCORM package directory
    * @param {Object} manifest - Parsed manifest object
    * @returns {Promise<Object>} Compliance check result
@@ -207,6 +207,123 @@ class PackageAnalyzer {
       this.errorHandler?.setError('301', `Compliance check failed: ${error.message}`, 'checkCompliance');
       throw error;
     }
+  }
+
+  /**
+   * Check SCORM compliance (synchronous version for analysis)
+   * @param {string} packagePath - Path to SCORM package directory
+   * @param {Object} manifest - Parsed manifest object
+   * @returns {Object} Basic compliance check result
+   */
+  checkComplianceSync(packagePath, manifest) {
+    try {
+      console.log('PackageAnalyzer: Starting synchronous compliance check');
+      console.log('PackageAnalyzer: packagePath:', packagePath);
+      console.log('PackageAnalyzer: manifest type:', typeof manifest);
+      console.log('PackageAnalyzer: manifest is null/undefined:', manifest == null);
+
+      if (!manifest) {
+        console.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');
+        return {
+          hasRequiredElements: false,
+          validScormTypes: false,
+          validIdentifiers: false,
+          sequencingCompliance: false,
+          metadataCompliance: false,
+          overallCompliance: false,
+          isValid: false,
+          errors: ['Manifest is null or undefined'],
+          warnings: []
+        };
+      }
+
+      // Basic synchronous compliance checks
+      const hasRequiredElements = !!(manifest.identifier && manifest.organizations && manifest.resources);
+      const validScormTypes = this.validateScormTypesSync(manifest.resources || []);
+      const validIdentifiers = this.validateIdentifiersSync(manifest);
+      const sequencingCompliance = this.hasSequencingRules(manifest);
+      const metadataCompliance = !!manifest.metadata;
+
+      const result = {
+        hasRequiredElements,
+        validScormTypes,
+        validIdentifiers,
+        sequencingCompliance,
+        metadataCompliance,
+        overallCompliance: hasRequiredElements && validScormTypes && validIdentifiers,
+        isValid: hasRequiredElements && validScormTypes && validIdentifiers,
+        errors: [],
+        warnings: []
+      };
+
+      console.log('PackageAnalyzer: Synchronous compliance check completed:', result);
+      return result;
+    } catch (error) {
+      console.error('PackageAnalyzer: Synchronous compliance check failed:', error);
+      this.errorHandler?.setError('301', `Synchronous compliance check failed: ${error.message}`, 'checkComplianceSync');
+      return {
+        hasRequiredElements: false,
+        validScormTypes: false,
+        validIdentifiers: false,
+        sequencingCompliance: false,
+        metadataCompliance: false,
+        overallCompliance: false,
+        isValid: false,
+        errors: [error.message],
+        warnings: []
+      };
+    }
+  }
+
+  /**
+   * Validate SCORM types synchronously
+   * @param {Array} resources - Resources array
+   * @returns {boolean} True if all SCORM types are valid
+   */
+  validateScormTypesSync(resources) {
+    if (!Array.isArray(resources)) return false;
+    
+    return resources.every(resource => {
+      if (!resource.scormType) return true; // Missing scormType is allowed (defaults to asset)
+      return ['sco', 'asset'].includes(resource.scormType.toLowerCase());
+    });
+  }
+
+  /**
+   * Validate identifiers synchronously
+   * @param {Object} manifest - Parsed manifest object
+   * @returns {boolean} True if all identifiers are valid and unique
+   */
+  validateIdentifiersSync(manifest) {
+    const identifiers = new Set();
+    let duplicates = false;
+    
+    // Check manifest identifier
+    if (manifest.identifier) {
+      identifiers.add(manifest.identifier);
+    }
+    
+    // Check organization identifiers
+    manifest.organizations?.organizations?.forEach(org => {
+      if (org.identifier) {
+        if (identifiers.has(org.identifier)) {
+          duplicates = true;
+        }
+        identifiers.add(org.identifier);
+      }
+    });
+    
+    // Check resource identifiers
+    manifest.resources?.forEach(resource => {
+      if (resource.identifier) {
+        if (identifiers.has(resource.identifier)) {
+          duplicates = true;
+        }
+        identifiers.add(resource.identifier);
+      }
+    });
+    
+    return !duplicates;
   }
 
   // Helper methods for analysis (retained for analysis, not validation)

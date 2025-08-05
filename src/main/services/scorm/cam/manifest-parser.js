@@ -83,36 +83,117 @@ class ManifestParser {
    */
   parseManifestXML(xmlContent, basePath = '') {
     try {
+      console.log('ManifestParser: Starting XML parsing');
+      console.log('ManifestParser: xmlContent type:', typeof xmlContent);
+      console.log('ManifestParser: xmlContent length:', xmlContent?.length || 'undefined');
+      console.log('ManifestParser: basePath:', basePath);
+
       // Check for null or empty content
       if (!xmlContent || xmlContent.trim() === '') {
+        console.error('ManifestParser: Empty or null XML content');
         this.errorHandler?.setError('301', 'Empty or null XML content', 'parseManifestXML');
         throw new Error('Empty or null XML content');
       }
 
+      // Log first 200 characters of XML for debugging
+      console.log('ManifestParser: XML content preview:', xmlContent.substring(0, 200) + '...');
+
+      console.log('ManifestParser: About to parse XML with DOMParser');
       const doc = this.parser.parseFromString(xmlContent, 'text/xml');
+      console.log('ManifestParser: DOMParser completed, doc:', !!doc);
+
       const manifestElement = doc.documentElement;
+      console.log('ManifestParser: documentElement:', !!manifestElement);
+      console.log('ManifestParser: documentElement tagName:', manifestElement?.tagName);
 
       // Check for XML parsing errors
       const parserError = doc.getElementsByTagName('parsererror');
       if (parserError.length > 0) {
+        console.error('ManifestParser: XML parsing error detected, parsererror elements:', parserError.length);
+        for (let i = 0; i < parserError.length; i++) {
+          console.error('ManifestParser: Parser error', i, ':', parserError[i].textContent);
+        }
         this.errorHandler?.setError('301', 'XML parsing error', 'parseManifestXML');
         throw new Error('XML parsing error');
       }
 
       if (!manifestElement || manifestElement.tagName !== 'manifest') {
+        console.error('ManifestParser: Invalid manifest structure');
+        console.error('ManifestParser: manifestElement exists:', !!manifestElement);
+        console.error('ManifestParser: tagName:', manifestElement?.tagName);
         this.errorHandler?.setError('301', 'Invalid manifest: root element must be <manifest>', 'parseManifestXML');
         throw new Error('Invalid manifest structure');
       }
 
-      return {
-        identifier: this.getAttribute(manifestElement, 'identifier'),
-        version: this.getAttribute(manifestElement, 'version') || '1.0',
-        metadata: this.parseMetadata(manifestElement, basePath),
-        organizations: this.parseOrganizations(manifestElement, basePath),
-        resources: this.parseResources(manifestElement, basePath),
-        manifest: this.parseSubManifests(manifestElement, basePath)
+      console.log('ManifestParser: Starting to extract manifest attributes and elements');
+
+      // Extract basic attributes
+      const identifier = this.getAttribute(manifestElement, 'identifier');
+      const version = this.getAttribute(manifestElement, 'version') || '1.0';
+      
+      console.log('ManifestParser: Basic attributes - identifier:', identifier, 'version:', version);
+
+      // Parse sub-elements with error handling
+      let metadata, organizations, resources, subManifests;
+
+      try {
+        console.log('ManifestParser: Parsing metadata');
+        metadata = this.parseMetadata(manifestElement, basePath);
+        console.log('ManifestParser: Metadata parsed successfully');
+      } catch (metadataError) {
+        console.error('ManifestParser: Metadata parsing failed:', metadataError);
+        metadata = null;
+      }
+
+      try {
+        console.log('ManifestParser: Parsing organizations');
+        organizations = this.parseOrganizations(manifestElement, basePath);
+        console.log('ManifestParser: Organizations parsed successfully');
+      } catch (orgError) {
+        console.error('ManifestParser: Organizations parsing failed:', orgError);
+        organizations = null;
+      }
+
+      try {
+        console.log('ManifestParser: Parsing resources');
+        resources = this.parseResources(manifestElement, basePath);
+        console.log('ManifestParser: Resources parsed successfully, count:', resources?.length || 0);
+      } catch (resourceError) {
+        console.error('ManifestParser: Resources parsing failed:', resourceError);
+        resources = [];
+      }
+
+      try {
+        console.log('ManifestParser: Parsing sub-manifests');
+        subManifests = this.parseSubManifests(manifestElement, basePath);
+        console.log('ManifestParser: Sub-manifests parsed successfully');
+      } catch (subManifestError) {
+        console.error('ManifestParser: Sub-manifests parsing failed:', subManifestError);
+        subManifests = [];
+      }
+
+      const result = {
+        identifier,
+        version,
+        metadata,
+        organizations,
+        resources,
+        manifest: subManifests
       };
+
+      console.log('ManifestParser: Manifest parsing completed successfully');
+      console.log('ManifestParser: Result structure:', {
+        hasIdentifier: !!result.identifier,
+        hasMetadata: !!result.metadata,
+        hasOrganizations: !!result.organizations,
+        hasResources: !!result.resources,
+        resourceCount: result.resources?.length || 0
+      });
+
+      return result;
     } catch (error) {
+      console.error('ManifestParser: Parsing failed with error:', error);
+      console.error('ManifestParser: Error stack:', error.stack);
       this.errorHandler?.setError('301', `Manifest parsing failed: ${error.message}`, 'parseManifestXML');
       throw error;
     }

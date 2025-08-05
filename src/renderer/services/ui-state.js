@@ -7,7 +7,6 @@
  * @fileoverview UI state management service
  */
 
-import { eventBus } from './event-bus.js';
 
 /**
  * UI State Manager Class
@@ -20,9 +19,11 @@ class UIStateManager {
     this.subscribers = new Map();
     this.persistenceKey = 'scorm-tester-ui-state';
     this.debounceTimeout = null;
+    this.eventBus = null; // Will be loaded dynamically
     
     this.loadPersistedState();
-    this.setupEventListeners();
+    // Event listeners that don't depend on eventBus can be set up here
+    this.setupGlobalEventListeners();
   }
 
   /**
@@ -151,7 +152,7 @@ class UIStateManager {
       isConnected: sessionData.connected !== false
     });
     
-    eventBus.emit('session:updated', sessionData);
+    this.eventBus?.emit('session:updated', sessionData);
   }
 
   /**
@@ -166,7 +167,7 @@ class UIStateManager {
       entryPoint: courseData.entryPoint
     });
     
-    eventBus.emit('course:loaded', courseData);
+    this.eventBus?.emit('course:loaded', courseData);
   }
 
   /**
@@ -196,7 +197,7 @@ class UIStateManager {
     });
     
     console.log('UIState: Emitting navigation:updated event');
-    eventBus.emit('navigation:updated', navData);
+    this.eventBus?.emit('navigation:updated', navData);
   }
 
   /**
@@ -211,7 +212,7 @@ class UIStateManager {
       }
     });
     
-    eventBus.emit('progress:updated', progressData);
+    this.eventBus?.emit('progress:updated', progressData);
   }
 
   /**
@@ -226,7 +227,7 @@ class UIStateManager {
       }
     });
     
-    eventBus.emit('ui:updated', uiData);
+    this.eventBus?.emit('ui:updated', uiData);
   }
 
   /**
@@ -335,14 +336,14 @@ class UIStateManager {
     this.notifyStateChange({}, this.state);
     this.debouncedPersist();
     
-    eventBus.emit('state:reset');
+    this.eventBus?.emit('state:reset');
   }
 
   /**
-   * Setup event listeners
+   * Setup global event listeners (not dependent on eventBus)
    * @private
    */
-  setupEventListeners() {
+  setupGlobalEventListeners() {
     // Listen for window visibility changes
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
@@ -353,6 +354,21 @@ class UIStateManager {
     // Listen for beforeunload to persist state
     window.addEventListener('beforeunload', () => {
       this.persistState();
+    });
+  }
+
+  /**
+   * Setup event bus listeners
+   * @private
+   */
+  setupEventBusListeners() {
+    if (!this.eventBus) {
+      console.warn('UIStateManager: EventBus not available for setting up listeners.');
+      return;
+    }
+    // Listen for state changes to emit a general event
+    this.eventBus.on('state:changed', (data) => {
+      // This is already handled by notifyStateChange, but keeping for consistency if needed elsewhere
     });
   }
 
@@ -378,7 +394,7 @@ class UIStateManager {
       }
     }
     
-    eventBus.emit('state:changed', { previous: previousState, current: newState });
+    this.eventBus?.emit('state:changed', { previous: previousState, current: newState });
   }
 
   /**
@@ -540,11 +556,30 @@ class UIStateManager {
       clearTimeout(this.debounceTimeout);
     }
     
-    eventBus.emit('state:destroyed');
+    this.eventBus?.emit('state:destroyed');
   }
 }
 
 // Create and export singleton instance
-const uiState = new UIStateManager();
+let uiStateInstance = null;
+
+async function initializeUiState() {
+  if (!uiStateInstance) {
+    uiStateInstance = new UIStateManager();
+    try {
+      const eventBusModule = await import('./event-bus.js');
+      uiStateInstance.eventBus = eventBusModule.eventBus;
+      uiStateInstance.setupEventBusListeners();
+      console.log('UIStateManager: EventBus loaded and listeners set up.');
+    } catch (error) {
+      console.error('UIStateManager: Failed to load EventBus dynamically:', error);
+      // Handle error, perhaps by disabling event-dependent features
+    }
+  }
+  return uiStateInstance;
+}
+
+// Export a promise that resolves with the initialized instance
+const uiState = initializeUiState();
 
 export { UIStateManager, uiState };

@@ -46,35 +46,130 @@ class ScormCAMService {
   async processPackage(packagePath, manifestContent) {
     try {
       this.logger?.info(`ScormCAMService: Starting package processing for ${packagePath}`);
+      
+      // Add comprehensive logging for debugging
+      this.logger?.info(`ScormCAMService: manifestContent type: ${typeof manifestContent}, length: ${manifestContent?.length || 'undefined'}`);
+      this.logger?.info(`ScormCAMService: packagePath: ${packagePath}`);
 
-      // 1. Parse Manifest
-      const manifest = this.manifestParser.parseManifestXML(manifestContent, packagePath);
-      this.logger?.debug('ScormCAMService: Manifest parsed successfully');
+      // Check for null/undefined manifestContent
+      if (!manifestContent) {
+        this.logger?.error('ScormCAMService: manifestContent is null or undefined');
+        throw new Error('Manifest content is null or undefined');
+      }
+
+      if (typeof manifestContent !== 'string') {
+        this.logger?.error(`ScormCAMService: manifestContent is not a string, got: ${typeof manifestContent}`);
+        throw new Error(`Manifest content must be a string, got: ${typeof manifestContent}`);
+      }
+
+      if (manifestContent.trim() === '') {
+        this.logger?.error('ScormCAMService: manifestContent is empty string');
+        throw new Error('Manifest content is empty');
+      }
+
+      // 1. Parse Manifest with detailed logging
+      this.logger?.info('ScormCAMService: About to parse manifest XML');
+      let manifest;
+      try {
+        manifest = this.manifestParser.parseManifestXML(manifestContent, packagePath);
+        this.logger?.info('ScormCAMService: Manifest parsing completed successfully');
+        this.logger?.debug('ScormCAMService: Parsed manifest structure:', {
+          hasIdentifier: !!manifest?.identifier,
+          hasOrganizations: !!manifest?.organizations,
+          hasResources: !!manifest?.resources,
+          manifestType: typeof manifest
+        });
+      } catch (parseError) {
+        this.logger?.error('ScormCAMService: Manifest parsing failed:', parseError);
+        throw new Error(`Manifest parsing failed: ${parseError.message}`);
+      }
+
+      // Validate manifest object before proceeding
+      if (!manifest) {
+        this.logger?.error('ScormCAMService: Manifest parser returned null/undefined');
+        throw new Error('Manifest parser returned null or undefined');
+      }
+
+      if (typeof manifest !== 'object') {
+        this.logger?.error(`ScormCAMService: Manifest parser returned non-object: ${typeof manifest}`);
+        throw new Error(`Manifest parser returned invalid type: ${typeof manifest}`);
+      }
 
       // 2. Validate Package
-      const validation = await this.contentValidator.validatePackage(packagePath, manifest);
-      this.logger?.debug('ScormCAMService: Package validation completed', { isValid: validation.isValid });
+      this.logger?.info('ScormCAMService: Starting package validation');
+      let validation;
+      try {
+        validation = await this.contentValidator.validatePackage(packagePath, manifest);
+        this.logger?.info('ScormCAMService: Package validation completed', { isValid: validation.isValid });
+      } catch (validationError) {
+        this.logger?.error('ScormCAMService: Package validation failed:', validationError);
+        throw new Error(`Package validation failed: ${validationError.message}`);
+      }
 
       // 3. Analyze Package
-      const analysis = this.packageAnalyzer.analyzePackage(packagePath, manifest);
-      this.logger?.debug('ScormCAMService: Package analysis completed');
+      this.logger?.info('ScormCAMService: Starting package analysis');
+      let analysis;
+      try {
+        analysis = this.packageAnalyzer.analyzePackage(packagePath, manifest);
+        this.logger?.info('ScormCAMService: Package analysis completed');
+      } catch (analysisError) {
+        this.logger?.error('ScormCAMService: Package analysis failed:', analysisError);
+        throw new Error(`Package analysis failed: ${analysisError.message}`);
+      }
 
       // 4. Extract Metadata (if any)
-      const metadata = this.metadataHandler.extractMetadata(manifest.metadata);
-      this.logger?.debug('ScormCAMService: Metadata extracted');
+      this.logger?.info('ScormCAMService: Starting metadata extraction');
+      let metadata;
+      try {
+        metadata = this.metadataHandler.extractMetadata(manifest.metadata);
+        this.logger?.info('ScormCAMService: Metadata extraction completed');
+      } catch (metadataError) {
+        this.logger?.error('ScormCAMService: Metadata extraction failed:', metadataError);
+        // Don't throw here, metadata extraction is not critical
+        metadata = null;
+      }
 
-      return {
+      // Create clean response object (avoid circular references and non-serializable data)
+      const response = {
         success: true,
-        manifest,
+        manifest: this.cleanManifestForSerialization(manifest),
         validation,
         analysis,
         metadata
       };
 
+      this.logger?.info('ScormCAMService: Package processing completed successfully');
+      return response;
+
     } catch (error) {
       this.errorHandler?.setError('301', `SCORM package processing failed: ${error.message}`, 'ScormCAMService.processPackage');
       this.logger?.error('ScormCAMService: Package processing error:', error);
+      this.logger?.error('ScormCAMService: Error stack:', error.stack);
       return { success: false, error: error.message, reason: error.message };
+    }
+  }
+
+  /**
+   * Clean manifest object for IPC serialization by removing non-serializable properties
+   * @param {Object} manifest - Original manifest object
+   * @returns {Object} Cleaned manifest object
+   */
+  cleanManifestForSerialization(manifest) {
+    try {
+      // Create a deep copy and remove any potential DOM elements or functions
+      const cleaned = JSON.parse(JSON.stringify(manifest));
+      this.logger?.debug('ScormCAMService: Manifest cleaned for serialization');
+      return cleaned;
+    } catch (error) {
+      this.logger?.error('ScormCAMService: Failed to clean manifest for serialization:', error);
+      // Return a minimal safe object
+      return {
+        identifier: manifest?.identifier || null,
+        version: manifest?.version || null,
+        organizations: manifest?.organizations || null,
+        resources: manifest?.resources || null,
+        metadata: manifest?.metadata || null
+      };
     }
   }
 

@@ -7,7 +7,6 @@
  * @fileoverview Base class for all renderer components
  */
 
-import { eventBus } from '../services/event-bus.js';
 
 /**
  * Base Component Class
@@ -63,6 +62,9 @@ class BaseComponent {
       // Find or create element
       this.element = this.findOrCreateElement();
       
+      // Load dependencies dynamically
+      await this.loadDependencies();
+
       // Setup component
       await this.setup();
       
@@ -82,6 +84,19 @@ class BaseComponent {
       
     } catch (error) {
       console.error(`Error initializing component ${this.constructor.name}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Dynamically load dependencies for the component.
+   * @returns {Promise<void>}
+   */
+  async loadDependencies() {
+    try {
+      this.eventBus = (await import('../services/event-bus.js')).eventBus;
+    } catch (error) {
+      console.error(`Error loading dependencies for ${this.constructor.name}:`, error);
       throw error;
     }
   }
@@ -259,14 +274,18 @@ class BaseComponent {
    * @param {*} data - Event data
    */
   emit(event, data = null) {
+    if (!this.eventBus) {
+      console.warn(`EventBus not loaded for ${this.constructor.name}. Cannot emit event: ${event}`);
+      return;
+    }
     const eventData = {
       component: this.constructor.name,
       elementId: this.elementId,
       data
     };
     
-    eventBus.emit(`component:${event}`, eventData);
-    eventBus.emit(`${this.constructor.name.toLowerCase()}:${event}`, eventData);
+    this.eventBus.emit(`component:${event}`, eventData);
+    this.eventBus.emit(`${this.constructor.name.toLowerCase()}:${event}`, eventData);
   }
 
   /**
@@ -276,7 +295,10 @@ class BaseComponent {
    * @returns {Function} Unsubscribe function
    */
   subscribe(event, handler) {
-    const unsubscribe = eventBus.on(event, handler.bind(this));
+    if (!this.eventBus) {
+      throw new Error('EventBus not loaded. Ensure loadDependencies() is called before subscribing.');
+    }
+    const unsubscribe = this.eventBus.on(event, handler.bind(this));
     this.unsubscribeFunctions.push(unsubscribe);
     return unsubscribe;
   }
