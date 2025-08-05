@@ -117,7 +117,7 @@ class CourseLoader {
       
       // Step 4: Determine entry point from processed manifest
       // console.log('CourseLoader: Step 4 - Determining entry point...'); // Removed debug log
-      const entryResult = await window.electronAPI.resolveScormUrl(analysis.launchSequence[0].href, extractedPath); // Assuming first SCO in launch sequence is entry
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(analysis.launchSequence[0].href, extractedPath); // Assuming first SCO in launch sequence is entry
       
       if (!entryResult.success) {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
