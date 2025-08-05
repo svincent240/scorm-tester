@@ -17,6 +17,7 @@
   border-radius: var(--content-viewer-border-radius);
   margin: 0;
   overflow: hidden;
+  min-height: 0;  /* Allow flex shrinking */
 }
 
 .content-viewer__container {
@@ -24,6 +25,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  min-height: 0;  /* Allow flex shrinking */
+  height: 100%;
 }
 
 /* Welcome Screen */
@@ -97,16 +100,15 @@
 
 /* Content Frame (iframe) */
 .content-viewer__frame {
+  flex: 1;  /* Take all available space */
   width: 100%;
-  height: 70vh; /* Force substantial height */
-  min-height: 600px;
+  min-height: 400px;  /* Reduced minimum height for better responsiveness */
   border: none;
   background: #ffffff;
   display: block;
   
   /* Ensure proper scaling and containment */
   object-fit: contain;
-  overflow: hidden;
   
   /* Fix for iframe scaling issues */
   transform-origin: top left;
@@ -120,9 +122,12 @@
 /* Navigation Controls */
 .navigation-controls {
   flex-shrink: 0;
+  height: var(--navigation-controls-height);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);  /* Reduced vertical padding */
+  display: flex;
+  align-items: center;
 }
 
 .nav-controls {
@@ -130,6 +135,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
+  width: 100%;  /* Ensure full width */
+  height: 100%;  /* Fill parent height */
 }
 
 .nav-btn {
@@ -178,15 +185,20 @@
 /* Progress Tracking */
 .progress-tracking {
   flex-shrink: 0;
+  height: var(--progress-tracking-height);
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);  /* Reduced vertical padding */
+  display: flex;
+  align-items: center;
 }
 
 .progress-bar {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  width: 100%;  /* Ensure full width */
+  height: 100%;  /* Fill parent height */
 }
 
 .progress-bar__track {

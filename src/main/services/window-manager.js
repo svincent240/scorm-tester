@@ -7,7 +7,7 @@
  * @fileoverview Window management service for SCORM Tester main process
  */
 
-const { BrowserWindow, protocol } = require('electron');
+const { BrowserWindow, protocol, screen } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
@@ -82,11 +82,18 @@ class WindowManager extends BaseService {
       this.logger?.info('WindowManager: Creating main window');
       this.setWindowState(WINDOW_TYPES.MAIN, WINDOW_STATES.CREATING);
       
+      // Calculate optimal window size based on screen dimensions
+      const optimalSize = this.calculateOptimalWindowSize();
+      this.logger?.info(`WindowManager: Calculated optimal size: ${optimalSize.width}x${optimalSize.height}`);
+      
       const mainWindow = new BrowserWindow({
-        width: this.config.mainWindow.width,
-        height: this.config.mainWindow.height,
+        width: optimalSize.width,
+        height: optimalSize.height,
         minWidth: this.config.mainWindow.minWidth,
         minHeight: this.config.mainWindow.minHeight,
+        center: true,
+        maximizable: true,
+        resizable: true,
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
@@ -387,6 +394,52 @@ class WindowManager extends BaseService {
       case 2: return 'warn';   // warning
       case 3: return 'error';  // error
       default: return 'info';
+    }
+  }
+
+  /**
+   * Calculate optimal window size based on screen dimensions
+   * @private
+   */
+  calculateOptimalWindowSize() {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+      
+      this.logger?.info(`WindowManager: Screen work area: ${screenWidth}x${screenHeight}`);
+      
+      // Calculate optimal size as percentage of screen size
+      // Use 85% of screen width and 90% of screen height for good usability
+      const optimalWidth = Math.floor(screenWidth * 0.85);
+      const optimalHeight = Math.floor(screenHeight * 0.90);
+      
+      // Constrain to configured min/max values
+      const finalWidth = Math.max(
+        this.config.mainWindow.minWidth,
+        Math.min(optimalWidth, this.config.mainWindow.width || 1200)
+      );
+      
+      const finalHeight = Math.max(
+        this.config.mainWindow.minHeight,
+        Math.min(optimalHeight, this.config.mainWindow.height || 800)
+      );
+      
+      return {
+        width: finalWidth,
+        height: finalHeight,
+        screenWidth,
+        screenHeight
+      };
+      
+    } catch (error) {
+      this.logger?.error('WindowManager: Failed to calculate optimal window size:', error);
+      // Fallback to configured defaults
+      return {
+        width: this.config.mainWindow.width,
+        height: this.config.mainWindow.height,
+        screenWidth: 1920, // Assume common resolution
+        screenHeight: 1080
+      };
     }
   }
 

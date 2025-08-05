@@ -197,7 +197,8 @@
   --nav-color: var(--text-light);
   
   /* Sidebar */
-  --sidebar-width: 300px;
+  --sidebar-width: 280px;  /* Reduced from 300px for better space utilization */
+  --sidebar-width-collapsed: 60px;  /* Width when collapsed */
   --sidebar-bg: var(--bg-secondary);
   --sidebar-border-color: var(--border-color);
   
@@ -280,7 +281,7 @@
   }
 }
 
-/* Missing Layout Variables - Added for debugging */
+/* Additional Layout Variables */
 :root {
   --container-max-width: 1200px;
   --spacing-md: var(--spacing-4);
@@ -293,7 +294,9 @@
   --z-sidebar: 90;
   --z-overlay: 1000;
   
-  --header-height: 60px;
+  --header-height: 56px;  /* Reduced from 60px for more content space */
+  --navigation-controls-height: 48px;  /* Height for navigation controls bar */
+  --progress-tracking-height: 32px;   /* Height for progress tracking bar */
   --transition-normal: var(--transition-base);
   --transition-fast: 0.15s ease-in-out;
   
@@ -302,8 +305,39 @@
   --primary-text: #ffffff;
   --danger-text: #ffffff;
   
-  --bg-color-secondary: var(--bg-secondary);
-  --text-color-muted: var(--text-muted);
-  --primary-color-hover: var(--primary-hover);
+  /* Semantic color mappings for layout */
+  --bg-color: var(--bg-primary);
+  --text-color: var(--text-primary);
+  --text-muted: var(--text-secondary);
   --border-radius: var(--border-radius-base);
+  --primary-color-alpha: rgba(0, 123, 255, 0.25);
+  
+  /* Screen-adaptive spacing */
+  --content-padding: var(--spacing-md);
+  --content-gap: var(--spacing-sm);
+}
+
+/* Screen size dependent variables */
+@media (max-width: 768px) {
+  :root {
+    --content-padding: var(--spacing-sm);
+    --content-gap: var(--spacing-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --content-padding: var(--spacing-xs);
+    --content-gap: var(--spacing-1);
+    --header-height: 48px;  /* Even smaller on mobile */
+    --navigation-controls-height: 40px;
+    --progress-tracking-height: 28px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --content-padding: var(--spacing-lg);
+    --content-gap: var(--spacing-md);
+  }
 }

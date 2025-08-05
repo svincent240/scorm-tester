@@ -37,37 +37,62 @@
   border: 0 !important;
 }
 
+/* UI Scaling Utilities */
+.full-height { height: 100% !important; }
+.full-width { width: 100% !important; }
+.no-scroll { overflow: hidden !important; }
+.scroll-y { overflow-y: auto !important; }
+
+/* Mobile overlay for sidebar */
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: calc(var(--z-overlay) - 1);
+  display: none;
+}
+
+.mobile-overlay--active {
+  display: block;
+}
+
 /* Application Root Styles */
 .scorm-tester-app {
-  font-family: var(--font-family);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
   color: var(--text-color);
   background: var(--bg-color);
-  min-height: 100vh;
-  
-  /* Ensure proper box-sizing */
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-  
-  /* Focus management */
-  :focus {
-    outline: 2px solid var(--focus-color);
-    outline-offset: 2px;
-  }
-  
-  :focus:not(:focus-visible) {
-    outline: none;
-  }
-  
-  /* Selection styling */
-  ::selection {
-    background: var(--primary-color-alpha);
-    color: var(--text-color);
-  }
+  height: 100vh;  /* Fixed height instead of min-height */
+  width: 100vw;   /* Full width */
+  overflow: hidden;  /* Prevent app-level scrolling */
+  position: relative;  /* Create stacking context */
+}
+
+/* Ensure proper box-sizing for all elements */
+.scorm-tester-app *,
+.scorm-tester-app *::before,
+.scorm-tester-app *::after {
+  box-sizing: border-box;
+}
+
+/* Focus management */
+.scorm-tester-app :focus {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.scorm-tester-app :focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Selection styling */
+.scorm-tester-app ::selection {
+  background: var(--primary-color-alpha);
+  color: var(--text-color);
 }
 
 /* State Classes */
@@ -97,6 +122,52 @@
   opacity: 0.6;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+/* Startup State Fixes */
+.app-layout {
+  /* Ensure layout is ready immediately */
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Prevent FOUC (Flash of Unstyled Content) */
+.app-layout:not(.initialized) {
+  /* Keep layout stable during initialization */
+  min-height: 100vh;
+}
+
+.app-layout.initialized {
+  /* Switch to optimal layout after initialization */
+  height: 100vh;
+  min-height: auto;
+}
+
+/* Component Startup Positioning Fixes */
+.navigation-controls,
+.progress-tracking,
+.content-viewer,
+.course-outline,
+.debug-panel {
+  /* Ensure components don't overlap during startup */
+  position: relative;
+  z-index: auto;
+}
+
+/* Prevent layout shifts during component initialization */
+.content-viewer {
+  /* Ensure content viewer takes proper space immediately */
+  min-height: 400px;
+}
+
+.navigation-controls {
+  /* Ensure navigation bar has proper height immediately */
+  min-height: var(--navigation-controls-height);
+}
+
+.progress-tracking {
+  /* Ensure progress bar has proper height immediately */
+  min-height: var(--progress-tracking-height);
 }
 
 /* Developer Mode Styles */

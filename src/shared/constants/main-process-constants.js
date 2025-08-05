@@ -78,20 +78,27 @@ const FILE_OPERATIONS = {
 const SERVICE_DEFAULTS = {
   WINDOW_MANAGER: {
     mainWindow: {
-      width: 1400,
-      height: 900,
-      minWidth: 800,
-      minHeight: 600,
+      width: 1200,     // Reduced from 1400 for better screen compatibility
+      height: 800,     // Reduced from 900 for better screen compatibility
+      minWidth: 900,   // Increased from 800 for better UI layout
+      minHeight: 650,  // Increased from 600 to prevent UI cramping
       webSecurity: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Add responsive window options
+      center: true,
+      maximizable: true,
+      resizable: true,
+      // Set reasonable bounds based on screen size
+      useContentSize: false,
+      show: false // Will be shown after proper sizing
     },
     debugWindow: {
-      width: 800,
-      height: 600,
-      minWidth: 600,
-      minHeight: 400,
-      parent: null // Will be set to main window
+      width: 900,      // Increased from 800 for better debug panel layout
+      height: 700,     // Increased from 600 for more debug content
+      minWidth: 700,   // Increased from 600 for better functionality
+      minHeight: 500,  // Increased from 400 for proper debug UI
+      parent: null     // Will be set to main window
     }
   },
   

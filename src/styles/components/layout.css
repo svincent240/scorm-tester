@@ -39,24 +39,30 @@
 .app-layout {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 100vh;
+  height: 100vh;  /* Use viewport height instead of 100% */
+  max-height: 100vh;  /* Prevent overflow */
   background: var(--bg-color);
   color: var(--text-color);
+  overflow: hidden;  /* Prevent document-level scrolling */
 }
 
 .app-header {
   flex-shrink: 0;
+  height: var(--header-height);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
   z-index: var(--z-header);
+  position: relative;  /* Create stacking context */
+  width: 100%;
 }
 
 .app-main {
   flex: 1;
   display: flex;
   overflow: hidden;
+  height: calc(100vh - var(--header-height));  /* Calculate available height */
+  min-height: 0;  /* Allow flex shrinking */
 }
 
 .app-sidebar {
@@ -65,12 +71,14 @@
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   overflow-y: auto;
-  transition: transform var(--transition-normal) ease;
+  transition: width var(--transition-normal) ease;
   z-index: var(--z-sidebar);
+  position: relative;  /* Create stacking context */
+  height: 100%;  /* Full height of parent */
 }
 
 .app-sidebar--collapsed {
-  transform: translateX(-100%);
+  width: var(--sidebar-width-collapsed);
 }
 
 .app-content {
@@ -79,7 +87,8 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-color);
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);  /* Reduced padding for more content space */
+  min-width: 0;  /* Allow flex shrinking */
 }
 
 .app-footer {
@@ -97,7 +106,9 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-sm) var(--spacing-md);
-  min-height: var(--header-height);
+  height: var(--header-height);  /* Fixed height instead of min-height */
+  width: 100%;
+  flex-shrink: 0;  /* Prevent header from shrinking */
 }
 
 .header__brand {
@@ -431,6 +442,19 @@
 }
 
 /* Responsive Design */
+
+/* Tablet and smaller desktop screens */
+@media (max-width: 1024px) {
+  .app-sidebar {
+    width: 260px;  /* Slightly smaller on tablets */
+  }
+  
+  .app-content {
+    padding: var(--spacing-xs);  /* Reduce content padding */
+  }
+}
+
+/* Tablet portrait and mobile landscape */
 @media (max-width: 768px) {
   .app-main {
     flex-direction: column;
@@ -444,6 +468,12 @@
     width: 280px;
     z-index: var(--z-overlay);
     box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);  /* Hidden by default on mobile */
+    transition: transform var(--transition-normal) ease;
+  }
+  
+  .app-sidebar--open {
+    transform: translateX(0);  /* Show when toggled */
   }
   
   .app-sidebar--collapsed {
@@ -452,6 +482,10 @@
   
   .header__nav {
     display: none;
+  }
+  
+  .app-content {
+    padding: var(--spacing-xs);
   }
   
   .content {
@@ -492,6 +526,7 @@
   .md\:items-end { align-items: flex-end; }
 }
 
+/* Mobile portrait */
 @media (max-width: 480px) {
   .container {
     padding: 0 var(--spacing-sm);
@@ -499,6 +534,20 @@
   
   .header {
     padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: calc(var(--header-height) - 8px);  /* Slightly smaller on mobile */
+  }
+  
+  .app-main {
+    height: calc(100vh - var(--header-height) + 8px);  /* Adjust for smaller header */
+  }
+  
+  .app-sidebar {
+    width: 90vw;  /* Use most of screen width on small screens */
+    max-width: 320px;
+  }
+  
+  .app-content {
+    padding: 2px;  /* Minimal padding on small screens */
   }
   
   .content {
@@ -521,6 +570,14 @@
 
 /* Large Screen Optimizations */
 @media (min-width: 1200px) {
+  .app-sidebar {
+    width: 320px;  /* Wider sidebar on large screens */
+  }
+  
+  .app-content {
+    padding: var(--spacing-md);  /* More padding on large screens */
+  }
+  
   .content {
     padding: var(--spacing-xl);
   }
@@ -539,6 +596,17 @@
   .lg\:grid--4 { grid-template-columns: repeat(4, 1fr); }
   .lg\:grid--5 { grid-template-columns: repeat(5, 1fr); }
   .lg\:grid--6 { grid-template-columns: repeat(6, 1fr); }
+}
+
+/* Ultra-wide screen optimizations */
+@media (min-width: 1600px) {
+  .app-sidebar {
+    width: 360px;  /* Even wider sidebar on ultra-wide screens */
+  }
+  
+  .app-content {
+    max-width: none;  /* Allow full width usage */
+  }
 }
 
 /* Print Styles */

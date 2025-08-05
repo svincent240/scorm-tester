@@ -31,13 +31,16 @@ html:focus-within {
 /* Set core root and body defaults for full height */
 html {
   height: 100%;
+  overflow: hidden;  /* Prevent document scrolling */
 }
 
 body {
-  height: 100%;
-  min-height: 100vh;
+  height: 100vh;  /* Use viewport height for consistency */
+  margin: 0;
+  padding: 0;
   text-rendering: optimizeSpeed;
   line-height: 1.5;
+  overflow: hidden;  /* Prevent body scrolling */
 }
 
 /* A elements that don't have a class get default styles */
