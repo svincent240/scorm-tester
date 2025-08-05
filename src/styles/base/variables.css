@@ -47,19 +47,19 @@
   
   /* Background Colors */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --bg-quaternary: #dee2e6;
-  --bg-dark: #343a40;
-  --bg-darker: #212529;
+  --bg-secondary: #f7f8fa; /* slightly brighter for separation */
+  --bg-tertiary: #eef1f4;  /* raise contrast for dividers/stripes */
+  --bg-quaternary: #e2e6ea;
+  --bg-dark: #2f3438;
+  --bg-darker: #1f2326;
   
   /* Text Colors */
-  --text-primary: #212529;
-  --text-secondary: #6c757d;
-  --text-muted: #adb5bd;
+  --text-primary: #1b1f22; /* increase contrast */
+  --text-secondary: #58636d; /* slightly darker */
+  --text-muted: #8c98a4;
   --text-light: #f8f9fa;
   --text-white: #ffffff;
-  --text-dark: #343a40;
+  --text-dark: #2f3438;
   
   /* Border Colors */
   --border-color: #dee2e6;
@@ -152,6 +152,10 @@
   --z-index-popover: 1060;
   --z-index-tooltip: 1070;
   --z-index-toast: 1080;
+
+  /* Content chrome layers */
+  --z-content-header: 95;
+  --z-content-stage: 10;
   
   /* Breakpoints */
   --breakpoint-xs: 0;
@@ -208,7 +212,7 @@
   --content-viewer-border-radius: var(--border-radius-lg);
   
   /* Progress Bars */
-  --progress-height: 20px;
+  --progress-height: 14px; /* compact, to free space */
   --progress-bg: var(--bg-tertiary);
   --progress-border-radius: var(--border-radius-full);
   --progress-fill-bg: linear-gradient(90deg, var(--success-color), #20c997);
@@ -284,35 +288,37 @@
 /* Additional Layout Variables */
 :root {
   --container-max-width: 1200px;
-  --spacing-md: var(--spacing-4);
-  --spacing-lg: var(--spacing-6);
-  --spacing-xl: var(--spacing-8);
+
+  /* Normalize spacing scale usage (8px base rhythm) */
   --spacing-xs: var(--spacing-1);
   --spacing-sm: var(--spacing-2);
-  
+  --spacing-md: var(--spacing-3);
+  --spacing-lg: var(--spacing-4);
+  --spacing-xl: var(--spacing-6);
+
   --z-header: 100;
   --z-sidebar: 90;
   --z-overlay: 1000;
-  
-  --header-height: 56px;  /* Reduced from 60px for more content space */
-  --footer-height: 56px;  /* Compact height matching header for progress footer */
-  --navigation-controls-height: 48px;  /* Height for navigation controls bar */
-  --progress-tracking-height: 32px;   /* Height for progress tracking bar */
+
+  --header-height: 52px;   /* slimmer header */
+  --footer-height: 52px;   /* match header */
+  --navigation-controls-height: 44px;  /* slimmer nav */
+  --progress-tracking-height: 28px;    /* slimmer progress row */
   --transition-normal: var(--transition-base);
   --transition-fast: 0.15s ease-in-out;
-  
+
   --bg-hover: var(--bg-secondary);
   --focus-color: var(--primary-color);
   --primary-text: #ffffff;
   --danger-text: #ffffff;
-  
+
   /* Semantic color mappings for layout */
   --bg-color: var(--bg-primary);
   --text-color: var(--text-primary);
   --text-muted: var(--text-secondary);
   --border-radius: var(--border-radius-base);
   --primary-color-alpha: rgba(0, 123, 255, 0.25);
-  
+
   /* Screen-adaptive spacing */
   --content-padding: var(--spacing-md);
   --content-gap: var(--spacing-sm);

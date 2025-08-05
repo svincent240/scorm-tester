@@ -141,17 +141,17 @@
   --bg-overlay: rgba(0, 0, 0, 0.8);
   
   /* Text Colors */
-  --text-color: var(--neutral-800);
-  --text-secondary: var(--neutral-600);
-  --text-muted: var(--neutral-500);
-  --text-disabled: var(--neutral-400);
+  --text-color: var(--neutral-900);       /* increase contrast */
+  --text-secondary: var(--neutral-700);   /* clearer secondary */
+  --text-muted: var(--neutral-600);
+  --text-disabled: var(--neutral-500);
   --text-inverse: var(--neutral-100);
   
   /* Border Colors */
-  --border-color: var(--neutral-200);
-  --border-secondary: var(--neutral-300);
+  --border-color: var(--neutral-300);
+  --border-secondary: var(--neutral-400);
   --border-focus: var(--primary-color);
-  --border-hover: var(--neutral-300);
+  --border-hover: var(--neutral-400);
   --border-active: var(--primary-color);
   
   /* Focus Colors */
@@ -320,8 +320,8 @@
 
 /* Scrollbar styling for dark theme */
 .theme-dark ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;  /* easier to grab */
+  height: 10px;
 }
 
 .theme-dark ::-webkit-scrollbar-track {
@@ -331,11 +331,11 @@
 
 .theme-dark ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb, var(--neutral-300));
-  border-radius: 4px;
-  
-  &:hover {
-    background: var(--scrollbar-thumb-hover, var(--neutral-400));
-  }
+  border-radius: 6px;
+  border: 2px solid var(--scrollbar-track, var(--neutral-100));
+}
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, var(--neutral-400));
 }
 
 .theme-dark ::-webkit-scrollbar-corner {
