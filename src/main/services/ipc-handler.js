@@ -89,21 +89,25 @@ class IpcHandler extends BaseService {
    */
   async doShutdown() {
     this.logger?.debug('IpcHandler: Starting shutdown');
-    
-    // Shutdown handler methods (clears API call history) (from IpcHandlers)
-    this.clearApiCallHistory(); // Directly call the method
+
+    // 1) Terminate SCORM sessions FIRST (best-effort, silent)
+    await this.terminateScormSessionsSafely();
+
+    // 2) Clear API call history (from IpcHandlers)
+    this.clearApiCallHistory();
     this.logger?.info('[DEBUG EVENT] API call history cleared on app shutdown');
-    
+
+    // 3) Unregister handlers AFTER SCORM termination
     this.unregisterHandlers();
     this.activeRequests.clear();
     this.rateLimitMap.clear();
-    
-    // Clear the rate limit cleanup interval
+
+    // 4) Clear the rate limit cleanup interval
     if (this.rateLimitCleanupInterval) {
       clearInterval(this.rateLimitCleanupInterval);
       this.rateLimitCleanupInterval = null;
     }
-    
+
     this.logger?.debug('IpcHandler: Shutdown completed');
   }
 
@@ -222,8 +226,45 @@ class IpcHandler extends BaseService {
         if (!this.validateRequest(event, channel, args)) {
           throw new Error('Request validation failed');
         }
-        
+
+        // Rate limit check with "soft-ok" for selected channels
         if (!this.checkRateLimit(event.sender)) {
+          // Initialize per-channel suppression map once
+          if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
+          const markSuppressed = (ch) => {
+            // track firstSeenAt and suppressed flag per channel
+            let st = this._rateLimitLogState.get(ch);
+            if (!st) {
+              st = { firstSeenAt: Date.now(), notified: false, suppressed: false };
+              this._rateLimitLogState.set(ch, st);
+            }
+            if (!st.notified) {
+              // Emit a single notice then suppress forever for this session
+              st.notified = true;
+              st.suppressed = true;
+              this.logger?.info(`IpcHandler: rate-limit engaged on ${ch}; further rate-limit logs suppressed for this session`);
+            }
+          };
+
+          const isRendererLogChannel =
+            channel === 'renderer-log-debug' ||
+            channel === 'renderer-log-info' ||
+            channel === 'renderer-log-warn' ||
+            channel === 'renderer-log-error';
+
+          const isScormChannel =
+            channel === 'scorm-set-value' ||
+            channel === 'scorm-commit' ||
+            channel === 'scorm-terminate';
+
+          if (isRendererLogChannel || isScormChannel) {
+            // Mark suppression and silently soft-ok without logging spam
+            markSuppressed(channel);
+            this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
+            return { success: true, rateLimited: true };
+          }
+
+          // Otherwise, enforce rate limit strictly
           throw new Error('Rate limit exceeded');
         }
         
@@ -242,6 +283,18 @@ class IpcHandler extends BaseService {
         
       } catch (error) {
         const duration = Date.now() - startTime;
+
+        // Downgrade known, non-fatal flow-control conditions to warnings for selected channels
+        const isRateLimit = (error && typeof error.message === 'string' && error.message.includes('Rate limit exceeded'));
+        const isScormChannel = (channel === 'scorm-set-value' || channel === 'scorm-commit' || channel === 'scorm-terminate');
+
+        if (isRateLimit && isScormChannel) {
+          // Silent soft-ok for SCORM channels with one-time suppression notice handled above
+          this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
+          return { success: true, rateLimited: true };
+        }
+
+        // Default: preserve error handling for all other cases
         this.recordOperation(`${channel}:error`, false);
         
         this.errorHandler?.setError(
@@ -387,7 +440,23 @@ class IpcHandler extends BaseService {
 
   async handleScormTerminate(event, sessionId) {
     const scormService = this.getDependency('scormService');
-    return await scormService.terminate(sessionId);
+    try {
+      const result = await scormService.terminate(sessionId);
+      // Normalize success shape
+      return (result && typeof result === 'object') ? result : { success: true };
+    } catch (e) {
+      // During controlled shutdown, avoid noisy errors; return soft-ok
+      const msg = (e && e.message) ? e.message : String(e);
+      if (msg && (msg.includes('already terminated') || msg.includes('window destroyed') || msg.includes('webContents destroyed'))) {
+        return { success: true, alreadyTerminated: true };
+      }
+      // If shutdown is underway (handlers being removed), also soft-ok
+      if (!this.handlers || this.handlers.size === 0) {
+        return { success: true, lateShutdown: true };
+      }
+      // For other cases, rethrow so upstream error handling applies
+      throw e;
+    }
   }
 
   // File operation handlers
@@ -554,6 +623,43 @@ class IpcHandler extends BaseService {
   // Logging handler
   handleLogMessage(event, { level, message, args }) {
     this.logger?.log(level, `[Renderer] ${message}`, ...args);
+  }
+
+  /**
+   * Gracefully terminate all SCORM sessions if available on scormService.
+   * Used during app shutdown to avoid noisy termination errors.
+   */
+  async terminateScormSessionsSafely() {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) return;
+
+      // Preferred fast path
+      if (typeof scormService.terminateAllSessions === 'function') {
+        const TERMINATE_TIMEOUT_MS = 1500;
+        const p = Promise.resolve().then(() => scormService.terminateAllSessions({ silent: true }));
+        await Promise.race([
+          p.catch(() => {}), // swallow individual errors
+          new Promise(res => setTimeout(res, TERMINATE_TIMEOUT_MS))
+        ]);
+        return;
+      }
+
+      // Fallback: try known method names if terminateAllSessions is not implemented
+      const candidates = ['shutdown', 'terminate', 'closeAllSessions'];
+      for (const m of candidates) {
+        if (typeof scormService[m] === 'function') {
+          try {
+            await Promise.resolve().then(() => scormService[m]({ silent: true }));
+            break;
+          } catch (_) {
+            // try next candidate
+          }
+        }
+      }
+    } catch (_) {
+      // swallow to keep shutdown clean
+    }
   }
 
   // Debug event handler

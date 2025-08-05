@@ -29,6 +29,13 @@ class ScormClient {
     this.validator = null; // Will be loaded dynamically
     this.uiState = null; // Will be set by AppManager
 
+    // Concurrency guards and throttles
+    this._finalizing = false;           // prevent concurrent Commit/Terminate bursts
+    this._lastSessionTimeSetAt = 0;     // throttle cmi.session_time SetValue()
+    this._SESSION_TIME_MIN_MS = 3000;   // min interval between session_time updates
+    this._lastIpcRateLimitAt = 0;       // skip immediate retries after rate limit
+    this._IPC_BACKOFF_MS = 1200;
+
     this.setupEventListeners();
     this.loadValidator(); // Load validator dynamically
   }
@@ -130,7 +137,8 @@ class ScormClient {
     this.lastError = '0';
 
     // Asynchronously terminate with main process
-    this.asyncTerminate();
+    // Space termination slightly to avoid colliding with Commit in the same window
+    setTimeout(() => { this.asyncTerminate(); }, 200);
 
     this.logApiCall('Terminate', parameter, 'true');
     eventBus.emit('scorm:terminated', { sessionId: this.sessionId });
@@ -326,12 +334,24 @@ class ScormClient {
    * @private
    */
   async asyncTerminate() {
+    // serialize with commit to avoid burst
+    if (this._finalizing) {
+      // slight jitter to allow commit to complete
+      await new Promise(r => setTimeout(r, 300));
+    }
     try {
       if (this.sessionId) {
         await window.electronAPI.scormTerminate(this.sessionId);
       }
     } catch (error) {
-      console.error('Error terminating SCORM session:', error);
+      const msg = (error && error.message) ? error.message : String(error);
+      if (msg.includes('Rate limit exceeded')) {
+        this._lastIpcRateLimitAt = Date.now();
+        // Silent backoff: do not log to app log or console
+        return;
+      }
+      // Swallow non-rate-limit errors during shutdown to avoid noisy logs
+      return;
     }
   }
 
@@ -360,10 +380,16 @@ class ScormClient {
     try {
       const result = await window.electronAPI.scormSetValue(this.sessionId, element, value);
       if (!result.success) {
-        console.warn(`Failed to set SCORM value ${element}:`, result.errorCode);
+        // Silent failure path; renderer cache already updated
       }
     } catch (error) {
-      console.error(`Error setting SCORM value ${element}:`, error);
+      // Silent backoff on rate limit; swallow other errors to keep shutdown quiet
+      const msg = (error && error.message) ? error.message : String(error);
+      if (msg.includes('Rate limit exceeded')) {
+        this._lastIpcRateLimitAt = Date.now();
+        return;
+      }
+      return;
     }
   }
 
@@ -372,13 +398,24 @@ class ScormClient {
    * @private
    */
   async asyncCommit() {
+    // prevent overlapping finalization bursts
+    if (this._finalizing) return;
+    this._finalizing = true;
     try {
       const result = await window.electronAPI.scormCommit(this.sessionId);
       if (!result.success) {
-        console.warn('Failed to commit SCORM data:', result.errorCode);
+        // Silent failure; commit retries are not critical here
       }
     } catch (error) {
-      console.error('Error committing SCORM data:', error);
+      const msg = (error && error.message) ? error.message : String(error);
+      if (msg.includes('Rate limit exceeded')) {
+        this._lastIpcRateLimitAt = Date.now();
+        // Silent backoff
+      }
+      // Swallow other errors to avoid log noise
+    } finally {
+      // small delay to avoid immediate follow-up terminate congestion
+      setTimeout(() => { this._finalizing = false; }, 250);
     }
   }
 
@@ -484,15 +521,24 @@ class ScormClient {
     // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
     
-    // Also emit via IPC for debug window
+    // Also emit via IPC for debug window (guard against rate limits)
     if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      console.log('SCORM Client: Emitting debug event via IPC:', apiCall);
-      window.electronAPI.emitDebugEvent('api:call', apiCall);
+      try {
+        // Use a single IPC emit; avoid excessive console logs that trigger extra IPC in preload bridges
+        window.electronAPI.emitDebugEvent('api:call', apiCall);
+      } catch (e) {
+        const msg = (e && e.message) ? e.message : String(e);
+        if (msg.includes('Rate limit exceeded')) {
+          // Degrade gracefully: skip further emits for this tick
+        } else {
+          // Suppress legacy warn path to avoid extra IPC/log noise
+        }
+      }
     }
     
-    // Legacy IPC event for backward compatibility
+    // Legacy IPC event for backward compatibility (non-critical)
     if (window.electronAPI && window.electronAPI.log) {
-      window.electronAPI.log('scorm-api-call', apiCall);
+      // Suppress legacy non-critical IPC logging to reduce noise
     }
   }
 
@@ -501,7 +547,7 @@ class ScormClient {
    * @private
    */
   setupEventListeners() {
-    // Listen for session timer updates
+    // Listen for session timer updates (renderer-only UI update; no IPC here)
     this.sessionTimer = setInterval(() => {
       if (this.isInitialized && this.sessionId) {
         this.updateSessionTime();
@@ -516,21 +562,36 @@ class ScormClient {
   updateSessionTime() {
     // Ensure uiState is available before attempting to use it
     if (!this.uiState) {
-      console.warn('ScormClient: uiState not yet available for session time update.');
+      // Silent if uiState not yet available; avoid console noise
       return;
     }
 
     const sessionData = this.uiState.getState('currentSession');
-    if (sessionData) {
-      const startTime = this.uiState.getState('sessionStartTime');
-      if (startTime) {
-        const elapsed = Date.now() - startTime;
-        const hours = Math.floor(elapsed / 3600000);
-        const minutes = Math.floor((elapsed % 3600000) / 60000);
-        const seconds = Math.floor((elapsed % 60000) / 1000);
-        const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        this.uiState.updateProgress({ sessionTime: timeString });
+    if (!sessionData) return;
+
+    const startTime = this.uiState.getState('sessionStartTime');
+    if (!startTime) return;
+
+    const now = Date.now();
+    const elapsed = now - startTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    // Update UI state only; throttle IPC SetValue for cmi.session_time
+    this.uiState.updateProgress({ sessionTime: timeString });
+
+    // Throttle actual SetValue to main (min interval)
+    if ((now - this._lastSessionTimeSetAt) >= this._SESSION_TIME_MIN_MS && this.isInitialized) {
+      this._lastSessionTimeSetAt = now;
+      // SCORM 2004 expects PTnHnMnS format; keep lightweight, avoid burst
+      const isoDur = `PT${hours}H${minutes}M${seconds}S`;
+      // Best-effort cache update and async send; tolerate rate-limit
+      this.localCache.set('cmi.session_time', isoDur);
+      // Avoid spamming if we recently saw an IPC rate limit
+      if ((now - this._lastIpcRateLimitAt) >= this._IPC_BACKOFF_MS) {
+        this.asyncSetValue('cmi.session_time', isoDur);
       }
     }
   }
@@ -572,19 +633,41 @@ class ScormClient {
    * Destroy the SCORM client
    */
   destroy() {
-    if (this.isInitialized) {
-      this.Terminate('');
-    }
-    
-    // Clear the session timer
-    if (this.sessionTimer) {
-      clearInterval(this.sessionTimer);
-      this.sessionTimer = null;
-    }
-    
-    this.clearCache();
-    eventBus.emit('scorm:destroyed');
-  }
+   if (this.isInitialized) {
+     this.Terminate('');
+   }
+   
+   // Clear the session timer
+   if (this.sessionTimer) {
+     clearInterval(this.sessionTimer);
+     this.sessionTimer = null;
+   }
+   
+   this.clearCache();
+   eventBus.emit('scorm:destroyed');
+ }
+
+ /**
+  * Ensure a spaced final flush to minimize IPC rate-limit collisions at shutdown.
+  * Sequence: optional session_time send (if not too recent) -> Commit -> Terminate (spaced)
+  */
+ async flushBeforeTerminate() {
+   try {
+     const now = Date.now();
+     // Try one last session_time send if allowed by throttle
+     const lastIso = this.localCache.get('cmi.session_time');
+     if (this.isInitialized && (now - this._lastSessionTimeSetAt) >= 5000 && lastIso && (now - this._lastIpcRateLimitAt) >= this._IPC_BACKOFF_MS) {
+       this._lastSessionTimeSetAt = now;
+       await this.asyncSetValue('cmi.session_time', lastIso);
+     }
+     // Commit, then slight delay, then terminate
+     await this.asyncCommit();
+     await new Promise(r => setTimeout(r, 250));
+     await this.asyncTerminate();
+   } catch (_) {
+     // swallow to avoid noisy shutdown
+   }
+ }
 
 }
 

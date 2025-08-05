@@ -91,10 +91,37 @@ class CourseOutline extends BaseComponent {
 
   setupEventSubscriptions() {
     // Ensure we pass bound handlers to avoid 'this' loss
+    // Dedupe course:loaded handling — ignore identical payloads within a small window
+    this._lastCourseLoadedSig = null;
+    this._lastCourseLoadedAt = 0;
+    this._COURSE_LOADED_DEDUPE_MS = 500;
+
     this.subscribe('course:loaded', (data) => {
+      const now = Date.now();
+      // Create a small signature from payload to detect duplicates
+      let sig = 'none';
+      try {
+        const payload = (data && data.data) ? data.data : data;
+        const s = payload?.structure;
+        const m = payload?.manifest;
+        sig = JSON.stringify({
+          t: payload?.title || payload?.courseTitle || '',
+          ic: Array.isArray(s?.items) ? s.items.length : 0,
+          mi: m?.identifier || null
+        });
+      } catch (_) {}
+
+      if (this._lastCourseLoadedSig === sig && (now - this._lastCourseLoadedAt) < this._COURSE_LOADED_DEDUPE_MS) {
+        try { rendererLogger.debug('CourseOutline: duplicate course:loaded ignored'); } catch (_) {}
+        return;
+      }
+      this._lastCourseLoadedSig = sig;
+      this._lastCourseLoadedAt = now;
+
       rendererLogger.info('CourseOutline: event course:loaded received');
       this.handleCourseLoaded(data);
     });
+
     this.subscribe('course:cleared', (data) => {
       rendererLogger.info('CourseOutline: event course:cleared received');
       this.handleCourseCleared(data);

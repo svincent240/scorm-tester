@@ -91,24 +91,36 @@ class ScormService extends BaseService {
    */
   async doShutdown() {
     this.logger?.debug('ScormService: Starting shutdown');
-    
-    // Terminate all active sessions
-    for (const [sessionId, session] of this.sessions) {
+
+    // Snapshot active session IDs for diagnostic visibility
+    try {
+      const ids = Array.from(this.sessions.keys());
+      this.logger?.info(`ScormService: Active sessions at shutdown: [${ids.join(', ')}]`);
+    } catch (_) {}
+
+    // Terminate all active sessions (idempotent)
+    for (const [sessionId] of this.sessions) {
       try {
-        await this.terminateSession(sessionId);
+        await this.terminate(sessionId);
       } catch (error) {
-        this.logger?.error(`ScormService: Failed to terminate session ${sessionId}:`, error);
+        const msg = (error && error.message) ? error.message : String(error);
+        // Downgrade benign shutdown races to warn
+        if (msg.includes('already terminated') || msg.includes('window destroyed') || msg.includes('webContents destroyed')) {
+          this.logger?.warn(`ScormService: Benign shutdown race during terminate(${sessionId}): ${msg}`);
+        } else {
+          this.logger?.error(`ScormService: Failed to terminate session ${sessionId}:`, error);
+        }
       }
     }
-    
+
     // Shutdown SCORM services
     if (this.snService) {
       this.snService.reset();
     }
-    
+
     this.sessions.clear();
     this.activeWorkflows.clear();
-    
+
     this.logger?.debug('ScormService: Shutdown completed');
   }
 
@@ -302,31 +314,62 @@ class ScormService extends BaseService {
     try {
       const session = this.sessions.get(sessionId);
       if (!session) {
-        return { success: false, errorCode: '301' };
+        // Idempotent soft-ok: already removed/terminated
+        this.logger?.warn(`ScormService: Terminate called for non-existent session ${sessionId} (idempotent)`);
+        return { success: true, errorCode: '0', alreadyTerminated: true };
       }
-      
+
+      // Guard against double-terminate races
+      if (session.__terminating || session.state === 'terminated') {
+        this.logger?.info(`ScormService: Session ${sessionId} already terminating/terminated (idempotent)`);
+        // Ensure map no longer holds terminated
+        this.sessions.delete(sessionId);
+        return { success: true, errorCode: '0', alreadyTerminated: true };
+      }
+      session.__terminating = true;
+
       // Log API call
       this.logApiCall(session, 'Terminate', '', '', '0');
-      
+
       // Update session state
+      const preState = session.state;
       session.state = 'terminated';
       session.endTime = new Date();
-      
+
       // Notify debug window
       this.notifyDebugWindow('session-terminated', { sessionId });
-      
+
       // Remove session
       this.sessions.delete(sessionId);
-      
-      this.logger?.info(`ScormService: Session ${sessionId} terminated`);
+
+      this.logger?.info(`ScormService: Session ${sessionId} terminated (prevState=${preState})`);
       this.recordOperation('terminate', true);
-      
+
       return { success: true, errorCode: '0' };
-      
+
     } catch (error) {
-      this.logger?.error(`ScormService: Terminate failed for session ${sessionId}:`, error);
+      const msg = (error && error.message) ? error.message : String(error);
+      // Benign shutdown races: downgrade to soft-ok
+      if (msg.includes('already terminated') || msg.includes('window destroyed') || msg.includes('webContents destroyed')) {
+        this.logger?.warn(`ScormService: Soft-ok terminate(${sessionId}) during shutdown/race: ${msg}`);
+        // Ensure cleanup
+        this.sessions.delete(sessionId);
+        this.recordOperation('terminate', true);
+        return { success: true, errorCode: '0', softOk: true };
+      }
+      // Preserve detailed error
+      this.logger?.error(`ScormService: Terminate failed for session ${sessionId}:`, {
+        message: msg,
+        name: error?.name,
+        code: error?.code,
+        stackHead: (error?.stack ? String(error.stack).split('\n').slice(0,3) : null)
+      });
       this.recordOperation('terminate', false);
-      return { success: false, errorCode: '101' };
+      return { success: false, errorCode: '101', reason: msg };
+    } finally {
+      // Best-effort: clear flag if still present
+      const s = this.sessions.get(sessionId);
+      if (s && s.__terminating) delete s.__terminating;
     }
   }
 
