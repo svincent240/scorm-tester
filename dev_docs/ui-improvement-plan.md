@@ -197,12 +197,18 @@ Execution Plan and Order
      - Removed console logging in modified regions; user-facing errors go through UIState notifications, aligning with centralized logging rules.
      - Ensured scaling support by enhancing CSS: added body.scaled-content transform rules and CSS variable fallbacks in [src/styles/components/content-viewer.css](src/styles/components/content-viewer.css:123). ContentViewer sets --scorm-scale and related variables, then applies the class when needed.
 7) Fix CourseLoader.clearCourse workflow.
+  - Status: Completed
+  - Notes:
+    - Updated [src/renderer/services/course-loader.js](src/renderer/services/course-loader.js:241) clearCourse() to be async and await the shared uiState instance, replacing the non-existent uiState.clearCourse() with:
+      uiState.updateCourse({ info: null, structure: null, path: null, entryPoint: null });
+    - Preserved eventBus.emit('course:cleared') to notify consumers.
+    - This aligns with centralized state management and prevents runtime errors when clearing the course.
 8) Configure EventBus debug via UIState and route to logger.
 9) Accessibility updates for CourseOutline/Nav controls.
 10) Update dev_docs:
-    - This ui-improvement-plan.md (updated with progress)
-    - guides/logging-debugging.md: renderer logging guidance (updated)
-    - guides/renderer-imports.md: SCORM API injection precedence and patterns
+   - This ui-improvement-plan.md (updated with progress)
+   - guides/logging-debugging.md: renderer logging guidance (updated)
+   - guides/renderer-imports.md: SCORM API injection precedence and patterns
 11) Add/extend renderer integration tests.
 
 Success Metrics

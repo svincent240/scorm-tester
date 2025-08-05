@@ -240,9 +240,10 @@ class CourseLoader {
   /**
    * Clear current course
    */
-  clearCourse() {
+  async clearCourse() {
     this.currentCourse = null;
-    uiState.clearCourse();
+    const uiState = await uiStatePromise;
+    uiState.updateCourse({ info: null, structure: null, path: null, entryPoint: null });
     eventBus.emit('course:cleared');
   }
 
