@@ -1,95 +1,231 @@
-# UI Improvement Plan for SCORM Tester
+# UI Improvement Plan
 
-This document outlines a plan for enhancing the User Interface (UI) of the SCORM Tester application, based on a comprehensive review of the `src/renderer` directory and existing `dev_docs`. The goal is to improve UI effectiveness, maintainability, and user experience, aligning with the project's modular, event-driven, and service-oriented architecture.
+Scope
+This plan focuses on improving the renderer UI to optimize the prioritized workflow: quick local test (load a SCORM package, launch, navigate next/previous, view progress, exit). It aligns with architecture and style rules, prioritizing centralized logging/notifications, robust navigation, clear loading/error states, and accessibility.
 
-## Current UI Architecture Strengths
+Objectives
+- Reliability: Eliminate fragile patterns and runtime errors that impact quick testing.
+- Consistency: Centralize logging and user-facing notifications.
+- Usability: Ensure clear, responsive controls and status visibility throughout the workflow.
+- Accessibility: Improve keyboard navigation, semantic roles, and labels in key components.
+- Maintainability: Keep UI logic decoupled from business logic with EventBus + UIState patterns.
 
-The SCORM Tester's UI is built on a solid foundation:
-*   **Modular Components:** Utilizes a `BaseComponent` class for consistent lifecycle management, event handling, and DOM utilities.
-*   **Event-Driven Communication:** Employs a centralized `EventBus` for loose coupling between components and services.
-*   **Service-Oriented Design:** Clear separation of concerns with dedicated services for UI state (`uiState`), SCORM API interaction (`scormClient`, `scormAPIBridge`), course loading (`courseLoader`), and sequencing/navigation (`snBridge`).
-*   **Key Features:** The `DebugPanel` (now to be focused on as a separate window) and `NavigationControls` (with its robust fallback mechanism) are critical for the tool's primary function.
+Top Issues Summary
+1. Console logging and ad-hoc error UI
+   - Problem: Broad console.* usage; inline error HTML injected in bootstrap and AppManager.
+   - Fix: Route to centralized logger writing to app log; use UIState notifications and consistent error overlay styles.
 
-## Proposed UI Improvements
+2. EventBus debug and state feedback loops
+   - Problem: Always-on console debug; potential two-way updates (NavigationControls & UIState) guarded by flags.
+   - Fix: Toggle debug via UIState; prefer single source of truth for navigation state; components emit intents.
 
-The following recommendations aim to refine existing patterns, enhance modularity, and improve consistency for a more maintainable and robust application.
+3. NavigationControls alignment and wiring
+   - Problem: Button state coupling to availableNavigation without authoritative source; not explicitly wired to ContentViewer; fallback warnings via console.
+   - Fix: Wire references in AppManager; feed button states from UIState or normalized SNBridge output; notify on fallback mode.
 
-### 1. Centralize Error/Success Notifications (Implemented)
+4. ContentViewer consistency
+   - Problem: Duplicate SCORM API surfaces (direct injection vs ScormAPIBridge); console logs; scaling relies on CSS class presence.
+   - Fix: Define precedence: direct injection primary, bridge fallback; add API presence verification; ensure scaling CSS exists.
 
-*   **Issue:** Inconsistent error and success messaging across the application. Some parts use native `alert()`, others log to console, and some components implement their own error display logic (e.g., `BaseComponent.showErrorState`, `ContentViewer.showError`). This leads to a fragmented and potentially intrusive user experience.
-*   **Implementation:** All application-level error and success notifications have been consolidated through the `uiState.showNotification` mechanism.
-    *   `AppManager` has been updated to use `uiState.showNotification` for all application-wide messages (e.g., course load success/failure).
-    *   `BaseComponent.showErrorState` has been refactored to leverage `uiState.showNotification`, removing previous inline CSS injection and direct DOM manipulation for error display.
-    *   `ContentViewer.showError` and `showEnhancedError` now integrate with `uiState.showNotification` for consistency.
-*   **Benefit:** Consistent, non-blocking, and user-friendly feedback; easier management of notification styles and behavior; improved maintainability.
+5. Footer components uiState misuse
+   - Problem: Re-awaiting uiState incorrectly, potentially clobbering the instance.
+   - Fix: Use resolved uiState from BaseComponent.loadDependencies only.
 
-### 2. Refine CSS Management for Dynamically Injected Elements (Implemented)
- 
-*   **Issue:** Certain components inject `<style>` tags directly into the DOM (`BaseComponent.showErrorState`) or into iframes (`ContentViewer.applyContentScaling`). While functional, this can lead to less maintainable CSS and potential conflicts.
-*   **Implementation:** Dynamic styles have been externalized into dedicated CSS files.
-    *   `src/styles/components/error-state.css` and `src/styles/components/content-scaling.css` were created.
-    *   `BaseComponent.showErrorState` no longer injects inline CSS; error notification styling is handled by `uiState.showNotification` and defined in `src/styles/components/error-state.css`.
-    *   `ContentViewer.applyContentScaling` now applies scaling by adding a `scaled-content` class and CSS variables to the iframe's `body` element, with styles defined in `src/styles/components/content-scaling.css`.
-    *   `src/styles/main.css` was updated to import these new CSS files.
-*   **Benefit:** Cleaner codebase; better adherence to CSS best practices and `dev_docs/style.md` (separation of concerns); improved maintainability and debugging of styles.
+6. CSS invalid nesting
+   - Problem: &:hover / &:active used in plain CSS.
+   - Fix: Replace with valid selectors.
 
-### 3. Decouple `ProgressTracking` from Global DOM Elements (Implemented)
+7. CourseLoader.clearCourse bug
+   - Problem: Calls a non-existent uiState.clearCourse().
+   - Fix: Update UIState via updateCourse with cleared fields and emit course:cleared.
 
-*   **Issue:** The `ProgressTracking.updateFooterElements` method directly queried and manipulated global DOM elements by their IDs (e.g., `footer-progress-fill`, `footer-status`), creating tight coupling.
-*   **Implementation:**
-    *   Created `src/renderer/components/scorm/footer-progress-bar.js` and `src/renderer/components/scorm/footer-status-display.js` as `BaseComponent`-derived components.
-    *   Modified `src/renderer/components/scorm/progress-tracking.js` to remove direct DOM manipulation of footer elements.
-    *   Ensured `uiState.updateProgress` (in `src/renderer/services/ui-state.js`) emits the full `progressData` object with the `progress:updated` event.
-    *   Configured `src/renderer/services/app-manager.js` to initialize the new `FooterProgressBar` and `FooterStatusDisplay` components, which now subscribe to `progress:updated` events and update their respective DOM elements.
-*   **Benefit:** Increased modularity; reduced coupling; improved testability; better adherence to the component-based architecture.
-*   **Verification Notes:**
-    *   **Progress Percentage (cmi.progress_measure):** The "Learning Progress" percentage remains at "0%" because the sample SCORM course does not send updates for `cmi.progress_measure`. The application correctly displays the data it receives.
-    *   **Completion Status (cmi.completion_status):** The "STATUS" remains "In Progress" because the sample SCORM course explicitly sets `cmi.completion_status` to "incomplete" and never sends a "completed" or "passed" signal. The application accurately reflects the course's reported status.
+Planned Changes by Area
 
-### 4. Eliminate Embedded Debug Panel; Focus on Separate Debug Console Window (Implemented)
+A) Centralized Logging and Notifications
+- Goal: No console.* in renderer; all logs go to app log. User-facing errors via UIState notifications.
+- Actions:
+  1) Introduce renderer logger adapter that calls shared logger (main) via preload IPC or reuse src/shared/utils/logger.js if it writes to app.log.
+  2) Replace console.* in:
+     - src/renderer/app.js
+     - src/renderer/services/app-manager.js
+     - src/renderer/services/event-bus.js
+     - src/renderer/services/ui-state.js
+     - src/renderer/services/course-loader.js
+     - src/renderer/services/scorm-client.js
+     - src/renderer/services/scorm-api-bridge.js
+     - src/renderer/components/scorm/content-viewer.js
+     - src/renderer/components/scorm/navigation-controls.js
+  3) Update dev_docs/guides/logging-debugging.md to document renderer logging flow and severity mapping.
+- Acceptance:
+  - All renderer errors/warnings written to app log.
+  - User-visible errors appear via notifications (not inline HTML).
 
-*   **Issue:** The `DebugPanel` component was instantiated and used in two places: as an embedded panel within the main application window, and as the primary content of a separate "Debug Console" Electron window (`debug.html`). This created redundancy and a potentially confusing user experience.
-*   **Implementation:** All debug functionality has been consolidated into the separate "Debug Console" window.
-    *   **Removed `DebugPanel` instantiation from `AppManager`:** The embedded debug panel was eliminated from the main application window.
-    *   **Updated `AppManager.toggleDebugPanel()`:** This method now triggers the creation or focus of the separate "Debug Console" window via an IPC call (`open-debug-window`) from the renderer process to the main process's `WindowManager.createDebugWindow()`.
-    *   **Ensured `debug.html` is the sole entry point for `DebugPanel`:** All debug-related UI and logic now resides exclusively within the separate "Debug Console" window.
-    *   **Verified IPC communication:** Confirmed that necessary debug data (API calls, SCORM state changes, errors) is correctly sent from the main process (and main renderer process) to the "Debug Console" window via the `debug-event` channel, and buffered calls are sent upon debug window creation.
-*   **Benefit:** Removes redundancy; provides a dedicated, more flexible, and potentially more feature-rich debugging environment; aligns with user preference for a separate debug window.
+Progress (Step 1 partial complete):
+- Implemented renderer logger adapter at src/renderer/utils/renderer-logger.js using direct import of src/shared/utils/logger.js.
+- Replaced console.* with rendererLogger in:
+  - src/renderer/app.js
+  - src/renderer/services/app-manager.js
+  - src/renderer/services/event-bus.js
+- Centralized initialization error handling in app.js catch: logs via rendererLogger, sets uiState error + persistent notification, emits eventBus 'app:error'.
+- Updated dev_docs/guides/logging-debugging.md with renderer logging flow and EventBus debug mode notes.
+- Additional stabilization:
+  - Added safe, cached loggers with no-op fallbacks in AppManager and EventBus to prevent early-startup undefined logger errors.
+  - Set EventBus default debug mode using a guarded call and internal cached logger to avoid startup exceptions.
+- Remaining for this area in future steps: replace console.* in ui-state.js, course-loader.js, scorm-client.js, scorm-api-bridge.js, content-viewer.js, navigation-controls.js; ensure severity mapping section if needed.
 
-### 5. Standardize Debugging Configuration (Implemented)
+B) Error Handling and Initialization UX
+- Goal: Consistent, styled, centralized error presentation.
+- Actions:
+  1) Remove inline error HTML injection:
+     - src/renderer/app.js (initializeApplication catch)
+     - src/renderer/services/app-manager.js handleInitializationError()
+  2) Replace with:
+     - logger.error
+     - uiState.setError(error)
+     - uiState.showNotification({ type: 'error', duration: 0 })
+     - eventBus.emit('app:error', { error })
+  3) Ensure styles/components/error-state.css provides global overlay/toast consistency.
+- Acceptance:
+  - Init failures show persistent notification; no inline style blocks.
 
-*   **Issue:** Reliance on the global `window.scormDebug` variable in `ContentViewer` and `ScormClient` to control debug logging. This was a less structured approach for managing application-wide debug behavior.
-*   **Implementation:** The `ContentViewer` component no longer uses `window.scormDebug` for logging. All SCORM API call logging is now centralized within the `ScormClient` service, which emits debug data via the `EventBus` and forwards it via IPC to the main process. This ensures all relevant debug data is consistently available for the dedicated "Debug Console" window, aligning with the recommended robust debugging mechanism.
-*   **Benefit:** More robust and controllable debugging; cleaner code; better alignment with `uiState`'s purpose; ensures debug data is available for the dedicated debug window regardless of a global flag.
+Progress (Step 2 partial in step 1 scope):
+- app.js: Removed inline error HTML in initializeApplication catch; now logs via rendererLogger, updates uiState, emits app:error.
+- app-manager.js: handleInitializationError now logs via rendererLogger and uses uiState notification rather than inline HTML; emits app:error.
+- Recursion guard: Added _handlingInitError flag in AppManager to prevent repeated notifications and loops during initialization failures.
+- Remaining: audit any other inline error UI; verify styles/components/error-state.css alignment.
 
-### 6. Clarify/Streamline SCORM API Injection (Implemented)
- 
-*   **Issue:** There appeared to be potential redundancy or unclear responsibility between `ScormAPIBridge.injectScormAPI` and `ContentViewer.setupScormAPI`.
-*   **Implementation:** `ScormAPIBridge.injectScormAPI`, `generateAPIScript`, and `generateWrapperHTML` methods were removed from `src/renderer/services/scorm-api-bridge.js`. `ContentViewer.setupScormAPI` is confirmed as the primary and effective method for injecting the SCORM API.
-*   **Benefit:** Reduced code complexity; clearer responsibilities; improved maintainability.
- 
-### 7. Enhance `AppManager`'s Component Initialization Robustness (Implemented)
- 
-*   **Issue:** `AppManager.initializeComponents` directly checked for the existence of DOM elements by ID, which was brittle.
-*   **Implementation:** The `initializeComponents` method in `src/renderer/services/app-manager.js` was refactored to use a declarative configuration array. This approach explicitly defines component classes, their target element IDs, and whether they are required or optional. An explicit error is now thrown if a required UI element is missing.
-*   **Benefit:** More explicit component dependency management; clearer error reporting for missing UI elements; improved maintainability of the initialization process.
- 
-### 8. Improve `AppManager`'s Progress Tracking Container Creation (Implemented)
- 
-*   **Issue:** `AppManager` was previously responsible for dynamically creating a hidden `div` with the ID `progress-tracking`, which was a workaround for its intended placement.
-*   **Implementation:** The `div` with `id="progress-tracking"` was explicitly added to `index.html` within the `app-footer` section. This ensures the element exists in the DOM from the start, aligning with the component's intended rendering location.
-*   **Benefit:** Clearer separation of concerns between application orchestration and DOM structure; improved predictability of component rendering.
+C) EventBus and Navigation State Authority
+- Goal: Reduce loop risk; single source of truth for navigation availability.
+- Actions:
+  1) EventBus: setDebugMode based on uiState.ui.devModeEnabled; route to logger.debug.
+  2) NavigationControls: emit navigation:request and updateAvailableNavigation based on normalized state from SNBridge/UIState.
+  3) UIState: remains authority for navigationState; components update via uiState.updateNavigation with internal flags as necessary (retain current guards, but limit two-way writes).
+- Acceptance:
+  - No repeated ping-pong updates; debug output controlled via UI setting.
 
-### Additional UI/Layout Issues (Reported by User)
+D) NavigationControls Wiring and Fallback UX
+- Goal: Seamless navigation with clear feedback.
+- Actions:
+  1) AppManager after init: navigationControls.setContentViewer(contentViewer).
+  2) Normalize availableNavigation and/or derive canNavigatePrevious/Next in UIState for button states.
+  3) On fallback mode, show UIState warning notification and visual badge; log via logger.warn.
+- Acceptance:
+  - Buttons reflect accurate enabled/disabled states; fallback clearly indicated.
 
-These issues were reported by the user after the initial review and require investigation and fixing.
+E) ContentViewer API Injection and Scaling
+- Goal: Reliable SCORM API setup and responsive display.
+- Actions:
+  1) Prefer direct injection; keep ScormAPIBridge for postMessage-driven content; document precedence in dev_docs/guides/renderer-imports.md.
+  2) After iframe load, validate presence of API or postMessage path; if missing, show notification explaining likely cause and next steps.
+  3) Ensure styles/components/content-viewer.css defines .scaled-content and CSS variables used by ContentViewer.
+- Acceptance:
+  - API is available in typical packages; missing API yields actionable notification.
 
-9.  **"Course Structure" Section Not Working (Implemented - Initial CSS Fix):**
-    *   **Issue:** The `CourseOutline` component was reported as "not working," potentially due to visibility issues, especially on smaller screens where the sidebar might be hidden.
-    *   **Implementation:** A CSS rule was added to `src/styles/components/layout.css` to ensure that the `.app-sidebar` (which contains the Course Outline) is always visible on desktop screens (`min-width: 769px`), overriding any mobile-specific `transform: translateX(-100%)` that might hide it. This addresses a potential cause of the "not working" report related to visibility.
-    *   **Benefit:** Improves the visibility of the Course Structure section on desktop, allowing for better debugging and user experience. Further investigation into data loading or rendering issues may be required if visibility is not the sole cause.
+F) Footer Components UI State Fix
+- Goal: Correct UI state resolution.
+- Actions:
+  1) Remove "this.uiState = await this.uiState" in:
+     - src/renderer/components/scorm/footer-progress-bar.js
+     - src/renderer/components/scorm/footer-status-display.js
+  2) Use BaseComponent.loadDependencies-provided uiState only.
+- Acceptance:
+  - Footers update from progress:updated without errors.
 
-10. **Navigation Controls Overlay/Cut-off Issues:**
-    *   **Issue:** The navigation controls (text like "Learning Management System", "No course loaded", "← Previous Next → ☰ Menu") are reported as "overlays" that are "not working and cut off." This strongly suggests CSS, layout, or z-index issues preventing proper display and interaction.
-    *   **Recommendation:** Investigate the styling and layout of the `NavigationControls` component and its parent containers. This will involve examining `src/styles/components/layout.css`, `src/styles/components/navigation-controls.css`, and potentially `main.css` or `index.html` to identify conflicting styles, incorrect positioning, or z-index problems that cause the elements to be cut off or appear as unintended overlays. Ensure responsiveness across different window sizes.
-    *   **Benefit:** Improves usability and visual integrity of core navigation elements.
+G) CSS Validity
+- Goal: Correct pseudo-selectors in plain CSS.
+- Actions:
+  1) Replace &:hover / &:active with .navigation-controls__btn:hover and .navigation-controls__btn:active in src/styles/components/navigation-controls.css.
+  2) Audit other CSS files for similar nesting (navigation, content-viewer, forms, buttons).
+- Acceptance:
+  - Hover/active styles work as expected.
+
+H) Course Clearing Workflow
+- Goal: No runtime errors when clearing course.
+- Actions:
+  1) Update src/renderer/services/course-loader.js clearCourse():
+     - Replace uiState.clearCourse() with:
+       uiState.updateCourse({ info: null, structure: null, path: null, entryPoint: null });
+       eventBus.emit('course:cleared');
+- Acceptance:
+  - Clear course path works without exceptions.
+
+I) Accessibility and UX Enhancements
+- Goal: Improve operability and clarity.
+- Actions:
+  1) CourseOutline:
+     - Add role="tree", role="treeitem", aria-expanded, aria-selected.
+     - Keyboard navigation: arrows to move/select; Enter/Space to toggle/launch.
+     - Replace emoji icons with CSS classes or consistent icon set; add aria-labels.
+  2) NavigationControls:
+     - Ensure button labels and titles are accessible; add aria-disabled when disabled.
+  3) Loading and error messages:
+     - Ensure live regions (aria-live="polite/assertive") for notifications.
+- Acceptance:
+  - Core components navigable via keyboard; semantic roles present.
+
+J) Tests
+- Goal: Prevent regressions.
+- Actions:
+  1) Renderer integration tests:
+     - Init error shows notification; no inline HTML.
+     - Course load success updates ContentViewer and CourseOutline.
+     - Navigation buttons enable/disable correctly when SNBridge state changes.
+     - Footer elements reflect progress updates.
+     - CSS hover styles operate (basic DOM style checks).
+- Acceptance:
+  - New tests pass locally; existing tests remain green.
+
+Execution Plan and Order
+1) Implement centralized logging adapter and replace console.* in prioritized files.
+   - Status: Partially completed (adapter added; console replacements applied in app.js, app-manager.js, event-bus.js; docs updated; early-startup logger guards added)
+2) Centralize initialization error handling and remove inline error HTML.
+   - Status: Partially completed (app.js catch and app-manager handleInitializationError updated; recursion guard added)
+3) Fix footer uiState misuse.
+   - Status: Completed (footer-progress-bar.js and footer-status-display.js updated to rely on injected uiState only)
+4) Fix navigation-controls CSS selectors.
+5) Wire NavigationControls to ContentViewer in AppManager and normalize button state source.
+6) Add ContentViewer API presence verification and ensure scaling CSS.
+7) Fix CourseLoader.clearCourse workflow.
+8) Configure EventBus debug via UIState and route to logger.
+9) Accessibility updates for CourseOutline/Nav controls.
+10) Update dev_docs:
+   - This ui-improvement-plan.md (updated with progress)
+   - guides/logging-debugging.md: renderer logging guidance (updated)
+   - guides/renderer-imports.md: SCORM API injection precedence and patterns
+11) Add/extend renderer integration tests.
+
+Success Metrics
+- Quick test workflow completes without console errors; all notifications/logs visible in app log.
+- No inline error HTML; unified notification system for init and runtime errors.
+- Navigation buttons reflect sequencing availability accurately; fallback clearly indicated.
+- Progress and footer elements update in real-time; no uiState misuse.
+- Accessibility smoke-check: components operable via keyboard with ARIA roles set.
+
+Mermaid Overview
+flowchart TD
+  A[User selects SCORM package] --> B[CourseLoader emits course:loadStart]
+  B --> C[Main CAM processes manifest]
+  C --> D[UIState.updateCourse + eventBus course:loaded]
+  D --> E[ContentViewer loads entry + injects SCORM API]
+  D --> F[CourseOutline renders tree; current item]
+  E --> G[SCORM calls update UIState progress]
+  G --> H[ProgressTracking + Footer update via progress:updated]
+  D --> I[SNBridge initializes; provides availableNavigation]
+  I --> J[UIState.navigationState normalized]
+  J --> K[NavigationControls enable/disable buttons]
+  K --> L[User navigates next/previous; navigation:request]
+  L --> I
+  E -. error/timeout .-> N[UIState notification error]
+  A -. init error .-> M[Centralized init notification]
+
+Change Log Requirements
+- All code changes must include matching documentation updates in dev_docs as per repository rules.
+- Add meaningful commit messages per change area (logging, error handling, CSS fix, accessibility).
+
+Dependencies and Assumptions
+- Shared logger is available or can be proxied via preload to write to app log.
+- Existing styles provide base variables; adding ARIA roles won’t alter visual layout.
+
+Ownership and Review
+- Implementation will be performed in Code mode in small, reviewable commits per area (A–J).
+- Tests will be added/updated to enforce behavior.

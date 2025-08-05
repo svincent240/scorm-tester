@@ -31,6 +31,29 @@ class AppManager {
     this.services = new Map();
     this.components = new Map();
     this.initialized = false;
+
+    // Prevent recursive initialization error handling loops
+    this._handlingInitError = false;
+
+    // Lazy, safe logger reference with no-op fallback
+    this.logger = {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {}
+    };
+
+    // Initialize logger asynchronously but safely
+    import('../utils/renderer-logger.js')
+      .then(({ rendererLogger }) => {
+        if (rendererLogger) {
+          this.logger = rendererLogger;
+        }
+      })
+      .catch(() => {
+        // keep no-op fallback
+      });
+
     this.setupErrorHandlers();
   }
 
@@ -38,12 +61,12 @@ class AppManager {
    * Initialize the application
    */
   async initialize() {
-    // console.log('AppManager: Starting application initialization...'); // Removed debug log
-    
     try {
+      // Ensure logger is available (no-op fallback already set in constructor)
       this.uiState = await uiStatePromise; // Resolve the promise
-      console.log('DEBUG: AppManager - uiState resolved:', this.uiState);
+      this.logger.debug('AppManager - uiState resolved');
       scormClient.setUiState(this.uiState); // Pass resolved uiState to scormClient
+
       // Step 1: Initialize services
       await this.initializeServices();
       
@@ -57,18 +80,17 @@ class AppManager {
       this.setupUIEventListeners();
       
       this.initialized = true;
-      // console.log('AppManager: Application initialized successfully'); // Removed debug log
-      
+
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
-      console.log('DEBUG: AppManager - uiState before setLoading(false):', this.uiState);
+      rendererLogger.debug('AppManager - setLoading(false)');
       this.uiState.setLoading(false); // Use the resolved instance
       
       // Emit initialization complete event
       eventBus.emit('app:initialized');
       
     } catch (error) {
-      console.error('AppManager: Failed to initialize application:', error);
+      try { this.logger.error('AppManager: Failed to initialize application', error?.message || error); } catch (_) {}
       this.handleInitializationError(error);
       throw error;
     }
@@ -101,12 +123,13 @@ class AppManager {
    * Initialize all components
    */
   async initializeComponents() {
-    console.log('AppManager: Initializing components...');
+    this.logger.info('AppManager: Initializing components...');
     
     const componentConfigs = [
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
-      { name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: true },
+      // ProgressTracking is a full widget not used in the footer; load only if its container exists elsewhere
+      { name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: false },
       { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'app-footer', required: true },
       { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'app-footer', required: true },
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true }
@@ -119,18 +142,18 @@ class AppManager {
           const componentInstance = new config.class(config.elementId);
           await componentInstance.initialize();
           this.components.set(config.name, componentInstance);
-          console.log(`AppManager: ${config.name} initialized`);
+          this.logger.info(`AppManager: ${config.name} initialized`);
         } else {
           if (config.required) {
             throw new Error(`Required UI element '${config.elementId}' for component '${config.name}' not found in DOM.`);
           } else {
-            console.debug(`AppManager: Optional UI element '${config.elementId}' for component '${config.name}' not found in DOM. Skipping initialization.`);
+            this.logger.debug(`AppManager: Optional UI element '${config.elementId}' for component '${config.name}' not found in DOM. Skipping initialization.`);
           }
         }
       }
-      console.log('AppManager: All components initialized');
+      this.logger.info('AppManager: All components initialized');
     } catch (error) {
-      console.error('AppManager: Error initializing components:', error);
+      try { this.logger.error('AppManager: Error initializing components', error?.message || error); } catch (_) {}
       throw error;
     }
   }
@@ -148,8 +171,8 @@ class AppManager {
     });
  
     eventBus.on('course:loadError', (errorData) => {
-      console.error('AppManager: Course load error:', errorData.error);
-      this.showError('Course Loading Error', errorData.error);
+      try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
+      this.showError('Course Loading Error', (errorData && (errorData.error || errorData.message)) || 'Unknown error');
     });
  
     eventBus.on('course:loadingStateChanged', (stateData) => {
@@ -166,15 +189,15 @@ class AppManager {
     });
  
     eventBus.on('scorm:error', (errorData) => {
-      console.error('AppManager: SCORM error:', JSON.stringify(errorData, null, 2));
-      console.error('AppManager: SCORM error details:', {
-        type: typeof errorData,
-        message: errorData?.message || 'No message',
-        code: errorData?.code || 'No code',
-        source: errorData?.source || 'No source',
-        timestamp: new Date().toISOString(),
-        raw: errorData
-      });
+      try {
+        const safeMsg = (errorData && (errorData.message || errorData.error)) || 'Unknown SCORM error';
+        this.logger.error('AppManager: SCORM error', safeMsg);
+        this.logger.error('AppManager: SCORM error details', {
+          code: errorData && errorData.code,
+          source: errorData && errorData.source,
+          timestamp: new Date().toISOString()
+        });
+      } catch (_) {}
     });
  
     // console.log('AppManager: Event handlers setup complete'); // Removed debug log
@@ -191,7 +214,7 @@ class AppManager {
     if (courseLoadBtn) {
       courseLoadBtn.addEventListener('click', () => {
         courseLoader.handleCourseLoad().catch(error => {
-          console.error('AppManager: Course load error:', error);
+          try { this.logger.error('AppManager: Course load error', error?.message || error); } catch (_) {}
         });
       });
       // console.log('AppManager: Course load button listener attached'); // Removed debug log
@@ -203,7 +226,7 @@ class AppManager {
       btn.onclick = null; // Remove inline onclick
       btn.addEventListener('click', () => {
         courseLoader.handleCourseLoad().catch(error => {
-          console.error('AppManager: Course load error from welcome button:', error);
+          try { this.logger.error('AppManager: Course load error from welcome button', error?.message || error); } catch (_) {}
         });
       });
       // console.log(`AppManager: Welcome button ${index + 1} listener attached`); // Removed debug log
@@ -240,14 +263,11 @@ class AppManager {
    * Handle course loaded event
    */
   handleCourseLoaded(courseData) {
-    console.log('DEBUG: AppManager - handleCourseLoaded - uiState:', this.uiState);
-    console.log('DEBUG: AppManager - handleCourseLoaded - courseData:', courseData);
-    // console.log('AppManager: Handling course loaded:', courseData); // Removed debug log
-    
+    try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) {}
+
     try {
       // Clear API call history when new course is loaded
       if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-        // console.log('AppManager: Clearing API call history for new course'); // Removed debug log
         window.electronAPI.emitDebugEvent('course:loaded', {
           courseTitle: courseData.info?.title || 'Course',
           timestamp: Date.now()
@@ -270,7 +290,7 @@ class AppManager {
       this.showSuccess('Course Loaded', `Successfully loaded: ${courseData.info?.title || 'Course'}`);
       
     } catch (error) {
-      console.error('AppManager: Error handling course loaded:', error);
+      try { this.logger.error('AppManager: Error handling course loaded', error?.message || error); } catch (_) {}
     }
   }
 
@@ -280,13 +300,15 @@ class AppManager {
   setupErrorHandlers() {
     // Global error handler
     window.addEventListener('error', (event) => {
-      console.error('AppManager: Global error detected:', event.error);
-      console.error('AppManager: Error source:', event.filename, 'line:', event.lineno);
+      try {
+        this.logger.error('AppManager: Global error detected', (event && (event.error && event.error.message)) || event?.error || 'unknown');
+        this.logger.error('AppManager: Error source', { file: event && event.filename, line: event && event.lineno });
+      } catch (_) {}
     });
 
     // Unhandled promise rejection handler  
     window.addEventListener('unhandledrejection', (event) => {
-      console.error('AppManager: Unhandled promise rejection:', event.reason);
+      try { this.logger.error('AppManager: Unhandled promise rejection', event?.reason?.message || event?.reason || 'unknown'); } catch (_) {}
     });
   }
 
@@ -294,18 +316,33 @@ class AppManager {
    * Handle initialization errors
    */
   handleInitializationError(error) {
-    console.error('AppManager: Initialization error:', error);
-    
-    // Show error to user
-    const errorElement = document.getElementById('app-error');
-    if (errorElement) {
-      errorElement.style.display = 'block';
-      errorElement.innerHTML = `
-        <h3>Application Initialization Error</h3>
-        <p>Failed to initialize the application: ${error.message}</p>
-        <button onclick="location.reload()">Reload Application</button>
-      `;
-    }
+    // Prevent recursive handling loops
+    if (this._handlingInitError) return;
+    this._handlingInitError = true;
+
+    try { this.logger.error('AppManager: Initialization error', error?.message || error); } catch (_) {}
+
+    // Centralized UI handling via UIState notification (no inline HTML)
+    try {
+      if (this.uiState && typeof this.uiState.showNotification === 'function') {
+        if (typeof this.uiState.setError === 'function') {
+          this.uiState.setError(error);
+        }
+        this.uiState.showNotification({
+          message: `Initialization Error: ${error?.message || 'Unknown error'}`,
+          type: 'error',
+          duration: 0
+        });
+      }
+    } catch (_) {}
+
+    // Emit app error for any listeners (avoid re-emitting inside an app:error handling path)
+    try {
+      eventBus.emit('app:error', { error });
+    } catch (_) {}
+
+    // Allow future error handling after this tick
+    setTimeout(() => { this._handlingInitError = false; }, 0);
   }
 
   /**
@@ -339,7 +376,9 @@ class AppManager {
    * Show error message
    */
   showError(title, message) {
-    console.error(`AppManager: ${title}:`, message);
+    import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+      rendererLogger.error(`AppManager: ${title}`, message);
+    });
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'error',
@@ -380,7 +419,7 @@ class AppManager {
     if (window.electronAPI && window.electronAPI.openDebugWindow) {
       window.electronAPI.openDebugWindow();
     } else {
-      console.warn('AppManager: electronAPI or openDebugWindow not available. Cannot open debug window.');
+      try { this.logger.warn('AppManager: electronAPI or openDebugWindow not available. Cannot open debug window.'); } catch (_) {}
     }
   }
 
@@ -398,7 +437,7 @@ class AppManager {
     try {
       localStorage.setItem('scorm-tester-theme', newTheme);
     } catch (error) {
-      console.warn('Failed to save theme preference:', error);
+      try { this.logger.warn('Failed to save theme preference', error?.message || error); } catch (_) {}
     }
   }
 
@@ -451,7 +490,7 @@ class AppManager {
       // console.log('AppManager: Application shutdown complete'); // Removed debug log
       
     } catch (error) {
-      console.error('AppManager: Error during shutdown:', error);
+      try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) {}
     }
   }
 }

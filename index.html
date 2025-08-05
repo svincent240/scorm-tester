@@ -208,10 +208,12 @@
     </main>
     
     <!-- Progress Footer -->
+    <!-- Note: Footer is the single source of truth for compact progress display.
+         The full ProgressTracking component should NOT be mounted in the footer.
+         Use it in sidebar or dedicated panels if needed. -->
     <footer id="app-footer" class="app-footer">
       <div class="footer">
         <div class="footer__progress">
-          <div id="progress-tracking" class="progress-tracking hidden"></div> <!-- Added this line -->
           <div class="progress-info">
             <span class="progress-info__label">Learning Progress</span>
             <div class="progress-bar">

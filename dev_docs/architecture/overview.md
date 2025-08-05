@@ -1,5 +1,14 @@
 # Application Architecture Overview
 
+> Footer progress display consolidation
+>
+> - The application footer is the single source of truth for compact progress indicators.
+> - Footer composition:
+>   - FooterProgressBar updates #footer-progress-fill and #footer-progress-percentage
+>   - FooterStatusDisplay updates #footer-status, #footer-score, and #footer-time
+> - The full ProgressTracking component is a standalone widget intended for non-footer contexts (e.g., sidebar or dedicated panels). It should not be mounted in the footer to avoid duplicate progress UIs.
+> - The hidden #progress-tracking placeholder previously inside the footer was removed from index.html to enforce this pattern.
+
 ## System Architecture
 
 The SCORM Tester is an Electron-based desktop application designed to simulate various Learning Management System (LMS) environments for testing SCORM 2004 4th Edition content packages locally.

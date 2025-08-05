@@ -29,21 +29,28 @@ async function initializeApplication() {
     await appManager.initialize();
     
   } catch (error) {
-    console.error('Application initialization failed:', error);
-    console.error('Error details:', error.stack);
-    
-    // Show error to user
-    const errorElement = document.getElementById('app-error') || document.body;
-    errorElement.innerHTML = `
-      <div style="padding: 20px; background: #f44336; color: white; margin: 10px;">
-        <h3>Application Initialization Error</h3>
-        <p>Failed to initialize the SCORM Tester application:</p>
-        <p><strong>${error.message}</strong></p>
-        <button onclick="location.reload()" style="margin-top: 10px; padding: 10px; background: white; color: #f44336; border: none; cursor: pointer;">
-          Reload Application
-        </button>
-      </div>
-    `;
+    // Centralized logging and UI notification (no inline HTML)
+    const { rendererLogger } = await import('./utils/renderer-logger.js');
+    const { eventBus } = await import('./services/event-bus.js');
+    const { uiState } = await import('./services/ui-state.js');
+    try {
+      rendererLogger.error('Application initialization failed:', error?.message || error);
+      rendererLogger.error('Error details stack:', error?.stack || 'no stack');
+    } catch (_) {}
+
+    try {
+      const resolvedUiState = await uiState;
+      resolvedUiState.setError(error);
+      resolvedUiState.showNotification({
+        message: `Initialization Error: ${error?.message || 'Unknown error'}`,
+        type: 'error',
+        duration: 0
+      });
+    } catch (_) {}
+
+    try {
+      eventBus.emit('app:error', { error });
+    } catch (_) {}
   }
 }
  

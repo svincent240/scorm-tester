@@ -14,7 +14,8 @@ class FooterProgressBar extends BaseComponent {
   }
 
   async setup() {
-    this.uiState = await this.uiState; // Ensure uiState is resolved
+    // Use uiState instance provided by BaseComponent.loadDependencies()
+    // No re-awaiting or reassignment to avoid clobbering the instance.
   }
 
   renderContent() {

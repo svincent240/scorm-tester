@@ -40,7 +40,9 @@ class EventBus {
     this.listeners.get(event).push(subscription);
 
     if (this.debugMode) {
-      console.debug(`EventBus: Subscribed to '${event}' (${this.listeners.get(event).length} total)`);
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug(`EventBus: Subscribed to '${event}' (${this.listeners.get(event).length} total)`);
+      });
     }
 
     // Return unsubscribe function
@@ -66,7 +68,9 @@ class EventBus {
       }
 
       if (this.debugMode) {
-        console.debug(`EventBus: Unsubscribed from '${event}' (${eventListeners.length} remaining)`);
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug(`EventBus: Unsubscribed from '${event}' (${eventListeners.length} remaining)`);
+        });
       }
     }
   }
@@ -95,7 +99,9 @@ class EventBus {
     }
 
     if (this.debugMode) {
-      console.debug(`EventBus: Emitting '${event}'`, data);
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug(`EventBus: Emitting '${event}'`, data);
+      });
     }
 
     // Emit to subscribers
@@ -110,7 +116,9 @@ class EventBus {
             subscription.handler(data, eventData);
           }
         } catch (error) {
-          console.error(`EventBus: Error in event handler for '${event}':`, error);
+          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+            rendererLogger.error(`EventBus: Error in event handler for '${event}'`, error?.message || error);
+          });
           // CRITICAL FIX: Prevent infinite recursion by not emitting 'error' event
           // Only emit error event if it's not already an error event to prevent loops
           if (event !== 'error') {
@@ -145,12 +153,16 @@ class EventBus {
     if (event) {
       this.listeners.delete(event);
       if (this.debugMode) {
-        console.debug(`EventBus: Cleared all listeners for '${event}'`);
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug(`EventBus: Cleared all listeners for '${event}'`);
+        });
       }
     } else {
       this.listeners.clear();
       if (this.debugMode) {
-        console.debug('EventBus: Cleared all listeners');
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug('EventBus: Cleared all listeners');
+        });
       }
     }
   }
@@ -206,7 +218,24 @@ class EventBus {
    */
   setDebugMode(enabled) {
     this.debugMode = Boolean(enabled);
-    console.log(`EventBus: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    // Use a local cached logger with no-op fallback to avoid undefined during early startup
+    if (!this._logger) {
+      this._logger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {}
+      };
+      // Initialize asynchronously; do not block or throw if import fails
+      import('../utils/renderer-logger.js')
+        .then(({ rendererLogger }) => {
+          if (rendererLogger) this._logger = rendererLogger;
+        })
+        .catch(() => { /* keep no-op */ });
+    }
+    try {
+      this._logger.info(`EventBus: Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (_) { /* no-op */ }
   }
 
   /**
@@ -216,7 +245,9 @@ class EventBus {
     this.clear();
     this.history = [];
     if (this.debugMode) {
-      console.debug('EventBus: Destroyed');
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug('EventBus: Destroyed');
+      });
     }
   }
 }
@@ -224,8 +255,11 @@ class EventBus {
 // Create and export singleton instance
 const eventBus = new EventBus();
 
-// Enable debug mode in development
-// Note: process.env is not available in renderer, so we'll enable debug mode by default
-eventBus.setDebugMode(true);
+// Enable debug mode default off; UIState will control later (step 8).
+try {
+  eventBus.setDebugMode(false);
+} catch (_) {
+  // no-op
+}
 
 export { EventBus, eventBus };
