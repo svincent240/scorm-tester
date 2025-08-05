@@ -385,25 +385,504 @@ class ManifestParser {
     return [];
   }
 
-  // Placeholder for sequencing parsing methods
-  parseControlMode(sequencingElement) { return null; }
-  parseSequencingRules(sequencingElement) { return null; }
-  parseLimitConditions(sequencingElement) { return null; }
-  parseRollupRules(sequencingElement) { return null; }
-  parseObjectives(sequencingElement) { return null; }
-  parseRandomizationControls(sequencingElement) { return null; }
-  parseDeliveryControls(sequencingElement) { return null; }
+  /**
+   * Parse controlMode element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Control mode information
+   */
+  parseControlMode(sequencingElement) {
+    const controlModeElement = this.getChildElement(sequencingElement, 'imsss:controlMode');
+    if (!controlModeElement) return null;
+
+    return {
+      choice: this.getAttribute(controlModeElement, 'choice') === 'true',
+      flow: this.getAttribute(controlModeElement, 'flow') === 'true',
+      forwardOnly: this.getAttribute(controlModeElement, 'forwardOnly') === 'true',
+      choiceExit: this.getAttribute(controlModeElement, 'choiceExit') === 'true',
+      flowExit: this.getAttribute(controlModeElement, 'flowExit') === 'true',
+      trackLMS: this.getAttribute(controlModeElement, 'trackLMS') === 'true',
+      trackSCO: this.getAttribute(controlModeElement, 'trackSCO') === 'true',
+      useCurrentAttemptObjectiveInfo: this.getAttribute(controlModeElement, 'useCurrentAttemptObjectiveInfo') === 'true',
+      useCurrentAttemptProgressInfo: this.getAttribute(controlModeElement, 'useCurrentAttemptProgressInfo') === 'true'
+    };
+  }
+
+  /**
+   * Parse sequencingRules element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Sequencing rules information
+   */
+  parseSequencingRules(sequencingElement) {
+    const sequencingRulesElement = this.getChildElement(sequencingElement, 'imsss:sequencingRules');
+    if (!sequencingRulesElement) return null;
+
+    return {
+      preConditionRules: this.parseRules(sequencingRulesElement, 'imsss:preConditionRule'),
+      postConditionRules: this.parseRules(sequencingRulesElement, 'imsss:postConditionRule'),
+      exitConditionRules: this.parseRules(sequencingRulesElement, 'imsss:exitConditionRule')
+    };
+  }
+
+  /**
+   * Helper to parse rule elements (preConditionRule, postConditionRule, exitConditionRule)
+   * @param {Element} parentElement - Parent element (sequencingRules)
+   * @param {string} tagName - Tag name of the rule element
+   * @returns {Array} Array of rule objects
+   */
+  parseRules(parentElement, tagName) {
+    const rules = [];
+    const ruleElements = this.getChildElements(parentElement, tagName);
+    for (const ruleElement of ruleElements) {
+      rules.push({
+        conditions: this.parseConditions(ruleElement),
+        actions: this.parseRuleActions(ruleElement)
+      });
+    }
+    return rules;
+  }
+
+  /**
+   * Parse conditions element
+   * @param {Element} ruleElement - Rule element
+   * @returns {Object|null} Conditions information
+   */
+  parseConditions(ruleElement) {
+    const conditionsElement = this.getChildElement(ruleElement, 'imsss:ruleConditions');
+    if (!conditionsElement) return null;
+
+    return {
+      conditionCombination: this.getAttribute(conditionsElement, 'conditionCombination') || 'all',
+      conditions: this.getChildElements(conditionsElement, 'imsss:ruleCondition').map(conditionElement => ({
+        condition: this.getAttribute(conditionElement, 'condition'),
+        operator: this.getAttribute(conditionElement, 'operator') || 'noOp',
+        measureThreshold: this.getAttribute(conditionElement, 'measureThreshold'),
+        referencedObjective: this.getAttribute(conditionElement, 'referencedObjective')
+      }))
+    };
+  }
+
+  /**
+   * Parse ruleActions element
+   * @param {Element} ruleElement - Rule element
+   * @returns {Object|null} Rule actions information
+   */
+  parseRuleActions(ruleElement) {
+    const actionsElement = this.getChildElement(ruleElement, 'imsss:ruleActions');
+    if (!actionsElement) return null;
+
+    return {
+      action: this.getAttribute(actionsElement, 'action')
+    };
+  }
+
+  /**
+   * Parse limitConditions element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Limit conditions information
+   */
+  parseLimitConditions(sequencingElement) {
+    const limitConditionsElement = this.getChildElement(sequencingElement, 'imsss:limitConditions');
+    if (!limitConditionsElement) return null;
+
+    return {
+      attemptLimit: this.getAttribute(limitConditionsElement, 'attemptLimit'),
+      attemptAbsoluteDurationLimit: this.getAttribute(limitConditionsElement, 'attemptAbsoluteDurationLimit'),
+      attemptExperiencedDurationLimit: this.getAttribute(limitConditionsElement, 'attemptExperiencedDurationLimit')
+    };
+  }
+
+  /**
+   * Parse rollupRules element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Rollup rules information
+   */
+  parseRollupRules(sequencingElement) {
+    const rollupRulesElement = this.getChildElement(sequencingElement, 'imsss:rollupRules');
+    if (!rollupRulesElement) return null;
+
+    return {
+      rollupObjectiveSatisfied: this.getAttribute(rollupRulesElement, 'rollupObjectiveSatisfied') === 'true',
+      rollupProgressCompletion: this.getAttribute(rollupRulesElement, 'rollupProgressCompletion') === 'true',
+      rollupTrackingAttempts: this.getAttribute(rollupRulesElement, 'rollupTrackingAttempts') === 'true',
+      rollupSuccess: this.getAttribute(rollupRulesElement, 'rollupSuccess'),
+      rollupProgress: this.getAttribute(rollupRulesElement, 'rollupProgress'),
+      rollupConsiderations: this.parseRollupConsiderations(rollupRulesElement),
+      rollupRules: this.parseRules(rollupRulesElement, 'imsss:rollupRule')
+    };
+  }
+
+  /**
+   * Parse rollupConsiderations element
+   * @param {Element} rollupRulesElement - Rollup rules element
+   * @returns {Object|null} Rollup considerations information
+   */
+  parseRollupConsiderations(rollupRulesElement) {
+    const rollupConsiderationsElement = this.getChildElement(rollupRulesElement, 'imsss:rollupConsiderations');
+    if (!rollupConsiderationsElement) return null;
+
+    return {
+      measureSatisfactionIfActive: this.getAttribute(rollupConsiderationsElement, 'measureSatisfactionIfActive') === 'true',
+      contributeToRollup: this.getAttribute(rollupConsiderationsElement, 'contributeToRollup'),
+      requiredForSatisfied: this.getAttribute(rollupConsiderationsElement, 'requiredForSatisfied'),
+      requiredForNotSatisfied: this.getAttribute(rollupConsiderationsElement, 'requiredForNotSatisfied'),
+      requiredForCompleted: this.getAttribute(rollupConsiderationsElement, 'requiredForCompleted'),
+      requiredForIncomplete: this.getAttribute(rollupConsiderationsElement, 'requiredForIncomplete')
+    };
+  }
+
+  /**
+   * Parse objectives element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Objectives information
+   */
+  parseObjectives(sequencingElement) {
+    const objectivesElement = this.getChildElement(sequencingElement, 'imsss:objectives');
+    if (!objectivesElement) return null;
+
+    return {
+      primaryObjective: this.parseObjective(objectivesElement, 'imsss:primaryObjective'),
+      objectives: this.getChildElements(objectivesElement, 'imsss:objective').map(objElement => this.parseObjective(objElement))
+    };
+  }
+
+  /**
+   * Helper to parse a single objective element
+   * @param {Element} parentElement - Parent element (objectives or primaryObjective)
+   * @param {string} [tagName='imsss:objective'] - Tag name of the objective element
+   * @returns {Object|null} Objective information
+   */
+  parseObjective(parentElement, tagName = 'imsss:objective') {
+    const objectiveElement = this.getChildElement(parentElement, tagName);
+    if (!objectiveElement) return null;
+
+    return {
+      satisfiedByMeasure: this.getAttribute(objectiveElement, 'satisfiedByMeasure') === 'true',
+      objectiveID: this.getAttribute(objectiveElement, 'objectiveID'),
+      minNormalizedMeasure: this.getElementText(objectiveElement, 'imsss:minNormalizedMeasure'),
+      mapInfo: this.parseMapInfo(objectiveElement)
+    };
+  }
+
+  /**
+   * Parse mapInfo element
+   * @param {Element} objectiveElement - Objective element
+   * @returns {Object|null} Map info information
+   */
+  parseMapInfo(objectiveElement) {
+    const mapInfoElement = this.getChildElement(objectiveElement, 'imsss:mapInfo');
+    if (!mapInfoElement) return null;
+
+    return {
+      targetObjectiveID: this.getAttribute(mapInfoElement, 'targetObjectiveID'),
+      readSatisfiedStatus: this.getAttribute(mapInfoElement, 'readSatisfiedStatus') === 'true',
+      readNormalizedMeasure: this.getAttribute(mapInfoElement, 'readNormalizedMeasure') === 'true',
+      writeSatisfiedStatus: this.getAttribute(mapInfoElement, 'writeSatisfiedStatus') === 'true',
+      writeNormalizedMeasure: this.getAttribute(mapInfoElement, 'writeNormalizedMeasure') === 'true'
+    };
+  }
+
+  /**
+   * Parse randomizationControls element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Randomization controls information
+   */
+  parseRandomizationControls(sequencingElement) {
+    const randomizationControlsElement = this.getChildElement(sequencingElement, 'imsss:randomizationControls');
+    if (!randomizationControlsElement) return null;
+
+    return {
+      randomizationTiming: this.getAttribute(randomizationControlsElement, 'randomizationTiming'),
+      reorderChildren: this.getAttribute(randomizationControlsElement, 'reorderChildren') === 'true',
+      selectionCount: this.getAttribute(randomizationControlsElement, 'selectionCount'),
+      selectionTiming: this.getAttribute(randomizationControlsElement, 'selectionTiming')
+    };
+  }
+
+  /**
+   * Parse deliveryControls element
+   * @param {Element} sequencingElement - Sequencing element
+   * @returns {Object|null} Delivery controls information
+   */
+  parseDeliveryControls(sequencingElement) {
+    const deliveryControlsElement = this.getChildElement(sequencingElement, 'imsss:deliveryControls');
+    if (!deliveryControlsElement) return null;
+
+    return {
+      tracked: this.getAttribute(deliveryControlsElement, 'tracked') === 'true',
+      completionSetByContent: this.getAttribute(deliveryControlsElement, 'completionSetByContent') === 'true',
+      objectiveSetByContent: this.getAttribute(deliveryControlsElement, 'objectiveSetByContent') === 'true'
+    };
+  }
+
+  /**
+   * Parse LOM General element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} General metadata
+   */
+  parseLOMGeneral(lomElement) {
+    const generalElement = this.getChildElement(lomElement, 'lom:general');
+    if (!generalElement) return null;
+
+    return {
+      identifier: this.parseLOMIdentifiers(generalElement),
+      title: this.parseLOMLangString(generalElement, 'lom:title'),
+      language: this.getElementText(generalElement, 'lom:language'),
+      description: this.parseLOMLangString(generalElement, 'lom:description'),
+      keyword: this.getChildElements(generalElement, 'lom:keyword').map(el => this.getElementText(el, 'lom:string')),
+      coverage: this.parseLOMLangString(generalElement, 'lom:coverage'),
+      structure: this.parseLOMVocabulary(generalElement, 'lom:structure'),
+      aggregationLevel: this.parseLOMVocabulary(generalElement, 'lom:aggregationLevel')
+    };
+  }
+
+  /**
+   * Parse LOM Lifecycle element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Lifecycle metadata
+   */
+  parseLOMLifecycle(lomElement) {
+    const lifecycleElement = this.getChildElement(lomElement, 'lom:lifecycle');
+    if (!lifecycleElement) return null;
+
+    return {
+      version: this.parseLOMLangString(lifecycleElement, 'lom:version'),
+      status: this.parseLOMVocabulary(lifecycleElement, 'lom:status'),
+      contribute: this.getChildElements(lifecycleElement, 'lom:contribute').map(el => ({
+        role: this.parseLOMVocabulary(el, 'lom:role'),
+        entity: this.getElementText(el, 'lom:entity'),
+        date: this.parseLOMDateTime(el, 'lom:date')
+      }))
+    };
+  }
+
+  /**
+   * Parse LOM MetaMetadata element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Meta-metadata
+   */
+  parseLOMMetaMetadata(lomElement) {
+    const metaMetadataElement = this.getChildElement(lomElement, 'lom:metaMetadata');
+    if (!metaMetadataElement) return null;
+
+    return {
+      identifier: this.parseLOMIdentifiers(metaMetadataElement),
+      catalogEntry: this.getChildElements(metaMetadataElement, 'lom:catalogEntry').map(el => ({
+        catalog: this.getElementText(el, 'lom:catalog'),
+        entry: this.parseLOMLangString(el, 'lom:entry')
+      })),
+      language: this.getElementText(metaMetadataElement, 'lom:language'),
+      contribute: this.getChildElements(metaMetadataElement, 'lom:contribute').map(el => ({
+        role: this.parseLOMVocabulary(el, 'lom:role'),
+        entity: this.getElementText(el, 'lom:entity'),
+        date: this.parseLOMDateTime(el, 'lom:date')
+      }))
+    };
+  }
+
+  /**
+   * Parse LOM Technical element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Technical metadata
+   */
+  parseLOMTechnical(lomElement) {
+    const technicalElement = this.getChildElement(lomElement, 'lom:technical');
+    if (!technicalElement) return null;
+
+    return {
+      format: this.getChildElements(technicalElement, 'lom:format').map(el => el.textContent.trim()),
+      size: this.getElementText(technicalElement, 'lom:size'),
+      location: this.getChildElements(technicalElement, 'lom:location').map(el => el.textContent.trim()),
+      requirement: this.getChildElements(technicalElement, 'lom:requirement').map(el => ({
+        orComposite: this.getChildElements(el, 'lom:orComposite').map(orEl => ({
+          type: this.parseLOMVocabulary(orEl, 'lom:type'),
+          name: this.parseLOMVocabulary(orEl, 'lom:name'),
+          minimumVersion: this.getElementText(orEl, 'lom:minimumVersion'),
+          maximumVersion: this.getElementText(orEl, 'lom:maximumVersion')
+        }))
+      })),
+      installationRemarks: this.parseLOMLangString(technicalElement, 'lom:installationRemarks'),
+      otherPlatformRequirements: this.parseLOMLangString(technicalElement, 'lom:otherPlatformRequirements'),
+      duration: this.parseLOMDuration(technicalElement)
+    };
+  }
+
+  /**
+   * Parse LOM Educational element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Educational metadata
+   */
+  parseLOMEducational(lomElement) {
+    const educationalElements = this.getChildElements(lomElement, 'lom:educational');
+    if (educationalElements.length === 0) return null;
+
+    return educationalElements.map(educationalElement => ({
+      interactivityType: this.parseLOMVocabulary(educationalElement, 'lom:interactivityType'),
+      learningResourceType: this.parseLOMVocabulary(educationalElement, 'lom:learningResourceType'),
+      interactivityLevel: this.parseLOMVocabulary(educationalElement, 'lom:interactivityLevel'),
+      semanticDensity: this.parseLOMVocabulary(educationalElement, 'lom:semanticDensity'),
+      intendedEndUserRole: this.parseLOMVocabulary(educationalElement, 'lom:intendedEndUserRole'),
+      context: this.parseLOMVocabulary(educationalElement, 'lom:context'),
+      typicalAgeRange: this.parseLOMLangString(educationalElement, 'lom:typicalAgeRange'),
+      difficulty: this.parseLOMVocabulary(educationalElement, 'lom:difficulty'),
+      typicalLearningTime: this.parseLOMDuration(educationalElement),
+      description: this.parseLOMLangString(educationalElement, 'lom:description'),
+      language: this.getElementText(educationalElement, 'lom:language')
+    }));
+  }
+
+  /**
+   * Parse LOM Rights element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Rights metadata
+   */
+  parseLOMRights(lomElement) {
+    const rightsElement = this.getChildElement(lomElement, 'lom:rights');
+    if (!rightsElement) return null;
+
+    return {
+      cost: this.parseLOMVocabulary(rightsElement, 'lom:cost'),
+      copyrightAndOtherRestrictions: this.parseLOMVocabulary(rightsElement, 'lom:copyrightAndOtherRestrictions'),
+      description: this.parseLOMLangString(rightsElement, 'lom:description')
+    };
+  }
+
+  /**
+   * Parse LOM Relation element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Relation metadata
+   */
+  parseLOMRelation(lomElement) {
+    const relationElements = this.getChildElements(lomElement, 'lom:relation');
+    if (relationElements.length === 0) return null;
+
+    return relationElements.map(relationElement => ({
+      kind: this.parseLOMVocabulary(relationElement, 'lom:kind'),
+      resource: {
+        identifier: this.parseLOMIdentifiers(relationElement),
+        description: this.parseLOMLangString(relationElement, 'lom:description')
+      }
+    }));
+  }
+
+  /**
+   * Parse LOM Annotation element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Annotation metadata
+   */
+  parseLOMAnnotation(lomElement) {
+    const annotationElements = this.getChildElements(lomElement, 'lom:annotation');
+    if (annotationElements.length === 0) return null;
+
+    return annotationElements.map(annotationElement => ({
+      entity: this.getElementText(annotationElement, 'lom:entity'),
+      date: this.parseLOMDateTime(annotationElement, 'lom:date'),
+      description: this.parseLOMLangString(annotationElement, 'lom:description')
+    }));
+  }
+
+  /**
+   * Parse LOM Classification element
+   * @param {Element} lomElement - LOM element
+   * @returns {Object|null} Classification metadata
+   */
+  parseLOMClassification(lomElement) {
+    const classificationElements = this.getChildElements(lomElement, 'lom:classification');
+    if (classificationElements.length === 0) return null;
+
+    return classificationElements.map(classificationElement => ({
+      purpose: this.parseLOMVocabulary(classificationElement, 'lom:purpose'),
+      taxonPath: this.getChildElements(classificationElement, 'lom:taxonPath').map(el => ({
+        source: this.parseLOMLangString(el, 'lom:source'),
+        taxon: this.getChildElements(el, 'lom:taxon').map(taxonEl => ({
+          id: this.getElementText(taxonEl, 'lom:id'),
+          entry: this.parseLOMLangString(taxonEl, 'lom:entry')
+        }))
+      })),
+      description: this.parseLOMLangString(classificationElement, 'lom:description'),
+      keyword: this.getChildElements(classificationElement, 'lom:keyword').map(el => this.parseLOMLangString(el, 'lom:string'))
+    }));
+  }
+
+  /**
+   * Helper to parse lom:langstring elements
+   * @param {Element} parentElement - Parent element
+   * @param {string} tagName - Tag name (e.g., 'lom:title', 'lom:description')
+   * @returns {Object|null} Language string object
+   */
+  parseLOMLangString(parentElement, tagName) {
+    const langStringElement = this.getChildElement(parentElement, tagName);
+    if (!langStringElement) return null;
+    const stringElement = this.getChildElement(langStringElement, 'lom:string');
+    if (!stringElement) return null;
+    return {
+      lang: this.getAttribute(stringElement, 'xml:lang'),
+      value: stringElement.textContent.trim()
+    };
+  }
+
+  /**
+   * Helper to parse lom:vocabulary elements
+   * @param {Element} parentElement - Parent element
+   * @param {string} tagName - Tag name (e.g., 'lom:structure', 'lom:status')
+   * @returns {Object|null} Vocabulary object
+   */
+  parseLOMVocabulary(parentElement, tagName) {
+    const vocabularyElement = this.getChildElement(parentElement, tagName);
+    if (!vocabularyElement) return null;
+    return {
+      source: this.getElementText(vocabularyElement, 'lom:source'),
+      value: this.getElementText(vocabularyElement, 'lom:value')
+    };
+  }
+
+  /**
+   * Helper to parse lom:dateTime elements
+   * @param {Element} parentElement - Parent element
+   * @param {string} tagName - Tag name (e.g., 'lom:date')
+   * @returns {Object|null} Date time object
+   */
+  parseLOMDateTime(parentElement, tagName) {
+    const dateTimeElement = this.getChildElement(parentElement, tagName);
+    if (!dateTimeElement) return null;
+    return {
+      dateTime: this.getElementText(dateTimeElement, 'lom:dateTime'),
+      description: this.parseLOMLangString(dateTimeElement, 'lom:description')
+    };
+  }
+
+  /**
+   * Helper to parse lom:duration elements
+   * @param {Element} parentElement - Parent element
+   * @param {string} tagName - Tag name (e.g., 'lom:duration')
+   * @returns {Object|null} Duration object
+   */
+  parseLOMDuration(parentElement, tagName = 'lom:duration') {
+    const durationElement = this.getChildElement(parentElement, tagName);
+    if (!durationElement) return null;
+    return {
+      duration: this.getElementText(durationElement, 'lom:duration'),
+      description: this.parseLOMLangString(durationElement, 'lom:description')
+    };
+  }
+
+  /**
+   * Helper to parse lom:identifier elements
+   * @param {Element} parentElement - Parent element
+   * @returns {Array} Array of identifier objects
+   */
+  parseLOMIdentifiers(parentElement) {
+    const identifiers = [];
+    const identifierElements = this.getChildElements(parentElement, 'lom:identifier');
+    for (const identifierElement of identifierElements) {
+      identifiers.push({
+        catalog: this.getElementText(identifierElement, 'lom:catalog'),
+        entry: this.getElementText(identifierElement, 'lom:entry')
+      });
+    }
+    return identifiers.length > 0 ? identifiers : null;
+  }
 
   // Placeholder for LOM parsing methods
-  parseLOMGeneral(lomElement) { return null; }
-  parseLOMLifecycle(lomElement) { return null; }
-  parseLOMMetaMetadata(lomElement) { return null; }
-  parseLOMTechnical(lomElement) { return null; }
-  parseLOMEducational(lomElement) { return null; }
-  parseLOMRights(lomElement) { return null; }
-  parseLOMRelation(lomElement) { return null; }
-  parseLOMAnnotation(lomElement) { return null; }
-  parseLOMClassification(lomElement) { return null; }
 }
 
 module.exports = ManifestParser;

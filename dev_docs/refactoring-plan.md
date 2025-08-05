@@ -48,7 +48,7 @@
     *   **Action:** Review and either complete or explicitly remove placeholder implementations. This includes:
         *   `CourseLoader.createTempFileFromBlob` in `src/renderer/services/course-loader.js`.
         *   `ScormService.processSpecialElement` in `src/main/services/scorm-service.js`.
-        *   Placeholder methods in `src/main/services/scorm/cam/manifest-parser.js` (which would be addressed by Priority 2.5 if merged).
+        *   Placeholder methods in `src/main/services/scorm/cam/manifest-parser.js` (now completed).
         *   "Simplified" checks in `src/main/services/scorm/cam/package-analyzer.js`.
     *   **Rationale:** Reduces technical debt and ensures the application's capabilities are accurately reflected.
 
