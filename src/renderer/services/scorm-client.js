@@ -34,11 +34,14 @@ class ScormClient {
   }
 
   /**
-   * Load the validator module dynamically
+   * Load the validator module dynamically using proper dynamic imports
+   * Uses renderer-specific ES6 validator that doesn't depend on CommonJS modules
    */
   async loadValidator() {
     try {
-      const validatorModule = await import('../../shared/utils/scorm-data-model-validator.js');
+      // Dynamic import of ES6 renderer validator
+      const validatorModule = await import('../utils/scorm-validator.js');
+      
       this.validator = {
         isValidElement: validatorModule.isValidElement,
         isValidValue: validatorModule.isValidValue

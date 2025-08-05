@@ -8,7 +8,7 @@
  */
 
 import { BaseComponent } from '../base-component.js';
-import { uiState } from '../../services/ui-state.js';
+import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
 
 /**
@@ -21,6 +21,15 @@ class DebugPanel extends BaseComponent {
     this.activeTab = 'api-calls';
     this.apiCalls = [];
     this.maxApiCalls = 1000;
+    this.uiState = null; // Will be set in doInitialize
+  }
+
+  async doInitialize() {
+    // Resolve the uiState promise
+    this.uiState = await uiStatePromise;
+    
+    // Call parent's doInitialize
+    await super.doInitialize();
   }
 
   getDefaultOptions() {
@@ -333,7 +342,11 @@ class DebugPanel extends BaseComponent {
   }
 
   loadApiCallHistory() {
-    const history = uiState.getState('apiCallHistory') || [];
+    if (!this.uiState) {
+      console.warn('DebugPanel: uiState not yet initialized, skipping API call history load');
+      return;
+    }
+    const history = this.uiState.getState('apiCallHistory') || [];
     this.apiCalls = history;
     this.refreshActiveTab();
   }
