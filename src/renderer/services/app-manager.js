@@ -17,7 +17,7 @@ import { BaseComponent } from '../components/base-component.js';
 import { ContentViewer } from '../components/scorm/content-viewer.js';
 import { NavigationControls } from '../components/scorm/navigation-controls.js';
 import { ProgressTracking } from '../components/scorm/progress-tracking.js';
-
+import { DebugPanel } from '../components/scorm/debug-panel.js';
 import { CourseOutline } from '../components/scorm/course-outline.js';
 
 /**
@@ -130,8 +130,17 @@ class AppManager {
         // console.log('AppManager: NavigationControls initialized'); // Removed debug log
       }
  
-      // Progress Tracking
-      if (document.getElementById(componentConfig.progressTracking.elementId)) {
+      // Progress Tracking - Create a container for it since it's in the footer
+      let progressContainer = document.getElementById('progress-tracking');
+      if (!progressContainer) {
+        // Create a hidden container for the progress tracking component
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'progress-tracking';
+        progressContainer.style.display = 'none'; // Hidden since we use footer display
+        document.body.appendChild(progressContainer);
+      }
+      
+      if (progressContainer) {
         const progressTracking = new ProgressTracking('progress-tracking');
         await progressTracking.initialize();
         this.components.set('progressTracking', progressTracking);
@@ -144,6 +153,14 @@ class AppManager {
         await courseOutline.initialize();
         this.components.set('courseOutline', courseOutline);
         // console.log('AppManager: CourseOutline initialized'); // Removed debug log
+      }
+
+      // Debug Panel
+      if (document.getElementById('debug-panel')) {
+        const debugPanel = new DebugPanel('debug-panel');
+        await debugPanel.initialize();
+        this.components.set('debugPanel', debugPanel);
+        // console.log('AppManager: DebugPanel initialized'); // Removed debug log
       }
  
       // console.log('AppManager: All components initialized'); // Removed debug log
@@ -228,6 +245,30 @@ class AppManager {
       // console.log(`AppManager: Welcome button ${index + 1} listener attached`); // Removed debug log
     });
  
+    // Debug panel toggle
+    const debugToggleBtn = document.getElementById('debug-toggle');
+    if (debugToggleBtn) {
+      debugToggleBtn.addEventListener('click', () => {
+        this.toggleDebugPanel();
+      });
+    }
+
+    // Theme toggle
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        this.toggleTheme();
+      });
+    }
+
+    // Sidebar toggle for mobile
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+    if (sidebarToggleBtn) {
+      sidebarToggleBtn.addEventListener('click', () => {
+        this.toggleSidebar();
+      });
+    }
+
     // console.log('AppManager: UI event listeners setup complete'); // Removed debug log
   }
 
@@ -359,6 +400,62 @@ class AppManager {
    */
   getComponent(name) {
     return this.components.get(name);
+  }
+
+  /**
+   * Toggle debug panel visibility
+   */
+  toggleDebugPanel() {
+    const debugPanel = document.getElementById('debug-panel');
+    if (debugPanel) {
+      const isHidden = debugPanel.classList.contains('hidden');
+      if (isHidden) {
+        debugPanel.classList.remove('hidden');
+        debugPanel.style.display = 'flex';
+      } else {
+        debugPanel.classList.add('hidden');
+        debugPanel.style.display = 'none';
+      }
+    }
+  }
+
+  /**
+   * Toggle application theme
+   */
+  toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'default';
+    const newTheme = currentTheme === 'dark' ? 'default' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    document.documentElement.className = document.documentElement.className.replace(/theme-\w+/, `theme-${newTheme}`);
+    
+    // Save theme preference
+    try {
+      localStorage.setItem('scorm-tester-theme', newTheme);
+    } catch (error) {
+      console.warn('Failed to save theme preference:', error);
+    }
+  }
+
+  /**
+   * Toggle sidebar visibility (mobile)
+   */
+  toggleSidebar() {
+    const sidebar = document.getElementById('app-sidebar');
+    if (sidebar) {
+      sidebar.classList.toggle('sidebar--mobile-open');
+    }
+    
+    const overlay = document.querySelector('.sidebar-overlay');
+    if (overlay) {
+      overlay.classList.toggle('active');
+    } else {
+      // Create overlay if it doesn't exist
+      const newOverlay = document.createElement('div');
+      newOverlay.className = 'sidebar-overlay active';
+      newOverlay.addEventListener('click', () => this.toggleSidebar());
+      document.body.appendChild(newOverlay);
+    }
   }
 
   /**

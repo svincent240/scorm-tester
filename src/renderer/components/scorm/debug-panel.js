@@ -21,15 +21,12 @@ class DebugPanel extends BaseComponent {
     this.activeTab = 'api-calls';
     this.apiCalls = [];
     this.maxApiCalls = 1000;
-    this.uiState = null; // Will be set in doInitialize
+    this.uiState = null; // Will be set in setup
   }
 
-  async doInitialize() {
-    // Resolve the uiState promise
+  async setup() {
     this.uiState = await uiStatePromise;
-    
-    // Call parent's doInitialize
-    await super.doInitialize();
+    this.loadApiCallHistory();
   }
 
   getDefaultOptions() {
@@ -42,9 +39,6 @@ class DebugPanel extends BaseComponent {
     };
   }
 
-  async setup() {
-    this.loadApiCallHistory();
-  }
 
   renderContent() {
     // Create the debug panel HTML structure if elements don't exist

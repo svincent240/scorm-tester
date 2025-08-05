@@ -53,6 +53,10 @@ class NavigationControls extends BaseComponent {
    */
   async setup() {
     this.uiState = await uiStatePromise;
+    
+    // Initialize logger
+    this.logger = console;
+    
     await this.initializeSNServiceBridge();
     this.loadNavigationState();
   }

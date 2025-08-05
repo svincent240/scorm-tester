@@ -68,19 +68,19 @@ class BaseComponent {
       // Load dependencies dynamically
       await this.loadDependencies();
 
-      // Setup component
-      await this.setup();
+      // Setup component with error boundary
+      await this.safeSetup();
       
       // Render if auto-render is enabled
       if (this.options.autoRender) {
-        this.render();
+        this.safeRender();
       }
       
-      // Bind events
-      this.bindEvents();
+      // Bind events with error boundary
+      this.safeBindEvents();
       
-      // Setup event bus subscriptions
-      this.setupEventSubscriptions();
+      // Setup event bus subscriptions with error boundary
+      this.safeSetupEventSubscriptions();
       
       this.isInitialized = true;
       this.log('debug', 'Component initialization completed');
@@ -122,6 +122,20 @@ class BaseComponent {
   }
 
   /**
+   * Safe wrapper for setup with error boundary
+   * @returns {Promise<void>}
+   */
+  async safeSetup() {
+    try {
+      await this.setup();
+    } catch (error) {
+      this.log('error', 'Component setup failed:', error);
+      this.showErrorState('Setup Error', `Failed to setup ${this.constructor.name}: ${error.message}`);
+      // Don't rethrow - allow component to continue in degraded mode
+    }
+  }
+
+  /**
    * Render the component
    */
   render() {
@@ -143,6 +157,18 @@ class BaseComponent {
     this.renderContent();
     
     this.emit('rendered');
+  }
+
+  /**
+   * Safe wrapper for render with error boundary
+   */
+  safeRender() {
+    try {
+      this.render();
+    } catch (error) {
+      this.log('error', 'Component render failed:', error);
+      this.showErrorState('Render Error', `Failed to render ${this.constructor.name}: ${error.message}`);
+    }
   }
 
   /**
@@ -488,11 +514,35 @@ class BaseComponent {
   }
 
   /**
+   * Safe wrapper for bindEvents with error boundary
+   */
+  safeBindEvents() {
+    try {
+      this.bindEvents();
+    } catch (error) {
+      this.log('error', 'Component event binding failed:', error);
+      this.showErrorState('Event Binding Error', `Failed to bind events for ${this.constructor.name}: ${error.message}`);
+    }
+  }
+
+  /**
    * Setup event bus subscriptions (override in subclasses)
    * @private
    */
   setupEventSubscriptions() {
     // Override in subclasses
+  }
+
+  /**
+   * Safe wrapper for setupEventSubscriptions with error boundary
+   */
+  safeSetupEventSubscriptions() {
+    try {
+      this.setupEventSubscriptions();
+    } catch (error) {
+      this.log('error', 'Component event subscription setup failed:', error);
+      this.showErrorState('Event Subscription Error', `Failed to setup event subscriptions for ${this.constructor.name}: ${error.message}`);
+    }
   }
 
   /**
@@ -540,6 +590,90 @@ class BaseComponent {
   log(level, message, data = null) {
     if (this.logger && typeof this.logger[level] === 'function') {
       this.logger[level](`[${this.constructor.name}] ${message}`, data);
+    }
+  }
+
+  /**
+   * Show error state in component
+   */
+  showErrorState(title, message) {
+    if (!this.element) return;
+    
+    // Create or update error display
+    let errorDisplay = this.element.querySelector('.component-error');
+    if (!errorDisplay) {
+      errorDisplay = document.createElement('div');
+      errorDisplay.className = 'component-error';
+      this.element.appendChild(errorDisplay);
+    }
+    
+    errorDisplay.innerHTML = `
+      <div class="component-error__content">
+        <div class="component-error__icon">⚠️</div>
+        <div class="component-error__title">${title}</div>
+        <div class="component-error__message">${message}</div>
+        <button class="component-error__retry" onclick="this.parentElement.parentElement.style.display='none'">
+          Dismiss
+        </button>
+      </div>
+    `;
+    
+    errorDisplay.style.display = 'block';
+    
+    // Add CSS if not already present
+    if (!document.querySelector('#component-error-styles')) {
+      const style = document.createElement('style');
+      style.id = 'component-error-styles';
+      style.textContent = `
+        .component-error {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(244, 67, 54, 0.1);
+          border: 2px solid #f44336;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        .component-error__content {
+          background: white;
+          padding: 20px;
+          border-radius: 4px;
+          text-align: center;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          max-width: 300px;
+        }
+        .component-error__icon {
+          font-size: 32px;
+          margin-bottom: 10px;
+        }
+        .component-error__title {
+          font-weight: bold;
+          color: #f44336;
+          margin-bottom: 8px;
+        }
+        .component-error__message {
+          color: #666;
+          margin-bottom: 15px;
+          font-size: 14px;
+        }
+        .component-error__retry {
+          background: #f44336;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .component-error__retry:hover {
+          background: #d32f2f;
+        }
+      `;
+      document.head.appendChild(style);
     }
   }
 }
