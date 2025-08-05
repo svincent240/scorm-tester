@@ -1,36 +1,35 @@
 /**
  * Navigation Controls Component
  * 
- * Provides LMS-style navigation bar with Previous/Next buttons,
- * menu toggle, and navigation state management. Handles both
- * flow-only and choice navigation courses.
+ * Provides LMS-style navigation bar that integrates with the main process
+ * SCORM Sequencing and Navigation (SN) service. Eliminates duplicate navigation
+ * logic by delegating to proper SCORM-compliant services.
  * 
  * @fileoverview SCORM navigation controls component
  */
 
 import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
-import { scormClient } from '../../services/scorm-client.js';
+import { snBridge } from '../../services/sn-bridge.js';
 
 /**
  * Navigation Controls Class
  * 
- * Manages LMS-style navigation with Previous/Next buttons,
- * course outline toggle, and navigation state coordination.
+ * Manages LMS-style navigation UI that delegates navigation logic
+ * to the main process SCORM SN service for proper compliance.
  */
 class NavigationControls extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
     
     this.navigationState = {
-      canNavigatePrevious: false,
-      canNavigateNext: false,
-      currentItem: null,
-      isFlowOnly: false,
+      availableNavigation: [],
+      currentActivity: null,
+      sequencingState: null,
       menuVisible: false
     };
     
-    this.contentViewer = null;
+    this.snService = null; // Will be set via IPC bridge
   }
 
   /**
@@ -54,7 +53,27 @@ class NavigationControls extends BaseComponent {
    */
   async setup() {
     this.uiState = await uiStatePromise;
+    await this.initializeSNServiceBridge();
     this.loadNavigationState();
+  }
+
+  /**
+   * Initialize bridge to main process SN service
+   */
+  async initializeSNServiceBridge() {
+    try {
+      const initResult = await snBridge.initialize();
+      if (initResult.success) {
+        this.snService = snBridge;
+        this.logger?.debug('NavigationControls: SN service bridge initialized');
+      } else {
+        this.logger?.warn('NavigationControls: Failed to initialize SN bridge:', initResult.error);
+        this.snService = null;
+      }
+    } catch (error) {
+      this.logger?.error('NavigationControls: SN bridge initialization error:', error);
+      this.snService = null;
+    }
   }
 
   /**
@@ -172,21 +191,21 @@ class NavigationControls extends BaseComponent {
   /**
    * Handle previous button click
    */
-  handlePreviousClick() {
-    if (!this.navigationState.canNavigatePrevious) return;
+  async handlePreviousClick() {
+    if (!this.isNavigationAvailable('previous')) return;
     
     this.emit('navigationRequested', { direction: 'previous' });
-    this.navigatePrevious();
+    await this.processNavigation('previous');
   }
 
   /**
    * Handle next button click
    */
-  handleNextClick() {
-    if (!this.navigationState.canNavigateNext) return;
+  async handleNextClick() {
+    if (!this.isNavigationAvailable('continue')) return;
     
     this.emit('navigationRequested', { direction: 'next' });
-    this.navigateNext();
+    await this.processNavigation('continue');
   }
 
   /**
@@ -234,64 +253,115 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Navigate to previous content
+   * Process navigation request via main process SN service
    */
-  navigatePrevious() {
-    const contentViewer = this.getContentViewer();
-    if (!contentViewer) return;
-    
-    const contentWindow = contentViewer.getContentWindow();
-    if (!contentWindow) return;
-    
-    const isFlowOnly = this.navigationState.isFlowOnly;
-    
+  async processNavigation(navigationRequest, targetActivityId = null) {
     try {
-      if (isFlowOnly) {
-        // For flow-only courses, let the course handle navigation
-        this.tryContentNavigation(contentWindow, 'previous');
-      } else {
-        // For choice navigation courses, use SCORM navigation requests
-        this.tryScormNavigation('previous');
+      if (!this.snService) {
+        this.logger?.warn('NavigationControls: SN service not available, falling back to content navigation');
+        return this.fallbackContentNavigation(navigationRequest);
       }
+
+      this.logger?.debug(`NavigationControls: Processing navigation request: ${navigationRequest}`);
+      
+      // Use main process SN service for proper SCORM navigation
+      const result = await this.snService.processNavigation(navigationRequest, targetActivityId);
+      
+      if (result.success) {
+        // Update UI state based on navigation result
+        await this.handleNavigationResult(result);
+        this.emit('navigationProcessed', { request: navigationRequest, result });
+      } else {
+        this.logger?.warn('NavigationControls: Navigation request failed:', result.reason);
+        this.emit('navigationError', { 
+          direction: navigationRequest, 
+          error: result.reason,
+          fallback: true 
+        });
+        // Try fallback navigation for better UX
+        return this.fallbackContentNavigation(navigationRequest);
+      }
+      
+      return result;
     } catch (error) {
-      console.error('Navigation error:', error);
-      this.emit('navigationError', { direction: 'previous', error });
+      this.logger?.error('NavigationControls: Navigation processing error:', error);
+      this.emit('navigationError', { direction: navigationRequest, error });
+      return this.fallbackContentNavigation(navigationRequest);
     }
   }
 
   /**
-   * Navigate to next content
+   * Handle navigation result and update content
    */
-  navigateNext() {
-    const contentViewer = this.getContentViewer();
-    if (!contentViewer) return;
+  async handleNavigationResult(result) {
+    if (result.targetActivity && result.action === 'launch') {
+      // Load new activity content
+      this.emit('activityLaunchRequested', {
+        activity: result.targetActivity,
+        sequencing: result.sequencing
+      });
+    }
     
-    const contentWindow = contentViewer.getContentWindow();
-    if (!contentWindow) return;
-    
-    const isFlowOnly = this.navigationState.isFlowOnly;
-    
-    try {
-      if (isFlowOnly) {
-        // For flow-only courses, let the course handle navigation
-        this.tryContentNavigation(contentWindow, 'next');
-      } else {
-        // For choice navigation courses, use SCORM navigation requests
-        this.tryScormNavigation('next');
-      }
-    } catch (error) {
-      console.error('Navigation error:', error);
-      this.emit('navigationError', { direction: 'next', error });
+    // Update available navigation options
+    if (result.availableNavigation) {
+      this.updateAvailableNavigation(result.availableNavigation);
     }
   }
 
   /**
-   * Try content-based navigation (for flow-only courses)
+   * Update available navigation options from SN service
+   */
+  updateAvailableNavigation(availableNavigation) {
+    this.navigationState.availableNavigation = availableNavigation || [];
+    this.updateButtonStates();
+    
+    this.logger?.debug('NavigationControls: Available navigation updated:', availableNavigation);
+  }
+
+  /**
+   * Check if specific navigation is available
+   */
+  isNavigationAvailable(navigationType) {
+    return this.navigationState.availableNavigation.includes(navigationType);
+  }
+
+  /**
+   * Fallback content navigation for when SN service is unavailable
+   * This is a simplified version that tries basic content navigation
+   */
+  fallbackContentNavigation(navigationRequest) {
+    const contentViewer = this.getContentViewer();
+    if (!contentViewer) {
+      this.logger?.warn('NavigationControls: No content viewer available for fallback navigation');
+      return { success: false, reason: 'No content viewer available' };
+    }
+    
+    const contentWindow = contentViewer.getContentWindow();
+    if (!contentWindow) {
+      this.logger?.warn('NavigationControls: No content window available for fallback navigation');
+      return { success: false, reason: 'No content window available' };
+    }
+    
+    try {
+      const direction = navigationRequest === 'continue' ? 'next' : navigationRequest;
+      const success = this.tryContentNavigation(contentWindow, direction);
+      
+      return {
+        success,
+        reason: success ? `Fallback ${direction} navigation succeeded` : `Fallback ${direction} navigation failed`,
+        fallback: true
+      };
+    } catch (error) {
+      this.logger?.error('NavigationControls: Fallback navigation error:', error);
+      return { success: false, reason: 'Fallback navigation error', error: error.message };
+    }
+  }
+
+  /**
+   * Try content-based navigation (simplified fallback version)
    */
   tryContentNavigation(contentWindow, direction) {
-    const contentDocument = contentWindow.document;
-    
-    // Try Storyline navigation
+    // Try Storyline navigation first (most common)
     if (this.tryStorylineNavigation(contentWindow, direction)) {
       return true;
     }
@@ -301,15 +371,8 @@ class NavigationControls extends BaseComponent {
       return true;
     }
     
-    // Try generic button navigation
-    if (this.tryGenericButtonNavigation(contentDocument, direction)) {
-      return true;
-    }
-    
-    // Try keyboard navigation as fallback
-    this.tryKeyboardNavigation(contentDocument, direction);
-    
-    return false;
+    // Try generic button navigation as last resort
+    return this.tryGenericButtonNavigation(contentWindow.document, direction);
   }
 
   /**
@@ -317,19 +380,8 @@ class NavigationControls extends BaseComponent {
    */
   tryStorylineNavigation(contentWindow, direction) {
     try {
-      if (contentWindow.GetPlayer) {
-        const player = contentWindow.GetPlayer();
-        if (direction === 'next' && player.NextSlide) {
-          player.NextSlide();
-          return true;
-        } else if (direction === 'previous' && player.PrevSlide) {
-          player.PrevSlide();
-          return true;
-        }
-      }
-      
-      if (contentWindow.parent && contentWindow.parent.GetPlayer) {
-        const player = contentWindow.parent.GetPlayer();
+      const player = contentWindow.GetPlayer?.() || contentWindow.parent?.GetPlayer?.();
+      if (player) {
         if (direction === 'next' && player.NextSlide) {
           player.NextSlide();
           return true;
@@ -339,9 +391,8 @@ class NavigationControls extends BaseComponent {
         }
       }
     } catch (error) {
-      // Continue to other methods
+      // Silently continue to other methods
     }
-    
     return false;
   }
 
@@ -360,29 +411,20 @@ class NavigationControls extends BaseComponent {
         }
       }
     } catch (error) {
-      // Continue to other methods
+      // Silently continue to other methods
     }
-    
     return false;
   }
 
   /**
-   * Try generic button navigation
+   * Try generic button navigation (simplified)
    */
   tryGenericButtonNavigation(contentDocument, direction) {
-    const buttonSelectors = direction === 'next' ? [
-      'button[title*="next" i]', 'button[aria-label*="next" i]',
-      'button[id*="next" i]', 'button[class*="next" i]',
-      '.next-btn', '.btn-next', '.continue', '.forward',
-      'input[type="button"][value*="next" i]'
-    ] : [
-      'button[title*="previous" i]', 'button[aria-label*="previous" i]',
-      'button[id*="prev" i]', 'button[class*="prev" i]',
-      '.prev-btn', '.btn-prev', '.previous', '.back',
-      'input[type="button"][value*="previous" i]'
-    ];
+    const selectors = direction === 'next' ? 
+      ['.next-btn', '.btn-next', '.continue'] : 
+      ['.prev-btn', '.btn-prev', '.previous', '.back'];
     
-    for (const selector of buttonSelectors) {
+    for (const selector of selectors) {
       try {
         const button = contentDocument.querySelector(selector);
         if (button && !button.disabled && button.offsetParent !== null) {
@@ -393,70 +435,53 @@ class NavigationControls extends BaseComponent {
         // Continue to next selector
       }
     }
-    
     return false;
   }
 
   /**
-   * Try keyboard navigation
-   */
-  tryKeyboardNavigation(contentDocument, direction) {
-    try {
-      const keyCode = direction === 'next' ? 'ArrowRight' : 'ArrowLeft';
-      const event = new contentDocument.defaultView.KeyboardEvent('keydown', {
-        key: keyCode,
-        code: keyCode,
-        bubbles: true,
-        cancelable: true
-      });
-      
-      contentDocument.dispatchEvent(event);
-    } catch (error) {
-      // Keyboard navigation failed
-    }
-  }
-
-  /**
-   * Try SCORM navigation (for choice navigation courses)
-   */
-  tryScormNavigation(direction) {
-    const navRequest = direction === 'next' ? 'continue' : 'previous';
-    
-    try {
-      scormClient.SetValue('adl.nav.request', navRequest);
-      scormClient.Commit('');
-      return true;
-    } catch (error) {
-      console.error('SCORM navigation failed:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Update navigation state
+   * Update navigation state (simplified to prevent infinite loops)
    */
   updateNavigationState(newState) {
-    console.log('NavigationControls: updateNavigationState called with:', newState);
+    this.logger?.debug('NavigationControls: updateNavigationState called with:', newState);
+    
+    // Only update if state actually changed to prevent infinite loops
+    const hasChanged = Object.keys(newState).some(key => 
+      this.navigationState[key] !== newState[key]
+    );
+    
+    if (!hasChanged) {
+      this.logger?.debug('NavigationControls: Navigation state unchanged, skipping update');
+      return;
+    }
+    
     this.navigationState = { ...this.navigationState, ...newState };
     this.updateButtonStates();
     this.updateMenuButton();
     
-    console.log('NavigationControls: Calling uiState.updateNavigation');
-    this.uiState.updateNavigation(this.navigationState);
+    // Only emit to UI state if this isn't from UI state to prevent loops
+    if (!newState._fromUIState) {
+      this.logger?.debug('NavigationControls: Updating UI state navigation');
+      this.uiState.updateNavigation(this.navigationState);
+    }
   }
 
   /**
-   * Update button states
+   * Update button states based on available navigation
    */
   updateButtonStates() {
+    const canNavigatePrevious = this.isNavigationAvailable('previous');
+    const canNavigateNext = this.isNavigationAvailable('continue');
+    
     if (this.previousBtn) {
-      this.previousBtn.disabled = !this.navigationState.canNavigatePrevious;
-      this.previousBtn.classList.toggle('disabled', !this.navigationState.canNavigatePrevious);
+      this.previousBtn.disabled = !canNavigatePrevious;
+      this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
+      this.previousBtn.title = canNavigatePrevious ? 'Previous' : 'Previous navigation not available';
     }
     
     if (this.nextBtn) {
-      this.nextBtn.disabled = !this.navigationState.canNavigateNext;
-      this.nextBtn.classList.toggle('disabled', !this.navigationState.canNavigateNext);
+      this.nextBtn.disabled = !canNavigateNext;
+      this.nextBtn.classList.toggle('disabled', !canNavigateNext);
+      this.nextBtn.title = canNavigateNext ? 'Next' : 'Next navigation not available';
     }
   }
 
@@ -527,11 +552,19 @@ class NavigationControls extends BaseComponent {
    * Get content viewer reference
    */
   getContentViewer() {
+    // Use event-based communication instead of direct DOM queries
+    // The app manager should provide component references
     if (!this.contentViewer) {
-      // Try to find content viewer component
-      this.contentViewer = document.querySelector('[data-component="content-viewer"]');
+      this.emit('contentViewerRequested');
     }
     return this.contentViewer;
+  }
+
+  /**
+   * Set content viewer reference (called by app manager)
+   */
+  setContentViewer(contentViewer) {
+    this.contentViewer = contentViewer;
   }
 
   /**
@@ -549,30 +582,64 @@ class NavigationControls extends BaseComponent {
   /**
    * Handle course loaded event
    */
-  handleCourseLoaded(data) {
+  async handleCourseLoaded(data) {
     this.updateTitleAndStatus('SCORM Course Player', 'Course loaded and active');
     
-    // Determine if flow-only course
-    const isFlowOnly = data.structure && data.structure.isFlowOnly;
-    this.setFlowOnlyMode(isFlowOnly);
+    // Initialize SN service for the course
+    if (this.snService && data.manifest) {
+      try {
+        const initResult = await this.snService.initializeCourse(data.manifest, data.packageInfo);
+        if (initResult.success) {
+          this.logger?.debug('NavigationControls: SN service initialized for course');
+          
+          // Get initial sequencing state
+          const sequencingState = await this.snService.getSequencingState();
+          if (sequencingState.success) {
+            this.updateAvailableNavigation(sequencingState.availableNavigation);
+            
+            // Store current activity info
+            this.navigationState.currentActivity = sequencingState.currentActivity;
+            this.navigationState.sequencingState = sequencingState;
+          }
+        }
+      } catch (error) {
+        this.logger?.error('NavigationControls: Failed to initialize SN service:', error);
+      }
+    }
     
-    // Enable navigation
-    this.updateNavigationState({
-      canNavigatePrevious: true,
-      canNavigateNext: true
-    });
+    // Update UI to show course is ready
+    this.element.classList.add('navigation-controls--course-loaded');
   }
 
   /**
    * Handle course cleared event
    */
-  handleCourseCleared() {
+  async handleCourseCleared() {
     this.updateTitleAndStatus('Learning Management System', 'No course loaded');
-    this.updateNavigationState({
-      canNavigatePrevious: false,
-      canNavigateNext: false,
+    
+    // Reset SN service
+    if (this.snService) {
+      try {
+        await this.snService.reset();
+        this.logger?.debug('NavigationControls: SN service reset');
+      } catch (error) {
+        this.logger?.error('NavigationControls: Failed to reset SN service:', error);
+      }
+    }
+    
+    // Reset navigation state
+    this.navigationState = {
+      availableNavigation: [],
+      currentActivity: null,
+      sequencingState: null,
       menuVisible: false
-    });
+    };
+    
+    this.updateButtonStates();
+    this.updateMenuButton();
+    
+    // Update UI to show no course
+    this.element.classList.remove('navigation-controls--course-loaded');
     
     if (this.progressElement) {
       this.progressElement.style.display = 'none';
@@ -580,19 +647,16 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Handle navigation updated event
+   * Handle navigation updated event from UI state
    */
   handleNavigationUpdated(data) {
-    console.log('NavigationControls: handleNavigationUpdated called with:', data);
-    console.log('NavigationControls: Current navigation state:', this.navigationState);
+    this.logger?.debug('NavigationControls: handleNavigationUpdated called with:', data);
     
-    // CRITICAL FIX: Update local state without triggering uiState.updateNavigation()
-    // to prevent infinite loop
-    this.navigationState = { ...this.navigationState, ...data };
-    this.updateButtonStates();
-    this.updateMenuButton();
+    // Mark as coming from UI state to prevent loops
+    const stateUpdate = { ...data, _fromUIState: true };
+    this.updateNavigationState(stateUpdate);
     
-    console.log('NavigationControls: Updated local navigation state without triggering event');
+    this.logger?.debug('NavigationControls: Navigation state updated from UI state');
   }
 
   /**

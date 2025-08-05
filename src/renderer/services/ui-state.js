@@ -171,33 +171,40 @@ class UIStateManager {
   }
 
   /**
-   * Update navigation state
+   * Update navigation state (simplified to prevent infinite loops)
    * @param {Object} navData - Navigation data
    */
   updateNavigation(navData) {
-    console.log('UIState: updateNavigation called with:', navData);
-    console.log('UIState: Current navigation state:', this.state.navigationState);
+    // Skip internal properties used for loop prevention
+    const cleanNavData = Object.keys(navData)
+      .filter(key => !key.startsWith('_'))
+      .reduce((obj, key) => {
+        obj[key] = navData[key];
+        return obj;
+      }, {});
     
-    // Check if the navigation state actually changed to prevent infinite loops
+    // Check if the navigation state actually changed
     const currentNav = this.state.navigationState;
-    const hasChanged = Object.keys(navData).some(key =>
-      currentNav[key] !== navData[key]
+    const hasChanged = Object.keys(cleanNavData).some(key =>
+      JSON.stringify(currentNav[key]) !== JSON.stringify(cleanNavData[key])
     );
     
     if (!hasChanged) {
-      console.log('UIState: Navigation state unchanged, skipping update');
-      return;
+      return; // No change, skip update
     }
     
+    // Update state silently to prevent event loop
     this.setState({
       navigationState: {
         ...this.state.navigationState,
-        ...navData
+        ...cleanNavData
       }
-    });
+    }, null, true); // silent = true
     
-    console.log('UIState: Emitting navigation:updated event');
-    this.eventBus?.emit('navigation:updated', navData);
+    // Emit event only if not coming from a component update
+    if (!navData._fromComponent) {
+      this.eventBus?.emit('navigation:updated', cleanNavData);
+    }
   }
 
   /**
@@ -560,28 +567,47 @@ class UIStateManager {
   }
 }
 
-// Create and export singleton instance
-let uiStateInstance = null;
+// Simplified singleton pattern to reduce complexity
+class UIStateSingleton {
+  constructor() {
+    this.instance = null;
+    this.initPromise = null;
+  }
 
-async function initializeUiState() {
-  if (!uiStateInstance) {
-    uiStateInstance = new UIStateManager();
+  async getInstance() {
+    if (this.instance) {
+      return this.instance;
+    }
+
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = this.initialize();
+    return this.initPromise;
+  }
+
+  async initialize() {
     try {
+      this.instance = new UIStateManager();
+      
+      // Load EventBus synchronously to avoid timing issues
       const eventBusModule = await import('./event-bus.js');
-      uiStateInstance.eventBus = eventBusModule.eventBus;
-      uiStateInstance.setupEventBusListeners();
-      console.log('UIStateManager: EventBus loaded and listeners set up.');
+      this.instance.eventBus = eventBusModule.eventBus;
+      this.instance.setupEventBusListeners();
+      
+      return this.instance;
     } catch (error) {
-      console.error('UIStateManager: Failed to load EventBus dynamically:', error);
-      // Handle error, perhaps by disabling event-dependent features
+      console.error('UIStateManager: Failed to initialize:', error);
+      // Return a basic instance without EventBus
+      this.instance = new UIStateManager();
+      return this.instance;
     }
   }
-  return uiStateInstance;
 }
 
-// Export a promise that resolves with the initialized instance
-const uiState = initializeUiState();
-
-console.log('DEBUG: uiState singleton instance exported:', uiState);
+// Create singleton
+const uiStateSingleton = new UIStateSingleton();
+const uiState = uiStateSingleton.getInstance();
 
 export { UIStateManager, uiState };

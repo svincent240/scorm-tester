@@ -101,8 +101,8 @@ class ContentViewer extends BaseComponent {
     super.bindEvents();
     
     if (this.iframe) {
-      this.iframe.addEventListener('load', this.handleIframeLoad);
-      this.iframe.addEventListener('error', this.handleIframeError);
+      this.iframe.addEventListener('load', this.handleIframeLoad.bind(this));
+      this.iframe.addEventListener('error', this.handleIframeError.bind(this));
     }
     
     if (this.fullscreenBtn) {

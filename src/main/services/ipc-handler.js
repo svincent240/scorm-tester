@@ -137,6 +137,9 @@ class IpcHandler extends BaseService {
       // SCORM CAM processing handler (new)
       this.registerHandler('process-scorm-manifest', this.handleProcessScormManifest.bind(this));
       
+      // SN Service handlers
+      this.registerHandler('sn:getStatus', this.handleSNGetStatus.bind(this));
+      
       // LMS and testing handlers
       this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
       this.registerHandler('get-lms-profiles', this.handleGetLmsProfiles.bind(this));
@@ -576,6 +579,18 @@ class IpcHandler extends BaseService {
   async handleProcessScormManifest(event, folderPath, manifestContent) {
     const scormService = this.getDependency('scormService');
     return await scormService.processScormManifest(folderPath, manifestContent);
+  }
+
+  // SN Service handlers
+  async handleSNGetStatus(event) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (snService) {
+      const status = snService.getStatus();
+      return { success: true, ...status };
+    } else {
+      return { success: false, error: 'SN service not available' };
+    }
   }
 
   // --- End of merged IpcHandlers methods ---

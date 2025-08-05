@@ -155,6 +155,22 @@ class ScormService extends BaseService {
       
       this.sessions.set(sessionId, session);
       
+      // Set default current activity in SN service if available
+      if (this.snService) {
+        const snState = this.snService.getSequencingState();
+        if (snState.sessionState === 'active' && !snState.currentActivity) {
+          // Try to set the first available activity as current
+          const treeStats = snState.activityTreeStats;
+          if (treeStats && treeStats.totalActivities > 0) {
+            // Navigate to the first activity to set it as current
+            const navResult = await this.snService.processNavigation('start');
+            if (navResult.success) {
+              this.logger?.info(`ScormService: Set default current activity in SN service`);
+            }
+          }
+        }
+      }
+      
       // Notify debug window if available
       this.notifyDebugWindow('session-initialized', session);
       
@@ -387,6 +403,17 @@ class ScormService extends BaseService {
         throw new Error('CAM Service not initialized');
       }
       const result = await this.camService.processPackage(folderPath, manifestContent);
+      
+      // Initialize SN service with the processed manifest if successful
+      if (result.success && result.manifest && this.snService) {
+        const snInitResult = await this.snService.initialize(result.manifest, { folderPath });
+        if (snInitResult.success) {
+          this.logger?.info(`ScormService: SN service initialized with manifest`);
+        } else {
+          this.logger?.warn(`ScormService: SN service initialization failed: ${snInitResult.reason}`);
+        }
+      }
+      
       this.recordOperation('processScormManifest', result.success && result.validation?.isValid);
       return { success: true, ...result };
     } catch (error) {
@@ -718,6 +745,14 @@ class ScormService extends BaseService {
         debugWindow.webContents.send(event, data);
       }
     }
+  }
+
+  /**
+   * Get SN service instance
+   * @returns {ScormSNService|null} SN service instance or null if not available
+   */
+  getSNService() {
+    return this.snService;
   }
 
   /**

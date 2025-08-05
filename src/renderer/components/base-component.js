@@ -46,19 +46,22 @@ class BaseComponent {
   }
 
   /**
-   * Initialize the component
+   * Initialize the component with better error handling
    * @returns {Promise<void>}
    */
   async initialize() {
     if (this.isInitialized) {
-      throw new Error(`Component ${this.constructor.name} is already initialized`);
+      this.log('warn', 'Component already initialized', { elementId: this.elementId });
+      return;
     }
 
     if (this.isDestroyed) {
-      throw new Error(`Component ${this.constructor.name} has been destroyed`);
+      throw new Error(`Component ${this.constructor.name} has been destroyed and cannot be reinitialized`);
     }
 
     try {
+      this.log('debug', 'Starting component initialization');
+      
       // Find or create element
       this.element = this.findOrCreateElement();
       
@@ -80,10 +83,19 @@ class BaseComponent {
       this.setupEventSubscriptions();
       
       this.isInitialized = true;
+      this.log('debug', 'Component initialization completed');
       this.emit('initialized');
       
     } catch (error) {
-      console.error(`Error initializing component ${this.constructor.name}:`, error);
+      this.log('error', 'Component initialization failed:', error);
+      
+      // Cleanup partial initialization
+      try {
+        this.destroy();
+      } catch (cleanupError) {
+        console.error('Error during cleanup after failed initialization:', cleanupError);
+      }
+      
       throw error;
     }
   }
@@ -365,27 +377,47 @@ class BaseComponent {
 
     this.emit('beforeDestroy');
 
-    // Destroy child components
-    for (const [name, component] of this.childComponents) {
-      component.destroy();
+    try {
+      // Destroy child components first
+      for (const [name, component] of this.childComponents) {
+        try {
+          component.destroy();
+        } catch (error) {
+          console.error(`Error destroying child component ${name}:`, error);
+        }
+      }
+      this.childComponents.clear();
+
+      // Remove event listeners
+      this.removeAllEventListeners();
+
+      // Unsubscribe from event bus
+      this.unsubscribeFunctions.forEach(unsubscribe => {
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.error('Error unsubscribing from event bus:', error);
+        }
+      });
+      this.unsubscribeFunctions = [];
+
+      // Only remove element if it was created by this component
+      if (this.element && this.options.removeOnDestroy !== false) {
+        if (this.element.parentNode) {
+          this.element.parentNode.removeChild(this.element);
+        }
+      }
+
+      // Clear references
+      this.element = null;
+      this.eventBus = null;
+      this.options = null;
+      
+    } finally {
+      // Always mark as destroyed, even if cleanup failed
+      this.isDestroyed = true;
+      this.isInitialized = false;
     }
-    this.childComponents.clear();
-
-    // Remove event listeners
-    this.removeAllEventListeners();
-
-    // Unsubscribe from event bus
-    this.unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-    this.unsubscribeFunctions = [];
-
-    // Clean up element
-    if (this.element && this.element.parentNode) {
-      this.element.parentNode.removeChild(this.element);
-    }
-
-    this.isDestroyed = true;
-    this.isInitialized = false;
-    this.element = null;
 
     this.emit('destroyed');
   }
@@ -395,45 +427,49 @@ class BaseComponent {
    * @private
    */
   findOrCreateElement() {
-    console.log(`DEBUG: BaseComponent.findOrCreateElement() called for elementId: '${this.elementId}'`);
     let element = document.getElementById(this.elementId);
-    console.log(`DEBUG: Element found:`, !!element);
     
     if (!element) {
-      console.log(`DEBUG: Creating new element with id: '${this.elementId}'`);
-      element = document.createElement('div');
-      element.id = this.elementId;
-      
-      // Add to document if no parent specified
-      if (!this.options.parent) {
-        document.body.appendChild(element);
-      } else {
-        const parent = typeof this.options.parent === 'string'
-          ? document.getElementById(this.options.parent)
-          : this.options.parent;
+      // Only create element if explicitly requested
+      if (this.options.createIfNotFound !== false) {
+        element = document.createElement('div');
+        element.id = this.elementId;
+        
+        // Add to document if no parent specified
+        const parent = this.options.parent 
+          ? (typeof this.options.parent === 'string'
+              ? document.getElementById(this.options.parent)
+              : this.options.parent)
+          : document.body;
         
         if (parent) {
           parent.appendChild(element);
         } else {
-          document.body.appendChild(element);
+          throw new Error(`Parent element not found for component ${this.elementId}`);
         }
+      } else {
+        throw new Error(`Required element with id '${this.elementId}' not found in DOM`);
       }
     }
     
-    console.log(`DEBUG: Returning element:`, !!element, element?.id);
     return element;
   }
 
   /**
-   * Bind component methods to this context
+   * Bind critical component methods to this context
    * @private
    */
   bindMethods() {
-    const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(this))
-      .filter(name => name !== 'constructor' && typeof this[name] === 'function');
+    // Only bind methods that are commonly used as event handlers
+    const methodsToBind = [
+      'handleUpdate', 'show', 'hide', 'toggle', 'enable', 'disable',
+      'destroy', 'setupEventSubscriptions', 'renderContent'
+    ];
     
-    methods.forEach(method => {
-      this[method] = this[method].bind(this);
+    methodsToBind.forEach(method => {
+      if (typeof this[method] === 'function') {
+        this[method] = this[method].bind(this);
+      }
     });
   }
 
@@ -479,12 +515,32 @@ class BaseComponent {
   getStatus() {
     return {
       elementId: this.elementId,
+      className: this.constructor.name,
       isInitialized: this.isInitialized,
       isDestroyed: this.isDestroyed,
-      isVisible: this.isVisible(),
+      isVisible: this.element ? this.isVisible() : false,
+      hasElement: !!this.element,
       childCount: this.childComponents.size,
-      eventListenerCount: Array.from(this.eventListeners.values()).reduce((sum, listeners) => sum + listeners.length, 0)
+      eventListenerCount: Array.from(this.eventListeners.values())
+        .reduce((sum, listeners) => sum + listeners.length, 0),
+      subscriptionCount: this.unsubscribeFunctions.length
     };
+  }
+  
+  /**
+   * Set logger for the component
+   */
+  setLogger(logger) {
+    this.logger = logger;
+  }
+  
+  /**
+   * Log component events (if logger is available)
+   */
+  log(level, message, data = null) {
+    if (this.logger && typeof this.logger[level] === 'function') {
+      this.logger[level](`[${this.constructor.name}] ${message}`, data);
+    }
   }
 }
 

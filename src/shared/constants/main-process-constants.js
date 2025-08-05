@@ -203,7 +203,8 @@ const SECURITY_CONFIG = {
       'path-join',
       'log-message',
       'debug-event',
-      'load-module' // Added new channel
+      'load-module', // Added new channel
+      'sn:getStatus' // SN service status channel
     ]
   },
   

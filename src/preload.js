@@ -123,7 +123,10 @@ const electronAPI = {
   
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),
-  getAppPath: () => safeInvoke('get-app-path')
+  getAppPath: () => safeInvoke('get-app-path'),
+  
+  // Generic IPC invoke method for modules that need direct IPC access
+  invoke: (channel, ...args) => safeInvoke(channel, ...args)
 };
 
 // Add a test method to verify the API is working

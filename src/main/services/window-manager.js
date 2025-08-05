@@ -252,11 +252,7 @@ class WindowManager extends BaseService {
         const appRoot = PathUtils.getAppRoot(__dirname);
         const result = PathUtils.handleProtocolRequest(request.url, appRoot);
         
-        this.logger?.info(`WindowManager: Protocol request - URL: ${request.url}`);
-        
         if (result.success) {
-          this.logger?.info(`WindowManager: Protocol request - Resolved path: ${result.resolvedPath}`);
-          this.logger?.info('WindowManager: Successfully serving file via custom protocol:', result.resolvedPath);
           callback({ path: result.resolvedPath });
         } else {
           // Handle undefined path errors more gracefully
