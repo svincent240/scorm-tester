@@ -154,6 +154,15 @@ class IpcHandler extends BaseService {
       this.registerSyncHandler('log-message', this.handleLogMessage.bind(this));
       this.registerSyncHandler('debug-event', this.handleDebugEvent.bind(this));
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
+
+      // Logger adapter loader for renderer fallback
+      this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
+
+      // Direct renderer logging channels (avoid cloning function objects over IPC)
+      this.registerHandler('renderer-log-info', async (_event, ...args) => { try { this.logger?.info(...args); } catch (e) {} return { success: true }; });
+      this.registerHandler('renderer-log-warn', async (_event, ...args) => { try { this.logger?.warn(...args); } catch (e) {} return { success: true }; });
+      this.registerHandler('renderer-log-error', async (_event, ...args) => { try { this.logger?.error(...args); } catch (e) {} return { success: true }; });
+      this.registerHandler('renderer-log-debug', async (_event, ...args) => { try { this.logger?.debug(...args); } catch (e) {} return { success: true }; });
       
       this.logger?.info(`IpcHandler: Registered ${this.handlers.size} IPC handlers`);
       this.recordOperation('registerHandlers', true);
@@ -467,6 +476,63 @@ class IpcHandler extends BaseService {
     return await shell.openExternal(url);
   }
 
+  async handleLoadSharedLoggerAdapter(_event) {
+    try {
+      // Lazy-require the CommonJS Logger class
+      // eslint-disable-next-line global-require, import/no-commonjs
+      const LoggerClass = require('../../shared/utils/logger.js');
+
+      // Prefer the same directory used by the main logger initialization
+      // If our BaseService logger is configured, assume it writes to the correct app.log already.
+      // The LoggerClass constructor requires a directory; we derive it from the existing logger if possible.
+      let logDir = null;
+
+      try {
+        // Best effort: extract directory from our logger's configured file path if available
+        if (this.logger && this.logger.logFile) {
+          logDir = path.dirname(this.logger.logFile);
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      // Fallbacks if we couldn't infer from the existing logger
+      if (!logDir) {
+        if (process.env && process.env.SCORM_TESTER_LOG_DIR) {
+          logDir = process.env.SCORM_TESTER_LOG_DIR;
+        } else if (process.env && process.env.APPDATA) {
+          logDir = path.join(process.env.APPDATA, 'scorm-tester');
+        } else {
+          logDir = path.join(process.cwd(), 'logs');
+        }
+      }
+
+      // Singleton the instance within this service
+      if (!this._sharedLoggerInstance) {
+        this._sharedLoggerInstance = new LoggerClass(logDir);
+      }
+
+      const inst = this._sharedLoggerInstance;
+
+      // Return a minimal proxy object with methods used by the renderer
+      return {
+        info: (message, ...args) => inst.info(message, ...args),
+        warn: (message, ...args) => inst.warn(message, ...args),
+        error: (message, ...args) => inst.error(message, ...args),
+        debug: (message, ...args) => inst.debug(message, ...args),
+      };
+    } catch (e) {
+      // Return no-op methods to prevent renderer crashes
+      this.logger?.error('IpcHandler: Failed to provide logger adapter to renderer', e?.message || e);
+      return {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      };
+    }
+  }
+ 
   async handlePathUtilsToFileUrl(event, filePath) {
     const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
     return PathUtils.toScormProtocolUrl(filePath, appRoot);

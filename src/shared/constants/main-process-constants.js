@@ -211,6 +211,11 @@ const SECURITY_CONFIG = {
       'log-message',
       'debug-event',
       'load-module', // Added new channel
+      'load-shared-logger-adapter', // Renderer logger IPC fallback
+      'renderer-log-info', // Direct renderer logging channels
+      'renderer-log-warn',
+      'renderer-log-error',
+      'renderer-log-debug',
       'sn:getStatus', // SN service status channel
       'open-debug-window' // Open debug console window
     ]

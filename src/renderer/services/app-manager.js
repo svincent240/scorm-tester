@@ -145,8 +145,8 @@ class AppManager {
    * Initialize all components
    */
   async initializeComponents() {
-    this.logger.info('AppManager: Initializing components...');
-    
+    try { this.logger.info('AppManager: Initializing components...'); } catch (_) {}
+
     const componentConfigs = [
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
@@ -157,12 +157,31 @@ class AppManager {
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true }
     ];
 
+    // DIAGNOSTIC: verify DOM mount points exist before instantiation
+    try {
+      ['content-viewer','navigation-controls','app-footer','course-outline'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) {
+          this.logger.error(`AppManager: Missing DOM element '${id}' prior to component init`);
+        } else {
+          this.logger.debug(`AppManager: Found DOM element '${id}' for component mounting`);
+        }
+      });
+    } catch (_) {}
+
     try {
       for (const config of componentConfigs) {
         const element = document.getElementById(config.elementId);
         if (element) {
+          this.logger.debug(`AppManager: Creating component '${config.name}' with elementId='${config.elementId}'`);
           const componentInstance = new config.class(config.elementId);
-          await componentInstance.initialize();
+          try {
+            await componentInstance.initialize();
+            this.logger.debug(`AppManager: Component '${config.name}' initialize() resolved`, componentInstance?.getStatus?.() || null);
+          } catch (err) {
+            this.logger.error(`AppManager: Component '${config.name}' initialize() failed`, err?.message || err);
+            throw err;
+          }
           this.components.set(config.name, componentInstance);
           this.logger.info(`AppManager: ${config.name} initialized`);
         } else {
@@ -175,14 +194,26 @@ class AppManager {
       }
 
       // Wire NavigationControls to ContentViewer reference
-      const navigationControls = this.components.get('navigationControls');
-      const contentViewer = this.components.get('contentViewer');
-      if (navigationControls && typeof navigationControls.setContentViewer === 'function') {
-        navigationControls.setContentViewer(contentViewer || null);
-        try { this.logger.debug('AppManager: navigationControls wired to contentViewer'); } catch (_) {}
-      }
+     const navigationControls = this.components.get('navigationControls');
+     const contentViewer = this.components.get('contentViewer');
+     if (navigationControls && typeof navigationControls.setContentViewer === 'function') {
+       navigationControls.setContentViewer(contentViewer || null);
+       try { this.logger.debug('AppManager: navigationControls wired to contentViewer'); } catch (_) {}
+     }
 
-      this.logger.info('AppManager: All components initialized');
+     // DIAGNOSTIC: After init, log status snapshots for key components
+     try {
+       const co = this.components.get('courseOutline');
+       const nc = this.components.get('navigationControls');
+       const cv = this.components.get('contentViewer');
+       this.logger.info('AppManager: Post-init component status snapshot', {
+         courseOutline: co?.getStatus?.() || null,
+         navigationControls: nc?.getStatus?.() || null,
+         contentViewer: cv?.getStatus?.() || null
+       });
+     } catch (_) {}
+
+     try { this.logger.info('AppManager: All components initialized'); } catch (_) {}
     } catch (error) {
       try { this.logger.error('AppManager: Error initializing components', error?.message || error); } catch (_) {}
       throw error;
@@ -193,13 +224,15 @@ class AppManager {
    * Setup application event handlers
    */
   setupEventHandlers() {
-    // console.log('AppManager: Setting up event handlers...'); // Removed debug log
-    
-    // Course loading events
-    eventBus.on('course:loaded', (courseData) => {
-      // console.log('AppManager: Course loaded event received'); // Removed debug log
-      this.handleCourseLoaded(courseData);
-    });
+   // console.log('AppManager: Setting up event handlers...'); // Removed debug log
+
+   try { this.logger.debug('AppManager: Registering core event handlers'); } catch (_) {}
+
+   // Course loading events
+   eventBus.on('course:loaded', (courseData) => {
+     try { this.logger.debug('AppManager: eventBus course:loaded received'); } catch (_) {}
+     this.handleCourseLoaded(courseData);
+   });
  
     eventBus.on('course:loadError', (errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
@@ -304,19 +337,31 @@ class AppManager {
           timestamp: Date.now()
         });
       }
- 
+
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
       if (contentViewer && courseData.launchUrl) {
-        contentViewer.loadContent(courseData.launchUrl);
+        try {
+          this.logger.debug('AppManager: Instructing ContentViewer.loadContent with launchUrl');
+          contentViewer.loadContent(courseData.launchUrl);
+        } catch (e) {
+          this.logger.error('AppManager: ContentViewer.loadContent threw', e?.message || e);
+        }
       }
- 
+
       // Update course outline
       const courseOutline = this.components.get('courseOutline');
       if (courseOutline) {
-        courseOutline.updateWithCourse(courseData);
+        try {
+          this.logger.debug('AppManager: Instructing CourseOutline.updateWithCourse');
+          courseOutline.updateWithCourse(courseData);
+        } catch (e) {
+          this.logger.error('AppManager: CourseOutline.updateWithCourse threw', e?.message || e);
+        }
+      } else {
+        this.logger.error('AppManager: courseOutline component not found in components map at course:loaded');
       }
- 
+
       // Show success message
       this.showSuccess('Course Loaded', `Successfully loaded: ${courseData.info?.title || 'Course'}`);
       

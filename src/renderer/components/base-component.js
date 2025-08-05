@@ -610,13 +610,22 @@ class BaseComponent {
       // Fallback to console error if uiState is not available
       console.error(`BaseComponent Error: ${title} - ${message}`);
     }
-    
+
+    // Log via renderer logger to app log as single source of truth
+    try {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
+      });
+    } catch (_) {
+      // no-op
+    }
+
     // Remove the old error display if it exists
     const oldErrorDisplay = this.element.querySelector('.component-error');
     if (oldErrorDisplay) {
       oldErrorDisplay.remove();
     }
-    
+
     // Remove the dynamically injected style if it exists
     const oldStyle = document.querySelector('#component-error-styles');
     if (oldStyle) {

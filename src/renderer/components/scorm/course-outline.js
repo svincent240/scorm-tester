@@ -9,6 +9,7 @@
 
 import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
+import { rendererLogger } from '../../utils/renderer-logger.js';
 
 /**
  * Course Outline Class
@@ -21,6 +22,21 @@ class CourseOutline extends BaseComponent {
     this.currentItem = null;
     this.expandedItems = new Set();
     this.progressData = new Map();
+
+    // Bind handlers to preserve 'this' context across event bus calls
+    this.handleCourseLoaded = this.handleCourseLoaded.bind(this);
+    this.handleCourseCleared = this.handleCourseCleared.bind(this);
+    this.handleNavigationUpdated = this.handleNavigationUpdated.bind(this);
+    this.handleProgressUpdated = this.handleProgressUpdated.bind(this);
+    this.handleScormDataChanged = this.handleScormDataChanged.bind(this);
+
+    // Bind UI callbacks
+    this.expandAll = this.expandAll.bind(this);
+    this.collapseAll = this.collapseAll.bind(this);
+    this.toggleItem = this.toggleItem.bind(this);
+    this.navigateToItem = this.navigateToItem.bind(this);
+
+    rendererLogger.info('CourseOutline: constructor initialized');
   }
 
   getDefaultOptions() {
@@ -36,6 +52,7 @@ class CourseOutline extends BaseComponent {
 
   async setup() {
     this.uiState = await uiStatePromise; // Resolve the promise
+    rendererLogger.info('CourseOutline.setup: uiState resolved');
     this.loadCourseStructure();
   }
 
@@ -69,15 +86,31 @@ class CourseOutline extends BaseComponent {
     this.expandAllBtn = this.element.querySelector('.outline-btn--expand');
     this.collapseAllBtn = this.element.querySelector('.outline-btn--collapse');
     
-    console.log('CourseOutline: HTML structure created successfully');
+    try { rendererLogger.info('CourseOutline: HTML structure created successfully'); } catch (_) {}
   }
 
   setupEventSubscriptions() {
-    this.subscribe('course:loaded', this.handleCourseLoaded);
-    this.subscribe('course:cleared', this.handleCourseCleared);
-    this.subscribe('navigation:updated', this.handleNavigationUpdated);
-    this.subscribe('progress:updated', this.handleProgressUpdated);
-    this.subscribe('scorm:dataChanged', this.handleScormDataChanged);
+    // Ensure we pass bound handlers to avoid 'this' loss
+    this.subscribe('course:loaded', (data) => {
+      rendererLogger.info('CourseOutline: event course:loaded received');
+      this.handleCourseLoaded(data);
+    });
+    this.subscribe('course:cleared', (data) => {
+      rendererLogger.info('CourseOutline: event course:cleared received');
+      this.handleCourseCleared(data);
+    });
+    this.subscribe('navigation:updated', (data) => {
+      rendererLogger.debug('CourseOutline: event navigation:updated', data);
+      this.handleNavigationUpdated(data);
+    });
+    this.subscribe('progress:updated', (data) => {
+      rendererLogger.debug('CourseOutline: event progress:updated', data);
+      this.handleProgressUpdated(data);
+    });
+    this.subscribe('scorm:dataChanged', (data) => {
+      rendererLogger.debug('CourseOutline: event scorm:dataChanged', data);
+      this.handleScormDataChanged(data);
+    });
   }
 
   bindEvents() {
@@ -94,25 +127,35 @@ class CourseOutline extends BaseComponent {
 
   renderCourseStructure() {
     if (!this.contentArea) {
-      console.warn('CourseOutline: Content area not available for rendering');
+      rendererLogger.warn('CourseOutline: Content area not available for rendering');
       return;
     }
     
-    if (!this.courseStructure || !this.courseStructure.items) {
+    // Prefer normalized 'items', but guard for legacy 'children'
+    const items = Array.isArray(this.courseStructure?.items) && this.courseStructure.items.length > 0
+      ? this.courseStructure.items
+      : (Array.isArray(this.courseStructure?.children) ? this.courseStructure.children : []);
+    
+    if (!this.courseStructure || !items || items.length === 0) {
+      rendererLogger.info('CourseOutline.renderCourseStructure: empty state condition met', {
+        hasStructure: !!this.courseStructure,
+        hasItems: !!this.courseStructure?.items,
+        itemCount: Array.isArray(this.courseStructure?.items) ? this.courseStructure.items.length : 0
+      });
       this.showEmptyState();
       return;
     }
     
     const html = `
       <div class="course-outline__tree">
-        ${this.renderItems(this.courseStructure.items)}
+        ${this.renderItems(items)}
       </div>
     `;
     
     this.contentArea.innerHTML = html;
     this.bindItemEvents();
     
-    console.log('CourseOutline: Course structure rendered successfully');
+    rendererLogger.info('CourseOutline: Course structure rendered successfully', { itemCount: items.length });
   }
 
   renderItems(items, depth = 0) {
@@ -273,7 +316,7 @@ class CourseOutline extends BaseComponent {
 
   showEmptyState() {
     if (!this.contentArea) {
-      console.warn('CourseOutline: Content area not available for empty state');
+      rendererLogger.warn('CourseOutline: Content area not available for empty state');
       return;
     }
     
@@ -287,13 +330,20 @@ class CourseOutline extends BaseComponent {
       </div>
     `;
     
-    console.log('CourseOutline: Empty state displayed');
+    rendererLogger.info('CourseOutline: Empty state displayed');
   }
 
   loadCourseStructure() {
     const structure = this.uiState.getState('courseStructure'); // Use the resolved instance
+    rendererLogger.info('CourseOutline.loadCourseStructure: state check', {
+      hasStructure: !!structure,
+      hasItems: !!structure?.items,
+      itemCount: structure?.items?.length || 0
+    });
     if (structure) {
       this.setCourseStructure(structure);
+    } else {
+      this.showEmptyState();
     }
   }
 
@@ -302,13 +352,29 @@ class CourseOutline extends BaseComponent {
     this.expandedItems.clear();
     this.progressData.clear();
     this.currentItem = null;
+    rendererLogger.info('CourseOutline.setCourseStructure: structure set', {
+      hasItems: !!structure?.items,
+      itemCount: structure?.items?.length || 0
+    });
     this.renderCourseStructure();
   }
 
   handleCourseLoaded(data) {
     const courseData = data.data || data;
+    rendererLogger.info('CourseOutline.handleCourseLoaded: received', {
+      hasStructure: !!courseData?.structure,
+      hasItems: !!courseData?.structure?.items,
+      itemCount: courseData?.structure?.items?.length || 0
+    });
     if (courseData.structure) {
       this.setCourseStructure(courseData.structure);
+    } else if (courseData.manifest) {
+      const converted = this.convertManifestToStructure(courseData.manifest);
+      rendererLogger.info('CourseOutline.handleCourseLoaded: converted manifest to structure', { itemCount: converted?.items?.length || 0 });
+      if (converted) this.setCourseStructure(converted);
+    } else {
+      rendererLogger.warn('CourseOutline.handleCourseLoaded: no structure or manifest found in payload');
+      this.showEmptyState();
     }
   }
 
@@ -354,28 +420,36 @@ class CourseOutline extends BaseComponent {
    * @param {Object} courseData - Course data from course loader
    */
   updateWithCourse(courseData) {
-    console.log('CourseOutline: updateWithCourse called with:', courseData);
+    try { rendererLogger.info('CourseOutline: updateWithCourse called with:', !!courseData ? '[object]' : 'null'); } catch (_) {}
     
     try {
+      // Ensure base HTML exists before rendering items
+      if (!this.element.querySelector('.course-outline__container')) {
+        this.renderContent();
+      }
+      
       // Extract structure from courseData
       let structure = null;
       
-      if (courseData.structure) {
+      if (courseData?.structure) {
         structure = courseData.structure;
-      } else if (courseData.manifest && courseData.manifest.organizations) {
+      } else if (courseData?.manifest && courseData.manifest.organizations) {
         // Convert manifest to structure format
         structure = this.convertManifestToStructure(courseData.manifest);
       }
       
       if (structure) {
         this.setCourseStructure(structure);
-        console.log('CourseOutline: Course structure updated successfully');
+        try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) {}
+        // Explicit re-render to avoid lifecycle races
+        this.renderCourseStructure();
       } else {
-        console.warn('CourseOutline: No valid structure found in course data');
+        try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) {}
+        this.showEmptyState();
       }
       
     } catch (error) {
-      console.error('CourseOutline: Error updating with course data:', error);
+      try { rendererLogger.error('CourseOutline: Error updating with course data:', error?.message || error); } catch (_) {}
     }
   }
 

@@ -100,6 +100,14 @@ const electronAPI = {
   
   // Logging
   log: (level, message, ...args) => safeSend('log', level, message, ...args),
+
+  // Renderer logger bridge: forward renderer logs to main logger via IPC
+  logger: {
+    info: (...args) => safeInvoke('renderer-log-info', ...args),
+    warn: (...args) => safeInvoke('renderer-log-warn', ...args),
+    error: (...args) => safeInvoke('renderer-log-error', ...args),
+    debug: (...args) => safeInvoke('renderer-log-debug', ...args)
+  },
   
   // Event Listeners
   onMenuEvent: (callback) => safeOn('menu-event', callback),

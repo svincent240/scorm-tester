@@ -200,22 +200,32 @@ class NavigationControls extends BaseComponent {
    */
   bindEvents() {
     super.bindEvents();
+
+    // Ensure 'this' context is bound for handlers used with addEventListener
+    if (!this._boundHandlers) {
+      this._boundHandlers = {
+        handlePreviousClick: this.handlePreviousClick.bind(this),
+        handleNextClick: this.handleNextClick.bind(this),
+        handleMenuClick: this.handleMenuClick.bind(this),
+        handleKeyDown: this.handleKeyDown.bind(this)
+      };
+    }
     
     if (this.previousBtn) {
-      this.previousBtn.addEventListener('click', this.handlePreviousClick);
+      this.previousBtn.addEventListener('click', this._boundHandlers.handlePreviousClick);
     }
     
     if (this.nextBtn) {
-      this.nextBtn.addEventListener('click', this.handleNextClick);
+      this.nextBtn.addEventListener('click', this._boundHandlers.handleNextClick);
     }
     
     if (this.menuBtn) {
-      this.menuBtn.addEventListener('click', this.handleMenuClick);
+      this.menuBtn.addEventListener('click', this._boundHandlers.handleMenuClick);
     }
     
     // Keyboard navigation
     if (this.options.enableKeyboardNavigation) {
-      document.addEventListener('keydown', this.handleKeyDown);
+      document.addEventListener('keydown', this._boundHandlers.handleKeyDown);
     }
   }
 
@@ -827,8 +837,18 @@ class NavigationControls extends BaseComponent {
       try { this._unsubscribeNav(); } catch (_) {}
       this._unsubscribeNav = null;
     }
-    if (this.options.enableKeyboardNavigation) {
-      document.removeEventListener('keydown', this.handleKeyDown);
+    // Remove listeners with the same bound references to avoid leaks
+    if (this.options.enableKeyboardNavigation && this._boundHandlers?.handleKeyDown) {
+      document.removeEventListener('keydown', this._boundHandlers.handleKeyDown);
+    }
+    if (this.previousBtn && this._boundHandlers?.handlePreviousClick) {
+      this.previousBtn.removeEventListener('click', this._boundHandlers.handlePreviousClick);
+    }
+    if (this.nextBtn && this._boundHandlers?.handleNextClick) {
+      this.nextBtn.removeEventListener('click', this._boundHandlers.handleNextClick);
+    }
+    if (this.menuBtn && this._boundHandlers?.handleMenuClick) {
+      this.menuBtn.removeEventListener('click', this._boundHandlers.handleMenuClick);
     }
     super.destroy();
   }

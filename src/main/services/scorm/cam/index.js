@@ -117,6 +117,57 @@ class ScormCAMService {
         throw new Error(`Package analysis failed: ${analysisError.message}`);
       }
 
+      // 3b. Build UI Outline for renderer (static, manifest-derived)
+      try {
+        // Manifest stats logging prior to building outline
+        const _toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+        const orgListForStats = _toArray(manifest?.organizations?.organization);
+        const resListForStats = _toArray(manifest?.resources?.resource);
+        const statsSample = {
+          firstOrg: orgListForStats.length > 0 ? {
+            identifier: orgListForStats[0]?.identifier || null,
+            title: orgListForStats[0]?.title || null,
+            hasItems: !!orgListForStats[0]?.item
+          } : null,
+          firstResource: resListForStats.length > 0 ? {
+            identifier: resListForStats[0]?.identifier || null,
+            href: resListForStats[0]?.href || null,
+            scormType: (resListForStats[0]?.['adlcp:scormType'] || resListForStats[0]?.scormType || null)
+          } : null
+        };
+        this.logger?.info('ScormCAMService: manifest org/resources counts', {
+          orgCount: orgListForStats.length,
+          resCount: resListForStats.length,
+          defaultOrg: manifest?.organizations?.default || null,
+          sample: statsSample
+        });
+
+        // Build outline from organizations
+        const uiOutlineFromOrg = this.buildUiOutlineFromManifest(manifest, packagePath);
+        analysis = analysis || {};
+        analysis.uiOutline = Array.isArray(uiOutlineFromOrg) ? uiOutlineFromOrg : [];
+
+        // If empty, try resources-based fallback with expanded coercions
+        let usedFallback = false;
+        if (analysis.uiOutline.length === 0) {
+          const fallback = this.buildUiOutlineFromResources(manifest);
+          if (Array.isArray(fallback) && fallback.length > 0) {
+            analysis.uiOutline = fallback;
+            usedFallback = true;
+          }
+        }
+
+        const itemCount = Array.isArray(analysis.uiOutline) ? analysis.uiOutline.length : 0;
+        const sample = itemCount > 0 ? analysis.uiOutline[0] : null;
+        this.logger?.info('ScormCAMService: UI outline built', {
+          itemCount,
+          usedFallback,
+          sample: sample ? { identifier: sample.identifier, title: sample.title, href: sample.href, type: sample.type } : null
+        });
+      } catch (outlineError) {
+        this.logger?.warn('ScormCAMService: Failed to build UI outline from manifest:', outlineError?.message || outlineError);
+      }
+
       // 4. Extract Metadata (if any)
       this.logger?.info('ScormCAMService: Starting metadata extraction');
       let metadata;
@@ -245,8 +296,142 @@ class ScormCAMService {
       lastError: this.errorHandler?.getLastError() || '0'
     };
   }
-}
+  /**
+   * Build a UI-friendly outline from manifest organizations/resources.
+   * Returns an array of normalized nodes for the default organization.
+   * Node shape: { identifier, title, type: 'cluster'|'sco'|'asset', href, items: [] }
+   */
+  buildUiOutlineFromManifest(manifest, basePath) {
+    // Helpers
+    const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+    const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
+ 
+    // Build resource map by identifier
+    const resources = manifest?.resources;
+    const resourceList = toArray(resources?.resource);
+    const resourceById = new Map();
+    for (const res of resourceList) {
+      const id = safeStr(res?.identifier);
+      if (!id) continue;
+      const scormType = safeStr(res?.['adlcp:scormType'] || res?.scormType || res?.['scormType']);
+      // Prefer href on resource; fall back later if needed
+      resourceById.set(id, {
+        identifier: id,
+        href: safeStr(res?.href, ''),
+        scormType: scormType || '',
+        title: safeStr(res?.title || res?.['adlcp:title'] || res?.['ims:title'] || '', '')
+      });
+    }
+ 
+    // Determine default organization
+    const orgs = manifest?.organizations;
+    const defaultOrgId = safeStr(orgs?.default);
+    const orgList = toArray(orgs?.organization);
+    let rootOrg = null;
+    if (defaultOrgId) {
+      rootOrg = orgList.find(o => safeStr(o?.identifier) === defaultOrgId) || null;
+    }
+    if (!rootOrg && orgList.length > 0) {
+      rootOrg = orgList[0];
+    }
+ 
+    if (!rootOrg) {
+      // No organizations — attempt to derive from resources as flat outline
+      const flat = [];
+      for (const res of resourceList) {
+        const href = safeStr(res?.href, '');
+        if (!href) continue;
+        const rawTitle = (typeof res?.title === 'string') ? res.title
+          : (res?.title?._text || res?.title?.['#text'] || '');
+        const title = safeStr(rawTitle, href.split('/').pop() || href);
+        const scormType = safeStr(res?.['adlcp:scormType'] || res?.scormType || res?.['scormType'] || '', '');
+        flat.push({
+          identifier: safeStr(res?.identifier, href),
+          title,
+          type: scormType.toLowerCase() === 'sco' ? 'sco' : 'asset',
+          href,
+          items: []
+        });
+      }
+      return flat;
+    }
+ 
+    // Traverse organization items
+    const traverse = (itemNode) => {
+      const id = safeStr(itemNode?.identifier);
+      const title = safeStr(itemNode?.title || itemNode?.['ims:title'] || itemNode?.['adlcp:title'] || '', id || 'Untitled');
+      const identifierref = safeStr(itemNode?.identifierref);
+      const childrenArr = toArray(itemNode?.item);
+      // Resolve type/href
+      let href = '';
+      let type = 'cluster';
+      if (identifierref) {
+        const res = resourceById.get(identifierref);
+        if (res) {
+          href = safeStr(res.href, '');
+          const st = safeStr(res.scormType).toLowerCase();
+          type = st === 'sco' ? 'sco' : (st ? 'asset' : 'asset');
+        } else {
+          // Unknown reference, leave as cluster with no href
+          type = childrenArr.length > 0 ? 'cluster' : 'asset';
+        }
+      } else if (childrenArr.length === 0) {
+        // Leaf without identifierref — treat as cluster without launch
+        type = 'cluster';
+      }
+ 
+      const items = childrenArr.map(traverse);
+      return { identifier: id || title, title, type, href, items };
+    };
+ 
+    const topLevelItems = toArray(rootOrg?.item).map(traverse);
+    return topLevelItems;
+  } // end buildUiOutlineFromManifest
 
+  /**
+   * Secondary outline builder: derive flat list from manifest.resources when organizations are absent/empty.
+   * Returns array of { identifier, title, type, href, items: [] }
+   */
+  buildUiOutlineFromResources(manifest) {
+    const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+    const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
+
+    // Coerce various shapes into a list of resource-like objects
+    let resources = [];
+    if (manifest?.resources?.resource) {
+      resources = toArray(manifest.resources.resource);
+    } else if (Array.isArray(manifest?.resources)) {
+      // Some parsers might flatten to an array
+      resources = manifest.resources;
+    } else if (manifest?.resources && typeof manifest.resources === 'object') {
+      // Unknown shape: try values
+      const vals = Object.values(manifest.resources).flat();
+      resources = vals.filter(v => typeof v === 'object' && (v.href || v.identifier));
+    }
+
+    const items = [];
+    for (const res of resources) {
+      const href = safeStr(res?.href, '');
+      if (!href) continue;
+      const id = safeStr(res?.identifier, href);
+      const t = safeStr(res?.['adlcp:scormType'] || res?.scormType || res?.['scormType'] || '', '').toLowerCase();
+      const rawTitle = (typeof res?.title === 'string') ? res.title
+        : (res?.title?._text || res?.title?.['#text'] || '');
+      const title = safeStr(rawTitle, href.split(/[\\/]/).pop() || href);
+      items.push({
+        identifier: id,
+        title,
+        type: t === 'sco' ? 'sco' : 'asset',
+        href,
+        items: []
+      });
+    }
+    // Log counts for diagnostics
+    this.logger?.info('ScormCAMService: resources fallback built outline', { resourceCount: resources.length, itemCount: items.length });
+    return items;
+  }
+} // end class ScormCAMService
+ 
 module.exports = {
   ScormCAMService,
   ManifestParser,
