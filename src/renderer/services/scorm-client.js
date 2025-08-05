@@ -10,7 +10,6 @@
 
 import { eventBus } from './event-bus.js';
 import { uiState } from './ui-state.js';
-import { isValidElement, isValidValue } from '../../shared/utils/scorm-data-model-validator.js'; // Import shared validation utilities
 
 /**
  * SCORM Client Class
@@ -27,8 +26,10 @@ class ScormClient {
     this.apiCallQueue = [];
     this.isProcessingQueue = false;
     this.sessionTimer = null;
+    this.validator = { isValidElement: () => false, isValidValue: () => false }; // Placeholder
     
     this.setupEventListeners();
+    this.loadValidator(); // Load validator dynamically
   }
 
   /**
@@ -114,8 +115,8 @@ class ScormClient {
       return '';
     }
 
-    // Validate element name
-    if (!this.isValidElement(element)) {
+    // Validate element name using dynamically loaded validator
+    if (!this.validator.isValidElement(element)) {
       this.setLastError('401'); // Undefined data model element
       return '';
     }
@@ -156,14 +157,14 @@ class ScormClient {
     // Convert to string
     value = String(value);
 
-    // Validate element name
-    if (!this.isValidElement(element)) {
+    // Validate element name using dynamically loaded validator
+    if (!this.validator.isValidElement(element)) {
       this.setLastError('401'); // Undefined data model element
       return 'false';
     }
 
-    // Validate value format
-    if (!this.isValidValue(element, value)) {
+    // Validate value format using dynamically loaded validator
+    if (!this.validator.isValidValue(element, value)) {
       this.setLastError('405'); // Incorrect data type
       return 'false';
     }
@@ -538,6 +539,22 @@ class ScormClient {
     
     this.clearCache();
     eventBus.emit('scorm:destroyed');
+  }
+
+  /**
+   * Dynamically load the SCORM data model validator.
+   * @private
+   */
+  async loadValidator() {
+    try {
+      const validatorModule = await import('../../shared/utils/scorm-data-model-validator.js');
+      this.validator.isValidElement = validatorModule.isValidElement;
+      this.validator.isValidValue = validatorModule.isValidValue;
+      console.log('SCORM Client: Data model validator loaded dynamically.');
+    } catch (error) {
+      console.error('SCORM Client: Failed to load data model validator dynamically:', error);
+      // Fallback or error handling if validator cannot be loaded
+    }
   }
 }
 
