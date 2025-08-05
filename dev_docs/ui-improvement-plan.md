@@ -183,6 +183,7 @@ Execution Plan and Order
 3) Fix footer uiState misuse.
    - Status: Completed (footer-progress-bar.js and footer-status-display.js updated to rely on injected uiState only)
 4) Fix navigation-controls CSS selectors.
+   - Status: Completed (invalid &:hover / &:active nesting replaced with valid flat selectors in [src/styles/components/navigation-controls.css](src/styles/components/navigation-controls.css))
 5) Wire NavigationControls to ContentViewer in AppManager and normalize button state source.
 6) Add ContentViewer API presence verification and ensure scaling CSS.
 7) Fix CourseLoader.clearCourse workflow.

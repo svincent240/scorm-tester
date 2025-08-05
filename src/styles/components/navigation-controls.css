@@ -68,22 +68,22 @@
   border-radius: var(--border-radius);
   cursor: pointer;
   transition: all var(--transition-fast) ease;
-  
-  &:hover {
-    background-color: var(--btn-secondary-hover-bg);
-    border-color: var(--btn-secondary-hover-border);
-  }
-  
-  &:active {
-    background-color: var(--btn-secondary-active-bg);
-    border-color: var(--btn-secondary-active-border);
-  }
 
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-sm);
+}
+
+.navigation-controls__btn:hover {
+  background-color: var(--btn-secondary-hover-bg);
+  border-color: var(--btn-secondary-hover-border);
+}
+
+.navigation-controls__btn:active {
+  background-color: var(--btn-secondary-active-bg);
+  border-color: var(--btn-secondary-active-border);
 }
 
 .navigation-controls__btn--previous,
