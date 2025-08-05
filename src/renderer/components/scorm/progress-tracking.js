@@ -130,8 +130,9 @@ class ProgressTracking extends BaseComponent {
       this.timeElement.textContent = this.progressData.sessionTime || '00:00:00';
     }
     
+
     // Also update footer elements if they exist
-    this.updateFooterElements(percentage);
+    // This is now handled by dedicated footer components listening to uiState.
   }
 
   formatStatus(status) {
@@ -146,41 +147,6 @@ class ProgressTracking extends BaseComponent {
 
   formatScore(score) {
     return (score !== null && score !== undefined) ? `${score}` : '--';
-  }
-
-  /**
-   * Update footer progress elements
-   */
-  updateFooterElements(percentage) {
-    // Update footer progress bar
-    const footerProgressFill = document.getElementById('footer-progress-fill');
-    if (footerProgressFill) {
-      footerProgressFill.style.width = `${percentage}%`;
-    }
-    
-    // Update footer progress percentage
-    const footerProgressPercentage = document.getElementById('footer-progress-percentage');
-    if (footerProgressPercentage) {
-      footerProgressPercentage.textContent = `${percentage}%`;
-    }
-    
-    // Update footer status
-    const footerStatus = document.getElementById('footer-status');
-    if (footerStatus) {
-      footerStatus.textContent = this.formatStatus(this.progressData.completionStatus);
-    }
-    
-    // Update footer score
-    const footerScore = document.getElementById('footer-score');
-    if (footerScore) {
-      footerScore.textContent = this.formatScore(this.progressData.scoreRaw);
-    }
-    
-    // Update footer time
-    const footerTime = document.getElementById('footer-time');
-    if (footerTime) {
-      footerTime.textContent = this.progressData.sessionTime || '00:00:00';
-    }
   }
 
   loadProgressData() {

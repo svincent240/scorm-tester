@@ -19,6 +19,8 @@ import { NavigationControls } from '../components/scorm/navigation-controls.js';
 import { ProgressTracking } from '../components/scorm/progress-tracking.js';
 import { DebugPanel } from '../components/scorm/debug-panel.js';
 import { CourseOutline } from '../components/scorm/course-outline.js';
+import { FooterProgressBar } from '../components/scorm/footer-progress-bar.js';
+import { FooterStatusDisplay } from '../components/scorm/footer-status-display.js';
 
 /**
  * Application Manager Class
@@ -130,21 +132,25 @@ class AppManager {
         // console.log('AppManager: NavigationControls initialized'); // Removed debug log
       }
  
-      // Progress Tracking - Create a container for it since it's in the footer
-      let progressContainer = document.getElementById('progress-tracking');
-      if (!progressContainer) {
-        // Create a hidden container for the progress tracking component
-        progressContainer = document.createElement('div');
-        progressContainer.id = 'progress-tracking';
-        progressContainer.style.display = 'none'; // Hidden since we use footer display
-        document.body.appendChild(progressContainer);
-      }
-      
-      if (progressContainer) {
+      // Progress Tracking
+      if (document.getElementById('progress-tracking')) {
         const progressTracking = new ProgressTracking('progress-tracking');
         await progressTracking.initialize();
         this.components.set('progressTracking', progressTracking);
-        // console.log('AppManager: ProgressTracking initialized'); // Removed debug log
+      }
+
+      // Footer Progress Bar
+      if (document.getElementById('footer-progress-fill')) {
+        const footerProgressBar = new FooterProgressBar('app-footer'); // Attach to the footer element
+        await footerProgressBar.initialize();
+        this.components.set('footerProgressBar', footerProgressBar);
+      }
+
+      // Footer Status Display
+      if (document.getElementById('footer-status')) {
+        const footerStatusDisplay = new FooterStatusDisplay('app-footer'); // Attach to the footer element
+        await footerStatusDisplay.initialize();
+        this.components.set('footerStatusDisplay', footerStatusDisplay);
       }
  
       // Course Outline
@@ -376,8 +382,11 @@ class AppManager {
    */
   showError(title, message) {
     console.error(`AppManager: ${title}:`, message);
-    // In a real implementation, this would show a proper error dialog
-    alert(`${title}: ${message}`);
+    this.uiState.showNotification({
+      message: `${title}: ${message}`,
+      type: 'error',
+      duration: 0 // Persistent until dismissed
+    });
   }
 
   /**
@@ -385,7 +394,11 @@ class AppManager {
    */
   showSuccess(title, message) {
     // console.log(`AppManager: ${title}:`, message); // Removed debug log
-    // In a real implementation, this would show a proper success notification
+    this.uiState.showNotification({
+      message: `${title}: ${message}`,
+      type: 'success',
+      duration: 5000 // Auto-dismiss after 5 seconds
+    });
   }
 
   /**

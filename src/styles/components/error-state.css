@@ -1,0 +1,16 @@
+/* Styles for error state display */
+
+.notification.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+.component-error {
+  color: #dc3545;
+  font-weight: bold;
+  margin-top: 10px;
+}

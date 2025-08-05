@@ -1,0 +1,9 @@
+/* Styles for content scaling */
+
+.scaled-content {
+  /* These values will be dynamically set by JavaScript */
+  /* transform: scale(var(--scorm-scale)) !important; */
+  /* transform-origin: top left !important; */
+  /* width: calc(100% / var(--scorm-scale)) !important; */
+  /* height: calc(100% / var(--scorm-scale)) !important; */
+}

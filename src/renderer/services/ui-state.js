@@ -219,7 +219,7 @@ class UIStateManager {
       }
     });
     
-    this.eventBus?.emit('progress:updated', progressData);
+    this.eventBus?.emit('progress:updated', this.state.progressData);
   }
 
   /**

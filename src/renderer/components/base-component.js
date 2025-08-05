@@ -107,6 +107,7 @@ class BaseComponent {
   async loadDependencies() {
     try {
       this.eventBus = (await import('../services/event-bus.js')).eventBus;
+      this.uiState = await (await import('../services/ui-state.js')).uiState;
     } catch (error) {
       console.error(`Error loading dependencies for ${this.constructor.name}:`, error);
       throw error;
@@ -599,81 +600,27 @@ class BaseComponent {
   showErrorState(title, message) {
     if (!this.element) return;
     
-    // Create or update error display
-    let errorDisplay = this.element.querySelector('.component-error');
-    if (!errorDisplay) {
-      errorDisplay = document.createElement('div');
-      errorDisplay.className = 'component-error';
-      this.element.appendChild(errorDisplay);
+    if (this.uiState) {
+      this.uiState.showNotification({
+        message: `${title}: ${message}`,
+        type: 'error',
+        duration: 0 // Persistent until dismissed
+      });
+    } else {
+      // Fallback to console error if uiState is not available
+      console.error(`BaseComponent Error: ${title} - ${message}`);
     }
     
-    errorDisplay.innerHTML = `
-      <div class="component-error__content">
-        <div class="component-error__icon">⚠️</div>
-        <div class="component-error__title">${title}</div>
-        <div class="component-error__message">${message}</div>
-        <button class="component-error__retry" onclick="this.parentElement.parentElement.style.display='none'">
-          Dismiss
-        </button>
-      </div>
-    `;
+    // Remove the old error display if it exists
+    const oldErrorDisplay = this.element.querySelector('.component-error');
+    if (oldErrorDisplay) {
+      oldErrorDisplay.remove();
+    }
     
-    errorDisplay.style.display = 'block';
-    
-    // Add CSS if not already present
-    if (!document.querySelector('#component-error-styles')) {
-      const style = document.createElement('style');
-      style.id = 'component-error-styles';
-      style.textContent = `
-        .component-error {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(244, 67, 54, 0.1);
-          border: 2px solid #f44336;
-          border-radius: 4px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-        .component-error__content {
-          background: white;
-          padding: 20px;
-          border-radius: 4px;
-          text-align: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          max-width: 300px;
-        }
-        .component-error__icon {
-          font-size: 32px;
-          margin-bottom: 10px;
-        }
-        .component-error__title {
-          font-weight: bold;
-          color: #f44336;
-          margin-bottom: 8px;
-        }
-        .component-error__message {
-          color: #666;
-          margin-bottom: 15px;
-          font-size: 14px;
-        }
-        .component-error__retry {
-          background: #f44336;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        .component-error__retry:hover {
-          background: #d32f2f;
-        }
-      `;
-      document.head.appendChild(style);
+    // Remove the dynamically injected style if it exists
+    const oldStyle = document.querySelector('#component-error-styles');
+    if (oldStyle) {
+      oldStyle.remove();
     }
   }
 }

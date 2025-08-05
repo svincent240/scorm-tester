@@ -479,21 +479,14 @@ class ContentViewer extends BaseComponent {
       // Apply scaling for content that needs it
       console.log(`ContentViewer: Applying content scaling: ${Math.round(scale * 100)}%`);
       
-      // Use a non-intrusive scaling approach
-      const scaleStyle = contentDoc.createElement('style');
-      scaleStyle.id = 'scorm-tester-scaling';
-      scaleStyle.textContent = `
-        body {
-          transform: scale(${scale}) !important;
-          transform-origin: top left !important;
-          width: ${100 / scale}% !important;
-          height: ${100 / scale}% !important;
-        }
-      `;
-      contentDoc.head.appendChild(scaleStyle);
+      // Apply scaling using CSS variables and a class
+      contentBody.style.setProperty('--scorm-scale', scale);
+      contentBody.style.setProperty('--scorm-inverse-scale-width', `${100 / scale}%`);
+      contentBody.style.setProperty('--scorm-inverse-scale-height', `${100 / scale}%`);
+      contentBody.classList.add('scaled-content');
       
       // Store scaling info for cleanup
-      this.appliedScaling = { scale, styleElement: scaleStyle };
+      this.appliedScaling = { scale };
 
     } catch (error) {
       console.warn('ContentViewer: Content scaling failed:', error.message);
@@ -505,12 +498,13 @@ class ContentViewer extends BaseComponent {
    * Remove applied content scaling
    */
   removeContentScaling() {
-    if (this.appliedScaling && this.contentWindow) {
+    if (this.appliedScaling && this.contentWindow && this.contentWindow.document && this.contentWindow.document.body) {
       try {
-        const { styleElement } = this.appliedScaling;
-        if (styleElement && styleElement.parentNode) {
-          styleElement.parentNode.removeChild(styleElement);
-        }
+        const contentBody = this.contentWindow.document.body;
+        contentBody.classList.remove('scaled-content');
+        contentBody.style.removeProperty('--scorm-scale');
+        contentBody.style.removeProperty('--scorm-inverse-scale-width');
+        contentBody.style.removeProperty('--scorm-inverse-scale-height');
         this.appliedScaling = null;
         console.log('ContentViewer: Content scaling removed');
       } catch (error) {
@@ -540,17 +534,19 @@ class ContentViewer extends BaseComponent {
     this.hideContent();
     this.hideNoContent();
     
+    this.uiState.showNotification({
+      message: message,
+      type: 'error',
+      details: details,
+      duration: 0 // Persistent until dismissed
+    });
+    
+    // Hide the internal error display as uiState will handle it
     if (this.errorElement) {
-      this.errorElement.style.display = 'flex';
-      
-      const messageEl = this.errorElement.querySelector('.error-message');
-      const detailsEl = this.errorElement.querySelector('.error-details');
-      
-      if (messageEl) messageEl.textContent = message;
-      if (detailsEl) detailsEl.textContent = details || '';
+      this.errorElement.style.display = 'none';
     }
     
-    this.uiState.setError(message);
+    this.uiState.setError(message); // Keep this for internal state tracking
     this.emit('errorShown', { message, details });
   }
 
@@ -629,45 +625,35 @@ class ContentViewer extends BaseComponent {
     this.hideContent();
     this.hideNoContent();
     
+    this.uiState.showNotification({
+      message: `${title}: ${message}`,
+      type: 'error',
+      details: options.details,
+      duration: 0, // Persistent until dismissed
+      actions: [ // Add actions for retry, reload, reset
+        options.showRetry ? { label: 'Retry Loading', handler: () => this.retryLoad() } : null,
+        options.showReload ? { label: 'Reload Page', handler: () => location.reload() } : null,
+        options.showReset ? { label: 'Reset Content', handler: () => this.resetContent() } : null,
+      ].filter(Boolean), // Filter out null actions
+      help: options.showHelp ? `
+        <details>
+          <summary>Troubleshooting Help</summary>
+          <ul>
+            <li>Check your internet connection</li>
+            <li>Verify the SCORM package is valid</li>
+            <li>Try refreshing the application</li>
+            <li>Contact support if the problem persists</li>
+          </ul>
+        </details>
+      ` : null
+    });
+    
+    // Hide the internal error display as uiState will handle it
     if (this.errorElement) {
-      const errorHtml = `
-        <div class="error-display">
-          <div class="error-icon">⚠️</div>
-          <div class="error-title">${title}</div>
-          <div class="error-message">${message}</div>
-          
-          ${options.details ? `<div class="error-details">${options.details}</div>` : ''}
-          
-          <div class="error-actions">
-            ${options.showRetry ? '<button class="error-btn error-retry-btn">Retry Loading</button>' : ''}
-            ${options.showReload ? '<button class="error-btn error-reload-btn">Reload Page</button>' : ''}
-            ${options.showReset ? '<button class="error-btn error-reset-btn">Reset Content</button>' : ''}
-          </div>
-          
-          ${options.showHelp ? `
-            <div class="error-help">
-              <details>
-                <summary>Troubleshooting Help</summary>
-                <ul>
-                  <li>Check your internet connection</li>
-                  <li>Verify the SCORM package is valid</li>
-                  <li>Try refreshing the application</li>
-                  <li>Contact support if the problem persists</li>
-                </ul>
-              </details>
-            </div>
-          ` : ''}
-        </div>
-      `;
-      
-      this.errorElement.innerHTML = errorHtml;
-      this.errorElement.style.display = 'flex';
-      
-      // Bind enhanced error actions
-      this.bindErrorActions();
+      this.errorElement.style.display = 'none';
     }
     
-    this.uiState.setError(title + ': ' + message);
+    this.uiState.setError(title + ': ' + message); // Keep this for internal state tracking
     this.emit('errorShown', { title, message, options });
   }
 
