@@ -46,14 +46,14 @@ The following recommendations aim to refine existing patterns, enhance modularit
     *   **Progress Percentage (cmi.progress_measure):** The "Learning Progress" percentage remains at "0%" because the sample SCORM course does not send updates for `cmi.progress_measure`. The application correctly displays the data it receives.
     *   **Completion Status (cmi.completion_status):** The "STATUS" remains "In Progress" because the sample SCORM course explicitly sets `cmi.completion_status` to "incomplete" and never sends a "completed" or "passed" signal. The application accurately reflects the course's reported status.
 
-### 4. Eliminate Embedded Debug Panel; Focus on Separate Debug Console Window
+### 4. Eliminate Embedded Debug Panel; Focus on Separate Debug Console Window (Implemented)
 
-*   **Issue:** The `DebugPanel` component is currently instantiated and used in two places: as an embedded panel within the main application window, and as the primary content of a separate "Debug Console" Electron window (`debug.html`). This creates redundancy and a potentially confusing user experience.
-*   **Recommendation:** Consolidate all debug functionality into the separate "Debug Console" window.
-    *   **Remove `DebugPanel` instantiation from `AppManager`:** This will eliminate the embedded debug panel from the main application window.
-    *   **Update `AppManager.toggleDebugPanel()`:** This method, currently used to toggle the visibility of the embedded panel, should be modified to trigger the creation or focus of the separate "Debug Console" window. This will involve an IPC call from the renderer process to the main process's `WindowManager.createDebugWindow()`.
-    *   **Ensure `debug.html` is the sole entry point for `DebugPanel`:** All debug-related UI and logic should reside exclusively within the separate "Debug Console" window, which already imports and uses the `DebugPanel` component.
-    *   **Verify IPC communication:** Confirm that all necessary debug data (API calls, SCORM state changes, errors) is correctly sent from the main process (and main renderer process) to the "Debug Console" window. The `WindowManager.sendBufferedApiCallsToDebugWindow` and the IPC listeners in `debug.html` are crucial for this.
+*   **Issue:** The `DebugPanel` component was instantiated and used in two places: as an embedded panel within the main application window, and as the primary content of a separate "Debug Console" Electron window (`debug.html`). This created redundancy and a potentially confusing user experience.
+*   **Implementation:** All debug functionality has been consolidated into the separate "Debug Console" window.
+    *   **Removed `DebugPanel` instantiation from `AppManager`:** The embedded debug panel was eliminated from the main application window.
+    *   **Updated `AppManager.toggleDebugPanel()`:** This method now triggers the creation or focus of the separate "Debug Console" window via an IPC call (`open-debug-window`) from the renderer process to the main process's `WindowManager.createDebugWindow()`.
+    *   **Ensured `debug.html` is the sole entry point for `DebugPanel`:** All debug-related UI and logic now resides exclusively within the separate "Debug Console" window.
+    *   **Verified IPC communication:** Confirmed that necessary debug data (API calls, SCORM state changes, errors) is correctly sent from the main process (and main renderer process) to the "Debug Console" window via the `debug-event` channel, and buffered calls are sent upon debug window creation.
 *   **Benefit:** Removes redundancy; provides a dedicated, more flexible, and potentially more feature-rich debugging environment; aligns with user preference for a separate debug window.
 
 ### 5. Standardize Debugging Configuration (Revised)

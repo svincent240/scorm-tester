@@ -153,6 +153,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       this.registerSyncHandler('log-message', this.handleLogMessage.bind(this));
       this.registerSyncHandler('debug-event', this.handleDebugEvent.bind(this));
+      this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
       
       this.logger?.info(`IpcHandler: Registered ${this.handlers.size} IPC handlers`);
       this.recordOperation('registerHandlers', true);
@@ -574,6 +575,18 @@ class IpcHandler extends BaseService {
     return [...this.apiCallHistory]; // Return copy to prevent external modification
   }
 
+
+  // Handle opening the debug window
+  async handleOpenDebugWindow(event) {
+    const windowManager = this.getDependency('windowManager');
+    if (windowManager) {
+      await windowManager.createDebugWindow();
+      return { success: true };
+    } else {
+      this.logger?.error('IpcHandler: WindowManager not available to open debug window');
+      return { success: false, error: 'WindowManager not available' };
+    }
+  }
 
   // SCORM CAM processing handler (new)
   async handleProcessScormManifest(event, folderPath, manifestContent) {

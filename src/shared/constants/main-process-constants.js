@@ -211,7 +211,8 @@ const SECURITY_CONFIG = {
       'log-message',
       'debug-event',
       'load-module', // Added new channel
-      'sn:getStatus' // SN service status channel
+      'sn:getStatus', // SN service status channel
+      'open-debug-window' // Open debug console window
     ]
   },
   

@@ -17,7 +17,6 @@ import { BaseComponent } from '../components/base-component.js';
 import { ContentViewer } from '../components/scorm/content-viewer.js';
 import { NavigationControls } from '../components/scorm/navigation-controls.js';
 import { ProgressTracking } from '../components/scorm/progress-tracking.js';
-import { DebugPanel } from '../components/scorm/debug-panel.js';
 import { CourseOutline } from '../components/scorm/course-outline.js';
 import { FooterProgressBar } from '../components/scorm/footer-progress-bar.js';
 import { FooterStatusDisplay } from '../components/scorm/footer-status-display.js';
@@ -161,13 +160,6 @@ class AppManager {
         // console.log('AppManager: CourseOutline initialized'); // Removed debug log
       }
 
-      // Debug Panel
-      if (document.getElementById('debug-panel')) {
-        const debugPanel = new DebugPanel('debug-panel');
-        await debugPanel.initialize();
-        this.components.set('debugPanel', debugPanel);
-        // console.log('AppManager: DebugPanel initialized'); // Removed debug log
-      }
  
       // console.log('AppManager: All components initialized'); // Removed debug log
       
@@ -419,16 +411,10 @@ class AppManager {
    * Toggle debug panel visibility
    */
   toggleDebugPanel() {
-    const debugPanel = document.getElementById('debug-panel');
-    if (debugPanel) {
-      const isHidden = debugPanel.classList.contains('hidden');
-      if (isHidden) {
-        debugPanel.classList.remove('hidden');
-        debugPanel.style.display = 'flex';
-      } else {
-        debugPanel.classList.add('hidden');
-        debugPanel.style.display = 'none';
-      }
+    if (window.electronAPI && window.electronAPI.openDebugWindow) {
+      window.electronAPI.openDebugWindow();
+    } else {
+      console.warn('AppManager: electronAPI or openDebugWindow not available. Cannot open debug window.');
     }
   }
 
