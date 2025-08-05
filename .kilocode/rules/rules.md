@@ -59,6 +59,8 @@ Do not bypass or work around the intended design.
 - Break up files that grow too large
 - Keep functions and classes focused and small
 
+- **Prioritize Logical Cohesion and Readability:** Files should encapsulate a single, well-defined logical unit or responsibility.
+
 ### Avoid unnecessary complexity
 - Write code that is simple to read and maintain
 - Avoid overly clever abstractions

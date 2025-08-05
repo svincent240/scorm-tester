@@ -8,15 +8,16 @@
  * @fileoverview IPC communication service for SCORM Tester main process
  */
 
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron'); // Added shell for handleOpenExternal
+const path = require('path'); // Added path for path utils
 const BaseService = require('./base-service');
-const IpcHandlers = require('./ipc-handlers');
 const { 
   SERVICE_DEFAULTS,
   SECURITY_CONFIG,
   SERVICE_EVENTS 
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
+const PathUtils = require('../../shared/utils/path-utils'); // Added PathUtils
 
 /**
  * IPC Handler Service Class
@@ -34,8 +35,17 @@ class IpcHandler extends BaseService {
     this.requestCounter = 0;
     this.rateLimitMap = new Map();
     this.securityConfig = SECURITY_CONFIG.IPC;
-    this.handlerMethods = new IpcHandlers(this);
+    // Removed this.handlerMethods = new IpcHandlers(this);
     this.rateLimitCleanupInterval = null;
+
+    // Persistent storage for all API calls during the session (from IpcHandlers)
+    this.apiCallHistory = [];
+    this.maxHistorySize = 5000; // Increased limit for persistent storage
+    this.sessionId = null; // Track current session for clearing
+    
+    // Clear history on startup (from IpcHandlers)
+    this.clearApiCallHistory();
+    this.logger?.info('[DEBUG EVENT] API call history cleared on startup');
   }
 
   /**
@@ -80,10 +90,9 @@ class IpcHandler extends BaseService {
   async doShutdown() {
     this.logger?.debug('IpcHandler: Starting shutdown');
     
-    // Shutdown handler methods (clears API call history)
-    if (this.handlerMethods && this.handlerMethods.shutdown) {
-      this.handlerMethods.shutdown();
-    }
+    // Shutdown handler methods (clears API call history) (from IpcHandlers)
+    this.clearApiCallHistory(); // Directly call the method
+    this.logger?.info('[DEBUG EVENT] API call history cleared on app shutdown');
     
     this.unregisterHandlers();
     this.activeRequests.clear();
@@ -104,40 +113,43 @@ class IpcHandler extends BaseService {
   registerHandlers() {
     try {
       // SCORM API handlers
-      this.registerHandler('scorm-initialize', this.handlerMethods.handleScormInitialize.bind(this.handlerMethods));
-      this.registerHandler('scorm-get-value', this.handlerMethods.handleScormGetValue.bind(this.handlerMethods));
-      this.registerHandler('scorm-set-value', this.handlerMethods.handleScormSetValue.bind(this.handlerMethods));
-      this.registerHandler('scorm-commit', this.handlerMethods.handleScormCommit.bind(this.handlerMethods));
-      this.registerHandler('scorm-terminate', this.handlerMethods.handleScormTerminate.bind(this.handlerMethods));
+      this.registerHandler('scorm-initialize', this.handleScormInitialize.bind(this));
+      this.registerHandler('scorm-get-value', this.handleScormGetValue.bind(this));
+      this.registerHandler('scorm-set-value', this.handleScormSetValue.bind(this));
+      this.registerHandler('scorm-commit', this.handleScormCommit.bind(this));
+      this.registerHandler('scorm-terminate', this.handleScormTerminate.bind(this));
       
       // File operation handlers
-      this.registerHandler('select-scorm-package', this.handlerMethods.handleSelectScormPackage.bind(this.handlerMethods));
-      this.registerHandler('extract-scorm', this.handlerMethods.handleExtractScorm.bind(this.handlerMethods));
-      this.registerHandler('save-temporary-file', this.handlerMethods.handleSaveTemporaryFile.bind(this.handlerMethods));
-      this.registerHandler('find-scorm-entry', this.handlerMethods.handleFindScormEntry.bind(this.handlerMethods));
-      this.registerHandler('get-course-info', this.handlerMethods.handleGetCourseInfo.bind(this.handlerMethods));
-      this.registerHandler('get-course-manifest', this.handlerMethods.handleGetCourseManifest.bind(this.handlerMethods));
+      this.registerHandler('select-scorm-package', this.handleSelectScormPackage.bind(this));
+      this.registerHandler('extract-scorm', this.handleExtractScorm.bind(this));
+      this.registerHandler('save-temporary-file', this.handleSaveTemporaryFile.bind(this));
+      this.registerHandler('find-scorm-entry', this.handleFindScormEntry.bind(this));
+      this.registerHandler('get-course-info', this.handleGetCourseInfo.bind(this));
+      this.registerHandler('get-course-manifest', this.handleGetCourseManifest.bind(this));
       
       // Validation and session handlers
-      this.registerHandler('validate-scorm-compliance', this.handlerMethods.handleValidateScormCompliance.bind(this.handlerMethods));
-      this.registerHandler('analyze-scorm-content', this.handlerMethods.handleAnalyzeScormContent.bind(this.handlerMethods));
-      this.registerHandler('get-session-data', this.handlerMethods.handleGetSessionData.bind(this.handlerMethods));
-      this.registerHandler('reset-session', this.handlerMethods.handleResetSession.bind(this.handlerMethods));
-      this.registerHandler('get-all-sessions', this.handlerMethods.handleGetAllSessions.bind(this.handlerMethods));
+      this.registerHandler('validate-scorm-compliance', this.handleValidateScormCompliance.bind(this));
+      this.registerHandler('analyze-scorm-content', this.handleAnalyzeScormContent.bind(this));
+      this.registerHandler('get-session-data', this.handleGetSessionData.bind(this));
+      this.registerHandler('reset-session', this.handleResetSession.bind(this));
+      this.registerHandler('get-all-sessions', this.handleGetAllSessions.bind(this));
+      
+      // SCORM CAM processing handler (new)
+      this.registerHandler('process-scorm-manifest', this.handleProcessScormManifest.bind(this));
       
       // LMS and testing handlers
-      this.registerHandler('apply-lms-profile', this.handlerMethods.handleApplyLmsProfile.bind(this.handlerMethods));
-      this.registerHandler('get-lms-profiles', this.handlerMethods.handleGetLmsProfiles.bind(this.handlerMethods));
-      this.registerHandler('run-test-scenario', this.handlerMethods.handleRunTestScenario.bind(this.handlerMethods));
+      this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
+      this.registerHandler('get-lms-profiles', this.handleGetLmsProfiles.bind(this));
+      this.registerHandler('run-test-scenario', this.handleRunTestScenario.bind(this));
       
       // Utility handlers
-      this.registerHandler('open-external', this.handlerMethods.handleOpenExternal.bind(this.handlerMethods));
-      this.registerHandler('path-to-file-url', this.handlerMethods.handlePathUtilsToFileUrl.bind(this.handlerMethods));
-      this.registerHandler('resolve-scorm-url', this.handlerMethods.handleResolveScormUrl.bind(this.handlerMethods));
-      this.registerHandler('path-normalize', this.handlerMethods.handlePathNormalize.bind(this.handlerMethods));
-      this.registerHandler('path-join', this.handlerMethods.handlePathJoin.bind(this.handlerMethods));
-      this.registerSyncHandler('log-message', this.handlerMethods.handleLogMessage.bind(this.handlerMethods));
-      this.registerSyncHandler('debug-event', this.handlerMethods.handleDebugEvent.bind(this.handlerMethods));
+      this.registerHandler('open-external', this.handleOpenExternal.bind(this));
+      this.registerHandler('path-to-file-url', this.handlePathUtilsToFileUrl.bind(this));
+      this.registerHandler('resolve-scorm-url', this.handleResolveScormUrl.bind(this));
+      this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
+      this.registerHandler('path-join', this.handlePathJoin.bind(this));
+      this.registerSyncHandler('log-message', this.handleLogMessage.bind(this));
+      this.registerSyncHandler('debug-event', this.handleDebugEvent.bind(this));
       
       this.logger?.info(`IpcHandler: Registered ${this.handlers.size} IPC handlers`);
       this.recordOperation('registerHandlers', true);
@@ -336,6 +348,236 @@ class IpcHandler extends BaseService {
     this.handlers.clear();
     this.logger?.info('IpcHandler: All handlers unregistered');
   }
+
+  // --- Start of merged IpcHandlers methods ---
+
+  // SCORM API handlers
+  async handleScormInitialize(event, sessionId) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.initializeSession(sessionId);
+  }
+
+  async handleScormGetValue(event, sessionId, element) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.getValue(sessionId, element);
+  }
+
+  async handleScormSetValue(event, sessionId, element, value) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.setValue(sessionId, element, value);
+  }
+
+  async handleScormCommit(event, sessionId) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.commit(sessionId);
+  }
+
+  async handleScormTerminate(event, sessionId) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.terminate(sessionId);
+  }
+
+  // File operation handlers
+  async handleSelectScormPackage(event) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.selectScormPackage();
+  }
+
+  async handleExtractScorm(event, zipPath) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.extractScorm(zipPath);
+  }
+
+  async handleFindScormEntry(event, folderPath) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.findScormEntry(folderPath);
+  }
+
+  async handleGetCourseInfo(event, folderPath) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.getCourseInfo(folderPath);
+  }
+
+  async handleGetCourseManifest(event, folderPath) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.getCourseManifest(folderPath);
+  }
+
+  async handleSaveTemporaryFile(event, fileName, base64Data) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.saveTemporaryFile(fileName, base64Data);
+  }
+
+  // Validation handlers
+  async handleValidateScormCompliance(event, folderPath) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.validateCompliance(folderPath);
+  }
+
+  async handleAnalyzeScormContent(event, folderPath) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.analyzeContent(folderPath);
+  }
+
+  // Session management handlers
+  async handleGetSessionData(event, sessionId) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.getSessionData(sessionId);
+  }
+
+  async handleResetSession(event, sessionId) {
+    const scormService = this.getDependency('scormService');
+    const result = await scormService.resetSession(sessionId);
+    
+    // Clear API call history when session is reset
+    this.clearApiCallHistory();
+    this.logger?.info(`[DEBUG EVENT] API call history cleared due to session reset: ${sessionId}`);
+    
+    return result;
+  }
+
+  async handleGetAllSessions(event) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.getAllSessions();
+  }
+
+  // LMS profile handlers
+  async handleApplyLmsProfile(event, sessionId, profileName) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.applyLmsProfile(sessionId, profileName);
+  }
+
+  async handleGetLmsProfiles(event) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.getLmsProfiles();
+  }
+
+  // Testing handlers
+  async handleRunTestScenario(event, sessionId, scenarioType) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.runTestScenario(sessionId, scenarioType);
+  }
+
+  // Utility handlers
+  async handleOpenExternal(event, url) {
+    return await shell.openExternal(url);
+  }
+
+  async handlePathUtilsToFileUrl(event, filePath) {
+    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+    return PathUtils.toScormProtocolUrl(filePath, appRoot);
+  }
+
+  async handleResolveScormUrl(event, contentPath, extractionPath) {
+    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
+  }
+
+  async handlePathNormalize(event, filePath) {
+    return PathUtils.normalize(filePath);
+  }
+
+  async handlePathJoin(event, ...paths) {
+    return PathUtils.normalize(path.join(...paths));
+  }
+
+  // Logging handler
+  handleLogMessage(event, { level, message, args }) {
+    this.logger?.log(level, `[Renderer] ${message}`, ...args);
+  }
+
+  // Debug event handler
+  handleDebugEvent(event, eventType, data) {
+    try {
+      this.logger?.info(`[DEBUG EVENT] Received debug event: ${eventType}`, data);
+      
+      // Get the window manager to access debug window
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager) {
+        this.logger?.info(`[DEBUG EVENT] WindowManager found, getting debug window`);
+        
+        const debugWindow = windowManager.getWindow('debug');
+        
+        // Always store API calls in persistent history
+        if (eventType === 'api:call') {
+          this.storeApiCall(data);
+        }
+        
+        // Handle special events for clearing history
+        if (eventType === 'course:loaded' || eventType === 'course:reset' || eventType === 'session:reset') {
+          this.clearApiCallHistory();
+          this.logger?.info(`[DEBUG EVENT] API call history cleared due to: ${eventType}`);
+        }
+        
+        if (debugWindow && !debugWindow.isDestroyed()) {
+          // Debug window is available - send event immediately
+          debugWindow.webContents.send('debug-event-received', eventType, data);
+          this.logger?.info(`[DEBUG EVENT] Event forwarded to debug window: ${eventType}`);
+        } else {
+          // Debug window not available - just log for non-API events
+          if (eventType !== 'api:call') {
+            this.logger?.warn(`[DEBUG EVENT] Debug window not available for event: ${eventType}`);
+          }
+        }
+      } else {
+        this.logger?.error(`[DEBUG EVENT] WindowManager not found`);
+      }
+    } catch (error) {
+      this.logger?.error('[DEBUG EVENT] Failed to handle debug event:', error);
+    }
+  }
+
+  // Store API call in persistent history
+  storeApiCall(data) {
+    // Add timestamp if not present
+    if (data && typeof data === 'object' && !data.timestamp) {
+      data.timestamp = Date.now();
+    }
+    
+    this.apiCallHistory.push(data);
+    
+    // Limit history size to prevent memory issues
+    if (this.apiCallHistory.length > this.maxHistorySize) {
+      // Remove oldest calls when history is full
+      const removed = this.apiCallHistory.splice(0, this.apiCallHistory.length - this.maxHistorySize);
+      this.logger?.warn(`[DEBUG EVENT] History full, removed ${removed.length} oldest API calls`);
+    }
+    
+    this.logger?.debug(`[DEBUG EVENT] API call stored in history (${this.apiCallHistory.length} total)`);
+  }
+
+  // Send all stored API calls to debug window (called when debug window is created)
+  sendBufferedApiCalls(debugWindow) {
+    if (this.apiCallHistory.length > 0 && debugWindow && !debugWindow.isDestroyed()) {
+      this.logger?.info(`[DEBUG EVENT] Sending ${this.apiCallHistory.length} stored API calls to newly opened debug window`);
+      for (const storedCall of this.apiCallHistory) {
+        debugWindow.webContents.send('debug-event-received', 'api:call', storedCall);
+      }
+      // Note: Do NOT clear the history after sending - keep it persistent
+    } else if (this.apiCallHistory.length === 0) {
+      this.logger?.debug(`[DEBUG EVENT] No stored API calls to send to debug window`);
+    }
+  }
+
+  // Clear API call history (called on course load, reset, etc.)
+  clearApiCallHistory() {
+    const clearedCount = this.apiCallHistory.length;
+    this.apiCallHistory = [];
+    this.logger?.info(`[DEBUG EVENT] Cleared ${clearedCount} API calls from history`);
+  }
+
+  // Get current API call history (for debugging)
+  getApiCallHistory() {
+    return [...this.apiCallHistory]; // Return copy to prevent external modification
+  }
+
+  // SCORM CAM processing handler (new)
+  async handleProcessScormManifest(event, folderPath, manifestContent) {
+    const scormService = this.getDependency('scormService');
+    return await scormService.processScormManifest(folderPath, manifestContent);
+  }
+
+  // --- End of merged IpcHandlers methods ---
 }
 
 module.exports = IpcHandler;

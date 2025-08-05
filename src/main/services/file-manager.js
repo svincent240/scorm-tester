@@ -14,7 +14,7 @@ const { dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const StreamZip = require('node-stream-zip');
-const xml2js = require('xml2js');
+// Removed xml2js import
 const BaseService = require('./base-service');
 const PathUtils = require('../../shared/utils/path-utils');
 const {
@@ -212,13 +212,13 @@ class FileManager extends BaseService {
   }
 
   /**
-   * Find SCORM entry point
+   * Find SCORM entry point (file system check only)
    * @param {string} folderPath - Extracted folder path
-   * @returns {Promise<Object>} Entry point information
+   * @returns {Promise<Object>} Result object with success and manifestPath
    */
   async findScormEntry(folderPath) {
     try {
-      this.logger?.info(`FileManager: Finding SCORM entry point in ${path.basename(folderPath)}`);
+      this.logger?.info(`FileManager: Checking for imsmanifest.xml in ${path.basename(folderPath)}`);
       
       if (!this.validateFolderPath(folderPath)) {
         throw new Error('Invalid folder path');
@@ -227,95 +227,35 @@ class FileManager extends BaseService {
       const manifestPath = path.join(folderPath, 'imsmanifest.xml');
       
       if (!fs.existsSync(manifestPath)) {
+        this.recordOperation('findScormEntry', false);
         return { success: false, error: 'No imsmanifest.xml found' };
       }
       
-      const manifestContent = fs.readFileSync(manifestPath, 'utf8');
-      
-      // Get app root for URL resolution
-      const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-      
-      // Find SCO resource
-      const scoResourceMatch = manifestContent.match(/<resource[^>]+adlcp:scormtype="sco"[^>]*>/i);
-      if (scoResourceMatch) {
-        const resourceBlock = scoResourceMatch[0];
-        const hrefMatch = resourceBlock.match(/href="([^"]+)"/i);
-        
-        if (hrefMatch && hrefMatch[1]) {
-          const contentPath = hrefMatch[1];
-          const urlResult = PathUtils.resolveScormContentUrl(contentPath, folderPath, appRoot);
-          
-          if (urlResult.success) {
-            this.logger?.info(`FileManager: Found SCO entry point: ${contentPath}`);
-            this.recordOperation('findScormEntry', true);
-            return {
-              success: true,
-              entryPath: urlResult.resolvedPath,
-              launchUrl: urlResult.url,
-              originalHref: contentPath
-            };
-          }
-        }
-      }
-      
-      // Fallback to first href found
-      const launchMatch = manifestContent.match(/href\s*=\s*["']([^"']+)["']/i);
-      if (launchMatch && launchMatch[1]) {
-        const contentPath = launchMatch[1];
-        const urlResult = PathUtils.resolveScormContentUrl(contentPath, folderPath, appRoot);
-        
-        if (urlResult.success) {
-          this.logger?.info(`FileManager: Found fallback entry point: ${contentPath}`);
-          this.recordOperation('findScormEntry', true);
-          return {
-            success: true,
-            entryPath: urlResult.resolvedPath,
-            launchUrl: urlResult.url,
-            originalHref: contentPath
-          };
-        }
-      }
-      
-      // Check common files
-      const commonFiles = ['index.html', 'launch.html', 'start.html', 'main.html'];
-      for (const file of commonFiles) {
-        const urlResult = PathUtils.resolveScormContentUrl(file, folderPath, appRoot);
-        if (urlResult.success) {
-          this.logger?.info(`FileManager: Found common file entry point: ${file}`);
-          this.recordOperation('findScormEntry', true);
-          return {
-            success: true,
-            entryPath: urlResult.resolvedPath,
-            launchUrl: urlResult.url,
-            originalHref: file
-          };
-        }
-      }
-      
-      this.recordOperation('findScormEntry', false);
-      return { success: false, error: 'No SCORM entry point found' };
+      this.logger?.info(`FileManager: Found imsmanifest.xml at ${manifestPath}`);
+      this.recordOperation('findScormEntry', true);
+      return { success: true, manifestPath: manifestPath };
       
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
-        `Find SCORM entry failed: ${error.message}`,
+        `File system check for SCORM entry failed: ${error.message}`,
         'FileManager.findScormEntry'
       );
       
-      this.logger?.error('FileManager: Find SCORM entry failed:', error);
+      this.logger?.error('FileManager: File system check for SCORM entry failed:', error);
       this.recordOperation('findScormEntry', false);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get course information from manifest
+   * Get course information (file system check only)
    * @param {string} folderPath - Course folder path
-   * @returns {Promise<Object>} Course information
+   * @returns {Promise<Object>} Result object with success and manifestPath
    */
   async getCourseInfo(folderPath) {
     try {
-      this.logger?.info(`FileManager: Getting course info from ${path.basename(folderPath)}`);
+      this.logger?.info(`FileManager: Checking for imsmanifest.xml for course info in ${path.basename(folderPath)}`);
       
       if (!this.validateFolderPath(folderPath)) {
         throw new Error('Invalid folder path');
@@ -324,69 +264,36 @@ class FileManager extends BaseService {
       const manifestPath = path.join(folderPath, 'imsmanifest.xml');
       
       if (!fs.existsSync(manifestPath)) {
-        return {
-          title: path.basename(folderPath) || 'Course',
-          version: 'Unknown',
-          scormVersion: 'Unknown',
-          hasManifest: false
-        };
+        this.recordOperation('getCourseInfo', false);
+        return { success: false, error: 'No imsmanifest.xml found' };
       }
       
-      // Check file size
-      const stats = fs.statSync(manifestPath);
-      const maxSize = 1024 * 1024; // 1MB
-      
-      if (stats.size > maxSize) {
-        this.logger?.warn(`FileManager: Manifest file too large (${this.formatBytes(stats.size)})`);
-        return {
-          title: 'Large Course Package',
-          version: 'Unknown',
-          scormVersion: 'Unknown',
-          hasManifest: true,
-          warning: 'Manifest file too large for processing'
-        };
-      }
-      
-      const manifestContent = fs.readFileSync(manifestPath, 'utf8');
-      
-      // Parse course information
-      const courseInfo = this.parseManifestInfo(manifestContent);
-      courseInfo.hasManifest = true;
-      courseInfo.manifestSize = stats.size;
-      
-      this.logger?.info(`FileManager: Course info retrieved: ${courseInfo.title}`);
+      this.logger?.info(`FileManager: Found imsmanifest.xml for course info at ${manifestPath}`);
       this.recordOperation('getCourseInfo', true);
-      
-      return courseInfo;
+      return { success: true, manifestPath: manifestPath };
       
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
-        `Get course info failed: ${error.message}`,
+        `File system check for course info failed: ${error.message}`,
         'FileManager.getCourseInfo'
       );
       
-      this.logger?.error('FileManager: Get course info failed:', error);
+      this.logger?.error('FileManager: File system check for course info failed:', error);
       this.recordOperation('getCourseInfo', false);
       
-      return {
-        title: 'Error Reading Course',
-        version: 'Unknown',
-        scormVersion: 'Unknown',
-        hasManifest: false,
-        error: error.message
-      };
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get course manifest structure
+   * Get course manifest content (file system check only)
    * @param {string} folderPath - Course folder path
-   * @returns {Promise<Object>} Manifest structure
+   * @returns {Promise<Object>} Result object with success and manifestContent
    */
   async getCourseManifest(folderPath) {
     try {
-      this.logger?.info(`FileManager: Getting course manifest from ${path.basename(folderPath)}`);
+      this.logger?.info(`FileManager: Reading imsmanifest.xml content from ${path.basename(folderPath)}`);
       
       if (!this.validateFolderPath(folderPath)) {
         throw new Error('Invalid folder path');
@@ -395,28 +302,28 @@ class FileManager extends BaseService {
       const manifestPath = path.join(folderPath, 'imsmanifest.xml');
       
       if (!fs.existsSync(manifestPath)) {
-        return { structure: null, error: 'Manifest not found' };
+        this.recordOperation('getCourseManifest', false);
+        return { success: false, error: 'Manifest not found' };
       }
       
       const manifestContent = fs.readFileSync(manifestPath, 'utf8');
-      const structure = await this.parseManifestStructure(manifestContent);
       
-      this.logger?.info('FileManager: Course manifest structure retrieved');
+      this.logger?.info('FileManager: Course manifest content retrieved');
       this.recordOperation('getCourseManifest', true);
       
-      return { structure, success: true };
+      return { success: true, manifestContent: manifestContent };
       
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
-        `Get course manifest failed: ${error.message}`,
+        `Read course manifest content failed: ${error.message}`,
         'FileManager.getCourseManifest'
       );
       
-      this.logger?.error('FileManager: Get course manifest failed:', error);
+      this.logger?.error('FileManager: Read course manifest content failed:', error);
       this.recordOperation('getCourseManifest', false);
       
-      return { structure: null, error: error.message };
+      return { success: false, error: error.message };
     }
   }
 
@@ -531,116 +438,10 @@ class FileManager extends BaseService {
   }
 
   /**
-   * Parse manifest information
-   * @private
-   * @param {string} manifestContent - Manifest XML content
-   * @returns {Object} Parsed course information
-   */
-  parseManifestInfo(manifestContent) {
-    const info = {
-      title: 'Unknown Course',
-      version: 'Unknown',
-      scormVersion: 'Unknown'
-    };
-    
-    try {
-      // Extract title
-      const titleMatch = manifestContent.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (titleMatch && titleMatch[1]) {
-        info.title = titleMatch[1].trim();
-      }
-      
-      // Extract version
-      const versionMatch = manifestContent.match(/version\s*=\s*["']([^"']+)["']/i);
-      if (versionMatch && versionMatch[1]) {
-        info.version = versionMatch[1].trim();
-      }
-      
-      // Extract SCORM version
-      const scormMatch = manifestContent.match(/schemaversion\s*=\s*["']([^"']+)["']/i);
-      if (scormMatch && scormMatch[1]) {
-        info.scormVersion = scormMatch[1].trim();
-      }
-      
-    } catch (error) {
-      this.logger?.warn('FileManager: Error parsing manifest info:', error);
-    }
-    
-    return info;
-  }
 
   /**
-   * Parse manifest structure
-   * @private
-   * @param {string} manifestContent - Manifest XML content
-   * @returns {Promise<Object>} Parsed manifest structure
-   */
-  async parseManifestStructure(manifestContent) {
-    try {
-      const parser = new xml2js.Parser({ explicitArray: false, mergeAttrs: true });
-      const result = await parser.parseStringPromise(manifestContent);
-      
-      const organization = result.manifest?.organizations?.organization;
-      if (!organization) {
-        return { items: [], isFlowOnly: true };
-      }
-      
-      // Check for flow-only navigation
-      let isFlowOnly = false;
-      if (organization['imsss:sequencing']?.['imsss:controlMode']) {
-        const controlMode = organization['imsss:sequencing']['imsss:controlMode'];
-        isFlowOnly = controlMode.flow === 'true' && controlMode.choice === 'false';
-      }
-      
-      const items = this.parseItems(organization.item || []);
-      
-      return {
-        items,
-        isFlowOnly,
-        title: organization.title || 'Course'
-      };
-      
-    } catch (error) {
-      this.logger?.error('FileManager: Failed to parse manifest structure:', error);
-      return { items: [], isFlowOnly: true };
-    }
-  }
 
   /**
-   * Parse manifest items recursively
-   * @private
-   * @param {Array|Object} xmlItems - XML items
-   * @returns {Array} Parsed items
-   */
-  parseItems(xmlItems) {
-    const items = [];
-    const itemArray = Array.isArray(xmlItems) ? xmlItems : [xmlItems];
-    
-    itemArray.forEach(xmlItem => {
-      if (!xmlItem) return;
-      
-      const isVisible = xmlItem.isvisible !== 'false';
-      const item = {
-        identifier: xmlItem.identifier || null,
-        identifierref: xmlItem.identifierref || null,
-        title: xmlItem.title || 'No Title',
-        isVisible: isVisible,
-        children: []
-      };
-      
-      if (xmlItem.item) {
-        item.children = this.parseItems(xmlItem.item);
-      }
-      
-      if (!item.isVisible && item.children.length > 0) {
-        items.push(...item.children);
-      } else if (item.isVisible) {
-        items.push(item);
-      }
-    });
-    
-    return items;
-  }
 
   /**
    * Sanitize filename for security

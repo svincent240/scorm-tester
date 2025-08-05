@@ -37,7 +37,7 @@ class AppManager {
    * Initialize the application
    */
   async initialize() {
-    console.log('AppManager: Starting application initialization...');
+    // console.log('AppManager: Starting application initialization...'); // Removed debug log
     
     try {
       // Step 1: Initialize services
@@ -53,7 +53,7 @@ class AppManager {
       this.setupUIEventListeners();
       
       this.initialized = true;
-      console.log('AppManager: Application initialized successfully');
+      // console.log('AppManager: Application initialized successfully'); // Removed debug log
       
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
@@ -73,7 +73,7 @@ class AppManager {
    * Initialize all services
    */
   async initializeServices() {
-    console.log('AppManager: Initializing services...');
+    // console.log('AppManager: Initializing services...'); // Removed debug log
     
     // Register services
     this.services.set('eventBus', eventBus);
@@ -86,17 +86,17 @@ class AppManager {
     if (!scormClient.getInitialized()) {
       // Note: ScormClient doesn't have an initialize() method - it initializes via Initialize()
       // We'll skip this for now as SCORM initialization happens when content is loaded
-      console.log('AppManager: SCORM client not initialized, will initialize when content loads');
+      // console.log('AppManager: SCORM client not initialized, will initialize when content loads'); // Removed debug log
     }
     
-    console.log('AppManager: Services initialized');
+    // console.log('AppManager: Services initialized'); // Removed debug log
   }
 
   /**
    * Initialize all components
    */
   async initializeComponents() {
-    console.log('AppManager: Initializing components...');
+    // console.log('AppManager: Initializing components...'); // Removed debug log
     
     try {
       // Initialize components with proper error handling
@@ -104,45 +104,45 @@ class AppManager {
         contentViewer: { elementId: 'content-frame', service: 'contentViewer' },
         navigationControls: { elementId: 'navigation-controls', service: 'navigationControls' },
         progressTracking: { elementId: 'progress-tracking', service: 'progressTracking' },
-
+ 
         courseOutline: { elementId: 'course-outline', service: 'courseOutline' }
       };
-
-      // Content Viewer - Fix: Check for correct element ID
+ 
+      // Content Viewer
       if (document.getElementById('content-viewer')) {
         const contentViewer = new ContentViewer('content-viewer');
         await contentViewer.initialize();
         this.components.set('contentViewer', contentViewer);
-        console.log('AppManager: ContentViewer initialized');
+        // console.log('AppManager: ContentViewer initialized'); // Removed debug log
       } else {
         console.warn('AppManager: content-viewer element not found in DOM');
       }
-
+ 
       // Navigation Controls
       if (document.getElementById(componentConfig.navigationControls.elementId)) {
         const navigationControls = new NavigationControls('navigation-controls');
         await navigationControls.initialize();
         this.components.set('navigationControls', navigationControls);
-        console.log('AppManager: NavigationControls initialized');
+        // console.log('AppManager: NavigationControls initialized'); // Removed debug log
       }
-
+ 
       // Progress Tracking
       if (document.getElementById(componentConfig.progressTracking.elementId)) {
         const progressTracking = new ProgressTracking('progress-tracking');
         await progressTracking.initialize();
         this.components.set('progressTracking', progressTracking);
-        console.log('AppManager: ProgressTracking initialized');
+        // console.log('AppManager: ProgressTracking initialized'); // Removed debug log
       }
-
+ 
       // Course Outline
       if (document.getElementById(componentConfig.courseOutline.elementId)) {
         const courseOutline = new CourseOutline('course-outline');
         await courseOutline.initialize();
         this.components.set('courseOutline', courseOutline);
-        console.log('AppManager: CourseOutline initialized');
+        // console.log('AppManager: CourseOutline initialized'); // Removed debug log
       }
-
-      console.log('AppManager: All components initialized');
+ 
+      // console.log('AppManager: All components initialized'); // Removed debug log
       
     } catch (error) {
       console.error('AppManager: Error initializing components:', error);
@@ -154,19 +154,19 @@ class AppManager {
    * Setup application event handlers
    */
   setupEventHandlers() {
-    console.log('AppManager: Setting up event handlers...');
+    // console.log('AppManager: Setting up event handlers...'); // Removed debug log
     
     // Course loading events
     eventBus.on('course:loaded', (courseData) => {
-      console.log('AppManager: Course loaded event received');
+      // console.log('AppManager: Course loaded event received'); // Removed debug log
       this.handleCourseLoaded(courseData);
     });
-
+ 
     eventBus.on('course:loadError', (errorData) => {
       console.error('AppManager: Course load error:', errorData.error);
       this.showError('Course Loading Error', errorData.error);
     });
-
+ 
     eventBus.on('course:loadingStateChanged', (stateData) => {
       if (stateData.loading) {
         this.showLoading('Loading course...');
@@ -174,12 +174,12 @@ class AppManager {
         this.hideLoading();
       }
     });
-
+ 
     // SCORM events
     eventBus.on('scorm:dataChanged', (data) => {
-      console.log('AppManager: SCORM data changed:', data);
+      // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
-
+ 
     eventBus.on('scorm:error', (errorData) => {
       console.error('AppManager: SCORM error:', JSON.stringify(errorData, null, 2));
       console.error('AppManager: SCORM error details:', {
@@ -191,15 +191,15 @@ class AppManager {
         raw: errorData
       });
     });
-
-    console.log('AppManager: Event handlers setup complete');
+ 
+    // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
 
   /**
    * Setup UI event listeners
    */
   setupUIEventListeners() {
-    console.log('AppManager: Setting up UI event listeners...');
+    // console.log('AppManager: Setting up UI event listeners...'); // Removed debug log
     
     // Course load button
     const courseLoadBtn = document.getElementById('course-load-btn');
@@ -209,9 +209,9 @@ class AppManager {
           console.error('AppManager: Course load error:', error);
         });
       });
-      console.log('AppManager: Course load button listener attached');
+      // console.log('AppManager: Course load button listener attached'); // Removed debug log
     }
-
+ 
     // Welcome page buttons
     const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
     welcomeButtons.forEach((btn, index) => {
@@ -221,40 +221,40 @@ class AppManager {
           console.error('AppManager: Course load error from welcome button:', error);
         });
       });
-      console.log(`AppManager: Welcome button ${index + 1} listener attached`);
+      // console.log(`AppManager: Welcome button ${index + 1} listener attached`); // Removed debug log
     });
-
-    console.log('AppManager: UI event listeners setup complete');
+ 
+    // console.log('AppManager: UI event listeners setup complete'); // Removed debug log
   }
 
   /**
    * Handle course loaded event
    */
   handleCourseLoaded(courseData) {
-    console.log('AppManager: Handling course loaded:', courseData);
+    // console.log('AppManager: Handling course loaded:', courseData); // Removed debug log
     
     try {
       // Clear API call history when new course is loaded
       if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-        console.log('AppManager: Clearing API call history for new course');
+        // console.log('AppManager: Clearing API call history for new course'); // Removed debug log
         window.electronAPI.emitDebugEvent('course:loaded', {
           courseTitle: courseData.info?.title || 'Course',
           timestamp: Date.now()
         });
       }
-
+ 
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
       if (contentViewer && courseData.launchUrl) {
         contentViewer.loadContent(courseData.launchUrl);
       }
-
+ 
       // Update course outline
       const courseOutline = this.components.get('courseOutline');
       if (courseOutline) {
         courseOutline.updateWithCourse(courseData);
       }
-
+ 
       // Show success message
       this.showSuccess('Course Loaded', `Successfully loaded: ${courseData.info?.title || 'Course'}`);
       
@@ -337,7 +337,7 @@ class AppManager {
    * Show success message
    */
   showSuccess(title, message) {
-    console.log(`AppManager: ${title}:`, message);
+    // console.log(`AppManager: ${title}:`, message); // Removed debug log
     // In a real implementation, this would show a proper success notification
   }
 
@@ -366,7 +366,7 @@ class AppManager {
    * Shutdown the application
    */
   async shutdown() {
-    console.log('AppManager: Shutting down application...');
+    // console.log('AppManager: Shutting down application...'); // Removed debug log
     
     try {
       // Cleanup components
@@ -380,7 +380,7 @@ class AppManager {
       eventBus.destroy();
       
       this.initialized = false;
-      console.log('AppManager: Application shutdown complete');
+      // console.log('AppManager: Application shutdown complete'); // Removed debug log
       
     } catch (error) {
       console.error('AppManager: Error during shutdown:', error);

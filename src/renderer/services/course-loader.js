@@ -25,31 +25,23 @@ class CourseLoader {
    * Handle course load request - opens file dialog and processes selection
    */
   async handleCourseLoad() {
-    console.log('CourseLoader: handleCourseLoad called');
+    // console.log('CourseLoader: handleCourseLoad called'); // Removed debug log
     
     try {
-      // Check if electronAPI is available
       if (typeof window.electronAPI === 'undefined') {
         throw new Error('Electron API not available');
       }
 
-      // DIAGNOSTIC: Log available API functions
-      console.log('CourseLoader: Available electronAPI functions:', Object.keys(window.electronAPI));
-      console.log('CourseLoader: Looking for selectScormFile function:', typeof window.electronAPI.selectScormFile);
-      console.log('CourseLoader: Available selectScormPackage function:', typeof window.electronAPI.selectScormPackage);
-
-      // Show file selection dialog - FIX: Use correct function name
       const result = await window.electronAPI.selectScormPackage();
-      console.log('CourseLoader: File selection result:', result);
+      // console.log('CourseLoader: File selection result:', result); // Removed debug log
       
       if (!result.success) {
-        console.log('CourseLoader: File selection was cancelled or failed:', result);
+        // console.log('CourseLoader: File selection was cancelled or failed:', result); // Removed debug log
         return;
       }
       
-      console.log('CourseLoader: File selected successfully:', result.filePath);
+      // console.log('CourseLoader: File selected successfully:', result.filePath); // Removed debug log
       
-      // Process the selected course file
       await this.loadCourseFromPath(result.filePath);
       
     } catch (error) {
@@ -63,7 +55,7 @@ class CourseLoader {
    * Load course from file path
    */
   async loadCourseFromPath(filePath) {
-    console.log('CourseLoader: loadCourseFromPath called with:', filePath);
+    // console.log('CourseLoader: loadCourseFromPath called with:', filePath); // Removed debug log
     
     try {
       this.setLoadingState(true);
@@ -84,65 +76,69 @@ class CourseLoader {
    * Process SCORM course file through complete workflow
    */
   async processCourseFile(filePath) {
-    console.log('CourseLoader: processCourseFile called with:', filePath);
+    // console.log('CourseLoader: processCourseFile called with:', filePath); // Removed debug log
     
     try {
       // Step 1: Extract the SCORM package
-      console.log('CourseLoader: Step 1 - Extracting SCORM package...');
+      // console.log('CourseLoader: Step 1 - Extracting SCORM package...'); // Removed debug log
       const extractResult = await window.electronAPI.extractScorm(filePath);
-      console.log('CourseLoader: Extract result:', extractResult);
-      
-      // DIAGNOSTIC: Log extract result properties
-      console.log('CourseLoader: Extract result keys:', Object.keys(extractResult));
-      console.log('CourseLoader: Extract result.success:', extractResult.success);
-      console.log('CourseLoader: Extract result.extractedPath:', extractResult.extractedPath);
-      console.log('CourseLoader: Extract result.extractionPath:', extractResult.extractionPath);
-      console.log('CourseLoader: Extract result.path:', extractResult.path);
+      // console.log('CourseLoader: Extract result:', extractResult); // Removed debug log
       
       if (!extractResult.success) {
         throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
       }
       
       const extractedPath = extractResult.path;
-      console.log('CourseLoader: Confirmed extractedPath:', extractedPath);
+      // console.log('CourseLoader: Confirmed extractedPath:', extractedPath); // Removed debug log
       
       if (!extractedPath) {
         throw new Error('Extract result did not contain a valid path property');
       }
       
-      // Step 2: Get entry point
-      console.log('CourseLoader: Step 2 - Getting entry point...');
+      // Step 2: Get manifest content (FileManager now only returns content, not parsed structure)
+      // console.log('CourseLoader: Step 2 - Getting course manifest content...'); // Removed debug log
+      const manifestContentResult = await window.electronAPI.getCourseManifest(extractedPath);
       
-      // DIAGNOSTIC: Log available entry point functions
-      console.log('CourseLoader: Looking for getCourseEntryPoint function:', typeof window.electronAPI.getCourseEntryPoint);
-      console.log('CourseLoader: Available findScormEntry function:', typeof window.electronAPI.findScormEntry);
-      
-      // FIX: Use correct function name
-      const entryResult = await window.electronAPI.findScormEntry(extractedPath);
-      console.log('CourseLoader: Entry result:', entryResult);
-      
-      if (!entryResult.success) {
-        throw new Error(`Failed to get course entry point: ${entryResult.error}`);
+      if (!manifestContentResult.success) {
+        throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
       }
       
-      // Step 3: Get course info
-      console.log('CourseLoader: Step 3 - Getting course info...');
-      const courseInfo = await window.electronAPI.getCourseInfo(extractedPath);
-      console.log('CourseLoader: Course info:', courseInfo);
+      const manifestContent = manifestContentResult.manifestContent;
       
-      // Step 4: Get course manifest
-      console.log('CourseLoader: Step 4 - Getting course manifest...');
-      const manifestResult = await window.electronAPI.getCourseManifest(extractedPath);
-      console.log('CourseLoader: Manifest result:', manifestResult);
+      // Step 3: Process manifest using ScormCAMService (via IPC)
+      // console.log('CourseLoader: Step 3 - Processing manifest with CAM service...'); // Removed debug log
+      const processManifestResult = await window.electronAPI.processScormManifest(extractedPath, manifestContent);
+      
+      if (!processManifestResult.success) {
+        throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
+      }
+      
+      const { manifest, validation, analysis } = processManifestResult;
+      
+      // Step 4: Determine entry point from processed manifest
+      // console.log('CourseLoader: Step 4 - Determining entry point...'); // Removed debug log
+      const entryResult = await window.electronAPI.resolveScormUrl(analysis.launchSequence[0].href, extractedPath); // Assuming first SCO in launch sequence is entry
+      
+      if (!entryResult.success) {
+        throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
+      }
       
       // Step 5: Create course data object
       const courseData = {
-        info: courseInfo,
-        structure: manifestResult.success ? manifestResult.structure : null,
+        info: {
+          title: manifest.organizations.organizations[0].title || manifest.identifier, // Use parsed title
+          version: manifest.version,
+          scormVersion: manifest.metadata?.schemaversion || 'Unknown',
+          hasManifest: true,
+          manifestSize: manifestContent.length // Use actual size
+        },
+        structure: analysis.structure, // Use detailed structure from CAM
         path: extractedPath,
-        entryPoint: entryResult.entryPath,
-        launchUrl: entryResult.launchUrl,
-        originalFilePath: filePath
+        entryPoint: entryResult.resolvedPath,
+        launchUrl: entryResult.url,
+        originalFilePath: filePath,
+        validation: validation, // Include full validation report
+        analysis: analysis // Include full analysis report
       };
       
       // Step 6: Update application state
@@ -152,7 +148,7 @@ class CourseLoader {
       // Step 7: Emit course loaded event
       eventBus.emit('course:loaded', courseData);
       
-      console.log('CourseLoader: Course processing completed successfully!');
+      // console.log('CourseLoader: Course processing completed successfully!'); // Removed debug log
       
     } catch (error) {
       console.error('CourseLoader: Error in processCourseFile:', error);
@@ -164,13 +160,12 @@ class CourseLoader {
    * Load course from File object (drag and drop support)
    */
   async loadCourse(file) {
-    console.log('CourseLoader: loadCourse called with file:', file.name);
+    // console.log('CourseLoader: loadCourse called with file:', file.name); // Removed debug log
     
     try {
       this.setLoadingState(true);
       eventBus.emit('course:loadStart', { fileName: file.name });
       
-      // Check if electronAPI is available
       if (typeof window.electronAPI === 'undefined') {
         throw new Error('Electron API not available');
       }
@@ -231,26 +226,28 @@ class CourseLoader {
   }
 
   /**
-   * Validate course structure
+   * Validate course structure (now handled by CAM service in main process)
    */
   validateCourse(courseData) {
+    // Basic client-side check, full validation is done by CAM service
     const errors = [];
     
-    if (!courseData) {
-      errors.push('Course data is missing');
+    if (!courseData || !courseData.validation || !courseData.analysis) {
+      errors.push('Course data, validation, or analysis is missing from CAM service result.');
       return errors;
     }
     
+    if (!courseData.validation.valid) {
+      errors.push('Course failed SCORM compliance validation.');
+      errors.push(...courseData.validation.errors);
+    }
+    
     if (!courseData.entryPoint) {
-      errors.push('Course entry point not found');
+      errors.push('Course entry point not found after CAM processing.');
     }
     
     if (!courseData.launchUrl) {
-      errors.push('Course launch URL not found');
-    }
-    
-    if (!courseData.info) {
-      errors.push('Course info not found');
+      errors.push('Course launch URL not found after CAM processing.');
     }
     
     return errors;

@@ -76,6 +76,7 @@ const electronAPI = {
   getCourseInfo: (coursePath) => safeInvoke('get-course-info', coursePath),
   getCourseManifest: (coursePath) => safeInvoke('get-course-manifest', coursePath),
   findScormEntry: (coursePath) => safeInvoke('find-scorm-entry', coursePath),
+  processScormManifest: (folderPath, manifestContent) => safeInvoke('process-scorm-manifest', folderPath, manifestContent),
   
   // SCORM API
   scormInitialize: (sessionId) => safeInvoke('scorm-initialize', sessionId),

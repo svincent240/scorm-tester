@@ -2,8 +2,7 @@
  * SCORM API Bridge Service
  * 
  * Handles SCORM API injection and communication between iframe content and the main application.
- * Preserves critical fixes from troubleshooting while maintaining clean architecture.
- * 
+ *
  * @fileoverview SCORM API bridge for iframe communication
  */
 
@@ -27,7 +26,7 @@ class ScormAPIBridge {
   setupMessageHandler() {
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'SCORM_API_CALL') {
-        console.log('SCORM API Bridge: Received API call from iframe:', event.data);
+        // console.log('SCORM API Bridge: Received API call from iframe:', event.data); // Removed debug log
         this.handleScormAPICall(event.data, event.source);
       }
     });
@@ -104,10 +103,10 @@ class ScormAPIBridge {
   }
 
   /**
-   * Inject SCORM API into iframe content (CRITICAL: preserved from troubleshooting)
+   * Inject SCORM API into iframe content
    */
   injectScormAPI(contentFrame) {
-    console.log('SCORM API Bridge: Injecting SCORM API into iframe');
+    // console.log('SCORM API Bridge: Injecting SCORM API into iframe'); // Removed debug log
     
     try {
       const contentUrl = contentFrame.src;
@@ -115,7 +114,7 @@ class ScormAPIBridge {
       const wrapperHtml = this.generateWrapperHTML(apiScript, contentUrl);
       
       contentFrame.srcdoc = wrapperHtml;
-      console.log('SCORM API Bridge: API injection completed successfully');
+      // console.log('SCORM API Bridge: API injection completed successfully'); // Removed debug log
       
     } catch (error) {
       console.error('SCORM API Bridge: Error during API injection:', error);
@@ -127,8 +126,6 @@ class ScormAPIBridge {
    */
   generateAPIScript() {
     return `
-      console.log('SCORM API: Enhanced injection with real data flow');
-      
       function createScormAPICall(method) {
         return function(...params) {
           const callId = 'call_' + Date.now() + '_' + Math.random();
@@ -208,8 +205,6 @@ class ScormAPIBridge {
         LMSGetErrorString: window.API_1484_11.GetErrorString,
         LMSGetDiagnostic: window.API_1484_11.GetDiagnostic
       };
-      
-      console.log('SCORM API enhanced injection completed');
     `;
   }
 
@@ -225,7 +220,6 @@ class ScormAPIBridge {
       </head>
       <body>
         <script>
-          console.log('SCORM Tester: Redirecting to content with enhanced API:', '${contentUrl}');
           try {
             window.location.href = '${contentUrl}';
           } catch (error) {
@@ -249,15 +243,12 @@ class ScormAPIBridge {
       errorCode,
       timestamp: Date.now()
     };
-
-    console.log('SCORM API Bridge: Logging API call:', apiCall);
-    
+ 
     // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
     
     // Also emit via IPC for debug window
     if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      console.log('SCORM API Bridge: Emitting debug event via IPC:', apiCall);
       window.electronAPI.emitDebugEvent('api:call', apiCall);
     }
     

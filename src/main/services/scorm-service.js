@@ -13,9 +13,10 @@
 const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
 const { ScormSNService } = require('./scorm/sn/index');
-const { 
+const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
+const {
   SERVICE_DEFAULTS,
-  SERVICE_EVENTS 
+  SERVICE_EVENTS
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 
@@ -37,7 +38,7 @@ class ScormService extends BaseService {
     
     // SCORM service instances
     this.rteService = null;
-    this.camService = null;
+    this.camService = null; // Will be initialized in initializeScormServices
     this.snService = null;
     
     // Session management
@@ -314,172 +315,100 @@ class ScormService extends BaseService {
   }
 
   /**
-   * Validate SCORM compliance
-   * @param {string} folderPath - Package folder path
+   * Validate SCORM compliance (delegated to CAM service)
+   * @param {string} manifestPath - Path to imsmanifest.xml file
    * @returns {Promise<Object>} Validation result
    */
-  async validateCompliance(folderPath) {
+  async validateCompliance(manifestPath) {
     try {
-      this.logger?.info(`ScormService: Validating SCORM compliance for ${folderPath}`);
-      
-      // Basic validation implementation
-      const manifestPath = require('path').join(folderPath, 'imsmanifest.xml');
-      const fs = require('fs');
-      
-      if (!fs.existsSync(manifestPath)) {
-        return { valid: false, errors: ['Missing imsmanifest.xml file'], warnings: [] };
+      this.logger?.info(`ScormService: Validating SCORM compliance for manifest: ${manifestPath}`);
+      if (!this.camService) {
+        throw new Error('CAM Service not initialized');
       }
-      
-      const manifestContent = fs.readFileSync(manifestPath, 'utf8');
-      const errors = [];
-      const warnings = [];
-      
-      // Check required elements
-      if (!manifestContent.includes('<organizations>')) {
-        errors.push('Missing required <organizations> element');
-      }
-      
-      if (!manifestContent.includes('<resources>')) {
-        errors.push('Missing required <resources> element');
-      }
-      
-      // Check SCORM version
-      const scormVersionMatch = manifestContent.match(/schemaversion\s*=\s*["']([^"']+)["']/i);
-      const scormVersion = scormVersionMatch ? scormVersionMatch[1] : null;
-      
-      if (!scormVersion) {
-        warnings.push('SCORM version not clearly specified');
-      }
-      
-      this.recordOperation('validateCompliance', true);
-      
+      const manifestContent = require('fs').readFileSync(manifestPath, 'utf8');
+      const result = await this.camService.validatePackage(manifestPath, manifestContent);
+      this.recordOperation('validateCompliance', result.validation.isValid);
       return {
-        valid: errors.length === 0,
-        errors,
-        warnings,
-        scormVersion,
-        hasValidEntry: true
+        valid: result.validation.isValid,
+        errors: result.validation.errors.map(e => e.message),
+        warnings: result.validation.warnings.map(w => w.message),
+        scormVersion: result.manifest.schemaversion,
+        hasValidEntry: true // This would be determined by SN service later
       };
-      
     } catch (error) {
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.SCORM_VALIDATION_FAILED,
+        `SCORM compliance validation failed: ${error.message}`,
+        'ScormService.validateCompliance'
+      );
       this.logger?.error('ScormService: Compliance validation failed:', error);
       this.recordOperation('validateCompliance', false);
-      
-      return {
-        valid: false,
-        errors: [`Validation error: ${error.message}`],
-        warnings: []
-      };
+      return { valid: false, errors: [`Validation error: ${error.message}`], warnings: [] };
     }
   }
 
   /**
-   * Analyze SCORM content
-   * @param {string} folderPath - Package folder path
+   * Analyze SCORM content (delegated to CAM service)
+   * @param {string} manifestPath - Path to imsmanifest.xml file
    * @returns {Promise<Object>} Analysis result
    */
-  async analyzeContent(folderPath) {
+  async analyzeContent(manifestPath) {
     try {
-      this.logger?.info(`ScormService: Analyzing SCORM content for ${folderPath}`);
-      
-      const analysis = {
-        fileCount: 0,
-        totalSize: 0,
-        fileTypes: {},
-        hasVideo: false,
-        hasAudio: false,
-        hasFlash: false,
-        hasJavaScript: false,
-        scormFiles: [],
-        mediaFiles: [],
-        potentialIssues: []
-      };
-      
-      const fs = require('fs');
-      const path = require('path');
-      
-      const scanDirectory = (dirPath) => {
-        const items = fs.readdirSync(dirPath);
-        
-        items.forEach(item => {
-          const fullPath = path.join(dirPath, item);
-          const stat = fs.statSync(fullPath);
-          
-          if (stat.isDirectory()) {
-            scanDirectory(fullPath);
-          } else {
-            analysis.fileCount++;
-            analysis.totalSize += stat.size;
-            
-            const ext = path.extname(item).toLowerCase();
-            analysis.fileTypes[ext] = (analysis.fileTypes[ext] || 0) + 1;
-            
-            // Check file types
-            if (['.mp4', '.avi', '.mov', '.wmv', '.flv'].includes(ext)) {
-              analysis.hasVideo = true;
-              analysis.mediaFiles.push(item);
-            }
-            
-            if (['.mp3', '.wav', '.ogg', '.m4a'].includes(ext)) {
-              analysis.hasAudio = true;
-              analysis.mediaFiles.push(item);
-            }
-            
-            if (['.swf', '.fla'].includes(ext)) {
-              analysis.hasFlash = true;
-              analysis.potentialIssues.push(`Flash file detected: ${item} (may not work in modern browsers)`);
-            }
-            
-            if (['.js'].includes(ext)) {
-              analysis.hasJavaScript = true;
-            }
-            
-            if (['imsmanifest.xml', 'metadata.xml'].includes(item.toLowerCase())) {
-              analysis.scormFiles.push(item);
-            }
-          }
-        });
-      };
-      
-      scanDirectory(folderPath);
-      
-      // Additional checks
-      if (analysis.totalSize > 100 * 1024 * 1024) {
-        analysis.potentialIssues.push('Course size is very large (>100MB) - may cause loading issues');
+      this.logger?.info(`ScormService: Analyzing SCORM content for manifest: ${manifestPath}`);
+      if (!this.camService) {
+        throw new Error('CAM Service not initialized');
       }
-      
-      if (!analysis.hasJavaScript) {
-        analysis.potentialIssues.push('No JavaScript files detected - SCORM API communication may not work');
-      }
-      
-      if (!analysis.scormFiles.includes('imsmanifest.xml')) {
-        analysis.potentialIssues.push('Missing imsmanifest.xml - not a valid SCORM package');
-      }
-      
+      const manifestContent = require('fs').readFileSync(manifestPath, 'utf8');
+      const result = await this.camService.analyzePackage(manifestPath, manifestContent);
       this.recordOperation('analyzeContent', true);
-      return analysis;
-      
+      return result.analysis;
     } catch (error) {
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.SCORM_ANALYSIS_FAILED,
+        `SCORM content analysis failed: ${error.message}`,
+        'ScormService.analyzeContent'
+      );
       this.logger?.error('ScormService: Content analysis failed:', error);
       this.recordOperation('analyzeContent', false);
-      
-      return {
-        fileCount: 0,
-        totalSize: 0,
-        fileTypes: {},
-        error: error.message
-      };
+      return { error: error.message };
     }
   }
 
   /**
-   * Get session data
-   * @param {string} sessionId - Session identifier
-   * @returns {Object|null} Session data or null
+   * Process SCORM manifest (delegated to CAM service)
+   * @param {string} folderPath - Path to extracted SCORM package directory
+   * @param {string} manifestContent - Content of imsmanifest.xml
+   * @returns {Promise<Object>} Full package processing result from CAM service
    */
-  getSessionData(sessionId) {
-    return this.sessions.get(sessionId) || null;
+  async processScormManifest(folderPath, manifestContent) {
+    try {
+      this.logger?.info(`ScormService: Processing SCORM manifest for ${folderPath}`);
+      if (!this.camService) {
+        throw new Error('CAM Service not initialized');
+      }
+      const result = await this.camService.processPackage(folderPath, manifestContent);
+      this.recordOperation('processScormManifest', result.validation.isValid);
+      return { success: true, ...result };
+    } catch (error) {
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.SCORM_MANIFEST_PROCESSING_FAILED,
+        `SCORM manifest processing failed: ${error.message}`,
+        'ScormService.processScormManifest'
+      );
+      this.logger?.error('ScormService: SCORM manifest processing failed:', error);
+      this.recordOperation('processScormManifest', false);
+      return { success: false, error: error.message, reason: error.message };
+    }
   }
+ 
+   /**
+    * Get session data
+    * @param {string} sessionId - Session identifier
+    * @returns {Object|null} Session data or null
+    */
+   getSessionData(sessionId) {
+     return this.sessions.get(sessionId) || null;
+   }
 
   /**
    * Reset session
@@ -623,6 +552,8 @@ class ScormService extends BaseService {
    * @private
    */
   async initializeScormServices() {
+    // Initialize CAM service
+    this.camService = new ScormCAMService(this.errorHandler, this.logger);
     // Initialize SN service for sequencing support
     this.snService = new ScormSNService(this.errorHandler, this.logger, {
       enableGlobalObjectives: this.config.enableGlobalObjectives,

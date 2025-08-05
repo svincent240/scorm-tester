@@ -48,7 +48,7 @@ This documentation is designed to provide comprehensive context for AI-driven de
 - **Comprehensive Testing**: 37/37 tests passing with full compliance validation
 
 ### 🏗️ Architecture Highlights
-- **Modular Design**: All files under 200-line limit for maintainability
+- **Modular Design**: Emphasizes logical cohesion and clear separation of concerns. Refer to [`style.md`](style.md) for file size guidelines.
 - **Event-Driven**: Component communication through centralized event bus
 - **Service-Oriented**: Clear separation of concerns with dependency injection
 - **Type-Safe**: Complete TypeScript definitions for development support
@@ -66,8 +66,8 @@ This documentation is designed to provide comprehensive context for AI-driven de
 ### When Working on This Codebase
 1. **Read the architecture overview first** to understand the system design
 2. **Check SCORM compliance requirements** before making changes to core functionality
-3. **Follow the modular patterns** established in the architecture documentation
-4. **Maintain file size limits** (max 200 lines per file)
+3. **Follow the modular patterns** established in the architecture documentation and [`style.md`](style.md)
+4. **Adhere to code style and file size guidelines** as defined in [`style.md`](style.md)
 5. **Update documentation** when making architectural changes
 6. **Run comprehensive tests** to ensure SCORM compliance is maintained
 
@@ -106,7 +106,7 @@ For questions about SCORM compliance, refer to the specification guide and compl
 ## 🔧 Development Workflow
 
 ### Code Standards
-- **File Size**: Maximum 200 lines per file (300 for index.html)
+- **Code Style & File Size**: Refer to [`style.md`](style.md) for detailed guidelines.
 - **Testing**: Comprehensive test coverage required for all changes
 - **Type Safety**: Use TypeScript definitions for all interfaces
 - **Documentation**: Update documentation with all architectural changes

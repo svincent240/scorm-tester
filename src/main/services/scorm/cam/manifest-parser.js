@@ -272,12 +272,138 @@ class ManifestParser {
   // Additional parsing methods would be implemented here
   // (parseItems, parseSequencing, parseFiles, etc.)
   // These are placeholder methods to keep under 200 lines
-  parseItems(orgElement, basePath) { return []; }
-  parseSequencing(element) { return null; }
-  parseFiles(resourceElement, basePath) { return []; }
-  parseDependencies(resourceElement) { return []; }
-  parseLOMMetadata(metadataElement) { return null; }
-  parseSubManifests(manifestElement, basePath) { return []; }
+  /**
+   * Parse items recursively
+   * @param {Element} parentElement - Parent element (organization or item)
+   * @param {string} basePath - Base path for resolving URLs
+   * @returns {Array} Array of item objects
+   */
+  parseItems(parentElement, basePath) {
+    const items = [];
+    const itemElements = this.getChildElements(parentElement, 'item');
+    for (const itemElement of itemElements) {
+      items.push({
+        identifier: this.getAttribute(itemElement, 'identifier'),
+        identifierref: this.getAttribute(itemElement, 'identifierref'),
+        isvisible: this.getAttribute(itemElement, 'isvisible') === 'true',
+        parameters: this.getAttribute(itemElement, 'parameters'),
+        title: this.getElementText(itemElement, 'title'),
+        children: this.parseItems(itemElement, basePath), // Recursive call for nested items
+        sequencing: this.parseSequencing(itemElement),
+        metadata: this.parseMetadata(itemElement, basePath)
+      });
+    }
+    return items;
+  }
+
+  /**
+   * Parse sequencing information
+   * @param {Element} element - Parent element (organization or item)
+   * @returns {Object|null} Sequencing information
+   */
+  parseSequencing(element) {
+    const sequencingElement = this.getChildElement(element, 'imsss:sequencing');
+    if (!sequencingElement) return null;
+
+    return {
+      controlMode: this.parseControlMode(sequencingElement),
+      sequencingRules: this.parseSequencingRules(sequencingElement),
+      limitConditions: this.parseLimitConditions(sequencingElement),
+      rollupRules: this.parseRollupRules(sequencingElement),
+      objectives: this.parseObjectives(sequencingElement),
+      randomizationControls: this.parseRandomizationControls(sequencingElement),
+      deliveryControls: this.parseDeliveryControls(sequencingElement)
+    };
+  }
+
+  /**
+   * Parse files within a resource
+   * @param {Element} resourceElement - Resource element
+   * @param {string} resolvedBase - Resolved base path for the resource
+   * @returns {Array} Array of file objects
+   */
+  parseFiles(resourceElement, resolvedBase) {
+    const files = [];
+    const fileElements = this.getChildElements(resourceElement, 'file');
+    for (const fileElement of fileElements) {
+      files.push({
+        href: this.getAttribute(fileElement, 'href'),
+        resolvedPath: path.resolve(resolvedBase, this.getAttribute(fileElement, 'href'))
+      });
+    }
+    return files;
+  }
+
+  /**
+   * Parse dependencies within a resource
+   * @param {Element} resourceElement - Resource element
+   * @returns {Array} Array of dependency objects
+   */
+  parseDependencies(resourceElement) {
+    const dependencies = [];
+    const dependencyElements = this.getChildElements(resourceElement, 'dependency');
+    for (const dependencyElement of dependencyElements) {
+      dependencies.push({
+        identifierref: this.getAttribute(dependencyElement, 'identifierref')
+      });
+    }
+    return dependencies;
+  }
+
+  /**
+   * Parse LOM metadata
+   * @param {Element} metadataElement - Metadata element
+   * @returns {Object|null} LOM metadata
+   */
+  parseLOMMetadata(metadataElement) {
+    const lomElement = this.getChildElement(metadataElement, 'lom');
+    if (!lomElement) return null;
+
+    return {
+      general: this.parseLOMGeneral(lomElement),
+      lifecycle: this.parseLOMLifecycle(lomElement),
+      metaMetadata: this.parseLOMMetaMetadata(lomElement),
+      technical: this.parseLOMTechnical(lomElement),
+      educational: this.parseLOMEducational(lomElement),
+      rights: this.parseLOMRights(lomElement),
+      relation: this.parseLOMRelation(lomElement),
+      annotation: this.parseLOMAnnotation(lomElement),
+      classification: this.parseLOMClassification(lomElement)
+    };
+  }
+
+  /**
+   * Parse sub-manifests (organizations within organizations)
+   * @param {Element} manifestElement - Manifest root element
+   * @param {string} basePath - Base path for resolving URLs
+   * @returns {Array} Array of sub-manifest objects
+   */
+  parseSubManifests(manifestElement, basePath) {
+    // This method would handle <manifest> elements nested within other <manifest> elements
+    // which is not common in SCORM but allowed by IMS CP.
+    // For SCORM, organizations are typically top-level within the main manifest.
+    return [];
+  }
+
+  // Placeholder for sequencing parsing methods
+  parseControlMode(sequencingElement) { return null; }
+  parseSequencingRules(sequencingElement) { return null; }
+  parseLimitConditions(sequencingElement) { return null; }
+  parseRollupRules(sequencingElement) { return null; }
+  parseObjectives(sequencingElement) { return null; }
+  parseRandomizationControls(sequencingElement) { return null; }
+  parseDeliveryControls(sequencingElement) { return null; }
+
+  // Placeholder for LOM parsing methods
+  parseLOMGeneral(lomElement) { return null; }
+  parseLOMLifecycle(lomElement) { return null; }
+  parseLOMMetaMetadata(lomElement) { return null; }
+  parseLOMTechnical(lomElement) { return null; }
+  parseLOMEducational(lomElement) { return null; }
+  parseLOMRights(lomElement) { return null; }
+  parseLOMRelation(lomElement) { return null; }
+  parseLOMAnnotation(lomElement) { return null; }
+  parseLOMClassification(lomElement) { return null; }
 }
 
 module.exports = ManifestParser;

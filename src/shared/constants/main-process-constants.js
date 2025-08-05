@@ -187,6 +187,7 @@ const SECURITY_CONFIG = {
       'find-scorm-entry',
       'get-course-info',
       'get-course-manifest',
+      'process-scorm-manifest',
       'validate-scorm-compliance',
       'analyze-scorm-content',
       'get-session-data',
