@@ -151,6 +151,15 @@ class AppManager {
           }
         }
       }
+
+      // Wire NavigationControls to ContentViewer reference
+      const navigationControls = this.components.get('navigationControls');
+      const contentViewer = this.components.get('contentViewer');
+      if (navigationControls && typeof navigationControls.setContentViewer === 'function') {
+        navigationControls.setContentViewer(contentViewer || null);
+        try { this.logger.debug('AppManager: navigationControls wired to contentViewer'); } catch (_) {}
+      }
+
       this.logger.info('AppManager: All components initialized');
     } catch (error) {
       try { this.logger.error('AppManager: Error initializing components', error?.message || error); } catch (_) {}

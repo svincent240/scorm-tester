@@ -185,14 +185,24 @@ Execution Plan and Order
 4) Fix navigation-controls CSS selectors.
    - Status: Completed (invalid &:hover / &:active nesting replaced with valid flat selectors in [src/styles/components/navigation-controls.css](src/styles/components/navigation-controls.css))
 5) Wire NavigationControls to ContentViewer in AppManager and normalize button state source.
+   - Status: Completed
+   - Notes:
+     - AppManager now wires NavigationControls to ContentViewer via navigationControls.setContentViewer(contentViewer) after component initialization ([src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:136)).
+     - NavigationControls derives authoritative button states from UIState. Available navigation from SNBridge is normalized into canNavigatePrevious/canNavigateNext and pushed to UIState; component subscribes to UIState.navigationState to reflect updates. Loop guards prevent feedback cycles. Logging uses renderer-logger.
 6) Add ContentViewer API presence verification and ensure scaling CSS.
+   - Status: Completed
+   - Notes:
+     - Implemented API presence verification in [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:905). After iframe load, verifyScormApiPresence() checks for direct API_1484_11/API with Initialize/LMSInitialize. If absent, probes postMessage bridge and handles response; on failure, shows persistent UIState notification and sets UI error, emitting scormApiMissing.
+     - Maintains preference for direct injection; scormApiInjected event emitted upon injection. Verification runs afterward to ensure availability or trigger fallback UX.
+     - Removed console logging in modified regions; user-facing errors go through UIState notifications, aligning with centralized logging rules.
+     - Ensured scaling support by enhancing CSS: added body.scaled-content transform rules and CSS variable fallbacks in [src/styles/components/content-viewer.css](src/styles/components/content-viewer.css:123). ContentViewer sets --scorm-scale and related variables, then applies the class when needed.
 7) Fix CourseLoader.clearCourse workflow.
 8) Configure EventBus debug via UIState and route to logger.
 9) Accessibility updates for CourseOutline/Nav controls.
 10) Update dev_docs:
-   - This ui-improvement-plan.md (updated with progress)
-   - guides/logging-debugging.md: renderer logging guidance (updated)
-   - guides/renderer-imports.md: SCORM API injection precedence and patterns
+    - This ui-improvement-plan.md (updated with progress)
+    - guides/logging-debugging.md: renderer logging guidance (updated)
+    - guides/renderer-imports.md: SCORM API injection precedence and patterns
 11) Add/extend renderer integration tests.
 
 Success Metrics

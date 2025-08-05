@@ -76,7 +76,7 @@ class ContentViewer extends BaseComponent {
     
     // If no iframe exists, create minimal structure
     if (!this.iframe) {
-      console.log('ContentViewer: Creating content viewer structure');
+      // NOTE: Per dev_docs, avoid console.* in renderer. Route via UI notification only if needed.
       this.element.innerHTML = `
         <div class="content-viewer__container">
           <div class="content-viewer__welcome">
@@ -87,8 +87,8 @@ class ContentViewer extends BaseComponent {
             </div>
           </div>
           
-          <iframe 
-            id="content-frame" 
+          <iframe
+            id="content-frame"
             class="content-viewer__frame hidden"
             sandbox="${this.options.sandbox}"
             style="width: 100%; height: 100%; border: none;"
@@ -132,8 +132,6 @@ class ContentViewer extends BaseComponent {
     this.errorElement = this.find('.content-viewer__error');
     this.noContentElement = this.find('.content-viewer__no-content');
     this.fullscreenBtn = this.find('.content-viewer__fullscreen-btn');
-    
-    console.log('ContentViewer: Content structure ready');
   }
 
   /**
@@ -237,16 +235,21 @@ class ContentViewer extends BaseComponent {
       
       // Setup SCORM API in content window using the bridge
       this.setupScormAPI();
+
+      // Verify SCORM API presence and fallbacks
+      setTimeout(() => {
+        this.verifyScormApiPresence();
+      }, 0);
       
       // Apply scaling after content loads
       setTimeout(() => {
         this.applyContentScaling();
       }, 100);
       
-      this.emit('contentLoaded', { 
-        url: this.currentUrl, 
+      this.emit('contentLoaded', {
+        url: this.currentUrl,
         loadTime,
-        contentWindow: this.contentWindow 
+        contentWindow: this.contentWindow
       });
       
     } catch (error) {
@@ -283,19 +286,17 @@ class ContentViewer extends BaseComponent {
     }
     
     try {
-      console.log('ContentViewer: Setting up SCORM API');
-      
       // Create optimized SCORM API wrapper
       const apiWrapper = this.createOptimizedAPIWrapper();
       
-      // Inject SCORM APIs
+      // Prefer direct injection
       this.contentWindow.API = apiWrapper.scorm12;           // SCORM 1.2
       this.contentWindow.API_1484_11 = apiWrapper.scorm2004; // SCORM 2004
       
       this.emit('scormApiInjected', { contentWindow: this.contentWindow });
       
     } catch (error) {
-      console.warn('Failed to inject SCORM API:', error);
+      // Do not console.warn per logging rules; presence verification will notify/log
     }
   }
 
@@ -403,15 +404,8 @@ class ContentViewer extends BaseComponent {
    * Apply content scaling to fit iframe content properly (optimized)
    */
   applyContentScaling() {
-    console.log('ContentViewer: Content scaling check started', {
-      enableContentScaling: this.options.enableContentScaling,
-      hasIframe: !!this.iframe,
-      hasContentWindow: !!this.contentWindow
-    });
-    
     // Skip scaling if disabled or content window not available
     if (!this.options.enableContentScaling || !this.iframe || !this.contentWindow) {
-      console.log('ContentViewer: Content scaling skipped - requirements not met');
       return;
     }
 
@@ -431,25 +425,17 @@ class ContentViewer extends BaseComponent {
       const contentWidth = Math.max(contentBody.scrollWidth, contentBody.offsetWidth);
       const contentHeight = Math.max(contentBody.scrollHeight, contentBody.offsetHeight);
       
-      console.log('ContentViewer: Dimension check - iframe:', iframeRect.width + 'x' + iframeRect.height, 'content:', contentWidth + 'x' + contentHeight);
-      
       // Calculate scaling ratios
       const scaleX = iframeRect.width / contentWidth;
       const scaleY = iframeRect.height / contentHeight;
       const scale = Math.min(scaleX, scaleY, 1);
       
-      console.log('ContentViewer: Scale calculation - scaleX:', scaleX, 'scaleY:', scaleY, 'final scale:', scale);
-      
-      // Apply scaling more aggressively - if content is smaller than iframe, scale it up
+      // If content fits, skip scaling
       if (scale >= 1.0) {
-        console.log('ContentViewer: Content is smaller than iframe, no scaling needed');
         return;
       }
 
       // Apply scaling for content that needs it
-      console.log(`ContentViewer: Applying content scaling: ${Math.round(scale * 100)}%`);
-      
-      // Apply scaling using CSS variables and a class
       contentBody.style.setProperty('--scorm-scale', scale);
       contentBody.style.setProperty('--scorm-inverse-scale-width', `${100 / scale}%`);
       contentBody.style.setProperty('--scorm-inverse-scale-height', `${100 / scale}%`);
@@ -459,8 +445,7 @@ class ContentViewer extends BaseComponent {
       this.appliedScaling = { scale };
 
     } catch (error) {
-      console.warn('ContentViewer: Content scaling failed:', error.message);
-      // Content should still be viewable without scaling
+      // Silent failure per plan; content remains viewable
     }
   }
 
@@ -761,13 +746,12 @@ class ContentViewer extends BaseComponent {
    * Handle SCORM error event
    */
   handleScormError(data) {
-    console.warn('SCORM Error:', JSON.stringify(data, null, 2));
-    console.warn('SCORM Error Details:', {
-      type: typeof data,
-      message: data?.message || 'No message',
-      code: data?.code || 'No code',
-      stack: data?.stack || 'No stack trace',
-      raw: data
+    // Route user-visible error through notifications; no console logging
+    const message = typeof data === 'string' ? data : (data?.message || 'SCORM error occurred');
+    this.uiState.showNotification({
+      type: 'error',
+      message: `SCORM Error: ${message}`,
+      duration: 0
     });
   }
 
@@ -832,6 +816,80 @@ class ContentViewer extends BaseComponent {
    */
   createIframe() {
     // Iframe will be created in renderContent
+  }
+
+  /**
+   * Verify SCORM API presence and establish fallback if needed
+   * - Prefer direct API injection (API_1484_11 or API with Initialize())
+   * - If unavailable, attempt bridge-based postMessage path
+   * - If both unavailable, notify user with persistent error
+   */
+  verifyScormApiPresence() {
+    try {
+      const win = this.contentWindow;
+      if (!win) {
+        this.showError('SCORM API Verification Failed', 'Content window not available to verify SCORM API.');
+        return;
+      }
+
+      // Check SCORM 2004 first
+      const api2004 = win.API_1484_11;
+      const api12 = win.API;
+      const has2004 = api2004 && typeof api2004.Initialize === 'function';
+      const has12 = api12 && (typeof api12.Initialize === 'function' || typeof api12.LMSInitialize === 'function');
+
+      if (has2004 || has12) {
+        // API present; nothing further required
+        this.emit('scormApiVerified', { mode: 'direct', has2004, has12 });
+        return;
+      }
+
+      // Fallback: attempt postMessage bridge discovery by sending a ping
+      const callId = 'probe_' + Date.now();
+      let responded = false;
+      const listener = (event) => {
+        if (event.data && event.data.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
+          responded = true;
+          window.removeEventListener('message', listener);
+          this.emit('scormApiVerified', { mode: 'bridge' });
+        }
+      };
+      window.addEventListener('message', listener);
+
+      // Post a harmless probe request expected by bridge (Initialize with empty)
+      try {
+        win.postMessage({
+          type: 'SCORM_API_CALL',
+          method: 'GetLastError',
+          params: [],
+          callId
+        }, '*');
+      } catch (_) {
+        // ignore
+      }
+
+      // Give the bridge a short time to respond
+      setTimeout(() => {
+        if (!responded) {
+          window.removeEventListener('message', listener);
+          // Neither direct API nor bridge responded; notify user
+          this.uiState.showNotification({
+            type: 'error',
+            duration: 0,
+            message: 'SCORM API not found in content. The SCO did not expose API_1484_11 or API, and no postMessage bridge responded. The course may not be SCORM-enabled or is loading in a context that cannot access the API.'
+          });
+          this.uiState.setError({ message: 'SCORM API not found (no direct API or bridge response).' });
+          this.emit('scormApiMissing', { url: this.currentUrl });
+        }
+      }, 600);
+    } catch (err) {
+      this.uiState.showNotification({
+        type: 'error',
+        duration: 0,
+        message: `SCORM API verification error: ${err.message || String(err)}`
+      });
+      this.uiState.setError(err);
+    }
   }
 
   /**

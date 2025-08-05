@@ -1,10 +1,17 @@
 /**
  * Content Viewer Component Styles
- * 
+ *
  * Styles for the main content viewing area including the iframe
  * that displays SCORM content and related UI components.
- * 
+ *
  * @fileoverview Content viewer component styles
+ *
+ * Notes:
+ * - Supports ContentViewer's responsive scaling by honoring the "scaled-content" class
+ *   and CSS variables set on the SCO document body:
+ *     --scorm-scale: number (0..1)
+ *     --scorm-inverse-scale-width: percentage
+ *     --scorm-inverse-scale-height: percentage
  */
 
 /* Content Viewer Container */
@@ -117,6 +124,26 @@
   background: #ffffff;
   display: block;
   min-height: 0;  /* Remove min-height constraint */
+}
+
+/* Responsive SCORM content scaling (applied inside iframe document body)
+   The ContentViewer sets the variables on the SCO body and adds "scaled-content" class.
+   These rules ensure content scales down to fit the iframe viewport while maintaining layout. */
+
+/* Fallback defaults in case variables are not set */
+:root {
+  --scorm-scale: 1;
+  --scorm-inverse-scale-width: 100%;
+  --scorm-inverse-scale-height: 100%;
+}
+
+/* These selectors target the SCO document when the class is applied */
+body.scaled-content {
+  transform: scale(var(--scorm-scale));
+  transform-origin: top left;
+  width: var(--scorm-inverse-scale-width);
+  height: var(--scorm-inverse-scale-height);
+  overflow: hidden; /* Prevent double scrollbars when scaled */
 }
 
 .content-viewer__frame.hidden {

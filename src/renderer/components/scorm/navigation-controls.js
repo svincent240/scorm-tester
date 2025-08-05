@@ -54,11 +54,27 @@ class NavigationControls extends BaseComponent {
   async setup() {
     this.uiState = await uiStatePromise;
     
-    // Initialize logger
-    this.logger = console;
+    // Initialize logger via renderer-logger with safe fallback
+    try {
+      const { rendererLogger } = await import('../../utils/renderer-logger.js');
+      this.logger = rendererLogger || console;
+    } catch (_) {
+      this.logger = console;
+    }
     
     await this.initializeSNServiceBridge();
     this.loadNavigationState();
+
+    // Subscribe to authoritative navigation state from UIState
+    try {
+      this._unsubscribeNav = this.uiState.subscribe((newNavState) => {
+        // Normalize and apply with loop guard
+        const normalized = this.normalizeNavStateFromUI(newNavState || {});
+        this.updateNavigationState({ ...normalized, _fromUIState: true });
+      }, 'navigationState');
+    } catch (e) {
+      this.logger?.warn('NavigationControls: Failed to subscribe to UIState navigationState', e?.message || e);
+    }
   }
 
   /**
@@ -319,6 +335,17 @@ class NavigationControls extends BaseComponent {
     
     // Update available navigation options
     if (result.availableNavigation) {
+      // Normalize into canNavigatePrevious/Next and push through UIState as authority
+      const normalized = this.normalizeAvailableNavigation(result.availableNavigation);
+      try {
+        this.uiState.updateNavigation({
+          ...normalized,
+          _fromComponent: true // prevent ping-pong loops
+        });
+      } catch (e) {
+        this.logger?.warn('NavigationControls: Failed to update UIState with navigation availability', e?.message || e);
+      }
+      // Also reflect locally for immediate button state sync
       this.updateAvailableNavigation(result.availableNavigation);
     }
   }
@@ -328,6 +355,11 @@ class NavigationControls extends BaseComponent {
    */
   updateAvailableNavigation(availableNavigation) {
     this.navigationState.availableNavigation = availableNavigation || [];
+    // derive authoritative booleans
+    const normalized = this.normalizeAvailableNavigation(this.navigationState.availableNavigation);
+    this.navigationState.canNavigatePrevious = normalized.canNavigatePrevious;
+    this.navigationState.canNavigateNext = normalized.canNavigateNext;
+
     this.updateButtonStates();
     
     this.logger?.debug('NavigationControls: Available navigation updated:', availableNavigation);
@@ -502,19 +534,22 @@ class NavigationControls extends BaseComponent {
    * Update button states based on available navigation
    */
   updateButtonStates() {
-    const canNavigatePrevious = this.isNavigationAvailable('previous');
-    const canNavigateNext = this.isNavigationAvailable('continue');
+    // Use authoritative booleans from UIState-normalized data when present
+    const canNavigatePrevious = !!this.navigationState.canNavigatePrevious || this.isNavigationAvailable('previous');
+    const canNavigateNext = !!this.navigationState.canNavigateNext || this.isNavigationAvailable('continue');
     
     if (this.previousBtn) {
       this.previousBtn.disabled = !canNavigatePrevious;
       this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
       this.previousBtn.title = canNavigatePrevious ? 'Previous' : 'Previous navigation not available';
+      this.previousBtn.setAttribute('aria-disabled', String(!canNavigatePrevious));
     }
     
     if (this.nextBtn) {
       this.nextBtn.disabled = !canNavigateNext;
       this.nextBtn.classList.toggle('disabled', !canNavigateNext);
       this.nextBtn.title = canNavigateNext ? 'Next' : 'Next navigation not available';
+      this.nextBtn.setAttribute('aria-disabled', String(!canNavigateNext));
     }
   }
 
@@ -788,11 +823,36 @@ class NavigationControls extends BaseComponent {
    * Destroy component
    */
   destroy() {
+    if (typeof this._unsubscribeNav === 'function') {
+      try { this._unsubscribeNav(); } catch (_) {}
+      this._unsubscribeNav = null;
+    }
     if (this.options.enableKeyboardNavigation) {
       document.removeEventListener('keydown', this.handleKeyDown);
     }
-    
     super.destroy();
+  }
+
+  /**
+   * Normalize availableNavigation array into booleans used as single source of truth.
+   */
+  normalizeAvailableNavigation(availableNavigation = []) {
+    const a = Array.isArray(availableNavigation) ? availableNavigation : [];
+    const canNavigatePrevious = a.includes('previous') || a.includes('choice.previous');
+    const canNavigateNext = a.includes('continue') || a.includes('choice.next') || a.includes('choice');
+    return { canNavigatePrevious, canNavigateNext };
+  }
+
+  /**
+   * Normalize UIState navigationState payload into this component's shape.
+   */
+  normalizeNavStateFromUI(navState = {}) {
+    // Trust booleans when supplied; retain local availableNavigation list if UIState doesn't send it
+    const normalized = {
+      canNavigatePrevious: !!navState.canNavigatePrevious,
+      canNavigateNext: !!navState.canNavigateNext
+    };
+    return normalized;
   }
 }
 
