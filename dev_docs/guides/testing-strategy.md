@@ -1,442 +1,254 @@
-# Testing Strategy Guide
+# Testing Strategy Guide (2025 Refresh)
 
-## Overview
+This document defines the updated, modular, and encapsulated testing strategy for the SCORM Tester application. It replaces prior guidance and aligns with development rules in [dev_docs/README.md](dev_docs/README.md:1), architecture in [architecture/overview.md](../architecture/overview.md:1), and style rules in [style.md](../style.md:1).
 
-This document outlines the comprehensive testing strategy for the SCORM Tester application, ensuring SCORM 2004 4th Edition compliance and robust functionality across all components.
+Goals
+- Maintain SCORM 2004 4th Edition compliance with confidence.
+- Encapsulate tests by module and contract boundaries.
+- Enable deterministic, flake-free execution locally and in CI.
+- Provide clear migration from legacy tests to a layered structure.
+- Establish coverage and performance policies with non-gating budgets initially.
 
-## Testing Framework
+Test Framework and Runners
+- Framework: Jest (retain current Jest/Electron/Node harness)
+- Environment: node
+- Global setup: [tests/setup.js](../../tests/setup.js:1)
+- Configuration: [package.json](../../package.json:1) jest section
+- Parallelism: Use Jest projects to shard by test layer to reduce wall time
+- Electron rendering: Avoid headful E2E; renderer “integration” targets state/intent wiring and logging guarantees via Node/JSDOM-compatible harnesses
 
-### Primary Framework: Jest
-- **Framework**: Jest 29.5.0 with Node.js environment
-- **Setup**: Global test setup in [`tests/setup.js`](../../tests/setup.js)
-- **Configuration**: Defined in [`package.json`](../../package.json) jest section
-- **Coverage**: 80% minimum threshold for branches, functions, lines, and statements
+Layered Test Model
+Tests are organized into layers, each with clear responsibilities and boundaries. Import only through public module entry points to avoid test-only coupling.
 
-### Test Environment Configuration
-```javascript
+1) Unit Tests
+- Scope: Pure logic within a single module. No filesystem, no IPC, no timers beyond fake timers.
+- Targets:
+  - RTE: [src/main/services/scorm/rte](../../src/main/services/scorm/rte/index.js:1)
+  - CAM: [src/main/services/scorm/cam](../../src/main/services/scorm/cam/index.js:1)
+  - SN:  [src/main/services/scorm/sn](../../src/main/services/scorm/sn/index.js:1)
+  - Shared utilities/constants: [src/shared](../../src/shared/utils/logger.js:1)
+- Tech:
+  - Fake timers: jest.useFakeTimers()
+  - Deterministic RNG helpers from tests/setup.js
+  - Mocks isolated to module boundaries
+- Example structure:
+  - tests/unit/rte/api-handler.test.js
+  - tests/unit/cam/manifest-parser.test.js
+  - tests/unit/sn/activity-tree.test.js
+  - tests/unit/shared/logger.test.js
+
+2) Contract Tests
+- Scope: Validate interfaces between modules using real adapters at boundary, while mocking external environment (FS, IPC).
+- Examples:
+  - RTE ApiHandler ↔ DataModel (read/write semantics, error codes)
+  - CAM ManifestParser ↔ ContentValidator (manifest-to-validation invariants)
+  - SN SequencingEngine ↔ NavigationHandler (request/response invariants)
+- Structure:
+  - tests/contract/rte-data-model/*.test.js
+  - tests/contract/cam-validator/*.test.js
+  - tests/contract/sn-nav/*.test.js
+- Principles:
+  - No deep-imports of internal private files
+  - Focus on public method surface and event/return contracts
+  - Deterministic clocks and seeded data
+
+3) Integration Tests
+- Scope: Cross-module flows with realistic orchestration but still within Node. IPC and FS may be mocked or temp-dir based.
+- Existing suites retained and mapped:
+  - tests/integration/scorm-compliance.test.js
+  - tests/integration/renderer-integration.test.js
+  - tests/integration/sn-workflow.test.js
+  - tests/integration/cam-workflow.test.js
+- Add missing flows as needed:
+  - RTE end-to-end sequence: Initialize → SetValue burst control → Commit → Terminate
+  - CAM processPackage happy/edge cases with temp dirs
+  - SN sequencing across representative rule sets
+
+4) Scenario Tests
+- Scope: End-to-end SCORM workflows representing canonical “phase” scenarios and compliance smoke.
+- Structure:
+  - tests/scenario/phase/*.test.js
+  - tests/scenario/compliance/*.test.js
+- Goals:
+  - Model realistic learner sessions
+  - Assert state transitions, error codes, and persisted outcomes
+  - Use canonical fixtures for manifests and activity trees
+
+5) Performance Micro-Benchmarks (non-gating initially)
+- Scope: Track latency distributions for the 8 SCORM API functions and selected SN evaluations.
+- Structure:
+  - tests/perf/rte-api-latency.test.js
+  - tests/perf/sn-rule-eval.test.js
+- Budgets (dev target; CI tolerance +25%):
+  - API functions p95 ≤ 1.0ms under baseline harness
+  - SN rule evaluation p95 within module-defined targets
+- Reporting: Log min/avg/p95 to artifacts; warnings only for now
+
+Renderer Integration Focus
+Renderer tests validate behavior without headful E2E:
+- Enablement logic via UIState: Navigation controls, attempt lifecycle, and devMode flags
+- Intent-only UI pattern: components emit intents; services own logic
+- Logging: no console usage; all renderer logs through [src/renderer/utils/renderer-logger.js](../../src/renderer/utils/renderer-logger.js:1) to app log (assertion via file taps in integration harness)
+- Rate limiting: single INFO when engaged per channel; no repeated INFOs; renderer silent backoff
+- Course load wiring: renderer consumes CAM analysis.uiOutline; must not reconstruct outline
+
+Directory Structure
+Proposed structure to improve encapsulation and discoverability:
+
+tests/
+├── setup.js
+├── fixtures/
+│   ├── manifests/
+│   ├── packages/
+│   ├── activity-trees/
+│   ├── data-model/
+│   └── README.md
+├── unit/
+│   ├── rte/
+│   ├── cam/
+│   ├── sn/
+│   └── shared/
+├── contract/
+│   ├── rte-data-model/
+│   ├── cam-validator/
+│   └── sn-navigation/
+├── integration/
+│   ├── rte-integration.test.js
+│   ├── cam-workflow.test.js
+│   ├── sn-workflow.test.js
+│   └── renderer-integration.test.js
+├── scenario/
+│   ├── phase/
+│   └── compliance/
+└── perf/
+    ├── rte-api-latency.test.js
+    └── sn-rule-eval.test.js
+
+Encapsulation Rules
+- Import only from public module entry points:
+  - CAM: [src/main/services/scorm/cam/index.js](../../src/main/services/scorm/cam/index.js:1)
+  - RTE: [src/main/services/scorm/rte/api-handler.js](../../src/main/services/scorm/rte/api-handler.js:1)
+  - SN:  [src/main/services/scorm/sn/index.js](../../src/main/services/scorm/sn/index.js:1)
+  - Shared: [src/shared/utils/*](../../src/shared/utils/logger.js:1), [src/shared/constants/*](../../src/shared/constants/error-codes.js:1)
+- No deep internal imports; prefer contract tests at boundaries
+- Mock at boundaries only; avoid white-box knowledge of internals
+
+Determinism and Anti-Flake
+- Time: jest.useFakeTimers(); advanceTimersByTime for sequencing
+- Randomness: centralized seeded RNG utilities in tests/setup.js
+- Filesystem: in-memory or temp directories cleaned up per test
+- Parallelism: serialize tests touching global singletons via per-project config
+- Test order independence: randomize test execution; prohibit cross-test state
+
+Coverage Policy and Gating
+Initial thresholds and gating:
+- Global: 80% lines, 75% branches
+- Module minima:
+  - RTE: 85% lines / 80% branches
+  - SN:  85% lines / 80% branches
+  - CAM: 80% lines / 75% branches
+- Enforcement:
+  - PRs must meet global thresholds
+  - Module-specific suites tracked with project-level thresholds
+  - Coverage artifacts: LCOV + summary uploaded in CI
+
+Performance Policy
+- Non-gating warnings initially with trend logging
+- Budgets:
+  - 8 API functions: p95 ≤ 1.0ms (dev), CI tolerance +25%
+  - SN rule evaluation: module-defined targets
+- Artifact: write trend JSON and human-readable summary per run
+
+Fixtures Governance
+Canonical fixtures enable consistent and repeatable scenarios:
+- Location: tests/fixtures
+- Categories:
+  - manifests/: minimal, typical, complex (large), invalid variants
+  - packages/: zipped/extracted sample packages (small, medium, large)
+  - activity-trees/: canonical trees and edge-case trees
+  - data-model/: pre-seeded cmi.* and adl.nav.* snapshots
+- Rules:
+  - Versioned fixture READMEs documenting intent and provenance
+  - Keep fixtures small and representative; large fixtures behind optional download script if needed
+  - Reuse across layers; avoid bespoke ad-hoc test data duplication
+
+Migration Plan
+1) Inventory and mapping
+- Map existing tests to new layers:
+  - tests/integration/*.test.js → integration/scenario split
+  - tests/unit/scorm/* → unit/{rte,cam,sn}
+2) Create Jest projects
+- Define projects in package.json to run unit, contract, integration, scenario, perf separately in CI matrix
+3) Establish fixtures
+- Extract repeated inline JSON/XML to tests/fixtures with documented canonical sets
+4) Incremental migration
+- Migrate by module; keep temporary aliases until each module meets coverage minima
+5) Remove legacy patterns
+- Eliminate deep-import tests; replace with contract tests
+- Replace ad-hoc timers with fake timers utilities
+6) Stabilize thresholds
+- Start with thresholds defined above; adjust up after stabilization
+
+Renderer Testing Requirements
+- Enablement logic:
+  - Initialize/SetValue/GetValue/Commit/Terminate availability based on UIState and lifecycle
+- Eventing pattern:
+  - Components emit intents; AppManager orchestrates; UIState authoritative
+- Logging:
+  - No console.* in renderer; assert logs through [src/renderer/utils/renderer-logger.js](../../src/renderer/utils/renderer-logger.js:1) to app log
+- Rate limiting:
+  - Single INFO per channel when engaged; no repeated INFO logs
+- CAM outline usage:
+  - Renderer must use analysis.uiOutline as-is; do not reconstruct
+
+Debug Window Testing
+- Status: Future Work (to follow planned refactor)
+- Placeholder: Define panel-level tests after refactor lands, aligning with [dev_docs/debug-window-plan.md](../debug-window-plan.md:1)
+  - API timeline linkage to errors
+  - Attempt lifecycle guardrails
+  - Data model sandbox validation/rollback
+  - Sequencing visualizer correctness
+  - EventBus inspector filters and devMode gating
+
+Execution and Scripts
+Suggested npm scripts (to be aligned in package.json):
+- test: run all Jest projects
+- test:coverage: run all with coverage and upload LCOV
+- test:unit, test:contract, test:integration, test:scenario, test:perf: run corresponding projects
+- test:watch: developer watch on unit + contract
+
+Example Configuration Snippet (conceptual)
 {
-  "testEnvironment": "node",
-  "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
-  "testTimeout": 10000,
-  "coverageThreshold": {
-    "global": {
-      "branches": 80,
-      "functions": 80,
-      "lines": 80,
-      "statements": 80
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testTimeout": 15000,
+    "projects": [
+      { "displayName": "unit", "testMatch": ["<rootDir>/tests/unit/**/*.test.js"] },
+      { "displayName": "contract", "testMatch": ["<rootDir>/tests/contract/**/*.test.js"] },
+      { "displayName": "integration", "testMatch": ["<rootDir>/tests/integration/**/*.test.js"] },
+      { "displayName": "scenario", "testMatch": ["<rootDir>/tests/scenario/**/*.test.js"] },
+      { "displayName": "perf", "testMatch": ["<rootDir>/tests/perf/**/*.test.js"] }
+    ],
+    "coverageThreshold": {
+      "global": { "lines": 80, "branches": 75 }
     }
   }
 }
-```
 
-## Test Structure
-
-### Directory Organization
-```
-tests/
-├── setup.js                    # Global test setup and utilities
-├── fixtures/                   # Test data and mock files
-├── unit/                       # Unit tests
-│   └── scorm/                  # SCORM-specific unit tests
-│       ├── api-handler.test.js
-│       ├── cam/
-│       └── sn/
-└── integration/                # Integration tests
-    ├── phase4-integration.test.js
-    ├── cam-workflow.test.js
-    ├── scorm-workflow.test.js
-    └── sn-workflow.test.js
-```
-
-### Test Categories
-
-### Renderer Integration Scenarios
-
-The renderer must validate the quick local test workflow. Add or maintain integration tests that verify:
-
-1. Initialization error handling
-   - On startup failure, a persistent notification is shown
-   - No inline error HTML is injected
-   - Logs are written via the centralized renderer logger
-   - Events: eventBus emits app:error
-   - References: [src/renderer/app.js](src/renderer/app.js:31), [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349)
-
-2. Course load workflow
-   - Course load success updates ContentViewer and CourseOutline
-   - ContentViewer loads the entry URL and begins API verification
-   - UIState course and structure state are updated and events emitted
-   - Renderer consumes CAM-provided analysis.uiOutline and renders CourseOutline; renderer MUST NOT reconstruct outline from raw manifest
-
-3. Navigation buttons state
-   - Buttons enable/disable based on normalized UIState.navigationState
-   - EventBus debug traces are off by default and toggle via UIState.devModeEnabled
-   - References: [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90), [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219)
-
-4. Footer progress updates
-   - FooterProgressBar and FooterStatusDisplay reflect progress:updated events
-   - No misuse of awaited uiState instances in components
-
-5. CSS hover/active behavior for navigation controls
-   - Basic DOM style checks confirm :hover and :active selectors function (no nested & usage)
-
-6. IPC rate limiting and log suppression
-   - Force rate-limit engagement for channels renderer-log-* and scorm-*; assert exactly one INFO log per engaged channel in app.log
-   - Assert no subsequent rate-limit logs after the first per channel
-   - Assert renderer does not emit any rate-limit warnings and applies silent backoff (coalesced renderer logs still reach app.log without spam)
-
-7. SCORM client throttling and serialization
-   - Assert cmi.session_time SetValue is not sent more than once every 3 seconds under bursty updates
-   - Assert Commit and Terminate are serialized (no overlapping in-flight operations)
-
-8. Graceful shutdown
-   - Trigger shutdown with an active session; assert best-effort termination occurs before IPC teardown
-   - Assert no ERROR-level logs for benign “already terminated” or late shutdown cases; WARN/INFO only if any
-
-### Directory Organization
-```
-tests/
-├── setup.js                    # Global test setup and utilities
-├── fixtures/                   # Test data and mock files
-├── unit/                       # Unit tests
-│   └── scorm/                  # SCORM-specific unit tests
-│       ├── api-handler.test.js
-│       ├── cam/
-│       └── sn/
-└── integration/                # Integration tests
-    ├── phase4-integration.test.js
-    ├── cam-workflow.test.js
-    ├── scorm-workflow.test.js
-    └── sn-workflow.test.js
-```
-
-### Global Test Utilities
-Available via `global.testUtils` in all test files:
-
-```javascript
-// Mock logger creation
-const mockLogger = global.testUtils.createMockLogger();
-
-// Mock session manager creation
-const mockSessionManager = global.testUtils.createMockSessionManager();
-
-// Test data generation
-const testScormData = global.testUtils.createTestScormData();
-
-// Utility functions
-await global.testUtils.wait(1000); // Wait helper
-const randomId = global.testUtils.randomString(10); // Random string generator
-```
-
-### Custom Jest Matchers
-SCORM-specific matchers for validation:
-
-```javascript
-// SCORM error code validation
-expect(errorCode).toBeValidScormErrorCode();
-
-// SCORM boolean validation
-expect(value).toBeScormBoolean();
-
-// Scaled score validation
-expect(score).toBeValidScaledScore();
-
-// ISO 8601 duration validation
-expect(duration).toBeValidTimeInterval();
-```
-
-### SCORM Test Constants
-Available via `global.SCORM_TEST_CONSTANTS`:
-
-```javascript
-// Valid vocabulary values
-VALID_COMPLETION_STATUSES: ['completed', 'incomplete', 'not attempted', 'unknown']
-VALID_SUCCESS_STATUSES: ['passed', 'failed', 'unknown']
-VALID_INTERACTION_TYPES: ['true-false', 'choice', 'fill-in', ...]
-// ... and more
-```
-
-## Testing Patterns
-
-### 1. Service Testing Pattern
-```javascript
-describe('ServiceName', () => {
-  let service;
-  let mockDependency;
-
-  beforeEach(() => {
-    mockDependency = global.testUtils.createMockLogger();
-    service = new ServiceName(mockDependency);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe('methodName', () => {
-    test('should handle valid input', () => {
-      // Test implementation
-    });
-
-    test('should handle invalid input', () => {
-      // Error case testing
-    });
-  });
-});
-```
-
-### 2. SCORM API Testing Pattern
-```javascript
-describe('SCORM API Function', () => {
-  let apiHandler;
-
-  beforeEach(() => {
-    const mockSessionManager = global.testUtils.createMockSessionManager();
-    const mockLogger = global.testUtils.createMockLogger();
-    apiHandler = new ScormApiHandler(mockSessionManager, mockLogger);
-    apiHandler.Initialize('');
-  });
-
-  test('should comply with SCORM specification', () => {
-    const result = apiHandler.SomeFunction('validParameter');
-    expect(result).toBe('true');
-    expect(apiHandler.GetLastError()).toBe('0');
-  });
-});
-```
-
-### 3. Integration Testing Pattern
-```javascript
-describe('Component Integration', () => {
-  let mainComponent;
-  let dependencies;
-
-  beforeEach(async () => {
-    dependencies = await setupTestDependencies();
-    mainComponent = new MainComponent(dependencies);
-    await mainComponent.initialize();
-  });
-
-  afterEach(async () => {
-    await mainComponent.shutdown();
-  });
-
-  test('should handle complete workflow', async () => {
-    // Test full workflow
-  });
-});
-```
-
-## Test Execution
-
-### NPM Scripts
-```bash
-# Run all tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run specific test suites
-npm run test:unit
-npm run test:integration
-npm run test:scorm
-
-# Watch mode for development
-npm run test:watch
-```
-
-### Test Categories by Script
-- `test:unit` - All unit tests in `tests/unit/`
-- `test:integration` - All integration tests in `tests/integration/`
-- `test:scorm` - SCORM-specific tests (unit + integration)
-- `test:cam` - CAM module tests
-- `test:sn` - Sequencing & Navigation tests
-
-## SCORM Compliance Testing
-
-### Required Test Coverage
-
-#### 1. SCORM API Functions (8 Required Functions)
-- `Initialize('')` - Session initialization
-- `Terminate('')` - Session termination
-- `GetValue(element)` - Data model retrieval
-- `SetValue(element, value)` - Data model updates
-- `Commit('')` - Data persistence
-- `GetLastError()` - Error code retrieval
-- `GetErrorString(errorCode)` - Error description
-- `GetDiagnostic(errorCode)` - Diagnostic information
-
-#### 2. Data Model Elements
-- Core elements (cmi.*)
-- Navigation elements (adl.nav.*)
-- Interaction tracking
-- Objective tracking
-- Score tracking
-
-#### 3. Sequencing and Navigation
-- Activity tree processing
-- Navigation request handling
-- Rollup rule processing
-- Sequencing rule evaluation
-
-#### 4. Content Aggregation Model (CAM)
-- Manifest parsing and validation
-- Resource processing
-- Organization structure
-- Metadata handling
-- UI outline generation (organizations-first with resources fallback); renderer must use analysis.uiOutline
-
-## Error Handling Testing
-
-### Error Categories
-1. **SCORM API Errors** - Standard SCORM error codes (0-999)
-2. **Application Errors** - Custom error codes (600-699 for main process)
-3. **System Errors** - File system, network, etc.
-
-### Error Testing Pattern
-```javascript
-test('should handle error condition gracefully', () => {
-  expect(() => {
-    service.methodThatShouldFail();
-  }).toThrow();
-  
-  expect(mockErrorHandler.setError).toHaveBeenCalledWith(
-    expectedErrorCode,
-    expectedMessage,
-    expectedContext
-  );
-});
-```
-
-## Performance Testing
-
-### Performance Benchmarks
-- Service initialization: < 100ms
-- Navigation processing: < 50ms
-- Progress updates: < 25ms
-- Rollup processing: < 30ms
-- Large activity trees: < 200ms
-
-### Memory Testing
-- Monitor memory usage during tests
-- Verify proper cleanup after service shutdown
-- Test with large datasets and activity trees
-
-## Mocking Strategy
-
-### Electron Modules
-```javascript
-jest.mock('electron', () => ({
-  app: { /* mock implementation */ },
-  BrowserWindow: jest.fn(),
-  ipcMain: { /* mock implementation */ }
-}));
-```
-
-### External Dependencies
-- File system operations
-- Network requests
-- Database connections
-- Logger instances
-
-### Internal Dependencies
-- Service dependencies
-- Error handlers
-- Session managers
-
-## Continuous Integration
-
-### Test Execution in CI
-1. **Pre-commit**: Run unit tests and linting
-2. **Pull Request**: Full test suite with coverage
-3. **Main Branch**: Full test suite + performance benchmarks
-4. **Release**: Complete test suite + compliance validation
-
-### Coverage Requirements
-- Minimum 80% coverage across all metrics
-- 100% coverage for SCORM API functions
-- 90% coverage for core services
-
-## Test Data Management
-
-### Fixtures
-- Sample SCORM packages in `tests/fixtures/`
-- Mock manifest files
-- Test interaction data
-- Sample learner records
-
-### Test Data Generation
-- Use utility functions for consistent test data
-- Randomized data for stress testing
-- Edge case data for boundary testing
-
-## Debugging Tests
-
-### Debug Configuration
-```javascript
-// Enable verbose logging in tests
-const logger = {
-  debug: console.log,  // Enable for debugging
-  info: console.log,
-  warn: console.warn,
-  error: console.error
-};
-```
-
-### Common Debugging Techniques
-1. Use `console.log` strategically
-2. Run single tests with `test.only()`
-3. Use Jest's `--verbose` flag
-4. Check mock call history with `toHaveBeenCalledWith()`
-
-## Best Practices
-
-### 1. Test Organization
-- Group related tests in `describe` blocks
-- Use descriptive test names
-- Follow AAA pattern (Arrange, Act, Assert)
-
-### 2. Test Independence
-- Each test should be independent
-- Use `beforeEach`/`afterEach` for setup/cleanup
-- Avoid shared state between tests
-
-### 3. Mocking Guidelines
-- Mock external dependencies
-- Keep mocks simple and focused
-- Verify mock interactions when relevant
-
-### 4. Assertion Quality
-- Use specific assertions
-- Test both success and failure cases
-- Verify error conditions explicitly
-
-### 5. Test Maintenance
-- Keep tests up-to-date with code changes
-- Refactor tests when refactoring code
-- Remove obsolete tests promptly
-
-## Migration from Legacy Tests
-
-### Current Issues
-The project currently has inconsistent testing approaches:
-
-1. **Main Directory Tests**: Custom test runners (not Jest)
-   - `error-handling-test.js`
-   - `integration-test.js`
-   - `scorm-compliance-test.js`
-   - `performance-benchmark.js`
-
-2. **Jest Tests**: Proper Jest structure in `tests/` directory
-
-### Migration Plan
-1. Convert main directory tests to Jest format
-2. Move to appropriate `tests/` subdirectories
-3. Standardize on Jest utilities and patterns
-4. Maintain test coverage during migration
-
-## Conclusion
-
-This testing strategy ensures comprehensive coverage of the SCORM Tester application while maintaining SCORM 2004 4th Edition compliance. All tests should follow the established patterns and use the provided utilities for consistency and maintainability.
-
-Regular review and updates of this strategy ensure it remains aligned with the application's evolution and testing best practices.
+Quality Guards
+- Respect architecture boundaries in [architecture/overview.md](../architecture/overview.md:1)
+- No duplicate code; prefer shared utilities and fixtures
+- Keep functions small and focused; prioritize logical cohesion
+- All new or modified features must include tests at appropriate layer(s)
+
+Acceptance Criteria for This Refresh
+- Tests restructured by layer and module with public-entry imports
+- Coverage thresholds enforced per policy
+- Performance tests produce trend artifacts with warnings only
+- Canonical fixtures in place with documentation
+- Renderer tests validate enablement, intent wiring, and logging policies
+- Debug Window testing tagged as Future Work pending refactor
+
+Changelog
+- 2025-08: Strategy fully refreshed; layered model, thresholds, fixtures governance, performance policies established.
