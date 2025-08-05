@@ -121,7 +121,16 @@ The renderer process provides the user interface and content display:
 ## Data Flow
 
 ### SCORM Package Loading
-1. User selects SCORM package (## Renderer Eventing and State Authority
+1. User selects SCORM package (IP file)
+2. File Manager extracts package to temporary directory
+3. CAM Manifest Parser validates and parses imsmanifest.xml
+4. Content Validator checks package integrity and compliance
+5. CAM builds a UI-focused static outline (analysis.uiOutline) from organizations; if organizations are missing/invalid, a resources-based fallback outline is generated.
+6. Renderer consumes analysis.uiOutline and normalizes to items for CourseOutline; renderer must not reconstruct outline from raw manifest.
+7. SN Activity Tree is constructed separately from organization structure for runtime sequencing (distinct from UI outline).
+8. UI updates to show course structure and enable navigation
+
+### Renderer Eventing and State Authority
 
 The renderer uses an event-driven model with UIState as the authority for navigation state and notifications. Components emit intents and subscribe to normalized state.
 
@@ -154,12 +163,8 @@ flowchart TD
   I --> J[navigation:request intents]
   J --> G
   C -. error .-> K[UIState notification + app log]
-  A -. init error .-> L[Centralized notification + app:error]IP file)
-2. File Manager extracts package to temporary directory
-3. CAM Manifest Parser validates and parses imsmanifest.xml
-4. Content Validator checks package integrity and compliance
-5. Activity Tree is constructed from organization structure
-6. UI updates to show course structure and enable navigation
+  A -. init error .-> L[Centralized notification + app:error]
+
 
 ### SCO Launch and Execution
 1. User selects SCO from course tree
@@ -190,40 +195,7 @@ flowchart TD
 
 ### Key Libraries
 - **xml2js**: XML parsing for SCORM manifests
-- **archiver/yauzl**: ## Renderer Eventing and State Authority
-
-The renderer uses an event-driven model with UIState as the authority for navigation state and notifications. Components emit intents and subscribe to normalized state.
-
-Key patterns:
-- UIState is the single source of truth for navigationState
-- NavigationControls emit navigation:request intents; they bind to UIState.navigationState (normalized canNavigatePrevious/canNavigateNext)
-- AppManager wires NavigationControls to ContentViewer explicitly
-- Initialization and runtime errors are handled centrally: log via renderer logger, set UI error, show notifications, and emit app:error events
-- EventBus debug mode is default off and synchronized with UIState.ui.devModeEnabled
-
-References:
-- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90)
-- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:177)
-- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349)
-- [src/renderer/services/ui-state.js](src/renderer/services/ui-state.js:240)
-- [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219)
-- [src/renderer/app.js](src/renderer/app.js:31)
-
-### Renderer Event Flow (Mermaid)
-
-flowchart TD
-  A[Course load] --> B[UIState.updateCourse]
-  B --> C[ContentViewer injects or bridges SCORM API]
-  B --> D[CourseOutline renders]
-  C --> E[Progress updates via UIState.updateProgress]
-  E --> F[Footer updates via progress:updated]
-  B --> G[SNBridge provides availableNavigation]
-  G --> H[UIState.navigationState normalized]
-  H --> I[NavigationControls enable/disable]
-  I --> J[navigation:request intents]
-  J --> G
-  C -. error .-> K[UIState notification + app log]
-  A -. init error .-> L[Centralized notification + app:error]IP file handling for SCORM packages
+- **archiver/yauzl**: ZIP/archival handling for SCORM packages
 - **winston**: Structured logging
 - **joi**: Data validation and schema enforcement
 - **electron-builder**: Application packaging and distribution
@@ -261,6 +233,18 @@ The application supports multiple LMS simulation profiles:
 - Comprehensive logging with structured error information
 - User-friendly error messages with technical details available
 - Automatic error reporting and crash recovery
+
+### IPC Rate Limiting and Suppression
+- Main IPC layer applies per-channel rate limiting.
+- On first engagement per session and channel (renderer-log-*, scorm-set-value, scorm-commit, scorm-terminate), log a single INFO line: “rate-limit engaged on <channel>; further rate-limit logs suppressed for this session”.
+- Subsequent rate-limited calls on these channels return soft-ok with no additional logs.
+- Renderer logger coalesces duplicates and applies silent backoff; renderer must not emit rate-limit warnings.
+
+### Graceful Shutdown Sequence
+1. Attempt SCORM session termination (best-effort, soft-ok, timeout-guarded) before unregistering IPC handlers.
+2. Unregister IPC handlers and clear IPC histories.
+3. Close windows/menus and finalize services.
+- Benign “already terminated” or late shutdown scenarios must not escalate to ERROR logs.
 
 ## Testing Strategy
 

@@ -55,6 +55,20 @@ const result = await camService.processPackage('/path/to/scorm/package');
 console.log('Package processed:', result.manifest.identifier);
 ```
 
+### UI Outline Generation (analysis.uiOutline)
+
+CAM produces a UI-focused static outline for the renderer:
+
+- Primary path: build from manifest organizations
+- Fallback path: build from resources when organizations are missing/invalid
+- Normalization: ensure consistent { id, title, items[], launch?, sco? } shape
+- Diagnostics: log organization/resource counts, default org, and outline itemCount to app.log
+
+Renderer requirements:
+- Consume `result.analysis.uiOutline` directly for CourseOutline
+- Do not reconstruct outline from raw manifest in the renderer
+
+
 ### 2. ManifestParser
 
 **Purpose**: Parse and extract data from SCORM manifest XML files
@@ -107,6 +121,7 @@ console.log('Package processed:', result.manifest.identifier);
 - Launch sequence determination
 - Complexity scoring
 - Structural compliance analysis (delegates all detailed validation to ContentValidator)
+- UI outline generation metrics (organizations/resources counts, itemCount, default organization)
 
 **Key Methods**:
 - [`analyzePackage(packagePath, manifest)`](../src/main/services/scorm/cam/package-analyzer.js:32) - Complete analysis

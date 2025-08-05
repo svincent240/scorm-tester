@@ -65,6 +65,7 @@ The renderer must validate the quick local test workflow. Add or maintain integr
    - Course load success updates ContentViewer and CourseOutline
    - ContentViewer loads the entry URL and begins API verification
    - UIState course and structure state are updated and events emitted
+   - Renderer consumes CAM-provided analysis.uiOutline and renders CourseOutline; renderer MUST NOT reconstruct outline from raw manifest
 
 3. Navigation buttons state
    - Buttons enable/disable based on normalized UIState.navigationState
@@ -77,6 +78,19 @@ The renderer must validate the quick local test workflow. Add or maintain integr
 
 5. CSS hover/active behavior for navigation controls
    - Basic DOM style checks confirm :hover and :active selectors function (no nested & usage)
+
+6. IPC rate limiting and log suppression
+   - Force rate-limit engagement for channels renderer-log-* and scorm-*; assert exactly one INFO log per engaged channel in app.log
+   - Assert no subsequent rate-limit logs after the first per channel
+   - Assert renderer does not emit any rate-limit warnings and applies silent backoff (coalesced renderer logs still reach app.log without spam)
+
+7. SCORM client throttling and serialization
+   - Assert cmi.session_time SetValue is not sent more than once every 3 seconds under bursty updates
+   - Assert Commit and Terminate are serialized (no overlapping in-flight operations)
+
+8. Graceful shutdown
+   - Trigger shutdown with an active session; assert best-effort termination occurs before IPC teardown
+   - Assert no ERROR-level logs for benign “already terminated” or late shutdown cases; WARN/INFO only if any
 
 ### Directory Organization
 ```
@@ -270,6 +284,7 @@ npm run test:watch
 - Resource processing
 - Organization structure
 - Metadata handling
+- UI outline generation (organizations-first with resources fallback); renderer must use analysis.uiOutline
 
 ## Error Handling Testing
 

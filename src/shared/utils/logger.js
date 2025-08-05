@@ -37,18 +37,66 @@ class Logger {
     }
 
     log(level, message, ...args) {
-        const timestamp = new Date().toISOString();
-        const formattedMessage = `${timestamp} [${level.toUpperCase()}] ${message} ${args.length ? JSON.stringify(args) : ''}\n`;
-
+      const timestamp = new Date().toISOString();
+  
+      // Normalize arguments to preserve Error details without huge payloads
+      const normalize = (val) => {
         try {
-            fs.appendFileSync(this.logFile, formattedMessage);
-        } catch (error) {
-            console.error('Failed to write to log file:', error);
+          if (val instanceof Error) {
+            return {
+              type: 'Error',
+              name: val.name,
+              message: val.message,
+              code: val.code,
+              stackHead: typeof val.stack === 'string' ? val.stack.split('\n').slice(0, 3) : null
+            };
+          }
+          if (val && typeof val === 'object') {
+            // If looks like an error-shaped object
+            if ((val.message && val.stack) || val.name === 'Error') {
+              return {
+                type: val.type || 'ErrorObject',
+                name: val.name,
+                message: val.message,
+                code: val.code,
+                stackHead: typeof val.stack === 'string' ? val.stack.split('\n').slice(0, 3) : null
+              };
+            }
+            // Shallow copy up to a few keys to avoid massive logs
+            const keys = Object.keys(val).slice(0, 10);
+            const out = {};
+            for (const k of keys) out[k] = val[k];
+            return out;
+          }
+          return val;
+        } catch (_) {
+          return String(val);
         }
-
-        if (process.env.NODE_ENV === 'development') {
-            console.log(`[${level.toUpperCase()}]`, message, ...args);
+      };
+  
+      let serialized = '';
+      try {
+        const norm = args.map(normalize);
+        serialized = norm.length ? JSON.stringify(norm) : '';
+      } catch (_) {
+        serialized = args.length ? String(args[0]) : '';
+      }
+  
+      const formattedMessage = `${timestamp} [${level.toUpperCase()}] ${message} ${serialized}\n`;
+  
+      try {
+        fs.appendFileSync(this.logFile, formattedMessage);
+      } catch (error) {
+        console.error('Failed to write to log file:', error);
+      }
+  
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          console.log(`[${level.toUpperCase()}]`, message, ...args);
+        } catch (_) {
+          // ignore console failure
         }
+      }
     }
 
     info(message, ...args) {

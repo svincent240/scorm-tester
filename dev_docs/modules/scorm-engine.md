@@ -365,6 +365,13 @@ ipcMain.handle('scorm:initialize', async (event, parameter) => {
 const result = await ipcRenderer.invoke('scorm:initialize', '');
 ```
 
+### IPC Rate Limiting and Soft-OK Semantics
+To prevent log spam and IPC overload:
+- The main IPC layer applies per-channel rate limiting. On first engagement per channel (renderer-log-*, scorm-set-value, scorm-commit, scorm-terminate), it logs a single INFO entry:
+  "rate-limit engaged on <channel>; further rate-limit logs suppressed for this session".
+- Subsequent rate-limited calls on these channels are treated as soft-ok with no additional logs.
+- Renderer services must silently back off without generating rate-limit logs; session_time SetValue must be throttled (>=3s) and Commit/Terminate serialized.
+
 ### Event System
 The engine uses an event-driven architecture for loose coupling:
 
@@ -389,8 +396,8 @@ try {
   return { success: true, data: result };
 } catch (error) {
   logger.error('SCORM operation failed', { error, context });
-  return { 
-    success: false, 
+  return {
+    success: false,
     error: {
       code: error.scormCode || 101,
       message: error.message,
@@ -399,6 +406,14 @@ try {
   };
 }
 ```
+
+### Graceful Shutdown
+Shutdown sequence must:
+1) Attempt to terminate SCORM sessions first (best-effort, soft-ok, timeout-guarded).
+2) Unregister IPC handlers and clear histories.
+3) Close windows and finalize services.
+
+Benign "already terminated" or late-shutdown terminations must not escalate to ERROR logs.
 
 ## Testing Strategy
 
