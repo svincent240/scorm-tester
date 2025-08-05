@@ -32,6 +32,7 @@ class ActivityNode {
     this.attemptState = ATTEMPT_STATES.NOT_ATTEMPTED;
     this.attemptCount = 0;
     this.suspended = false;
+    this.location = ''; // Added for cmi.location tracking
     
     // Sequencing information from manifest
     this.sequencing = item.sequencing || {};

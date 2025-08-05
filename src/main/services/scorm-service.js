@@ -680,6 +680,14 @@ class ScormService extends BaseService {
             // Assuming raw score can influence satisfaction, or is just reported
             // For now, just report, more complex logic would be in SN's rollup
             break;
+          case 'cmi.location':
+            // Update activity location in SN service
+            this.snService.updateActivityLocation(currentActivityId, value);
+            break;
+          case 'cmi.exit':
+            // Handle activity exit in SN service
+            this.snService.handleActivityExit(currentActivityId, value);
+            break;
           // Add other relevant CMI elements that affect SN
         }
 

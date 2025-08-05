@@ -385,6 +385,82 @@ class ScormSNService {
       lastError: this.errorHandler?.getLastError() || '0'
     };
   }
+
+  /**
+   * Update activity location in the SN service.
+   * This method would typically update the current activity's location property.
+   * @param {string} activityId - The ID of the activity to update.
+   * @param {string} location - The new location string.
+   * @returns {Object} Result indicating success or failure.
+   */
+  updateActivityLocation(activityId, location) {
+    try {
+      const activity = this.activityTreeManager.getActivity(activityId);
+      if (!activity) {
+        this.errorHandler?.setError(SN_ERROR_CODES.ACTIVITY_NOT_FOUND,
+          `Activity not found: ${activityId}`, 'updateActivityLocation');
+        return { success: false, reason: 'Activity not found' };
+      }
+      
+      activity.location = location; // Update the location property on the ActivityNode
+      this.logger?.debug(`SN Service: Updated location for activity ${activityId} to ${location}`);
+      return { success: true, reason: 'Activity location updated' };
+    } catch (error) {
+      this.logger?.error('Error updating activity location:', error);
+      this.errorHandler?.setError(SN_ERROR_CODES.SN_SERVICE_UNAVAILABLE,
+        `Update activity location failed: ${error.message}`, 'updateActivityLocation');
+      return { success: false, reason: 'Update activity location error', error: error.message };
+    }
+  }
+
+  /**
+   * Handle activity exit type in the SN service.
+   * This method triggers sequencing rules based on the exit type.
+   * @param {string} activityId - The ID of the activity that is exiting.
+   * @param {string} exitType - The exit type (e.g., 'normal', 'suspend', 'logout').
+   * @returns {Object} Result indicating success or failure.
+   */
+  handleActivityExit(activityId, exitType) {
+    try {
+      const activity = this.activityTreeManager.getActivity(activityId);
+      if (!activity) {
+        this.errorHandler?.setError(SN_ERROR_CODES.ACTIVITY_NOT_FOUND,
+          `Activity not found: ${activityId}`, 'handleActivityExit');
+        return { success: false, reason: 'Activity not found' };
+      }
+
+      this.logger?.debug(`SN Service: Handling exit for activity ${activityId} with type ${exitType}`);
+
+      let navigationResult = { success: true, reason: 'Exit handled' };
+
+      switch (exitType) {
+        case 'suspend':
+          // Trigger suspend all navigation request
+          navigationResult = this.navigationHandler.processSuspendAllRequest();
+          break;
+        case 'normal':
+        case 'logout':
+          // Trigger exit navigation request
+          navigationResult = this.navigationHandler.processExitRequest();
+          break;
+        case 'time-out':
+        case 'uninitialized':
+          // These might not trigger explicit navigation, but could update activity state
+          activity.setState(ACTIVITY_STATES.INACTIVE); // Or a more specific state
+          break;
+        default:
+          this.logger?.warn(`SN Service: Unhandled exit type: ${exitType} for activity ${activityId}`);
+          break;
+      }
+
+      return navigationResult;
+    } catch (error) {
+      this.logger?.error('Error handling activity exit:', error);
+      this.errorHandler?.setError(SN_ERROR_CODES.SN_SERVICE_UNAVAILABLE,
+        `Handle activity exit failed: ${error.message}`, 'handleActivityExit');
+      return { success: false, reason: 'Handle activity exit error', error: error.message };
+    }
+  }
 }
 
 module.exports = {

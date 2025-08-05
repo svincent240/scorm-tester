@@ -236,10 +236,53 @@ class PackageAnalyzer {
     );
   }
 
+  /**
+   * Checks if the manifest indicates the presence of navigation controls.
+   * This is determined by examining sequencing control mode attributes.
+   * @param {Object} manifest - Parsed manifest object
+   * @returns {boolean} True if navigation controls are indicated
+   */
   hasNavigationControls(manifest) {
-    // This check indicates the *potential* for navigation controls based on sequencing rules.
-    // A deeper analysis would involve the SN module.
-    return this.hasSequencingRules(manifest);
+    const organizations = manifest.organizations?.organizations || [];
+    for (const org of organizations) {
+      if (this.checkSequencingForNavigationControls(org.sequencing)) {
+        return true;
+      }
+      if (org.items && this.checkItemsForNavigationControls(org.items)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Helper to recursively check sequencing for navigation control attributes.
+   * @param {Object} sequencing - Sequencing object
+   * @returns {boolean} True if navigation controls are indicated
+   */
+  checkSequencingForNavigationControls(sequencing) {
+    if (!sequencing || !sequencing.controlMode) {
+      return false;
+    }
+    const controlMode = sequencing.controlMode;
+    return controlMode.choice || controlMode.flow || controlMode.choiceExit || controlMode.flowExit;
+  }
+
+  /**
+   * Helper to recursively check items for navigation control attributes.
+   * @param {Array} items - Array of item objects
+   * @returns {boolean} True if navigation controls are indicated
+   */
+  checkItemsForNavigationControls(items) {
+    for (const item of items) {
+      if (this.checkSequencingForNavigationControls(item.sequencing)) {
+        return true;
+      }
+      if (item.children && this.checkItemsForNavigationControls(item.children)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   calculateMaxDepth(organizations) {
