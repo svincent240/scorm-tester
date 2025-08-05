@@ -33,11 +33,18 @@ The following recommendations aim to refine existing patterns, enhance modularit
     *   `src/styles/main.css` was updated to import these new CSS files.
 *   **Benefit:** Cleaner codebase; better adherence to CSS best practices and `dev_docs/style.md` (separation of concerns); improved maintainability and debugging of styles.
 
-### 3. Decouple `ProgressTracking` from Global DOM Elements
+### 3. Decouple `ProgressTracking` from Global DOM Elements (Implemented)
 
-*   **Issue:** The `ProgressTracking.updateFooterElements` method directly queries and manipulates global DOM elements by their IDs (e.g., `footer-progress-fill`, `footer-status`). This creates tight coupling between the `ProgressTracking` component and specific elements in the main HTML, making the UI less modular and harder to refactor.
-*   **Recommendation:** Refactor the footer elements that display progress into their own `BaseComponent`-derived components (e.g., `FooterProgressBar`, `FooterStatusDisplay`). These new components should subscribe to `progress:updated` events emitted by `uiState` (which `ProgressTracking` already updates). This allows each component to manage its own display based on shared state, without direct DOM manipulation across components.
+*   **Issue:** The `ProgressTracking.updateFooterElements` method directly queried and manipulated global DOM elements by their IDs (e.g., `footer-progress-fill`, `footer-status`), creating tight coupling.
+*   **Implementation:**
+    *   Created `src/renderer/components/scorm/footer-progress-bar.js` and `src/renderer/components/scorm/footer-status-display.js` as `BaseComponent`-derived components.
+    *   Modified `src/renderer/components/scorm/progress-tracking.js` to remove direct DOM manipulation of footer elements.
+    *   Ensured `uiState.updateProgress` (in `src/renderer/services/ui-state.js`) emits the full `progressData` object with the `progress:updated` event.
+    *   Configured `src/renderer/services/app-manager.js` to initialize the new `FooterProgressBar` and `FooterStatusDisplay` components, which now subscribe to `progress:updated` events and update their respective DOM elements.
 *   **Benefit:** Increased modularity; reduced coupling; improved testability; better adherence to the component-based architecture.
+*   **Verification Notes:**
+    *   **Progress Percentage (cmi.progress_measure):** The "Learning Progress" percentage remains at "0%" because the sample SCORM course does not send updates for `cmi.progress_measure`. The application correctly displays the data it receives.
+    *   **Completion Status (cmi.completion_status):** The "STATUS" remains "In Progress" because the sample SCORM course explicitly sets `cmi.completion_status` to "incomplete" and never sends a "completed" or "passed" signal. The application accurately reflects the course's reported status.
 
 ### 4. Eliminate Embedded Debug Panel; Focus on Separate Debug Console Window
 
