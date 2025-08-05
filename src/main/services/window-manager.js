@@ -42,7 +42,8 @@ class WindowManager extends BaseService {
    * Validate dependencies
    */
   validateDependencies() {
-    return true; // No external dependencies
+    // WindowManager can optionally use IpcHandler for API call buffering
+    return true;
   }
 
   /**
@@ -194,10 +195,13 @@ class WindowManager extends BaseService {
       debugWindow.show();
       
       this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.READY);
-      this.emit(SERVICE_EVENTS.WINDOW_CREATED, { 
-        windowType: WINDOW_TYPES.DEBUG, 
-        windowId: debugWindow.id 
+      this.emit(SERVICE_EVENTS.WINDOW_CREATED, {
+        windowType: WINDOW_TYPES.DEBUG,
+        windowId: debugWindow.id
       });
+      
+      // Send any buffered API calls to the newly created debug window
+      this.sendBufferedApiCallsToDebugWindow(debugWindow);
       
       this.logger?.info(`WindowManager: Debug window created successfully (ID: ${debugWindow.id})`);
       this.recordOperation('createDebugWindow', true);
@@ -387,6 +391,25 @@ class WindowManager extends BaseService {
       case 2: return 'warn';   // warning
       case 3: return 'error';  // error
       default: return 'info';
+    }
+  }
+
+  /**
+   * Send buffered API calls to debug window
+   * @private
+   */
+  sendBufferedApiCallsToDebugWindow(debugWindow) {
+    try {
+      // Get the IPC handler to access buffered API calls
+      const ipcHandler = this.getDependency('ipcHandler');
+      if (ipcHandler && ipcHandler.handlerMethods && ipcHandler.handlerMethods.sendBufferedApiCalls) {
+        this.logger?.info('WindowManager: Sending buffered API calls to debug window');
+        ipcHandler.handlerMethods.sendBufferedApiCalls(debugWindow);
+      } else {
+        this.logger?.debug('WindowManager: No IPC handler or buffered calls available');
+      }
+    } catch (error) {
+      this.logger?.error('WindowManager: Failed to send buffered API calls:', error);
     }
   }
 }

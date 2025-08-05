@@ -103,9 +103,8 @@ class CourseLoader {
         throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
       }
       
-      // FIX: Use the correct property name from the extract result
-      const extractedPath = extractResult.extractedPath || extractResult.extractionPath || extractResult.path;
-      console.log('CourseLoader: Using extractedPath:', extractedPath);
+      const extractedPath = extractResult.path;
+      console.log('CourseLoader: Confirmed extractedPath:', extractedPath);
       
       if (!extractedPath) {
         throw new Error('Extract result did not contain a valid path property');

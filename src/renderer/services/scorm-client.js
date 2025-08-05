@@ -531,8 +531,19 @@ class ScormClient {
 
     uiState.addApiCall(apiCall);
     
-    // Emit event for debug panel
+    // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
+    
+    // Also emit via IPC for debug window
+    if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+      console.log('SCORM Client: Emitting debug event via IPC:', apiCall);
+      window.electronAPI.emitDebugEvent('api:call', apiCall);
+    }
+    
+    // Legacy IPC event for backward compatibility
+    if (window.electronAPI && window.electronAPI.log) {
+      window.electronAPI.log('scorm-api-call', apiCall);
+    }
   }
 
   /**

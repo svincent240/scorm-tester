@@ -234,6 +234,15 @@ class AppManager {
     console.log('AppManager: Handling course loaded:', courseData);
     
     try {
+      // Clear API call history when new course is loaded
+      if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+        console.log('AppManager: Clearing API call history for new course');
+        window.electronAPI.emitDebugEvent('course:loaded', {
+          courseTitle: courseData.info?.title || 'Course',
+          timestamp: Date.now()
+        });
+      }
+
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
       if (contentViewer && courseData.launchUrl) {

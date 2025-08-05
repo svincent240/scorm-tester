@@ -124,6 +124,12 @@ class MainProcess {
     }
     this.services.set('ipcHandler', ipcHandler);
     
+    // Now update WindowManager with IpcHandler dependency for API call buffering
+    const windowManagerDependencies = new Map([['ipcHandler', ipcHandler]]);
+    if (!await windowManager.initialize(windowManagerDependencies)) {
+      throw new Error('WindowManager re-initialization with IpcHandler failed');
+    }
+    
     this.logger?.info(`SCORM Tester: ${this.services.size} services initialized successfully`);
   }
 

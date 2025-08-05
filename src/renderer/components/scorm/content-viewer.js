@@ -11,6 +11,7 @@
 import { BaseComponent } from '../base-component.js';
 import { uiState } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
+import { scormAPIBridge } from '../../services/scorm-api-bridge.js';
 
 /**
  * SCORM Content Viewer Class
@@ -175,7 +176,7 @@ class ContentViewer extends BaseComponent {
       this.hideLoading();
       this.showContent();
       
-      // Setup SCORM API in content window
+      // Setup SCORM API in content window using the bridge
       this.setupScormAPI();
       
       // Apply scaling after content loads
@@ -214,45 +215,165 @@ class ContentViewer extends BaseComponent {
     if (!this.contentWindow) return;
     
     try {
-      // Inject SCORM API objects
+      console.log('ContentViewer: Setting up SCORM API with debug logging');
+      
+      // Inject SCORM API objects with logging wrappers
       this.contentWindow.API = {
         // LMS-prefixed methods (SCORM 1.2 standard)
-        LMSInitialize: (param) => scormClient.Initialize(scormClient.getSessionId() || 'default'),
-        LMSFinish: (param) => scormClient.Terminate(param),
-        LMSGetValue: (element) => scormClient.GetValue(element),
-        LMSSetValue: (element, value) => scormClient.SetValue(element, value),
-        LMSCommit: (param) => scormClient.Commit(param),
-        LMSGetLastError: () => scormClient.GetLastError(),
-        LMSGetErrorString: (errorCode) => scormClient.GetErrorString(errorCode),
-        LMSGetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode),
+        LMSInitialize: (param) => {
+          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
+          this.logApiCall('LMSInitialize', param, result);
+          return result;
+        },
+        LMSFinish: (param) => {
+          const result = scormClient.Terminate(param);
+          this.logApiCall('LMSFinish', param, result);
+          return result;
+        },
+        LMSGetValue: (element) => {
+          const result = scormClient.GetValue(element);
+          this.logApiCall('LMSGetValue', element, result);
+          return result;
+        },
+        LMSSetValue: (element, value) => {
+          const result = scormClient.SetValue(element, value);
+          this.logApiCall('LMSSetValue', `${element} = ${value}`, result);
+          return result;
+        },
+        LMSCommit: (param) => {
+          const result = scormClient.Commit(param);
+          this.logApiCall('LMSCommit', param, result);
+          return result;
+        },
+        LMSGetLastError: () => {
+          const result = scormClient.GetLastError();
+          this.logApiCall('LMSGetLastError', '', result);
+          return result;
+        },
+        LMSGetErrorString: (errorCode) => {
+          const result = scormClient.GetErrorString(errorCode);
+          this.logApiCall('LMSGetErrorString', errorCode, result);
+          return result;
+        },
+        LMSGetDiagnostic: (errorCode) => {
+          const result = scormClient.GetDiagnostic(errorCode);
+          this.logApiCall('LMSGetDiagnostic', errorCode, result);
+          return result;
+        },
         
         // Direct methods (for content that expects API.Commit instead of API.LMSCommit)
-        Initialize: (param) => scormClient.Initialize(scormClient.getSessionId() || 'default'),
-        Finish: (param) => scormClient.Terminate(param),
-        GetValue: (element) => scormClient.GetValue(element),
-        SetValue: (element, value) => scormClient.SetValue(element, value),
-        Commit: (param) => scormClient.Commit(param),
-        GetLastError: () => scormClient.GetLastError(),
-        GetErrorString: (errorCode) => scormClient.GetErrorString(errorCode),
-        GetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode)
+        Initialize: (param) => {
+          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
+          this.logApiCall('Initialize', param, result);
+          return result;
+        },
+        Finish: (param) => {
+          const result = scormClient.Terminate(param);
+          this.logApiCall('Finish', param, result);
+          return result;
+        },
+        GetValue: (element) => {
+          const result = scormClient.GetValue(element);
+          this.logApiCall('GetValue', element, result);
+          return result;
+        },
+        SetValue: (element, value) => {
+          const result = scormClient.SetValue(element, value);
+          this.logApiCall('SetValue', `${element} = ${value}`, result);
+          return result;
+        },
+        Commit: (param) => {
+          const result = scormClient.Commit(param);
+          this.logApiCall('Commit', param, result);
+          return result;
+        },
+        GetLastError: () => {
+          const result = scormClient.GetLastError();
+          this.logApiCall('GetLastError', '', result);
+          return result;
+        },
+        GetErrorString: (errorCode) => {
+          const result = scormClient.GetErrorString(errorCode);
+          this.logApiCall('GetErrorString', errorCode, result);
+          return result;
+        },
+        GetDiagnostic: (errorCode) => {
+          const result = scormClient.GetDiagnostic(errorCode);
+          this.logApiCall('GetDiagnostic', errorCode, result);
+          return result;
+        }
       };
       
       // SCORM 2004 API
       this.contentWindow.API_1484_11 = {
-        Initialize: (param) => scormClient.Initialize(scormClient.getSessionId() || 'default'),
-        Terminate: (param) => scormClient.Terminate(param),
-        GetValue: (element) => scormClient.GetValue(element),
-        SetValue: (element, value) => scormClient.SetValue(element, value),
-        Commit: (param) => scormClient.Commit(param),
-        GetLastError: () => scormClient.GetLastError(),
-        GetErrorString: (errorCode) => scormClient.GetErrorString(errorCode),
-        GetDiagnostic: (errorCode) => scormClient.GetDiagnostic(errorCode)
+        Initialize: (param) => {
+          const result = scormClient.Initialize(scormClient.getSessionId() || 'default');
+          this.logApiCall('Initialize', param, result);
+          return result;
+        },
+        Terminate: (param) => {
+          const result = scormClient.Terminate(param);
+          this.logApiCall('Terminate', param, result);
+          return result;
+        },
+        GetValue: (element) => {
+          const result = scormClient.GetValue(element);
+          this.logApiCall('GetValue', element, result);
+          return result;
+        },
+        SetValue: (element, value) => {
+          const result = scormClient.SetValue(element, value);
+          this.logApiCall('SetValue', `${element} = ${value}`, result);
+          return result;
+        },
+        Commit: (param) => {
+          const result = scormClient.Commit(param);
+          this.logApiCall('Commit', param, result);
+          return result;
+        },
+        GetLastError: () => {
+          const result = scormClient.GetLastError();
+          this.logApiCall('GetLastError', '', result);
+          return result;
+        },
+        GetErrorString: (errorCode) => {
+          const result = scormClient.GetErrorString(errorCode);
+          this.logApiCall('GetErrorString', errorCode, result);
+          return result;
+        },
+        GetDiagnostic: (errorCode) => {
+          const result = scormClient.GetDiagnostic(errorCode);
+          this.logApiCall('GetDiagnostic', errorCode, result);
+          return result;
+        }
       };
       
       this.emit('scormApiInjected', { contentWindow: this.contentWindow });
       
     } catch (error) {
       console.warn('Failed to inject SCORM API:', error);
+    }
+  }
+
+  /**
+   * Log API call for debug panel
+   * @private
+   */
+  logApiCall(method, parameter, result) {
+    const apiCall = {
+      method,
+      parameter: String(parameter || ''),
+      result: String(result),
+      errorCode: scormClient.GetLastError(),
+      timestamp: Date.now()
+    };
+
+    console.log('ContentViewer: API call:', apiCall);
+    
+    // Emit via IPC for debug window
+    if (window.electronAPI && window.electronAPI.emitDebugEvent) {
+      console.log('ContentViewer: Emitting debug event via IPC:', apiCall);
+      window.electronAPI.emitDebugEvent('api:call', apiCall);
     }
   }
 

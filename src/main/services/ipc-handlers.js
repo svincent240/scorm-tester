@@ -15,6 +15,14 @@
 class IpcHandlers {
   constructor(ipcHandler) {
     this.ipcHandler = ipcHandler;
+    // Persistent storage for all API calls during the session
+    this.apiCallHistory = [];
+    this.maxHistorySize = 5000; // Increased limit for persistent storage
+    this.sessionId = null; // Track current session for clearing
+    
+    // Clear history on startup
+    this.clearApiCallHistory();
+    this.ipcHandler.logger?.info('[DEBUG EVENT] API call history cleared on startup');
   }
 
   // SCORM API handlers
@@ -93,7 +101,13 @@ class IpcHandlers {
 
   async handleResetSession(event, sessionId) {
     const scormService = this.ipcHandler.getDependency('scormService');
-    return await scormService.resetSession(sessionId);
+    const result = await scormService.resetSession(sessionId);
+    
+    // Clear API call history when session is reset
+    this.clearApiCallHistory();
+    this.ipcHandler.logger?.info(`[DEBUG EVENT] API call history cleared due to session reset: ${sessionId}`);
+    
+    return result;
   }
 
   async handleGetAllSessions(event) {
@@ -163,13 +177,29 @@ class IpcHandlers {
       const windowManager = this.ipcHandler.getDependency('windowManager');
       if (windowManager) {
         this.ipcHandler.logger?.info(`[DEBUG EVENT] WindowManager found, getting debug window`);
+        
         const debugWindow = windowManager.getWindow('debug');
+        
+        // Always store API calls in persistent history
+        if (eventType === 'api:call') {
+          this.storeApiCall(data);
+        }
+        
+        // Handle special events for clearing history
+        if (eventType === 'course:loaded' || eventType === 'course:reset' || eventType === 'session:reset') {
+          this.clearApiCallHistory();
+          this.ipcHandler.logger?.info(`[DEBUG EVENT] API call history cleared due to: ${eventType}`);
+        }
+        
         if (debugWindow && !debugWindow.isDestroyed()) {
-          // Forward the debug event to the debug window
+          // Debug window is available - send event immediately
           debugWindow.webContents.send('debug-event-received', eventType, data);
           this.ipcHandler.logger?.info(`[DEBUG EVENT] Event forwarded to debug window: ${eventType}`);
         } else {
-          this.ipcHandler.logger?.warn(`[DEBUG EVENT] Debug window not available for event: ${eventType}`);
+          // Debug window not available - just log for non-API events
+          if (eventType !== 'api:call') {
+            this.ipcHandler.logger?.warn(`[DEBUG EVENT] Debug window not available for event: ${eventType}`);
+          }
         }
       } else {
         this.ipcHandler.logger?.error(`[DEBUG EVENT] WindowManager not found`);
@@ -177,6 +207,56 @@ class IpcHandlers {
     } catch (error) {
       this.ipcHandler.logger?.error('[DEBUG EVENT] Failed to handle debug event:', error);
     }
+  }
+
+  // Store API call in persistent history
+  storeApiCall(data) {
+    // Add timestamp if not present
+    if (data && typeof data === 'object' && !data.timestamp) {
+      data.timestamp = Date.now();
+    }
+    
+    this.apiCallHistory.push(data);
+    
+    // Limit history size to prevent memory issues
+    if (this.apiCallHistory.length > this.maxHistorySize) {
+      // Remove oldest calls when history is full
+      const removed = this.apiCallHistory.splice(0, this.apiCallHistory.length - this.maxHistorySize);
+      this.ipcHandler.logger?.warn(`[DEBUG EVENT] History full, removed ${removed.length} oldest API calls`);
+    }
+    
+    this.ipcHandler.logger?.debug(`[DEBUG EVENT] API call stored in history (${this.apiCallHistory.length} total)`);
+  }
+
+  // Send all stored API calls to debug window (called when debug window is created)
+  sendBufferedApiCalls(debugWindow) {
+    if (this.apiCallHistory.length > 0 && debugWindow && !debugWindow.isDestroyed()) {
+      this.ipcHandler.logger?.info(`[DEBUG EVENT] Sending ${this.apiCallHistory.length} stored API calls to newly opened debug window`);
+      for (const storedCall of this.apiCallHistory) {
+        debugWindow.webContents.send('debug-event-received', 'api:call', storedCall);
+      }
+      // Note: Do NOT clear the history after sending - keep it persistent
+    } else if (this.apiCallHistory.length === 0) {
+      this.ipcHandler.logger?.debug(`[DEBUG EVENT] No stored API calls to send to debug window`);
+    }
+  }
+
+  // Clear API call history (called on course load, reset, etc.)
+  clearApiCallHistory() {
+    const clearedCount = this.apiCallHistory.length;
+    this.apiCallHistory = [];
+    this.ipcHandler.logger?.info(`[DEBUG EVENT] Cleared ${clearedCount} API calls from history`);
+  }
+
+  // Get current API call history (for debugging)
+  getApiCallHistory() {
+    return [...this.apiCallHistory]; // Return copy to prevent external modification
+  }
+
+  // Shutdown cleanup - clear history on app close
+  shutdown() {
+    this.clearApiCallHistory();
+    this.ipcHandler.logger?.info('[DEBUG EVENT] API call history cleared on app shutdown');
   }
 }
 

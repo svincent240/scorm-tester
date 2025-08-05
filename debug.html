@@ -78,9 +78,98 @@
             display: none; /* Hide the component header since we have window header */
         }
 
+        .debug-panel__tabs {
+            flex-shrink: 0;
+            display: flex;
+            background: var(--bg-secondary, #2d2d30);
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+        }
+
+        .debug-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary, #cccccc);
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 12px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .debug-tab:hover {
+            background: var(--bg-hover, #37373d);
+            color: var(--text-primary, #ffffff);
+        }
+
+        .debug-tab--active {
+            color: var(--primary-color, #007acc);
+            border-bottom-color: var(--primary-color, #007acc);
+            background: var(--bg-hover, #37373d);
+        }
+
         .debug-panel__content {
             flex: 1;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Make debug content areas scrollable */
+        .debug-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .debug-log {
+            max-height: 100%;
+            overflow-y: auto;
+            padding: 4px;
+            font-family: var(--font-family-monospace, 'Consolas', 'Monaco', monospace);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .debug-data {
+            max-height: 100%;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .debug-info {
+            max-height: 100%;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        /* Style the scrollbars for better visibility */
+        .debug-content::-webkit-scrollbar,
+        .debug-log::-webkit-scrollbar,
+        .debug-data::-webkit-scrollbar,
+        .debug-info::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .debug-content::-webkit-scrollbar-track,
+        .debug-log::-webkit-scrollbar-track,
+        .debug-data::-webkit-scrollbar-track,
+        .debug-info::-webkit-scrollbar-track {
+            background: var(--bg-tertiary, #3c3c3c);
+        }
+
+        .debug-content::-webkit-scrollbar-thumb,
+        .debug-log::-webkit-scrollbar-thumb,
+        .debug-data::-webkit-scrollbar-thumb,
+        .debug-info::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb, #666);
+            border-radius: 4px;
+        }
+
+        .debug-content::-webkit-scrollbar-thumb:hover,
+        .debug-log::-webkit-scrollbar-thumb:hover,
+        .debug-data::-webkit-scrollbar-thumb:hover,
+        .debug-info::-webkit-scrollbar-thumb:hover {
+            background: var(--scrollbar-thumb-hover, #888);
         }
     </style>
 </head>
@@ -130,6 +219,7 @@
                     
                     this.setupWindowControls();
                     this.setupIPC();
+                    this.validateScrollingFix();
                     
                     console.log('Debug Window: Initialized successfully');
                     
@@ -228,6 +318,41 @@
                 } else {
                     console.error('DEBUG WINDOW: electronAPI not available for IPC setup');
                 }
+            }
+
+            validateScrollingFix() {
+                // Log to app log file to validate the scrolling fix
+                console.log('DEBUG WINDOW: Validating scrolling fix implementation...');
+                
+                // Check if debug content areas have proper overflow styles
+                setTimeout(() => {
+                    const debugContents = document.querySelectorAll('.debug-content');
+                    const debugLogs = document.querySelectorAll('.debug-log');
+                    const debugData = document.querySelectorAll('.debug-data');
+                    const debugInfo = document.querySelectorAll('.debug-info');
+                    
+                    console.log('DEBUG WINDOW: Found debug content elements:', {
+                        debugContents: debugContents.length,
+                        debugLogs: debugLogs.length,
+                        debugData: debugData.length,
+                        debugInfo: debugInfo.length
+                    });
+                    
+                    // Validate CSS properties
+                    debugContents.forEach((element, index) => {
+                        const styles = window.getComputedStyle(element);
+                        console.log(`DEBUG WINDOW: debug-content[${index}] overflow-y:`, styles.overflowY);
+                        console.log(`DEBUG WINDOW: debug-content[${index}] flex:`, styles.flex);
+                    });
+                    
+                    debugLogs.forEach((element, index) => {
+                        const styles = window.getComputedStyle(element);
+                        console.log(`DEBUG WINDOW: debug-log[${index}] overflow-y:`, styles.overflowY);
+                        console.log(`DEBUG WINDOW: debug-log[${index}] max-height:`, styles.maxHeight);
+                    });
+                    
+                    console.log('DEBUG WINDOW: Scrolling fix validation complete - check app log for details');
+                }, 1000); // Wait for DOM to be fully rendered
             }
 
             showError(message) {

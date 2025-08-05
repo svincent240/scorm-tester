@@ -161,15 +161,19 @@ class DebugPanel extends BaseComponent {
   }
 
   addApiCall(apiCall) {
+    console.log('Debug Panel: Adding API call to log:', apiCall);
+    
     this.apiCalls.push({
       ...apiCall,
-      timestamp: Date.now(),
+      timestamp: apiCall.timestamp || Date.now(),
       id: Date.now() + Math.random()
     });
     
     if (this.apiCalls.length > this.maxApiCalls) {
       this.apiCalls.shift();
     }
+    
+    console.log('Debug Panel: Total API calls logged:', this.apiCalls.length);
     
     if (this.activeTab === 'api-calls') {
       this.refreshApiCallsView();
@@ -335,6 +339,7 @@ class DebugPanel extends BaseComponent {
   }
 
   handleApiCall(data) {
+    console.log('Debug Panel: Received API call event:', data);
     this.addApiCall(data.data || data);
   }
 

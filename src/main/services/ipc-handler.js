@@ -79,6 +79,12 @@ class IpcHandler extends BaseService {
    */
   async doShutdown() {
     this.logger?.debug('IpcHandler: Starting shutdown');
+    
+    // Shutdown handler methods (clears API call history)
+    if (this.handlerMethods && this.handlerMethods.shutdown) {
+      this.handlerMethods.shutdown();
+    }
+    
     this.unregisterHandlers();
     this.activeRequests.clear();
     this.rateLimitMap.clear();

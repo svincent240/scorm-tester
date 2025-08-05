@@ -117,3 +117,7 @@ Additional documentation in this folder includes:
 Always check this folder before making architectural decisions.
 
 ---
+
+ALWAYS make sure to write to the app log file and not the browser console.
+
+Never try to run the app yourself, I will run it
