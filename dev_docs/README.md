@@ -102,7 +102,12 @@ This documentation is maintained as part of the application codebase and should 
 - ✅ **Production Ready**: Comprehensive testing and validation completed
 - ✅ **Maintenance Mode**: Focus on bug fixes, performance optimization, and feature enhancements
 - ✅ **Full Documentation**: Complete API reference and development guides available
-- ✅ **UI Improvements**: All planned UI enhancements from `dev_docs/ui-improvement-plan.md` have been implemented, further refining the user interface and underlying architecture. This plan will be removed after this documentation update.
+- ✅ UI Improvements: All planned renderer UI enhancements have been implemented and fully documented across permanent guides. See:
+  - [guides/logging-debugging.md](guides/logging-debugging.md) for centralized renderer logging, initialization error handling, and EventBus debug mode
+  - [guides/renderer-imports.md](guides/renderer-imports.md) for dynamic import strategy, SCORM API injection precedence, API presence verification, and content scaling contracts
+  - [architecture/overview.md](architecture/overview.md) for event-driven renderer architecture and state authority patterns
+  - [guides/testing-strategy.md](guides/testing-strategy.md) for renderer integration scenarios
+The temporary ui-improvement-plan.md has been absorbed into these documents and will be removed.
 
 For questions about SCORM compliance, refer to the specification guide and compliance documentation. For architectural decisions, see the detailed module documentation and design rationale sections.
 

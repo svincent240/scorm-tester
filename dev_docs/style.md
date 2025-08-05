@@ -35,6 +35,36 @@ The previous rigid 200-line limit per file has been re-evaluated. The new guidel
 
 *   **No Duplicate Code:** Reuse existing functionality or refactor common parts.
 *   **Separation of Concerns:** Keep UI logic, business logic, and data access in separate modules.
-*   **Respect the Architecture:** Adhere to the system architecture described in `dev_docs/architecture/overview.md`.
+*   **Respect the Architecture:** Adhere to the system architecture described in [architecture/overview.md](architecture/overview.md:1).
 *   **No Temporary Fixes:** Avoid shortcuts; fix the root cause.
 *   **Testing:** Every new feature or bug fix must include tests.
+
+## Renderer-Specific Rules
+
+These rules enforce the centralized logging, error handling, and UI state patterns now implemented throughout the renderer.
+
+*   Logging:
+    *   Do not use console.* in renderer code.
+    *   Use the centralized renderer logger adapter at [src/renderer/utils/renderer-logger.js](src/renderer/utils/renderer-logger.js:1).
+    *   All renderer logs must route to the app log via the shared logger.
+*   Error handling:
+    *   Do not inject inline error HTML in the renderer.
+    *   On errors, log via renderer logger, set UI error, show notifications, and emit events as appropriate:
+        *   See [src/renderer/app.js](src/renderer/app.js:31) and [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349).
+*   EventBus debug mode:
+    *   Default off.
+    *   Synchronized from UIState.ui.devModeEnabled.
+    *   See [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90), [src/renderer/services/ui-state.js](src/renderer/services/ui-state.js:240), [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219).
+*   Navigation state authority:
+    *   UIState is the authoritative source for navigation state.
+    *   Components emit intents (e.g., navigation:request) and subscribe to normalized UIState.navigationState.
+    *   Wiring of NavigationControls to ContentViewer is managed by AppManager.
+    *   See [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:177).
+*   Content scaling and API injection:
+    *   Prefer direct SCORM API injection; use bridge as fallback.
+    *   Verify API presence after load; notify user on failure.
+    *   Scaling uses CSS variables and class hooks defined in styles.
+    *   See [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:905) and [src/styles/components/content-viewer.css](src/styles/components/content-viewer.css:123).
+*   CSS validity:
+    *   Use valid selectors for pseudo-classes; no nested & in plain CSS.
+    *   See [src/styles/components/navigation-controls.css](src/styles/components/navigation-controls.css).

@@ -121,7 +121,40 @@ The renderer process provides the user interface and content display:
 ## Data Flow
 
 ### SCORM Package Loading
-1. User selects SCORM package (ZIP file)
+1. User selects SCORM package (## Renderer Eventing and State Authority
+
+The renderer uses an event-driven model with UIState as the authority for navigation state and notifications. Components emit intents and subscribe to normalized state.
+
+Key patterns:
+- UIState is the single source of truth for navigationState
+- NavigationControls emit navigation:request intents; they bind to UIState.navigationState (normalized canNavigatePrevious/canNavigateNext)
+- AppManager wires NavigationControls to ContentViewer explicitly
+- Initialization and runtime errors are handled centrally: log via renderer logger, set UI error, show notifications, and emit app:error events
+- EventBus debug mode is default off and synchronized with UIState.ui.devModeEnabled
+
+References:
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90)
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:177)
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349)
+- [src/renderer/services/ui-state.js](src/renderer/services/ui-state.js:240)
+- [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219)
+- [src/renderer/app.js](src/renderer/app.js:31)
+
+### Renderer Event Flow (Mermaid)
+
+flowchart TD
+  A[Course load] --> B[UIState.updateCourse]
+  B --> C[ContentViewer injects or bridges SCORM API]
+  B --> D[CourseOutline renders]
+  C --> E[Progress updates via UIState.updateProgress]
+  E --> F[Footer updates via progress:updated]
+  B --> G[SNBridge provides availableNavigation]
+  G --> H[UIState.navigationState normalized]
+  H --> I[NavigationControls enable/disable]
+  I --> J[navigation:request intents]
+  J --> G
+  C -. error .-> K[UIState notification + app log]
+  A -. init error .-> L[Centralized notification + app:error]IP file)
 2. File Manager extracts package to temporary directory
 3. CAM Manifest Parser validates and parses imsmanifest.xml
 4. Content Validator checks package integrity and compliance
@@ -157,7 +190,40 @@ The renderer process provides the user interface and content display:
 
 ### Key Libraries
 - **xml2js**: XML parsing for SCORM manifests
-- **archiver/yauzl**: ZIP file handling for SCORM packages
+- **archiver/yauzl**: ## Renderer Eventing and State Authority
+
+The renderer uses an event-driven model with UIState as the authority for navigation state and notifications. Components emit intents and subscribe to normalized state.
+
+Key patterns:
+- UIState is the single source of truth for navigationState
+- NavigationControls emit navigation:request intents; they bind to UIState.navigationState (normalized canNavigatePrevious/canNavigateNext)
+- AppManager wires NavigationControls to ContentViewer explicitly
+- Initialization and runtime errors are handled centrally: log via renderer logger, set UI error, show notifications, and emit app:error events
+- EventBus debug mode is default off and synchronized with UIState.ui.devModeEnabled
+
+References:
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90)
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:177)
+- [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349)
+- [src/renderer/services/ui-state.js](src/renderer/services/ui-state.js:240)
+- [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219)
+- [src/renderer/app.js](src/renderer/app.js:31)
+
+### Renderer Event Flow (Mermaid)
+
+flowchart TD
+  A[Course load] --> B[UIState.updateCourse]
+  B --> C[ContentViewer injects or bridges SCORM API]
+  B --> D[CourseOutline renders]
+  C --> E[Progress updates via UIState.updateProgress]
+  E --> F[Footer updates via progress:updated]
+  B --> G[SNBridge provides availableNavigation]
+  G --> H[UIState.navigationState normalized]
+  H --> I[NavigationControls enable/disable]
+  I --> J[navigation:request intents]
+  J --> G
+  C -. error .-> K[UIState notification + app log]
+  A -. init error .-> L[Centralized notification + app:error]IP file handling for SCORM packages
 - **winston**: Structured logging
 - **joi**: Data validation and schema enforcement
 - **electron-builder**: Application packaging and distribution

@@ -227,14 +227,20 @@ class UIStateManager {
    * @param {Object} uiData - UI data
    */
   updateUI(uiData) {
+    const prevDev = !!this.state.ui.devModeEnabled;
     this.setState({
       ui: {
         ...this.state.ui,
         ...uiData
       }
     });
-    
+    // Emit generic UI update
     this.eventBus?.emit('ui:updated', uiData);
+    // Emit specific dev mode change to keep EventBus in sync (Step 8)
+    const nextDev = !!this.state.ui.devModeEnabled;
+    if (nextDev !== prevDev) {
+      this.eventBus?.emit('ui:devModeChanged', { enabled: nextDev });
+    }
   }
 
   /**
@@ -377,6 +383,18 @@ class UIStateManager {
     this.eventBus.on('state:changed', (data) => {
       // This is already handled by notifyStateChange, but keeping for consistency if needed elsewhere
     });
+
+    // Provide explicit API to toggle dev mode and broadcast (Step 8)
+    // Consumers can call uiState.setDevModeEnabled(bool)
+    if (!this.setDevModeEnabled) {
+      this.setDevModeEnabled = (enabled) => {
+        const prev = !!this.state.ui.devModeEnabled;
+        const next = !!enabled;
+        if (prev === next) return;
+        this.updateUI({ devModeEnabled: next });
+        // updateUI emits ui:devModeChanged when the flag changes
+      };
+    }
   }
 
   /**

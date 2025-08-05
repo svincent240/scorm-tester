@@ -50,24 +50,50 @@ tests/
 
 ### Test Categories
 
-#### 1. Unit Tests
-- **Location**: `tests/unit/`
-- **Purpose**: Test individual components in isolation
-- **Coverage**: All service classes, utilities, and core functions
-- **Mocking**: Heavy use of mocks for dependencies
+### Renderer Integration Scenarios
 
-#### 2. Integration Tests
-- **Location**: `tests/integration/`
-- **Purpose**: Test component interactions and workflows
-- **Coverage**: Service integration, data flow, and API workflows
-- **Mocking**: Minimal mocking, focus on real interactions
+The renderer must validate the quick local test workflow. Add or maintain integration tests that verify:
 
-#### 3. Compliance Tests
-- **Purpose**: Validate SCORM 2004 4th Edition compliance
-- **Coverage**: All SCORM API functions, data model validation, sequencing rules
-- **Standards**: Based on SCORM RTE specification requirements
+1. Initialization error handling
+   - On startup failure, a persistent notification is shown
+   - No inline error HTML is injected
+   - Logs are written via the centralized renderer logger
+   - Events: eventBus emits app:error
+   - References: [src/renderer/app.js](src/renderer/app.js:31), [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349)
 
-## Test Utilities and Setup
+2. Course load workflow
+   - Course load success updates ContentViewer and CourseOutline
+   - ContentViewer loads the entry URL and begins API verification
+   - UIState course and structure state are updated and events emitted
+
+3. Navigation buttons state
+   - Buttons enable/disable based on normalized UIState.navigationState
+   - EventBus debug traces are off by default and toggle via UIState.devModeEnabled
+   - References: [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90), [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219)
+
+4. Footer progress updates
+   - FooterProgressBar and FooterStatusDisplay reflect progress:updated events
+   - No misuse of awaited uiState instances in components
+
+5. CSS hover/active behavior for navigation controls
+   - Basic DOM style checks confirm :hover and :active selectors function (no nested & usage)
+
+### Directory Organization
+```
+tests/
+├── setup.js                    # Global test setup and utilities
+├── fixtures/                   # Test data and mock files
+├── unit/                       # Unit tests
+│   └── scorm/                  # SCORM-specific unit tests
+│       ├── api-handler.test.js
+│       ├── cam/
+│       └── sn/
+└── integration/                # Integration tests
+    ├── phase4-integration.test.js
+    ├── cam-workflow.test.js
+    ├── scorm-workflow.test.js
+    └── sn-workflow.test.js
+```
 
 ### Global Test Utilities
 Available via `global.testUtils` in all test files:

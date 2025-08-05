@@ -83,9 +83,31 @@ class AppManager {
 
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
-      rendererLogger.debug('AppManager - setLoading(false)');
+      try { this.logger.debug('AppManager - setLoading(false)'); } catch (_) {}
       this.uiState.setLoading(false); // Use the resolved instance
-      
+
+      // Configure EventBus debug mode based on UIState (Step 8)
+      try {
+        const devEnabled = !!this.uiState.getState('ui.devModeEnabled');
+        eventBus.setDebugMode(devEnabled);
+      } catch (_) {}
+
+      // Keep EventBus debug mode in sync with UIState changes
+      try {
+        // Prefer explicit API if available; otherwise watch for UI updates and detect devModeEnabled changes
+        if (typeof this.uiState.subscribe === 'function') {
+          let lastDev = !!this.uiState.getState('ui.devModeEnabled');
+          this.uiState.subscribe((newState) => {
+            const current = !!(newState && newState.ui && newState.ui.devModeEnabled);
+            if (current !== lastDev) {
+              lastDev = current;
+              try { this.logger.info(`AppManager: UI devModeEnabled changed -> ${current}`); } catch (_) {}
+              eventBus.setDebugMode(current);
+            }
+          });
+        }
+      } catch (_) {}
+
       // Emit initialization complete event
       eventBus.emit('app:initialized');
       

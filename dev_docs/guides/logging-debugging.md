@@ -4,7 +4,7 @@ This document outlines the structured approach to logging and debugging within t
 
 ## Renderer Logging Flow (Centralized)
 
-As part of the UI Improvement Plan (Step 1), the renderer now routes all logs through a centralized adapter so nothing writes to the browser console.
+Renderer logs are routed through a centralized adapter so nothing writes to the browser console.
 
 - Use [`renderer-logger.js`](../../src/renderer/utils/renderer-logger.js) in the renderer for all logging:
   - Methods: `debug`, `info`, `warn`, `error`
