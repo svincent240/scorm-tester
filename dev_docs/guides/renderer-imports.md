@@ -1,91 +1,98 @@
-# Renderer Imports
+@ -1,97 +0,0 @@
+# Electron ES6 Module Loading Issue
 
-## Problem: Static ES6 Imports in Custom Protocols
+## Problem
 
-Using static ES6 `import` statements (e.g., `import { module } from './module.js';`) in Electron renderer scripts loaded via **custom protocols** (like `scorm-app://`) leads to a critical runtime error:
+Using static ES6 `import` statements in Electron renderer scripts loaded via custom protocols causes this error:
 
 ```
 [ERROR] Uncaught SyntaxError: Cannot use import statement outside a module
 ```
 
-This occurs because Electron's custom protocols do not fully support ES6 modules in the same way as standard web contexts, even when `type="module"` is explicitly added to the script tag.
+## Root Cause
 
-## Solution: Mandate Dynamic Imports
+Electron's custom protocols (like `scorm-app://`) don't support ES6 modules the same way as standard web contexts. Even adding `type="module"` to the script tag doesn't resolve this limitation.
 
-To prevent the `SyntaxError` and ensure proper module loading in Electron renderer processes, **you MUST use dynamic imports** instead of static ES6 imports when scripts are loaded via custom protocols.
+## Solution
 
-### Why Dynamic Imports?
-
-Dynamic imports (`await import('./path/to/module.js')`) are the only reliable method for module loading in this specific Electron environment because:
-
-1.  **Protocol Compatibility:** They bypass the limitations of Electron's custom protocol handling for ES6 modules.
-2.  **Runtime Flexibility:** Modules are loaded asynchronously at runtime, which is compatible with how custom protocols serve content.
-3.  **Error Handling:** They allow for robust error handling (e.g., `try...catch` blocks) if a module fails to load, preventing application crashes.
-4.  **Modular Architecture:** They enable maintaining a clean, organized, and modular codebase without resorting to monolithic files or global variables.
-
-### When is this Required?
-
-This strategy is **strictly required** for:
-
-*   **All JavaScript files executed within the Electron renderer process** that are loaded via a custom protocol (e.g., `scorm-app://`).
-*   Specifically, the main renderer entry point, such as [`src/renderer/app.js`](../../src/renderer/app.js), and any modules it directly or indirectly imports.
-*   Ensuring the main script tag in [`index.html`](../../index.html) (or similar entry HTML files) does **NOT** use `type="module"`. It should be a regular script.
-
-## Implementation Guidance
+**Use dynamic imports instead of static ES6 imports in renderer scripts loaded via custom protocols.**
 
 ### ✅ Recommended Approach: Dynamic Imports
 
-```javascript
-// ❌ AVOID: Static imports will cause errors in custom protocols
-// import { appManager } from './services/app-manager.js';
+Dynamic imports work in regular scripts and maintain modular architecture:
 
-// ✅ USE THIS: Dynamic imports for all module loading in custom protocol contexts
+```javascript
+// ❌ Don't use static imports (causes error)
+import { appManager } from './services/app-manager.js';
+
+// ✅ Use dynamic imports instead
 async function initializeApplication() {
   try {
-    // Load required services dynamically
+    const { appManager } = await import('./services/app-manager.js');
+    await appManager.initialize();
+  } catch (error) {
+    console.error('Failed to load modules:', error);
+  }
+}
+```
+
+### Benefits of Dynamic Imports
+
+1. **Works with Electron custom protocols** - No module loading errors
+2. **Maintains modular architecture** - Keep code organized in separate files
+3. **Supports error handling** - Graceful fallbacks if modules fail to load
+4. **Preserves file size limits** - Avoid monolithic files
+
+## Implementation Pattern
+
+```javascript
+/**
+ * Load and initialize application modules dynamically
+ */
+async function initializeApplication() {
+  try {
+    // Load required services
     const { appManager } = await import('./services/app-manager.js');
     const { eventBus } = await import('./services/event-bus.js');
     
-    // Initialize application components
+    // Initialize application
     await appManager.initialize();
-    // ... other initializations
     
   } catch (error) {
-    console.error('Application initialization failed due to module loading:', error);
-    // Implement user-friendly error display or fallback
+    console.error('Application initialization failed:', error);
+    // Show user-friendly error message
   }
 }
-
-// Call the initialization function
-initializeApplication();
 ```
 
-### Quick Fix Checklist
+## Quick Fix
 
-If you encounter the "Cannot use import statement outside a module" error:
+If you see the "Cannot use import statement outside a module" error:
 
-1.  **Replace Static Imports:** Change `import { module } from './module.js';` to `const { module } = await import('./module.js');`.
-2.  **Wrap in Async Function:** Ensure the code performing dynamic imports is within an `async` function.
-3.  **Add Error Handling:** Implement `try...catch` blocks around dynamic imports.
-4.  **Verify HTML Script Tag:** Confirm that the main script in `index.html` is loaded as a regular script (no `type="module"`).
-5.  **Test Thoroughly:** Verify that the application loads and functions correctly after changes.
+1. **Replace static imports** with dynamic imports:
+   ```javascript
+   // Change this:
+   import { module } from './module.js';
+   
+   // To this:
+   const { module } = await import('./module.js');
+   ```
 
-## Anti-Patterns (Do NOT Use)
+2. **Wrap in async function** if not already in one
+3. **Add error handling** for failed imports
+4. **Test that the application loads properly**
 
-The following approaches are explicitly forbidden as they violate architectural principles or introduce unnecessary complexity:
+## Files Affected
 
-*   **Self-contained scripts:** Consolidating all functionality into a single, monolithic file. (Violates file size limits, reduces readability).
-*   **Global variables:** Attaching modules or their exports directly to the `window` object. (Poor architecture, leads to naming collisions, difficult to track dependencies).
-*   **Script concatenation:** Relying on build steps to combine files into a single bundle for the renderer. (Adds build complexity, obscures module boundaries).
+- [`src/renderer/app.js`](../../src/renderer/app.js) - Main renderer entry point (uses dynamic imports)
+- [`index.html`](../../index.html) - Script loading configuration (regular script, not module)
 
-## Guidance for AI Tools
+## Alternative Approaches (Not Recommended)
 
-AI tools working on this project **MUST strictly adhere** to this module strategy when generating or modifying code for Electron renderer processes, especially those loaded via custom protocols.
+1. **Self-contained scripts** - Put all functionality in one file (violates file size limits)
+2. **Global variables** - Attach modules to window object (poor architecture)
+3. **Script concatenation** - Build step to combine files (adds complexity)
 
-*   **Prioritize Dynamic Imports:** Always generate `await import(...)` for module loading in these contexts.
-*   **Prohibit Static Imports:** Never introduce `import ... from '...'` statements in renderer code intended for custom protocols.
-*   **Enforce Error Handling:** Always include `try...catch` blocks around dynamic imports.
-*   **Respect HTML Configuration:** Understand that `index.html` (or similar) loads the main renderer script as a regular script, not a module.
-*   **Maintain Modularity:** Continue to design and implement code in a modular fashion, leveraging dynamic imports to connect components.
+## Conclusion
 
-Strict adherence to this document is paramount for maintaining the stability, performance, and architectural integrity of the application.
+Dynamic imports provide the best balance of modular architecture and Electron compatibility. This approach allows maintaining clean separation of concerns while working within Electron's custom protocol limitations.
