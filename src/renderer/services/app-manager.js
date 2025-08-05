@@ -101,68 +101,34 @@ class AppManager {
    * Initialize all components
    */
   async initializeComponents() {
-    // console.log('AppManager: Initializing components...'); // Removed debug log
+    console.log('AppManager: Initializing components...');
     
+    const componentConfigs = [
+      { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
+      { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
+      { name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: true },
+      { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'app-footer', required: true },
+      { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'app-footer', required: true },
+      { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true }
+    ];
+
     try {
-      // Initialize components with proper error handling
-      const componentConfig = {
-        contentViewer: { elementId: 'content-frame', service: 'contentViewer' },
-        navigationControls: { elementId: 'navigation-controls', service: 'navigationControls' },
-        progressTracking: { elementId: 'progress-tracking', service: 'progressTracking' },
- 
-        courseOutline: { elementId: 'course-outline', service: 'courseOutline' }
-      };
- 
-      // Content Viewer
-      if (document.getElementById('content-viewer')) {
-        const contentViewer = new ContentViewer('content-viewer');
-        await contentViewer.initialize();
-        this.components.set('contentViewer', contentViewer);
-        // console.log('AppManager: ContentViewer initialized'); // Removed debug log
-      } else {
-        console.warn('AppManager: content-viewer element not found in DOM');
+      for (const config of componentConfigs) {
+        const element = document.getElementById(config.elementId);
+        if (element) {
+          const componentInstance = new config.class(config.elementId);
+          await componentInstance.initialize();
+          this.components.set(config.name, componentInstance);
+          console.log(`AppManager: ${config.name} initialized`);
+        } else {
+          if (config.required) {
+            throw new Error(`Required UI element '${config.elementId}' for component '${config.name}' not found in DOM.`);
+          } else {
+            console.debug(`AppManager: Optional UI element '${config.elementId}' for component '${config.name}' not found in DOM. Skipping initialization.`);
+          }
+        }
       }
- 
-      // Navigation Controls
-      if (document.getElementById(componentConfig.navigationControls.elementId)) {
-        const navigationControls = new NavigationControls('navigation-controls');
-        await navigationControls.initialize();
-        this.components.set('navigationControls', navigationControls);
-        // console.log('AppManager: NavigationControls initialized'); // Removed debug log
-      }
- 
-      // Progress Tracking
-      if (document.getElementById('progress-tracking')) {
-        const progressTracking = new ProgressTracking('progress-tracking');
-        await progressTracking.initialize();
-        this.components.set('progressTracking', progressTracking);
-      }
-
-      // Footer Progress Bar
-      if (document.getElementById('footer-progress-fill')) {
-        const footerProgressBar = new FooterProgressBar('app-footer'); // Attach to the footer element
-        await footerProgressBar.initialize();
-        this.components.set('footerProgressBar', footerProgressBar);
-      }
-
-      // Footer Status Display
-      if (document.getElementById('footer-status')) {
-        const footerStatusDisplay = new FooterStatusDisplay('app-footer'); // Attach to the footer element
-        await footerStatusDisplay.initialize();
-        this.components.set('footerStatusDisplay', footerStatusDisplay);
-      }
- 
-      // Course Outline
-      if (document.getElementById(componentConfig.courseOutline.elementId)) {
-        const courseOutline = new CourseOutline('course-outline');
-        await courseOutline.initialize();
-        this.components.set('courseOutline', courseOutline);
-        // console.log('AppManager: CourseOutline initialized'); // Removed debug log
-      }
-
- 
-      // console.log('AppManager: All components initialized'); // Removed debug log
-      
+      console.log('AppManager: All components initialized');
     } catch (error) {
       console.error('AppManager: Error initializing components:', error);
       throw error;

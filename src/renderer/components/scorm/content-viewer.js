@@ -310,7 +310,6 @@ class ContentViewer extends BaseComponent {
     const createAPIMethod = (methodName, clientMethod) => {
       return (...args) => {
         const result = clientMethod.apply(scormClient, args);
-        this.logApiCall(methodName, args.join(', '), result);
         return result;
       };
     };
@@ -348,35 +347,6 @@ class ContentViewer extends BaseComponent {
     };
   }
 
-  /**
-   * Log API call for debug panel (optimized)
-   * @private
-   */
-  logApiCall(method, parameter, result) {
-    // Only create full log object if debug is enabled or if there's an error
-    const errorCode = scormClient.GetLastError();
-    const hasError = errorCode && errorCode !== '0';
-    
-    if (hasError || window.scormDebug) {
-      const apiCall = {
-        method,
-        parameter: String(parameter || ''),
-        result: String(result),
-        errorCode,
-        timestamp: Date.now()
-      };
-
-      // Only log to console in debug mode or on errors
-      if (window.scormDebug || hasError) {
-        console.log('ContentViewer: API call:', apiCall);
-      }
-      
-      // Emit via IPC for debug window (throttled)
-      if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-        window.electronAPI.emitDebugEvent('api:call', apiCall);
-      }
-    }
-  }
 
   /**
    * Show loading state

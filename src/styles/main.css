@@ -19,6 +19,7 @@
 @import url('./components/content-viewer.css');
 @import url('./components/error-state.css');
 @import url('./components/content-scaling.css');
+@import url('./components/navigation-controls.css'); /* Added this line */
 
 /* Theme Styles */
 @import url('./themes/default.css');

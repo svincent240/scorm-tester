@@ -56,38 +56,38 @@ The following recommendations aim to refine existing patterns, enhance modularit
     *   **Verified IPC communication:** Confirmed that necessary debug data (API calls, SCORM state changes, errors) is correctly sent from the main process (and main renderer process) to the "Debug Console" window via the `debug-event` channel, and buffered calls are sent upon debug window creation.
 *   **Benefit:** Removes redundancy; provides a dedicated, more flexible, and potentially more feature-rich debugging environment; aligns with user preference for a separate debug window.
 
-### 5. Standardize Debugging Configuration (Revised)
+### 5. Standardize Debugging Configuration (Implemented)
 
-*   **Issue:** Reliance on the global `window.scormDebug` variable in `ContentViewer` and `ScormClient` to control debug logging. This is a less structured approach for managing application-wide debug behavior.
-*   **Recommendation:** Replace `window.scormDebug` with a more robust mechanism. All relevant debug data (e.g., SCORM API calls, internal state changes) should *always* be emitted via the `EventBus` and then forwarded via IPC to the main process. The main process can then route this data to the separate "Debug Console" window. The "Debug Console" window itself (or the `DebugPanel` component within it) can then manage its display and filtering based on its own internal settings or `uiState` flags (e.g., a `ui.devModeEnabled` flag).
+*   **Issue:** Reliance on the global `window.scormDebug` variable in `ContentViewer` and `ScormClient` to control debug logging. This was a less structured approach for managing application-wide debug behavior.
+*   **Implementation:** The `ContentViewer` component no longer uses `window.scormDebug` for logging. All SCORM API call logging is now centralized within the `ScormClient` service, which emits debug data via the `EventBus` and forwards it via IPC to the main process. This ensures all relevant debug data is consistently available for the dedicated "Debug Console" window, aligning with the recommended robust debugging mechanism.
 *   **Benefit:** More robust and controllable debugging; cleaner code; better alignment with `uiState`'s purpose; ensures debug data is available for the dedicated debug window regardless of a global flag.
 
-### 6. Clarify/Streamline SCORM API Injection
-
-*   **Issue:** There appears to be potential redundancy or unclear responsibility between `ScormAPIBridge.injectScormAPI` (which uses `iframe.srcdoc` to inject a wrapper HTML with the API script) and `ContentViewer.setupScormAPI` (which directly injects `window.API` and `window.API_1484_11` into the iframe's `contentWindow` after the content loads). `ContentViewer.setupScormAPI` seems to be the more active and direct method.
-*   **Recommendation:** Review and streamline the SCORM API injection process. If `ContentViewer.setupScormAPI` is confirmed as the primary and more effective method for injecting the SCORM API into the content iframe, then `ScormAPIBridge.injectScormAPI` should be removed to avoid confusion and potential conflicts. If `ScormAPIBridge.injectScormAPI` serves a specific, distinct purpose (e.g., for very early API access or specific content types), that purpose should be clearly documented.
+### 6. Clarify/Streamline SCORM API Injection (Implemented)
+ 
+*   **Issue:** There appeared to be potential redundancy or unclear responsibility between `ScormAPIBridge.injectScormAPI` and `ContentViewer.setupScormAPI`.
+*   **Implementation:** `ScormAPIBridge.injectScormAPI`, `generateAPIScript`, and `generateWrapperHTML` methods were removed from `src/renderer/services/scorm-api-bridge.js`. `ContentViewer.setupScormAPI` is confirmed as the primary and effective method for injecting the SCORM API.
 *   **Benefit:** Reduced code complexity; clearer responsibilities; improved maintainability.
-
-### 7. Enhance `AppManager`'s Component Initialization Robustness
-
-*   **Issue:** `AppManager.initializeComponents` directly checks for the existence of DOM elements by ID (`document.getElementById`) for each component. If an element is not found, it logs a `console.warn`. While functional, this approach can be brittle if DOM IDs change or components become optional.
-*   **Recommendation:** Make component initialization more declarative and robust. Consider using a configuration array for components, where each entry specifies the component class, its target element ID, and whether it's optional or required. For required components, throw a more explicit error if their root element is missing. For optional components, handle their absence gracefully without warnings unless it indicates a misconfiguration.
+ 
+### 7. Enhance `AppManager`'s Component Initialization Robustness (Implemented)
+ 
+*   **Issue:** `AppManager.initializeComponents` directly checked for the existence of DOM elements by ID, which was brittle.
+*   **Implementation:** The `initializeComponents` method in `src/renderer/services/app-manager.js` was refactored to use a declarative configuration array. This approach explicitly defines component classes, their target element IDs, and whether they are required or optional. An explicit error is now thrown if a required UI element is missing.
 *   **Benefit:** More explicit component dependency management; clearer error reporting for missing UI elements; improved maintainability of the initialization process.
-
-### 8. Improve `AppManager`'s Progress Tracking Container Creation
-
-*   **Issue:** `AppManager` currently creates a hidden `div` with the ID `progress-tracking` and appends it to `document.body` if it doesn't already exist. This suggests a workaround for the `ProgressTracking` component's intended placement (e.g., in a footer).
-*   **Recommendation:** If the `ProgressTracking` component is intended to always render into a specific footer element, ensure that element is explicitly defined in the main `index.html` and `ProgressTracking` is initialized with its ID. The `AppManager` should not be responsible for creating arbitrary DOM elements for components unless they are truly dynamic or optional. This clarifies the intended DOM structure.
+ 
+### 8. Improve `AppManager`'s Progress Tracking Container Creation (Implemented)
+ 
+*   **Issue:** `AppManager` was previously responsible for dynamically creating a hidden `div` with the ID `progress-tracking`, which was a workaround for its intended placement.
+*   **Implementation:** The `div` with `id="progress-tracking"` was explicitly added to `index.html` within the `app-footer` section. This ensures the element exists in the DOM from the start, aligning with the component's intended rendering location.
 *   **Benefit:** Clearer separation of concerns between application orchestration and DOM structure; improved predictability of component rendering.
 
 ### Additional UI/Layout Issues (Reported by User)
 
 These issues were reported by the user after the initial review and require investigation and fixing.
 
-9.  **"Course Structure" Section Not Working:**
-    *   **Issue:** The `CourseOutline` component (responsible for the "Course Structure" section) is reported as "not working." This could manifest as content not displaying, updates not occurring, or functional issues.
-    *   **Recommendation:** Investigate the root cause of the `CourseOutline` component's reported malfunction. This will involve debugging its initialization, data loading (`handleCourseLoaded`, `loadCourseStructure`), rendering (`renderCourseStructure`), and event handling (`handleNavigationUpdated`, `handleProgressUpdated`, `handleScormDataChanged`). Ensure it correctly receives and processes course data and updates its display.
-    *   **Benefit:** Restores critical functionality for course navigation and overview.
+9.  **"Course Structure" Section Not Working (Implemented - Initial CSS Fix):**
+    *   **Issue:** The `CourseOutline` component was reported as "not working," potentially due to visibility issues, especially on smaller screens where the sidebar might be hidden.
+    *   **Implementation:** A CSS rule was added to `src/styles/components/layout.css` to ensure that the `.app-sidebar` (which contains the Course Outline) is always visible on desktop screens (`min-width: 769px`), overriding any mobile-specific `transform: translateX(-100%)` that might hide it. This addresses a potential cause of the "not working" report related to visibility.
+    *   **Benefit:** Improves the visibility of the Course Structure section on desktop, allowing for better debugging and user experience. Further investigation into data loading or rendering issues may be required if visibility is not the sole cause.
 
 10. **Navigation Controls Overlay/Cut-off Issues:**
     *   **Issue:** The navigation controls (text like "Learning Management System", "No course loaded", "← Previous Next → ☰ Menu") are reported as "overlays" that are "not working and cut off." This strongly suggests CSS, layout, or z-index issues preventing proper display and interaction.

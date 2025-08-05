@@ -1,0 +1,145 @@
+/**
+ * Navigation Controls Component Styles
+ * 
+ * Styles for the LMS-style navigation bar.
+ * 
+ * @fileoverview Navigation controls component styles
+ */
+
+.navigation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  min-height: var(--navigation-controls-height); /* Defined in variables.css */
+  z-index: var(--z-content-header); /* Ensure it's above content */
+  position: relative; /* For z-index to work */
+}
+
+.navigation-controls__container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--spacing-md);
+}
+
+.navigation-controls__left,
+.navigation-controls__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.navigation-controls__center {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.navigation-controls__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color);
+}
+
+.navigation-controls__status {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.navigation-controls__status--warning {
+  color: var(--warning-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+.navigation-controls__btn {
+  /* Inherit button styles from buttons.css */
+  /* @extend is a Sass/Less feature, not plain CSS. I will remove it and rely on direct class application or manual duplication if needed. */
+  /* For now, I'll just define basic button styles that align with the existing buttons.css */
+  background-color: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+  
+  &:hover {
+    background-color: var(--btn-secondary-hover-bg);
+    border-color: var(--btn-secondary-hover-border);
+  }
+  
+  &:active {
+    background-color: var(--btn-secondary-active-bg);
+    border-color: var(--btn-secondary-active-border);
+  }
+
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.navigation-controls__btn--previous,
+.navigation-controls__btn--next {
+  min-width: 100px; /* Ensure consistent button width */
+  justify-content: center;
+}
+
+.navigation-controls__btn--menu {
+  min-width: 80px;
+  justify-content: center;
+}
+
+.navigation-controls__btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.navigation-controls__error-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--danger-color);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--spacing-md);
+}
+
+.navigation-controls__error-indicator .error-icon {
+  font-size: var(--font-size-md);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .navigation-controls {
+    flex-wrap: wrap;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: auto;
+  }
+
+  .navigation-controls__container {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .navigation-controls__left,
+  .navigation-controls__right {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .navigation-controls__center {
+    width: 100%;
+  }
+
+  .navigation-controls__btn {
+    flex-grow: 1;
+  }
+}

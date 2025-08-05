@@ -547,6 +547,13 @@
   .app-sidebar--collapsed {
     transform: translateX(-100%);
   }
+}
+
+/* Ensure sidebar is always visible on desktop */
+@media (min-width: 769px) {
+ .app-sidebar {
+   transform: translateX(0) !important; /* Override mobile hide */
+ }
   
   .header__nav {
     display: none;
