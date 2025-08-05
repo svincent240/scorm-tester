@@ -41,7 +41,8 @@
 
 .welcome-content {
   text-align: center;
-  max-width: 600px;
+  max-width: 700px;  /* Slightly wider for better content display */
+  width: 100%;  /* Ensure full width usage */
 }
 
 .welcome-content h1 {
@@ -67,9 +68,10 @@
 
 .welcome-features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--spacing-lg);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-xl);
   margin-top: var(--spacing-xl);
+  max-width: 100%;
 }
 
 .feature {
@@ -77,6 +79,10 @@
   align-items: flex-start;
   gap: var(--spacing-md);
   text-align: left;
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
 }
 
 .feature svg {
@@ -182,23 +188,60 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* Progress Tracking */
-.progress-tracking {
-  flex-shrink: 0;
-  height: var(--progress-tracking-height);
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  padding: var(--spacing-xs) var(--spacing-md);  /* Reduced vertical padding */
+/* Progress Tracking - Sticky Footer */
+#progress-tracking {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: calc(var(--sidebar-width) + var(--spacing-sm)) !important;
+  right: var(--spacing-sm) !important;
+  background: var(--bg-secondary) !important;
+  border-top: 1px solid var(--border-color) !important;
+  border-radius: 0 !important;
+  padding: var(--spacing-md) var(--spacing-lg) !important;
+  margin: 0 !important;
+  z-index: var(--z-index-fixed) !important;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
+  transition: left var(--transition-normal) ease !important;
+}
+
+/* Responsive behavior for sidebar collapse */
+.app-sidebar--collapsed ~ .app-content #progress-tracking {
+  left: calc(var(--sidebar-width-collapsed) + var(--spacing-sm)) !important;
+}
+
+/* Progress Tracking Container */
+.progress-tracking__container {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+}
+
+.progress-tracking__header {
+  margin-bottom: var(--spacing-sm);
+}
+
+.progress-tracking__header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .progress-bar {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  width: 100%;  /* Ensure full width */
-  height: 100%;  /* Fill parent height */
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.progress-bar__label {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-color);
+  min-width: 50px;
+  text-align: right;
 }
 
 .progress-bar__track {
@@ -216,6 +259,38 @@
   border-radius: var(--progress-border-radius);
   transition: width var(--transition-base) ease;
   min-width: 0;
+}
+
+/* Progress Stats */
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
+.progress-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: var(--bg-primary);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color-light);
+}
+
+.stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .progress-bar__info {
@@ -271,6 +346,12 @@
   
   .progress-bar__info {
     justify-content: space-between;
+  }
+  
+  /* Mobile progress tracking positioning */
+  #progress-tracking {
+    left: 0 !important;  /* Full width on mobile */
+    padding: var(--spacing-sm) var(--spacing-md) !important;
   }
 }
 

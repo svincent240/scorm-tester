@@ -78,10 +78,10 @@ const FILE_OPERATIONS = {
 const SERVICE_DEFAULTS = {
   WINDOW_MANAGER: {
     mainWindow: {
-      width: 1200,     // Reduced from 1400 for better screen compatibility
-      height: 800,     // Reduced from 900 for better screen compatibility
-      minWidth: 900,   // Increased from 800 for better UI layout
-      minHeight: 650,  // Increased from 600 to prevent UI cramping
+      width: 1400,     // Increased to accommodate all sections without scrolling
+      height: 1000,    // Increased to fit Learning Progress section comfortably
+      minWidth: 1100,  // Increased minimum to ensure proper layout
+      minHeight: 800,  // Increased to prevent section cut-off
       webSecurity: false,
       contextIsolation: true,
       nodeIntegration: false,
