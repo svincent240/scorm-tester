@@ -571,6 +571,7 @@ class IpcHandler extends BaseService {
     return [...this.apiCallHistory]; // Return copy to prevent external modification
   }
 
+
   // SCORM CAM processing handler (new)
   async handleProcessScormManifest(event, folderPath, manifestContent) {
     const scormService = this.getDependency('scormService');

@@ -9,7 +9,7 @@
  */
 
 import { BaseComponent } from '../base-component.js';
-import { uiState } from '../../services/ui-state.js';
+import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
 import { scormAPIBridge } from '../../services/scorm-api-bridge.js';
 
@@ -52,6 +52,7 @@ class ContentViewer extends BaseComponent {
    * Setup component
    */
   async setup() {
+    this.uiState = await uiStatePromise;
     this.createIframe();
     this.createLoadingIndicator();
     this.createErrorDisplay();
@@ -389,7 +390,7 @@ class ContentViewer extends BaseComponent {
       this.loadingElement.style.display = 'flex';
     }
     
-    uiState.setLoading(true, 'Loading SCORM course...');
+    this.uiState.setLoading(true, 'Loading SCORM course...');
   }
 
   /**
@@ -400,7 +401,7 @@ class ContentViewer extends BaseComponent {
       this.loadingElement.style.display = 'none';
     }
     
-    uiState.setLoading(false);
+    this.uiState.setLoading(false);
   }
 
   /**
@@ -541,7 +542,7 @@ class ContentViewer extends BaseComponent {
       if (detailsEl) detailsEl.textContent = details || '';
     }
     
-    uiState.setError(message);
+    this.uiState.setError(message);
     this.emit('errorShown', { message, details });
   }
 
@@ -559,7 +560,7 @@ class ContentViewer extends BaseComponent {
    */
   clearError() {
     this.hideError();
-    uiState.setError(null);
+    this.uiState.setError(null);
   }
 
   /**

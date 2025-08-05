@@ -248,7 +248,7 @@ class UIStateManager {
     }
     
     this.setState({ apiCallHistory: history });
-    eventBus.emit('api:call', apiCall);
+    this.eventBus?.emit('api:call', apiCall);
   }
 
   /**
@@ -318,7 +318,7 @@ class UIStateManager {
     this.updateUI({ error: errorData });
     
     if (error) {
-      eventBus.emit('error', errorData);
+      this.eventBus?.emit('error', errorData);
     }
   }
 
@@ -581,5 +581,7 @@ async function initializeUiState() {
 
 // Export a promise that resolves with the initialized instance
 const uiState = initializeUiState();
+
+console.log('DEBUG: uiState singleton instance exported:', uiState);
 
 export { UIStateManager, uiState };

@@ -8,7 +8,7 @@
  */
 
 import { eventBus } from './event-bus.js';
-import { uiState } from './ui-state.js';
+import { uiState as uiStatePromise } from './ui-state.js';
 
 /**
  * Course Loader Class
@@ -143,6 +143,7 @@ class CourseLoader {
       
       // Step 6: Update application state
       this.currentCourse = courseData;
+      const uiState = await uiStatePromise; // Await the promise
       uiState.updateCourse(courseData);
       
       // Step 7: Emit course loaded event

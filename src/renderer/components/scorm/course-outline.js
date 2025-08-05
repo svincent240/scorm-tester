@@ -8,7 +8,7 @@
  */
 
 import { BaseComponent } from '../base-component.js';
-import { uiState } from '../../services/ui-state.js';
+import { uiState as uiStatePromise } from '../../services/ui-state.js';
 
 /**
  * Course Outline Class
@@ -35,6 +35,7 @@ class CourseOutline extends BaseComponent {
   }
 
   async setup() {
+    this.uiState = await uiStatePromise; // Resolve the promise
     this.loadCourseStructure();
   }
 
@@ -228,7 +229,7 @@ class CourseOutline extends BaseComponent {
   }
 
   loadCourseStructure() {
-    const structure = uiState.getState('courseStructure');
+    const structure = this.uiState.getState('courseStructure'); // Use the resolved instance
     if (structure) {
       this.setCourseStructure(structure);
     }

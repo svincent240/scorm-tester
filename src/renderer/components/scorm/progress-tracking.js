@@ -8,7 +8,7 @@
  */
 
 import { BaseComponent } from '../base-component.js';
-import { uiState } from '../../services/ui-state.js';
+import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
 
 /**
@@ -41,6 +41,7 @@ class ProgressTracking extends BaseComponent {
   }
 
   async setup() {
+    this.uiState = await uiStatePromise; // Resolve the promise
     this.loadProgressData();
     this.startUpdateTimer();
   }
@@ -145,7 +146,7 @@ class ProgressTracking extends BaseComponent {
   }
 
   loadProgressData() {
-    const data = uiState.getState('progressData');
+    const data = this.uiState.getState('progressData'); // Use the resolved instance
     if (data) {
       this.updateProgress(data);
     }

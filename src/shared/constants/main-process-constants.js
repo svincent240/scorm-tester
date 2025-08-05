@@ -202,7 +202,8 @@ const SECURITY_CONFIG = {
       'path-normalize',
       'path-join',
       'log-message',
-      'debug-event'
+      'debug-event',
+      'load-module' // Added new channel
     ]
   },
   

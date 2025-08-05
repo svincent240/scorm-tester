@@ -8,7 +8,7 @@
  */
 
 import { eventBus } from './event-bus.js';
-import { uiState } from './ui-state.js';
+import { uiState as uiStatePromise } from './ui-state.js';
 import { scormClient } from './scorm-client.js';
 import { scormAPIBridge } from './scorm-api-bridge.js';
 import { courseLoader } from './course-loader.js';
@@ -40,6 +40,9 @@ class AppManager {
     // console.log('AppManager: Starting application initialization...'); // Removed debug log
     
     try {
+      this.uiState = await uiStatePromise; // Resolve the promise
+      console.log('DEBUG: AppManager - uiState resolved:', this.uiState);
+      scormClient.setUiState(this.uiState); // Pass resolved uiState to scormClient
       // Step 1: Initialize services
       await this.initializeServices();
       
@@ -57,7 +60,8 @@ class AppManager {
       
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
-      uiState.setLoading(false);
+      console.log('DEBUG: AppManager - uiState before setLoading(false):', this.uiState);
+      this.uiState.setLoading(false); // Use the resolved instance
       
       // Emit initialization complete event
       eventBus.emit('app:initialized');
@@ -77,7 +81,7 @@ class AppManager {
     
     // Register services
     this.services.set('eventBus', eventBus);
-    this.services.set('uiState', uiState);
+    this.services.set('uiState', this.uiState); // Use the resolved instance
     this.services.set('scormClient', scormClient);
     this.services.set('scormAPIBridge', scormAPIBridge);
     this.services.set('courseLoader', courseLoader);
@@ -231,6 +235,8 @@ class AppManager {
    * Handle course loaded event
    */
   handleCourseLoaded(courseData) {
+    console.log('DEBUG: AppManager - handleCourseLoaded - uiState:', this.uiState);
+    console.log('DEBUG: AppManager - handleCourseLoaded - courseData:', courseData);
     // console.log('AppManager: Handling course loaded:', courseData); // Removed debug log
     
     try {

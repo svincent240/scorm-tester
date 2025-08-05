@@ -87,6 +87,7 @@ const electronAPI = {
   scormGetLastError: (sessionId) => safeInvoke('scorm-get-last-error', sessionId),
   scormGetErrorString: (sessionId, errorCode) => safeInvoke('scorm-get-error-string', sessionId, errorCode),
   scormGetDiagnostic: (sessionId, errorCode) => safeInvoke('scorm-get-diagnostic', sessionId, errorCode),
+  loadModule: (modulePath) => safeInvoke('load-module', modulePath), // New method
   
   // Session Management
   createSession: (courseData) => safeInvoke('create-session', courseData),

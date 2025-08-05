@@ -9,7 +9,7 @@
  */
 
 import { BaseComponent } from '../base-component.js';
-import { uiState } from '../../services/ui-state.js';
+import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
 
 /**
@@ -53,6 +53,7 @@ class NavigationControls extends BaseComponent {
    * Setup component
    */
   async setup() {
+    this.uiState = await uiStatePromise;
     this.loadNavigationState();
   }
 
@@ -441,7 +442,7 @@ class NavigationControls extends BaseComponent {
     this.updateMenuButton();
     
     console.log('NavigationControls: Calling uiState.updateNavigation');
-    uiState.updateNavigation(this.navigationState);
+    this.uiState.updateNavigation(this.navigationState);
   }
 
   /**
@@ -537,7 +538,7 @@ class NavigationControls extends BaseComponent {
    * Load navigation state from UI state
    */
   loadNavigationState() {
-    const state = uiState.getState('navigationState');
+    const state = this.uiState.getState('navigationState');
     if (state) {
       this.navigationState = { ...this.navigationState, ...state };
       this.updateButtonStates();
@@ -625,7 +626,7 @@ class NavigationControls extends BaseComponent {
   handleScormDataChanged(data) {
     // Update progress if completion status changed
     if (data.element === 'cmi.completion_status' || data.element === 'cmi.progress_measure') {
-      const progressData = uiState.getState('progressData');
+      const progressData = this.uiState.getState('progressData');
       if (progressData) {
         this.updateProgress(progressData);
       }

@@ -9,7 +9,7 @@
  */
 
 import { eventBus } from './event-bus.js';
-import { uiState } from './ui-state.js';
+import { uiState as uiStatePromise } from './ui-state.js';
 
 /**
  * SCORM Client Class
@@ -26,10 +26,46 @@ class ScormClient {
     this.apiCallQueue = [];
     this.isProcessingQueue = false;
     this.sessionTimer = null;
-    this.validator = { isValidElement: () => false, isValidValue: () => false }; // Placeholder
-    
+    this.validator = null; // Will be loaded dynamically
+    this.uiState = null; // Will be set by AppManager
+
     this.setupEventListeners();
     this.loadValidator(); // Load validator dynamically
+  }
+
+  /**
+   * Load the validator module dynamically
+   */
+  async loadValidator() {
+    try {
+      const validatorModule = await import('../../shared/utils/scorm-data-model-validator.js');
+      this.validator = {
+        isValidElement: validatorModule.isValidElement,
+        isValidValue: validatorModule.isValidValue
+      };
+    } catch (error) {
+      console.error('Failed to load validator module:', error);
+      // Fallback: create dummy validators that always return true
+      this.validator = {
+        isValidElement: () => true,
+        isValidValue: () => true
+      };
+    }
+  }
+
+  /**
+   * Check if validator is available (fallback to true if not loaded)
+   */
+  isValidatorReady() {
+    return this.validator !== null;
+  }
+
+  /**
+   * Set the UI State Manager instance
+   * @param {Object} uiStateInstance - The resolved UIStateManager instance
+   */
+  setUiState(uiStateInstance) {
+    this.uiState = uiStateInstance;
   }
 
   /**
@@ -56,7 +92,7 @@ class ScormClient {
     this.asyncInitialize(sessionId);
 
     // Update UI state
-    uiState.updateSession({
+    this.uiState.updateSession({
       id: sessionId,
       startTime: Date.now(),
       connected: true
@@ -116,7 +152,7 @@ class ScormClient {
     }
 
     // Validate element name using dynamically loaded validator
-    if (!this.validator.isValidElement(element)) {
+    if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
       this.setLastError('401'); // Undefined data model element
       return '';
     }
@@ -158,13 +194,13 @@ class ScormClient {
     value = String(value);
 
     // Validate element name using dynamically loaded validator
-    if (!this.validator.isValidElement(element)) {
+    if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
       this.setLastError('401'); // Undefined data model element
       return 'false';
     }
 
     // Validate value format using dynamically loaded validator
-    if (!this.validator.isValidValue(element, value)) {
+    if (this.isValidatorReady() && !this.validator.isValidValue(element, value)) {
       this.setLastError('405'); // Incorrect data type
       return 'false';
     }
@@ -413,7 +449,7 @@ class ScormClient {
     }
 
     if (Object.keys(progressUpdates).length > 0) {
-      uiState.updateProgress(progressUpdates);
+      this.uiState.updateProgress(progressUpdates);
     }
   }
 
@@ -440,7 +476,7 @@ class ScormClient {
       timestamp: Date.now()
     };
 
-    uiState.addApiCall(apiCall);
+    this.uiState.addApiCall(apiCall);
     
     // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
@@ -475,9 +511,15 @@ class ScormClient {
    * @private
    */
   updateSessionTime() {
-    const sessionData = uiState.getState('currentSession');
+    // Ensure uiState is available before attempting to use it
+    if (!this.uiState) {
+      console.warn('ScormClient: uiState not yet available for session time update.');
+      return;
+    }
+
+    const sessionData = this.uiState.getState('currentSession');
     if (sessionData) {
-      const startTime = uiState.getState('sessionStartTime');
+      const startTime = this.uiState.getState('sessionStartTime');
       if (startTime) {
         const elapsed = Date.now() - startTime;
         const hours = Math.floor(elapsed / 3600000);
@@ -485,7 +527,7 @@ class ScormClient {
         const seconds = Math.floor((elapsed % 60000) / 1000);
         const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
-        uiState.updateProgress({ sessionTime: timeString });
+        this.uiState.updateProgress({ sessionTime: timeString });
       }
     }
   }
@@ -541,21 +583,6 @@ class ScormClient {
     eventBus.emit('scorm:destroyed');
   }
 
-  /**
-   * Dynamically load the SCORM data model validator.
-   * @private
-   */
-  async loadValidator() {
-    try {
-      const validatorModule = await import('../../shared/utils/scorm-data-model-validator.js');
-      this.validator.isValidElement = validatorModule.isValidElement;
-      this.validator.isValidValue = validatorModule.isValidValue;
-      console.log('SCORM Client: Data model validator loaded dynamically.');
-    } catch (error) {
-      console.error('SCORM Client: Failed to load data model validator dynamically:', error);
-      // Fallback or error handling if validator cannot be loaded
-    }
-  }
 }
 
 // Create and export singleton instance
