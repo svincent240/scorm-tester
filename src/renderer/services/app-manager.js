@@ -78,7 +78,10 @@ class AppManager {
       
       // Step 4: Setup UI event listeners
       this.setupUIEventListeners();
-      
+
+      // Step 5: Setup centralized SN status polling
+      this.setupSnPollingController();
+
       this.initialized = true;
 
       // Clear any persistent loading states from previous sessions
@@ -400,6 +403,206 @@ class AppManager {
   }
 
   /**
+   * Centralized SN status polling controller
+   * - Single owner
+   * - Min interval enforcement
+   * - Lifecycle gating (init, navigation, content load)
+   * - Backoff on errors/rate limit
+   * - App log only (no console)
+   */
+  setupSnPollingController() {
+    // Configuration
+    this._SN_MIN_INTERVAL_MS = 800; // >= 750ms to respect IPC rate limits
+    this._SN_MAX_INTERVAL_MS = 5000;
+    this._SN_BACKOFF_BASE_MS = 1200;
+    this._SN_BACKOFF_FACTOR = 1.75;
+    this._SN_BACKOFF_MAX_MS = 8000;
+
+    // State
+    this._snPollTimer = null;
+    this._snPollingActive = false;
+    this._snBackoffMs = 0;
+    this._snLastTickAt = 0;
+    this._snNavInFlight = false;
+    this._snContentLoading = false;
+    this._snInitialized = false;
+
+    // Helper guards
+    const canPoll = () => {
+      if (!this._snInitialized) return false;
+      if (this._snNavInFlight) return false;
+      if (this._snContentLoading) return false;
+      return true;
+    };
+
+    const scheduleNext = (delayMs) => {
+      const ms = Math.max(this._SN_MIN_INTERVAL_MS, delayMs || 0);
+      clearTimeout(this._snPollTimer);
+      this._snPollTimer = setTimeout(tick, ms);
+    };
+
+    const applyBackoff = () => {
+      if (this._snBackoffMs <= 0) {
+        this._snBackoffMs = this._SN_BACKOFF_BASE_MS;
+      } else {
+        this._snBackoffMs = Math.min(
+          Math.floor(this._snBackoffMs * this._SN_BACKOFF_FACTOR),
+          this._SN_BACKOFF_MAX_MS
+        );
+      }
+      try { this.logger.info('AppManager: SN polling backoff applied', { backoffMs: this._snBackoffMs }); } catch (_) {}
+    };
+
+    const resetBackoff = () => {
+      if (this._snBackoffMs !== 0) {
+        this._snBackoffMs = 0;
+        try { this.logger.info('AppManager: SN polling backoff reset'); } catch (_) {}
+      }
+    };
+
+    const tick = async () => {
+      // If deactivated, skip
+      if (!this._snPollingActive) return;
+
+      // Enforce min spacing
+      const now = Date.now();
+      if (now - this._snLastTickAt < this._SN_MIN_INTERVAL_MS) {
+        scheduleNext(this._SN_MIN_INTERVAL_MS - (now - this._snLastTickAt));
+        return;
+      }
+
+      // Lifecycle gates
+      if (!canPoll()) {
+        // If cannot poll, reschedule with min interval (or backoff if present)
+        const next = this._snBackoffMs > 0 ? this._snBackoffMs : this._SN_MIN_INTERVAL_MS;
+        scheduleNext(next);
+        return;
+      }
+
+      this._snLastTickAt = now;
+      try { this.logger.debug('AppManager: SN polling tick'); } catch (_) {}
+
+      // Use scormAPIBridge if available, else scormClient as fallback
+      let status = null;
+      try {
+        if (scormAPIBridge && typeof scormAPIBridge.getStatus === 'function') {
+          status = await scormAPIBridge.getStatus();
+        } else if (scormClient && typeof scormClient.getStatus === 'function') {
+          status = await scormClient.getStatus();
+        } else {
+          // No API available; pause polling
+          applyBackoff();
+          scheduleNext(this._snBackoffMs);
+          return;
+        }
+      } catch (err) {
+        // Handle rate limit or generic errors with backoff
+        const msg = err && (err.message || String(err));
+        const isRateLimit = /rate limit/i.test(msg || '') || /614/.test(msg || '');
+        try { this.logger.error('AppManager: SN polling error', { message: msg, isRateLimit }); } catch (_) {}
+        applyBackoff();
+        scheduleNext(this._snBackoffMs);
+        return;
+      }
+
+      // Successful status retrieval
+      resetBackoff();
+
+      // Reflect available navigation into UIState if present
+      try {
+        const available = status && (status.availableNavigation || status.available || []);
+        const normalized = this.normalizeAvailableNavigation(available);
+        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+      } catch (e) {
+        try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) {}
+      }
+
+      // Schedule next
+      scheduleNext(this._SN_MIN_INTERVAL_MS);
+    };
+
+    // Public controls
+    this.startSnPolling = () => {
+      if (this._snPollingActive) return;
+      this._snPollingActive = true;
+      try { this.logger.info('AppManager: SN polling started'); } catch (_) {}
+      // First run after a small delay to allow init to settle
+      scheduleNext(200);
+    };
+
+    this.stopSnPolling = () => {
+      this._snPollingActive = false;
+      clearTimeout(this._snPollTimer);
+      this._snPollTimer = null;
+      try { this.logger.info('AppManager: SN polling stopped'); } catch (_) {}
+    };
+
+    this.pauseSnPolling = (reason = 'unknown') => {
+      this._snPollingActive = false;
+      try { this.logger.info('AppManager: SN polling paused', { reason }); } catch (_) {}
+    };
+
+    this.resumeSnPolling = () => {
+      if (this._snPollingActive) return;
+      this._snPollingActive = true;
+      try { this.logger.info('AppManager: SN polling resumed'); } catch (_) {}
+      scheduleNext(this._snBackoffMs > 0 ? this._snBackoffMs : this._SN_MIN_INTERVAL_MS);
+    };
+
+    // Lifecycle hooks
+    // 1) Detect SN initialized
+    eventBus.on('sn:initialized', () => {
+      this._snInitialized = true;
+      this.startSnPolling();
+    });
+
+    // Some implementations may not emit sn:initialized. Fallback: after course:loaded and SCORM Initialize
+    eventBus.on('course:loaded', () => {
+      // Do not start yet, wait for Initialize event from ContentViewer (via scormAPIBridge) if available
+      // But if absent, attempt delayed start
+      setTimeout(() => {
+        if (!this._snInitialized) {
+          this._snInitialized = true; // optimistic start
+          this.startSnPolling();
+        }
+      }, 1500);
+    });
+
+    // 2) Navigation in-flight gating
+    eventBus.on('navigation:request', () => {
+      this._snNavInFlight = true;
+      this.pauseSnPolling('navigation');
+    });
+    eventBus.on('navigation:launch', () => {
+      // content will load; keep paused until contentViewer signals ready
+      this._snNavInFlight = false;
+      this._snContentLoading = true;
+    });
+
+    // 3) ContentViewer load lifecycle
+    eventBus.on('content:load:start', () => {
+      this._snContentLoading = true;
+      this.pauseSnPolling('content-load');
+    });
+    eventBus.on('content:load:ready', () => {
+      this._snContentLoading = false;
+      this.resumeSnPolling();
+    });
+    eventBus.on('content:load:error', () => {
+      this._snContentLoading = false;
+      // keep polling paused briefly to avoid thrash
+      applyBackoff();
+      scheduleNext(this._snBackoffMs);
+    });
+
+    // 4) Commit/Terminate gating (if emitted by scormAPIBridge)
+    eventBus.on('scorm:commit:start', () => this.pauseSnPolling('commit'));
+    eventBus.on('scorm:commit:done', () => this.resumeSnPolling());
+    eventBus.on('scorm:terminate:start', () => this.pauseSnPolling('terminate'));
+    eventBus.on('scorm:terminate:done', () => this.stopSnPolling());
+  }
+
+  /**
    * Setup UI event listeners
    */
   setupUIEventListeners() {
@@ -481,17 +684,13 @@ class AppManager {
         }
       }
 
-      // Update course outline
+      // Do NOT directly update CourseOutline here.
+      // CourseOutline subscribes to 'course:loaded' and will render itself once.
       const courseOutline = this.components.get('courseOutline');
-      if (courseOutline) {
-        try {
-          this.logger.debug('AppManager: Instructing CourseOutline.updateWithCourse');
-          courseOutline.updateWithCourse(courseData);
-        } catch (e) {
-          this.logger.error('AppManager: CourseOutline.updateWithCourse threw', e?.message || e);
-        }
-      } else {
+      if (!courseOutline) {
         this.logger.error('AppManager: courseOutline component not found in components map at course:loaded');
+      } else {
+        try { this.logger.info('AppManager: Relying on CourseOutline event subscription for course:loaded'); } catch (_) {}
       }
 
       // Show success message
@@ -691,6 +890,11 @@ class AppManager {
     // console.log('AppManager: Shutting down application...'); // Removed debug log
     
     try {
+      // Stop polling before tearing down
+      if (typeof this.stopSnPolling === 'function') {
+        this.stopSnPolling();
+      }
+
       // Cleanup components
       for (const component of this.components.values()) {
         if (component.destroy) {

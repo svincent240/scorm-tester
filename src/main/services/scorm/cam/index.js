@@ -180,22 +180,184 @@ class ScormCAMService {
             return withItems || orgListForStats[0] || null;
           })();
 
-          // Build outline strictly from organizations branch
-          uiOutlineFromOrg = this.buildUiOutlineFromManifest({
+          // SCORM 2004 org-first: render the items of the single default organization ONLY.
+          // Do NOT merge multiple organizations at the top level.
+          // Fix: When the chosen organization contains a single wrapper item that simply groups content
+          // and has identifier identical to a sibling "wrapper" produced by parser remapping, avoid
+          // double-root by keeping ONLY the organization's item list as the root items.
+          const constrainedManifest = {
             ...manifest,
-            organizations: { default: pickOrg?.identifier || orgContainer?.default, organization: [pickOrg || orgListForStats[0]].filter(Boolean) }
-          }, packagePath) || [];
+            organizations: { default: pickOrg?.identifier || orgContainer?.default, organization: [pickOrg].filter(Boolean) }
+          };
+
+          uiOutlineFromOrg = this.buildUiOutlineFromManifest(constrainedManifest, packagePath) || [];
+
+          // Root-wrapper normalization must occur BEFORE any identifier collision renaming.
+          // Goal: collapse duplicate structural wrappers at the root produced by org wrapper + first child wrapper.
+          const stripSuffix = (id) => {
+            const s = (typeof id === 'string') ? id.trim() : '';
+            // remove our collision suffix pattern: __<seed>__<n>
+            return s.replace(/__[^_]+__\d+$/g, '');
+          };
+          const isEmptyHrefClusterWithChildren = (node) => {
+            if (!node || typeof node !== 'object') return false;
+            const href = typeof node.href === 'string' ? node.href.trim() : '';
+            const type = node.type;
+            const items = Array.isArray(node.items) ? node.items : [];
+            return ((!href) && type === 'cluster' && items.length > 0);
+          };
+          const titlesMatchLoosely = (a, b) => {
+            const sa = (typeof a === 'string') ? a.trim().toLowerCase() : '';
+            const sb = (typeof b === 'string') ? b.trim().toLowerCase() : '';
+            return !!sa && sa === sb;
+          };
+
+          try {
+            this.logger?.info('ScormCAMService: Root wrapper precheck', {
+              topCount: Array.isArray(uiOutlineFromOrg) ? uiOutlineFromOrg.length : 0,
+              topIds: Array.isArray(uiOutlineFromOrg) ? uiOutlineFromOrg.map(n => n?.identifier) : []
+            });
+          } catch (_) {}
+
+          if (Array.isArray(uiOutlineFromOrg)) {
+            // Case A: Single top-level wrapper whose first child mirrors it => lift children
+            if (uiOutlineFromOrg.length === 1) {
+              const only = uiOutlineFromOrg[0] || null;
+              const onlyChildren = Array.isArray(only?.items) ? only.items : [];
+              if (isEmptyHrefClusterWithChildren(only) && onlyChildren.length > 0) {
+                const firstChild = onlyChildren[0] || null;
+                const idBaseOnly = stripSuffix(only?.identifier);
+                const idBaseChild = stripSuffix(firstChild?.identifier);
+                const idsEqual = !!idBaseOnly && !!idBaseChild && (idBaseOnly === idBaseChild);
+                const titlesEqual = titlesMatchLoosely(only?.title, firstChild?.title);
+                if ((idsEqual || titlesEqual) && isEmptyHrefClusterWithChildren(firstChild)) {
+                  try {
+                    this.logger?.info('ScormCAMService: Root wrapper normalization executed (single-root lift)', {
+                      beforeIds: uiOutlineFromOrg.map(n => n?.identifier),
+                      liftedFrom: only?.identifier,
+                      childRef: firstChild?.identifier
+                    });
+                  } catch (_) {}
+                  // Replace root with the children of the first child (flatten two wrappers into one level)
+                  uiOutlineFromOrg = Array.isArray(firstChild.items) ? firstChild.items.slice() : onlyChildren.slice();
+                }
+              }
+            }
+
+            // Case B: Two top-level structural wrappers that are the same logical wrapper => keep one
+            if (uiOutlineFromOrg.length === 2) {
+              const a = uiOutlineFromOrg[0];
+              const b = uiOutlineFromOrg[1];
+              if (isEmptyHrefClusterWithChildren(a) && isEmptyHrefClusterWithChildren(b)) {
+                const idA = stripSuffix(a?.identifier);
+                const idB = stripSuffix(b?.identifier);
+                const idsEqual = !!idA && !!idB && (idA === idB);
+                const titlesEqual = titlesMatchLoosely(a?.title, b?.title);
+                if (idsEqual || titlesEqual) {
+                  // Prefer the one that has deeper children; otherwise keep the first
+                  const lenA = Array.isArray(a.items) ? a.items.length : 0;
+                  const lenB = Array.isArray(b.items) ? b.items.length : 0;
+                  const keep = lenB > lenA ? b : a;
+                  try {
+                    this.logger?.info('ScormCAMService: Root wrapper normalization executed (dual-root collapse)', {
+                      beforeIds: [a?.identifier, b?.identifier],
+                      kept: keep?.identifier
+                    });
+                  } catch (_) {}
+                  uiOutlineFromOrg = [keep];
+                }
+              }
+            }
+          }
         }
 
+        // Helper to normalize duplicate identifiers at a single array level deterministically
+        const normalizeUniqueIds = (items, suffixSeed) => {
+          if (!Array.isArray(items) || items.length === 0) return items || [];
+          const seen = new Map();
+          const out = [];
+          for (const it of items) {
+            const node = { ...it };
+            const origId = typeof node.identifier === 'string' && node.identifier.trim() ? node.identifier.trim() : '';
+            let id = origId || (typeof node.title === 'string' ? node.title.trim() : '');
+            if (!id) {
+              id = 'node';
+            }
+            if (seen.has(id)) {
+              // collision: increment counter and rewrite with suffix + counter
+              const count = seen.get(id) + 1;
+              seen.set(id, count);
+              const seed = suffixSeed ? String(suffixSeed) : 'org';
+              const newId = `${id}__${seed}__${count}`;
+              node.identifier = newId;
+            } else {
+              seen.set(id, 1);
+              node.identifier = id;
+            }
+            // Do not recurse here; current requirement is to address top-level collisions.
+            out.push(node);
+          }
+          return out;
+        };
+ 
+        // Choose outline (org-first) then normalize IDs for uniqueness at top-level
         if ((hasAnyOrgs && uiOutlineFromOrg.length > 0)) {
-          analysis.uiOutline = uiOutlineFromOrg;
+          const activeOrgId = (orgContainer?.default)
+            ? (orgListForStats.find(o => (o && (o.identifier === orgContainer.default)))?.identifier || orgContainer.default)
+            : (orgListForStats[0]?.identifier || 'org');
+ 
+          const beforeIds = uiOutlineFromOrg.map(n => n?.identifier);
+          const normalized = normalizeUniqueIds(uiOutlineFromOrg, activeOrgId);
+          const afterIds = normalized.map(n => n?.identifier);
+ 
+          // Diagnostics: collisions and rewrite summary
+          try {
+            const collisions = (() => {
+              const counts = beforeIds.reduce((acc, id) => {
+                const k = String(id || '');
+                acc[k] = (acc[k] || 0) + 1;
+                return acc;
+              }, {});
+              return Object.entries(counts).filter(([, c]) => c > 1).map(([k, c]) => ({ id: k, count: c }));
+            })();
+            this.logger?.info('ScormCAMService: CAM uiOutline identifier normalization', {
+              level: 'top',
+              activeOrgId,
+              beforeIds,
+              afterIds,
+              collisions,
+              rewritesPerformed: afterIds.filter((id, idx) => id !== beforeIds[idx]).length
+            });
+          } catch (_) { /* swallow diagnostics errors */ }
+ 
+          analysis.uiOutline = normalized;
         } else {
           // Only fall back to resources when no orgs or org had zero items
           const fallback = this.buildUiOutlineFromResources(manifest);
-          analysis.uiOutline = Array.isArray(fallback) ? fallback : [];
+          const beforeIds = Array.isArray(fallback) ? fallback.map(n => n?.identifier) : [];
+          const normalized = normalizeUniqueIds(Array.isArray(fallback) ? fallback : [], 'resources');
+          const afterIds = normalized.map(n => n?.identifier);
+ 
+          try {
+            const counts = beforeIds.reduce((acc, id) => {
+              const k = String(id || '');
+              acc[k] = (acc[k] || 0) + 1;
+              return acc;
+            }, {});
+            const collisions = Object.entries(counts).filter(([, c]) => c > 1).map(([k, c]) => ({ id: k, count: c }));
+            this.logger?.info('ScormCAMService: CAM uiOutline identifier normalization (resources fallback)', {
+              level: 'top',
+              beforeIds,
+              afterIds,
+              collisions,
+              rewritesPerformed: afterIds.filter((id, idx) => id !== beforeIds[idx]).length
+            });
+          } catch (_) { /* swallow diagnostics errors */ }
+ 
+          analysis.uiOutline = normalized;
           usedFallback = analysis.uiOutline.length > 0;
         }
-
+ 
         const itemCount = Array.isArray(analysis.uiOutline) ? analysis.uiOutline.length : 0;
         const sample = itemCount > 0 ? analysis.uiOutline[0] : null;
         this.logger?.info('ScormCAMService: UI outline built', {
@@ -483,7 +645,8 @@ class ScormCAMService {
       rootOrg = orgList.find(o => safeStr(o?.identifier) === defaultOrgId) || null;
     }
     if (!rootOrg && orgList.length > 0) {
-      rootOrg = orgList[0];
+      // Prefer first org that actually has items before blindly taking index 0
+      rootOrg = orgList.find(o => !!(o && (Array.isArray(o.item) ? o.item.length : (o.item || o.items || o.children)))) || orgList[0];
     }
  
     if (!rootOrg) {
@@ -507,12 +670,19 @@ class ScormCAMService {
       return flat;
     }
  
-    // Traverse organization items
+    // Traverse organization items (accept item/items/children)
     const traverse = (itemNode) => {
       const id = safeStr(itemNode?.identifier);
       const title = safeStr(itemNode?.title || itemNode?.['ims:title'] || itemNode?.['adlcp:title'] || '', id || 'Untitled');
       const identifierref = safeStr(itemNode?.identifierref);
-      const childrenArr = toArray(itemNode?.item);
+      const childrenArr = (() => {
+        const a = toArray(itemNode?.item);
+        if (a.length > 0) return a;
+        const b = toArray(itemNode?.items);
+        if (b.length > 0) return b;
+        const c = toArray(itemNode?.children);
+        return c;
+      })();
       // Resolve type/href
       let href = '';
       let type = 'cluster';
@@ -532,10 +702,23 @@ class ScormCAMService {
       }
  
       const items = childrenArr.map(traverse);
-      return { identifier: id || title, title, type, href, items };
+  
+      // SCORM conformance: prevent generating a synthetic organization-level wrapper node
+      // that duplicates the first child cluster when identifier is missing.
+      // Prefer stable identifier: use itemNode.identifier when present; otherwise use title.
+      const stableId = id || title;
+  
+      return { identifier: stableId, title, type, href, items };
     };
  
-    const topLevelItems = toArray(rootOrg?.item).map(traverse);
+    const topLevelItems = (() => {
+      const a = toArray(rootOrg?.item);
+      if (a.length > 0) return a.map(traverse);
+      const b = toArray(rootOrg?.items);
+      if (b.length > 0) return b.map(traverse);
+      const c = toArray(rootOrg?.children);
+      return c.map(traverse);
+    })();
     return topLevelItems;
   } // end buildUiOutlineFromManifest
 

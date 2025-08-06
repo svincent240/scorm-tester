@@ -53,7 +53,35 @@ class CourseOutline extends BaseComponent {
   async setup() {
     this.uiState = await uiStatePromise; // Resolve the promise
     rendererLogger.info('CourseOutline.setup: uiState resolved');
-    this.loadCourseStructure();
+
+    // Ensure our event subscriptions are established before any initial render,
+    // to avoid a double-render race between initial state read and course:loaded event.
+    try {
+      this.setupEventSubscriptions?.();
+    } catch (e) {
+      try { rendererLogger.error('CourseOutline.setup: setupEventSubscriptions failed', e?.message || e); } catch (_) {}
+    }
+
+    // After subscriptions are in place, if a course is already present in state,
+    // emit a synthetic 'course:loaded' so we take the same code path as normal loads.
+    try {
+      const existingStructure = this.uiState.getState('courseStructure');
+      const existingInfo = this.uiState.getState('courseInfo');
+      if (existingStructure && Array.isArray(existingStructure.items)) {
+        try { rendererLogger.info('CourseOutline.setup: emitting synthetic course:loaded for existing state'); } catch (_) {}
+        const { eventBus } = await import('../../services/event-bus.js');
+        eventBus.emit('course:loaded', { info: existingInfo || null, structure: existingStructure });
+      } else {
+        // No existing course; render empty state once
+        this.renderContent();
+        this.showEmptyState();
+      }
+    } catch (e) {
+      try { rendererLogger.error('CourseOutline.setup: initial state check failed', e?.message || e); } catch (_) {}
+      // Fallback to rendering base content to ensure component mounts
+      this.renderContent();
+      this.showEmptyState();
+    }
   }
 
   renderContent() {
@@ -373,25 +401,26 @@ class CourseOutline extends BaseComponent {
     rendererLogger.info('CourseOutline: Empty state displayed');
   }
 
-  loadCourseStructure() {
-    const structure = this.uiState.getState('courseStructure'); // Use the resolved instance
-    rendererLogger.info('CourseOutline.loadCourseStructure: state check', {
-      hasStructure: !!structure,
-      hasItems: !!structure?.items,
-      itemCount: structure?.items?.length || 0
-    });
-    if (structure) {
-      this.setCourseStructure(structure);
-    } else {
-      this.showEmptyState();
-    }
-  }
+  // Removed eager loadCourseStructure path to avoid double-render with course:loaded subscription.
+  // Initialization now emits a synthetic course:loaded when needed after subscriptions are ready.
 
   setCourseStructure(structure) {
     this.courseStructure = structure;
     this.expandedItems.clear();
     this.progressData.clear();
     this.currentItem = null;
+
+    // Diagnostics: capture top-level identifiers to detect duplication at receiver side
+    try {
+      const topIds = Array.isArray(structure?.items)
+        ? structure.items.slice(0, 48).map(n => n?.identifier || 'unknown')
+        : [];
+      rendererLogger.info('CourseOutline.setCourseStructure: top-level IDs', {
+        count: topIds.length,
+        ids: topIds
+      });
+    } catch (_) {}
+
     rendererLogger.info('CourseOutline.setCourseStructure: structure set', {
       hasItems: !!structure?.items,
       itemCount: structure?.items?.length || 0
@@ -479,6 +508,17 @@ class CourseOutline extends BaseComponent {
       }
       
       if (structure) {
+        // Diagnostics: log incoming structure before setting to catch duplication earlier
+        try {
+          const ids = Array.isArray(structure?.items)
+            ? structure.items.slice(0, 48).map(n => n?.identifier || 'unknown')
+            : [];
+          rendererLogger.info('CourseOutline.updateWithCourse: incoming top-level IDs', {
+            count: ids.length,
+            ids
+          });
+        } catch (_) {}
+
         this.setCourseStructure(structure);
         try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) {}
         // Avoid redundant explicit re-render; setCourseStructure already renders

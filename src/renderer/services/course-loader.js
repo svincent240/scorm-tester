@@ -295,52 +295,84 @@ class CourseLoader {
         };
       };
 
-      // Prefer CAM-provided structure from organizations when available; wrap uiOutline into structure
-      let rawStructure;
+      // Prefer CAM-provided structure from organizations when available; when uiOutline exists, treat it as the single source of truth
+      let uiStructure;
       if (Array.isArray(analysis?.uiOutline) && analysis.uiOutline.length > 0) {
-        rawStructure = {
-          title: (manifest?.organizations?.organization?.title)
-            || (Array.isArray(manifest?.organizations?.organization) ? manifest.organizations.organization[0]?.title : null)
-            || manifest?.identifier
-            || 'Course',
-          identifier: (manifest?.organizations?.organization?.identifier)
-            || (Array.isArray(manifest?.organizations?.organization) ? manifest.organizations.organization[0]?.identifier : null)
-            || manifest?.identifier
-            || 'course',
-          items: analysis.uiOutline
+        // Build from uiOutline only; avoid additional organization discovery/merges that can duplicate nodes
+        const rootTitle =
+          (Array.isArray(manifest?.organizations?.organization)
+            ? manifest.organizations.organization[0]?.title
+            : manifest?.organizations?.organization?.title)
+          || manifest?.identifier
+          || 'Course';
+        const rootId =
+          (Array.isArray(manifest?.organizations?.organization)
+            ? manifest.organizations.organization[0]?.identifier
+            : manifest?.organizations?.organization?.identifier)
+          || manifest?.identifier
+          || 'course';
+
+        // Normalize uiOutline nodes minimally to ensure items key exists
+        const normalizeFromUiOutline = (node) => {
+          if (!node || typeof node !== 'object') return null;
+          const id = node.identifier || node.id || node.identifierref || `node_${Math.random().toString(36).slice(2,10)}`;
+          const title = (typeof node.title === 'string' && node.title.trim()) ? node.title.trim() : (node.identifier || 'Untitled');
+          const href = node.href || node.launch || node.url || (node.resource && node.resource.href) || undefined;
+          const childrenLike = Array.isArray(node.items) ? node.items
+                               : Array.isArray(node.children) ? node.children
+                               : (node.item ? (Array.isArray(node.item) ? node.item : [node.item]) : []);
+          return {
+            identifier: id,
+            title,
+            type: node.type || (node.identifierref ? 'sco' : (childrenLike?.length ? 'cluster' : 'asset')),
+            href,
+            items: (childrenLike || []).map(normalizeFromUiOutline).filter(Boolean)
+          };
         };
+
+        uiStructure = {
+          title: rootTitle,
+          identifier: rootId,
+          items: analysis.uiOutline.map(normalizeFromUiOutline).filter(Boolean)
+        };
+
+        // IMPORTANT: Do not deduplicate in renderer.
+        // CAM (main process) is the single source of truth and now guarantees
+        // unique top-level identifiers via deterministic normalization.
+        // Keeping renderer-side dedupe risks masking source issues and creating mismatches
+        // with SN/activity-tree logs. This block intentionally left as a no-op.
       } else {
         // If CAM didn't provide uiOutline, build from manifest organizations before any resource fallback
-        rawStructure = (analysis && analysis.structure) ? analysis.structure : buildStructureFromManifest(manifest);
-      }
-      let normalized = normalizeStructure(rawStructure);
+        const rawStructure = (analysis && analysis.structure) ? analysis.structure : buildStructureFromManifest(manifest);
+        const normalized = normalizeStructure(rawStructure);
 
-      // Fallbacks if items are still empty: try deeper common keys
-      if (!normalized || !Array.isArray(normalized.items) || normalized.items.length === 0) {
-        const candidates = [
-          Array.isArray(rawStructure?.children) ? rawStructure.children : null,
-          Array.isArray(rawStructure?.items) ? rawStructure.items : null,
-          rawStructure?.item ? (Array.isArray(rawStructure.item) ? rawStructure.item : [rawStructure.item]) : null
-        ].filter(Boolean);
+        // Ensure final structure shape
+        uiStructure = normalized && Array.isArray(normalized.items)
+          ? normalized
+          : { title: 'Course', identifier: 'course', items: [] };
 
-        const firstNonEmpty = candidates.find(c => Array.isArray(c) && c.length > 0) || [];
-        if (firstNonEmpty.length > 0) {
-          const rootTitle = rawStructure?.title
-            || manifest?.organizations?.organization?.title
-            || manifest?.identifier
-            || 'Course';
-          normalized = {
-            title: rootTitle,
-            identifier: rawStructure?.identifier || 'course',
-            items: firstNonEmpty.map(child => normalizeNode(child)).filter(Boolean)
-          };
+        // Fallbacks if items are still empty: try deeper common keys
+        if (!Array.isArray(uiStructure.items) || uiStructure.items.length === 0) {
+          const candidates = [
+            Array.isArray(rawStructure?.children) ? rawStructure.children : null,
+            Array.isArray(rawStructure?.items) ? rawStructure.items : null,
+            rawStructure?.item ? (Array.isArray(rawStructure.item) ? rawStructure.item : [rawStructure.item]) : null
+          ].filter(Boolean);
+
+          const firstNonEmpty = candidates.find(c => Array.isArray(c) && c.length > 0) || [];
+          if (firstNonEmpty.length > 0) {
+            const rootTitle = rawStructure?.title
+              || manifest?.organizations?.organization?.title
+              || manifest?.identifier
+              || 'Course';
+            uiStructure = {
+              title: rootTitle,
+              identifier: rawStructure?.identifier || 'course',
+              items: firstNonEmpty.map(child => normalizeNode(child)).filter(Boolean)
+            };
+          }
         }
       }
-
-      // Ensure final structure shape
-      let uiStructure = normalized && Array.isArray(normalized.items)
-        ? normalized
-        : { title: 'Course', identifier: 'course', items: [] };
 
       // Helper: build map of manifest resources for resolving hrefs
       const buildResourceMap = (mf) => {
@@ -404,8 +436,7 @@ class CourseLoader {
         } catch (_) {}
       }
 
-      // FINAL SAFETY B: Only if organizations container exists but has no organization nodes at all,
-      // derive a flat list from resources (true org absence). Otherwise never override org-derived structure.
+      // FINAL SAFETY B remains valid, but only applies when uiOutline was NOT used (kept above in else-path).
       if (Array.isArray(uiStructure.items) && uiStructure.items.length === 0 && manifest?.organizations && !manifest?.organizations?.organization) {
         try {
           const resourceMap = buildResourceMap(manifest);
@@ -519,16 +550,25 @@ class CourseLoader {
         // ignore logging errors
       }
 
+      // Additional diagnostics: capture top-level identifiers to detect duplication before publishing
+      try {
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        const topIds = Array.isArray(courseData?.structure?.items)
+          ? courseData.structure.items.slice(0, 24).map(n => n?.identifier || 'unknown')
+          : [];
+        rendererLogger.info('CourseLoader: uiStructure top-level IDs', { count: topIds.length, ids: topIds });
+      } catch (_) {}
+
       // Step 7: Update application state
       this.currentCourse = courseData;
       const uiState = await uiStatePromise; // Await the promise
       uiState.updateCourse(courseData);
 
-      // Emit course loaded event for UI components
-      eventBus.emit('course:loaded', courseData);
-      
+      // Do NOT emit course:loaded directly here; UIState.updateCourse already emits it.
+      // This avoids duplicate event paths and potential double render/update races.
+
       // console.log('CourseLoader: Course processing completed successfully!'); // Removed debug log
-      
+
     } catch (error) {
       console.error('CourseLoader: Error in processCourseFile:', error);
       throw error;

@@ -42,7 +42,16 @@ class IpcHandler extends BaseService {
     this.apiCallHistory = [];
     this.maxHistorySize = 5000; // Increased limit for persistent storage
     this.sessionId = null; // Track current session for clearing
-    
+
+    // Simple, centralized SN status cache managed ONLY by main-owned poller
+    this._sn = {
+      cache: { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] },
+      lastUpdateTs: 0,
+      pollTimer: null,
+      pollIntervalMs: 1000, // single cadence; simple and stable
+      running: false
+    };
+
     // Clear history on startup (from IpcHandlers)
     this.clearApiCallHistory();
     this.logger?.info('[DEBUG EVENT] API call history cleared on startup');
@@ -81,6 +90,10 @@ class IpcHandler extends BaseService {
     this.logger?.debug('IpcHandler: Starting initialization');
     this.registerHandlers();
     this.setupRateLimitCleanup();
+
+    // Start main-owned SN status poller (no renderer polling required)
+    this.startSnMainPoller();
+
     this.logger?.debug('IpcHandler: Initialization completed');
   }
 
@@ -89,6 +102,9 @@ class IpcHandler extends BaseService {
    */
   async doShutdown() {
     this.logger?.debug('IpcHandler: Starting shutdown');
+
+    // Stop SN poller
+    this.stopSnMainPoller();
 
     // 1) Terminate SCORM sessions FIRST (best-effort, silent)
     await this.terminateScormSessionsSafely();
@@ -289,23 +305,38 @@ class IpcHandler extends BaseService {
           }
         }
 
-        // Rate limit check with channel policies (pass channel for SCORM-aware exemptions)
-        const rateAllowed = this.checkRateLimit(event.sender, channel);
-        if (!rateAllowed) {
-          // Initialize per-channel suppression map once
-          if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
-          const markSuppressed = (ch) => {
-            let st = this._rateLimitLogState.get(ch);
-            if (!st) {
-              st = { firstSeenAt: Date.now(), notified: false, suppressed: false };
-              this._rateLimitLogState.set(ch, st);
-            }
-            if (!st.notified) {
-              st.notified = true;
-              st.suppressed = true;
-              this.logger?.info(`IpcHandler: rate-limit engaged on ${ch}; further rate-limit logs suppressed for this session`);
-            }
-          };
+        // Do NOT apply generic rate limiting to core SN channels; let handlers/SN enforce correctness.
+        // Exempted SN channels:
+        //   - sn:getStatus (cache-only, already simplified)
+        //   - sn:processNavigation (sequenced by SN)
+        //   - sn:initialize (one-time init)
+        //   - sn:updateActivityProgress (driven by content runtime)
+        //   - sn:reset (admin/reset)
+        const snBypass = (
+          channel === 'sn:getStatus' ||
+          channel === 'sn:processNavigation' ||
+          channel === 'sn:initialize' ||
+          channel === 'sn:updateActivityProgress' ||
+          channel === 'sn:reset'
+        );
+        if (!snBypass) {
+          // Rate limit check with channel policies (pass channel for SCORM-aware exemptions)
+          const rateAllowed = this.checkRateLimit(event.sender, channel);
+          if (!rateAllowed) {
+            // Initialize per-channel suppression map once
+            if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
+            const markSuppressed = (ch) => {
+              let st = this._rateLimitLogState.get(ch);
+              if (!st) {
+                st = { firstSeenAt: Date.now(), notified: false, suppressed: false };
+                this._rateLimitLogState.set(ch, st);
+              }
+              if (!st.notified) {
+                st.notified = true;
+                st.suppressed = true;
+                this.logger?.info(`IpcHandler: rate-limit engaged on ${ch}; further rate-limit logs suppressed for this session`);
+              }
+            };
 
           const isRendererLogChannel =
             channel === 'renderer-log-debug' ||
@@ -356,6 +387,7 @@ class IpcHandler extends BaseService {
           // Otherwise, enforce
           throw new Error('Rate limit exceeded');
         }
+        } // end non-SN bypass branch
 
         this.activeRequests.set(requestId, { channel, startTime, event });
 
@@ -552,6 +584,69 @@ class IpcHandler extends BaseService {
         }
       }
     }, this.config.rateLimitWindow);
+  }
+
+  // --- Main-owned SN simple poller (single source of truth) ---
+  startSnMainPoller() {
+    if (this._sn.running) return;
+    this._sn.running = true;
+
+    const tick = async () => {
+      try {
+        const scormService = this.getDependency('scormService');
+        const snService = scormService && typeof scormService.getSNService === 'function'
+          ? scormService.getSNService()
+          : null;
+
+        if (!snService) {
+          // keep cache at not_initialized; do not log spam
+          this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
+          this._sn.lastUpdateTs = Date.now();
+          return;
+        }
+
+        // If SN exposes isInitialized, reflect that; otherwise rely on getStatus shape.
+        let initialized = true;
+        try {
+          if (typeof snService.isInitialized === 'function') {
+            initialized = !!snService.isInitialized();
+          }
+        } catch (_) { initialized = true; }
+
+        if (!initialized) {
+          this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
+          this._sn.lastUpdateTs = Date.now();
+          return;
+        }
+
+        const status = await Promise.resolve(
+          typeof snService.getStatus === 'function'
+            ? snService.getStatus()
+            : { initialized: true, sessionState: 'unknown', availableNavigation: [] }
+        );
+
+        this._sn.cache = { success: true, ...status };
+        this._sn.lastUpdateTs = Date.now();
+      } catch (e) {
+        // Never throw; maintain a safe cache
+        this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [], fallback: true };
+        this._sn.lastUpdateTs = Date.now();
+      }
+    };
+
+    // First tick immediately to populate cache quickly, then steady cadence
+    tick();
+    this._sn.pollTimer = setInterval(tick, this._sn.pollIntervalMs);
+    this.logger?.info('IpcHandler: SN main poller started (1s interval)');
+  }
+
+  stopSnMainPoller() {
+    if (this._sn.pollTimer) {
+      try { clearInterval(this._sn.pollTimer); } catch (_) {}
+      this._sn.pollTimer = null;
+    }
+    this._sn.running = false;
+    this.logger?.info('IpcHandler: SN main poller stopped');
   }
 
   /**
@@ -920,14 +1015,10 @@ class IpcHandler extends BaseService {
 
   // SN Service handlers
   async handleSNGetStatus(event) {
-    const scormService = this.getDependency('scormService');
-    const snService = scormService.getSNService();
-    if (snService) {
-      const status = snService.getStatus();
-      return { success: true, ...status };
-    } else {
-      return { success: false, error: 'SN service not available' };
-    }
+    // Return the latest cached status immediately; no throttling, no coalescing needed
+    // because the main-owned poller is the single producer of status.
+    const payload = this._sn?.cache || { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
+    return payload;
   }
 
   async handleSNGetSequencingState(event) {
