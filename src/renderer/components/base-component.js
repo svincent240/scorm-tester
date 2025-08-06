@@ -93,7 +93,13 @@ class BaseComponent {
       try {
         this.destroy();
       } catch (cleanupError) {
-        console.error('Error during cleanup after failed initialization:', cleanupError);
+        try {
+          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+            rendererLogger.error(`[${this.constructor.name}] Error during cleanup after failed initialization`, cleanupError?.message || cleanupError);
+          });
+        } catch (_) {
+          // no-op
+        }
       }
       
       throw error;
@@ -109,7 +115,13 @@ class BaseComponent {
       this.eventBus = (await import('../services/event-bus.js')).eventBus;
       this.uiState = await (await import('../services/ui-state.js')).uiState;
     } catch (error) {
-      console.error(`Error loading dependencies for ${this.constructor.name}:`, error);
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error(`[${this.constructor.name}] Error loading dependencies`, error?.message || error);
+        });
+      } catch (_) {
+        // no-op
+      }
       throw error;
     }
   }
@@ -314,7 +326,13 @@ class BaseComponent {
    */
   emit(event, data = null) {
     if (!this.eventBus) {
-      console.warn(`EventBus not loaded for ${this.constructor.name}. Cannot emit event: ${event}`);
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.warn(`[${this.constructor.name}] EventBus not loaded. Cannot emit event: ${event}`);
+        });
+      } catch (_) {
+        // no-op
+      }
       return;
     }
     const eventData = {
@@ -410,7 +428,13 @@ class BaseComponent {
         try {
           component.destroy();
         } catch (error) {
-          console.error(`Error destroying child component ${name}:`, error);
+          try {
+            import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.error(`[${this.constructor.name}] Error destroying child component ${name}`, error?.message || error);
+            });
+          } catch (_) {
+            // no-op
+          }
         }
       }
       this.childComponents.clear();
@@ -423,7 +447,13 @@ class BaseComponent {
         try {
           unsubscribe();
         } catch (error) {
-          console.error('Error unsubscribing from event bus:', error);
+          try {
+            import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.error(`[${this.constructor.name}] Error unsubscribing from event bus`, error?.message || error);
+            });
+          } catch (_) {
+            // no-op
+          }
         }
       });
       this.unsubscribeFunctions = [];
@@ -436,7 +466,7 @@ class BaseComponent {
       }
 
       // Clear references
-      this.element = null;
+      // IMPORTANT: Null element only after all element operations complete
       this.eventBus = null;
       this.options = null;
       
@@ -444,6 +474,8 @@ class BaseComponent {
       // Always mark as destroyed, even if cleanup failed
       this.isDestroyed = true;
       this.isInitialized = false;
+      // Finally, drop the element reference last to avoid accidental access during cleanup
+      this.element = null;
     }
 
     this.emit('destroyed');
@@ -551,9 +583,19 @@ class BaseComponent {
    * @private
    */
   removeAllEventListeners() {
+    // If element is already cleared, skip DOM removal but still clear internal map
+    const el = this.element;
+    if (!this.eventListeners || this.eventListeners.size === 0) return;
     for (const [event, listeners] of this.eventListeners) {
+      if (!Array.isArray(listeners)) continue;
       listeners.forEach(listener => {
-        this.element.removeEventListener(event, listener.boundHandler, listener.options);
+        if (el) {
+          try {
+            el.removeEventListener(event, listener.boundHandler, listener.options);
+          } catch (_) {
+            // swallow to avoid console noise in renderer
+          }
+        }
       });
     }
     this.eventListeners.clear();
@@ -607,8 +649,14 @@ class BaseComponent {
         duration: 0 // Persistent until dismissed
       });
     } else {
-      // Fallback to console error if uiState is not available
-      console.error(`BaseComponent Error: ${title} - ${message}`);
+      // Fallback to app log even if uiState not available
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
+        });
+      } catch (_) {
+        // no-op
+      }
     }
 
     // Log via renderer logger to app log as single source of truth

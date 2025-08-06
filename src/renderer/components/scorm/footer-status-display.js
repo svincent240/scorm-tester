@@ -31,19 +31,38 @@ class FooterStatusDisplay extends BaseComponent {
   handleProgressUpdated(data) {
     const progressData = data.data || data;
 
+    if (!this.element) {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterStatusDisplay: element not available for update');
+      }).catch(() => {});
+      return;
+    }
+
     const footerStatus = this.element.querySelector('#footer-status');
     if (footerStatus) {
       footerStatus.textContent = this.formatStatus(progressData.completionStatus);
+    } else {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterStatusDisplay: #footer-status not found in DOM');
+      }).catch(() => {});
     }
     
     const footerScore = this.element.querySelector('#footer-score');
     if (footerScore) {
       footerScore.textContent = this.formatScore(progressData.scoreRaw);
+    } else {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterStatusDisplay: #footer-score not found in DOM');
+      }).catch(() => {});
     }
     
     const footerTime = this.element.querySelector('#footer-time');
     if (footerTime) {
       footerTime.textContent = progressData.sessionTime || '00:00:00';
+    } else {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterStatusDisplay: #footer-time not found in DOM');
+      }).catch(() => {});
     }
   }
 

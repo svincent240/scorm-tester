@@ -57,9 +57,9 @@ class NavigationControls extends BaseComponent {
     // Initialize logger via renderer-logger with safe fallback
     try {
       const { rendererLogger } = await import('../../utils/renderer-logger.js');
-      this.logger = rendererLogger || console;
+      this.logger = rendererLogger || null;
     } catch (_) {
-      this.logger = console;
+      this.logger = null;
     }
     
     await this.initializeSNServiceBridge();
@@ -210,21 +210,22 @@ class NavigationControls extends BaseComponent {
         handleKeyDown: this.handleKeyDown.bind(this)
       };
     }
-    
-    if (this.previousBtn) {
+
+    // Guard existence of elements before binding
+    if (this.previousBtn && this._boundHandlers.handlePreviousClick) {
       this.previousBtn.addEventListener('click', this._boundHandlers.handlePreviousClick);
     }
     
-    if (this.nextBtn) {
+    if (this.nextBtn && this._boundHandlers.handleNextClick) {
       this.nextBtn.addEventListener('click', this._boundHandlers.handleNextClick);
     }
     
-    if (this.menuBtn) {
+    if (this.menuBtn && this._boundHandlers.handleMenuClick) {
       this.menuBtn.addEventListener('click', this._boundHandlers.handleMenuClick);
     }
     
-    // Keyboard navigation
-    if (this.options.enableKeyboardNavigation) {
+    // Keyboard navigation with guard against missing binding
+    if (this.options.enableKeyboardNavigation && this._boundHandlers.handleKeyDown) {
       document.addEventListener('keydown', this._boundHandlers.handleKeyDown);
     }
   }
@@ -531,7 +532,7 @@ class NavigationControls extends BaseComponent {
       try {
         this.uiState.updateNavigation(this.navigationState);
       } catch (error) {
-        console.warn('NavigationControls: Failed to update UI state:', error);
+        this.logger?.warn('NavigationControls: Failed to update UI state:', error?.message || error);
         // Revert state on error
         this.navigationState = prevState;
         this.updateButtonStates();
@@ -618,7 +619,9 @@ class NavigationControls extends BaseComponent {
       this.element.appendChild(this.errorIndicator);
     }
     
-    console.warn('NavigationControls: Operating in fallback mode:', message);
+    if (this.logger && typeof this.logger.warn === 'function') {
+      this.logger.warn('NavigationControls: Operating in fallback mode:', message);
+    }
   }
 
   /**
@@ -838,16 +841,16 @@ class NavigationControls extends BaseComponent {
       this._unsubscribeNav = null;
     }
     // Remove listeners with the same bound references to avoid leaks
-    if (this.options.enableKeyboardNavigation && this._boundHandlers?.handleKeyDown) {
+    if (this.options.enableKeyboardNavigation && this._boundHandlers && this._boundHandlers.handleKeyDown) {
       document.removeEventListener('keydown', this._boundHandlers.handleKeyDown);
     }
-    if (this.previousBtn && this._boundHandlers?.handlePreviousClick) {
+    if (this.previousBtn && this._boundHandlers && this._boundHandlers.handlePreviousClick) {
       this.previousBtn.removeEventListener('click', this._boundHandlers.handlePreviousClick);
     }
-    if (this.nextBtn && this._boundHandlers?.handleNextClick) {
+    if (this.nextBtn && this._boundHandlers && this._boundHandlers.handleNextClick) {
       this.nextBtn.removeEventListener('click', this._boundHandlers.handleNextClick);
     }
-    if (this.menuBtn && this._boundHandlers?.handleMenuClick) {
+    if (this.menuBtn && this._boundHandlers && this._boundHandlers.handleMenuClick) {
       this.menuBtn.removeEventListener('click', this._boundHandlers.handleMenuClick);
     }
     super.destroy();

@@ -427,8 +427,15 @@ class AppManager {
   showLoading(message = 'Loading...') {
     const loadingElement = document.getElementById('loading-overlay');
     if (loadingElement) {
-      // FIX: Use ID selector instead of class selector
-      const messageElement = document.getElementById('loading-message');
+      // Resolve message element robustly: prefer id, fallback to class within overlay
+      let messageElement = document.getElementById('loading-message');
+      if (!messageElement) {
+        try {
+          messageElement = loadingElement.querySelector('.loading-message');
+        } catch (_) {
+          messageElement = null;
+        }
+      }
       if (messageElement) {
         messageElement.textContent = message;
       }

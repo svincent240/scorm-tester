@@ -40,6 +40,13 @@ class ProgressTracking extends BaseComponent {
     };
   }
 
+  /**
+   * Override setLogger to ensure BaseComponent logger is available if needed
+   */
+  setLogger(logger) {
+    super.setLogger(logger);
+  }
+
   async setup() {
     this.uiState = await uiStatePromise; // Resolve the promise
     this.loadProgressData();
@@ -179,7 +186,9 @@ class ProgressTracking extends BaseComponent {
       
       this.updateProgress(updates);
     } catch (error) {
-      console.warn('Failed to refresh progress from SCORM:', error);
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('ProgressTracking: Failed to refresh progress from SCORM', error?.message || error);
+      }).catch(() => {});
     }
   }
 

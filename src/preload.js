@@ -9,9 +9,20 @@
  */
 
 // CRITICAL DEBUG: Log immediately when preload script loads
-console.log('CRITICAL DEBUG: preload.js script is loading...');
-console.log('CRITICAL DEBUG: contextBridge exists:', typeof require('electron').contextBridge !== 'undefined');
-console.log('CRITICAL DEBUG: ipcRenderer exists:', typeof require('electron').ipcRenderer !== 'undefined');
+// Route to main logger via IPC rather than console in renderer; keep minimal safe console only if IPC not ready.
+try {
+  const { ipcRenderer: __ipc } = require('electron');
+  if (__ipc) {
+    __ipc.invoke('renderer-log-info', 'Preload script is loading...');
+    __ipc.invoke('renderer-log-debug', 'contextBridge exists:', typeof require('electron').contextBridge !== 'undefined');
+    __ipc.invoke('renderer-log-debug', 'ipcRenderer exists:', typeof require('electron').ipcRenderer !== 'undefined');
+  } else {
+    // Fallback minimal console only if IPC is absent (should not happen in Electron)
+    console.log('CRITICAL DEBUG: preload.js script is loading (no IPC)');
+  }
+} catch (_) {
+  // Final fallback
+}
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -138,18 +149,71 @@ const electronAPI = {
   invoke: (channel, ...args) => safeInvoke(channel, ...args)
 };
 
+// Performance artifacts writer (JSON + TXT) - optional bridge used by diagnostics benchmarks
+try {
+  const fs = require('fs');
+  const fsp = require('fs').promises;
+  const path = require('path');
+
+  electronAPI.writePerfArtifact = async (name, payload) => {
+    try {
+      if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'invalid_name' };
+      }
+      const baseName = name.trim();
+      const ts = new Date().toISOString().replace(/:/g, '-'); // match existing artifacts timestamps
+      const artifactsDir = path.resolve(process.cwd(), 'artifacts', 'perf');
+      await fsp.mkdir(artifactsDir, { recursive: true });
+
+      const jsonPath = path.join(artifactsDir, `${baseName}-${ts}.json`);
+      const txtPath = path.join(artifactsDir, `${baseName}-${ts}.txt`);
+
+      // Write JSON (pretty)
+      const jsonContent = JSON.stringify(payload ?? {}, null, 2);
+      await fsp.writeFile(jsonPath, jsonContent, 'utf8');
+
+      // Derive a simple human-readable TXT summary
+      const lines = [];
+      lines.push(`# ${baseName}`);
+      lines.push(`when: ${new Date().toISOString()}`);
+      if (payload && typeof payload === 'object') {
+        if (payload.iterations) lines.push(`iterations: ${payload.iterations}`);
+        if (payload.stats && typeof payload.stats === 'object') {
+          for (const [k, v] of Object.entries(payload.stats)) {
+            if (v && typeof v === 'object') {
+              const min = v.min != null ? v.min : '';
+              const avg = v.avg != null ? v.avg : '';
+              const p95 = v.p95 != null ? v.p95 : '';
+              lines.push(`${k}: min ${min}ms avg ${avg}ms p95 ${p95}ms`);
+            }
+          }
+        }
+      }
+      await fsp.writeFile(txtPath, lines.join('\n') + '\n', 'utf8');
+
+      // Inform main logger
+      try { await ipcRenderer.invoke('renderer-log-info', '[Perf] artifacts written', { baseName, jsonPath, txtPath }); } catch (_) {}
+      return { success: true, jsonPath, txtPath };
+    } catch (e) {
+      try { await ipcRenderer.invoke('renderer-log-error', '[Perf] artifact write failed', String(e?.message || e)); } catch (_) {}
+      return { success: false, error: String(e?.message || e) };
+    }
+  };
+} catch (_) {
+  // Bridge remains optional; renderer guards presence.
+}
+
 // Add a test method to verify the API is working
 electronAPI.testConnection = () => {
-  console.log('SCORM Tester: electronAPI test connection called');
+  try { ipcRenderer.invoke('renderer-log-debug', 'electronAPI test connection called'); } catch (_) {}
   return { success: true, message: 'electronAPI is working' };
 };
 
 // Expose the API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 
-// Log successful preload
-console.log('SCORM Tester: Preload script loaded successfully');
-console.log('SCORM Tester: electronAPI exposed with methods:', Object.keys(electronAPI));
+// Log successful preload (via main logger IPC if available)
+try { ipcRenderer.invoke('renderer-log-info', 'Preload script loaded; electronAPI exposed', Object.keys(electronAPI)); } catch (_) {}
 
 // Note: DOM access is not available in preload scripts
 // DOM ready logging will be handled in the renderer process

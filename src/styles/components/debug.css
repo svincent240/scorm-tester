@@ -1,0 +1,173 @@
+/**
+ * Debug Styles
+ *
+ * Styles for debug panel components, diagnostics, and transient value highlighting.
+ *
+ * @fileoverview Debug/diagnostics specific styles
+ */
+ 
+/* Tabs layout and active state */
+.debug-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.debug-tab {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.debug-tab--active {
+  background: var(--bg-primary);
+  border-color: var(--accent-color, var(--border-color));
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent-color, var(--border-color)) inset;
+}
+
+/* Content visibility */
+.debug-content {
+  display: none;
+}
+
+.debug-content--active {
+  display: block;
+}
+
+/* Container spacing */
+.debug-content-area {
+  margin-top: 8px;
+}
+
+/* Changed value highlight in Data tab */
+.debug-data__value--changed {
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 3px;
+  transition: background 600ms ease;
+}
+
+/* Empty-state and info item spacing for Diagnostics/Manifest tabs */
+.debug-log__empty {
+  color: var(--text-muted);
+  padding: 8px 12px;
+  font-style: italic;
+}
+
+.debug-info__item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+.debug-info__label {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  min-width: 160px;
+}
+
+.debug-info__value {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Simple pre formatting for structured dumps */
+.debug-pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 8px 12px;
+  overflow: auto;
+  max-height: 280px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* Diagnostics sections */
+.diagnostics-section {
+  margin: 12px 0;
+}
+
+.diagnostics-header {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.diagnostics-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Logs list area */
+.debug-log {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
+  padding: 6px 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* Items inside logs */
+.debug-call {
+  border-bottom: 1px dashed var(--border-color);
+  padding: 6px 4px;
+}
+
+.debug-call:last-child {
+  border-bottom: none;
+}
+
+.debug-call__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.debug-call__method {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.debug-call__time {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.debug-call__details {
+  color: var(--text-secondary);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.debug-call__error {
+  color: var(--danger-color);
+  margin-top: 2px;
+}
+
+.debug-call__duration {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .debug-data__value--changed {
+    transition: none;
+  }
+}

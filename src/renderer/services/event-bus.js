@@ -26,6 +26,12 @@ class EventBus {
       lastLogs: [],
       maxLogs: 500
     };
+
+    // Reentrancy and cycle guards
+    this._inFlightCounts = new Map();   // event -> depth
+    this._maxSyncDepth = 12;            // cap synchronous nesting per event
+    this._recentRing = [];              // recent event names for cycle detection
+    this._recentRingMax = 20;
   }
 
   /**
@@ -93,6 +99,40 @@ class EventBus {
       throw new Error('Event name must be a string');
     }
 
+    // Depth guard (per event)
+    const currentDepth = (this._inFlightCounts.get(event) || 0) + 1;
+    this._inFlightCounts.set(event, currentDepth);
+    if (currentDepth > this._maxSyncDepth) {
+      // Drop further synchronous recursion to avoid stack overflow
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn(`EventBus: Dropping emit for '${event}' due to depth>${this._maxSyncDepth}`, { dataType: typeof data });
+      }).catch(() => { /* no-op */ });
+      // Decrement depth before returning
+      this._inFlightCounts.set(event, currentDepth - 1);
+      return;
+    }
+
+    // Basic short-cycle detection on recent pattern e.g., api:call <-> error
+    try {
+      this._recentRing.push(event);
+      if (this._recentRing.length > this._recentRingMax) this._recentRing.shift();
+      const len = this._recentRing.length;
+      if (len >= 4) {
+        const a = this._recentRing[len - 4];
+        const b = this._recentRing[len - 3];
+        const c = this._recentRing[len - 2];
+        const d = this._recentRing[len - 1];
+        const isABAB = (a === c) && (b === d) && (a !== b);
+        if (isABAB) {
+          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+            rendererLogger.error(`EventBus: Detected repeating cycle '${a}' <-> '${b}', dropping '${event}'`);
+          }).catch(() => { /* no-op */ });
+          this._inFlightCounts.set(event, currentDepth - 1);
+          return;
+        }
+      }
+    } catch (_) { /* no-op */ }
+
     const eventData = {
       event,
       data,
@@ -118,27 +158,47 @@ class EventBus {
     }
 
     // Emit to subscribers
-    if (this.listeners.has(event)) {
-      const eventListeners = [...this.listeners.get(event)]; // Copy to avoid modification during iteration
-      
-      eventListeners.forEach(subscription => {
-        try {
-          if (subscription.context) {
-            subscription.handler.call(subscription.context, data, eventData);
-          } else {
-            subscription.handler(data, eventData);
-          }
-        } catch (error) {
-          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.error(`EventBus: Error in event handler for '${event}'`, error?.message || error);
-          }).catch(() => { /* no-op */ });
-          // CRITICAL FIX: Prevent infinite recursion by not emitting 'error' event
-          // Only emit error event if it's not already an error event to prevent loops
-          if (event !== 'error') {
-            this.emit('error', { event, error, subscription: subscription.id });
+    try {
+      if (this.listeners.has(event)) {
+        const eventListeners = [...this.listeners.get(event)]; // Copy to avoid modification during iteration
+        
+        for (const subscription of eventListeners) {
+          try {
+            if (subscription.context) {
+              subscription.handler.call(subscription.context, data, eventData);
+            } else {
+              subscription.handler(data, eventData);
+            }
+          } catch (error) {
+            // Log error (file logger via IPC; no event emission here if in error path)
+            import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.error(`EventBus: Error in event handler for '${event}'`, error?.message || error);
+            }).catch(() => { /* no-op */ });
+
+            // Only emit 'error' if:
+            //  - The original event isn't 'error'
+            //  - We are not already handling an 'error' at any depth
+            //  - The current depth for 'error' is 0 (to avoid nested recursion)
+            const errorDepth = this._inFlightCounts.get('error') || 0;
+            const safeToEmitError = event !== 'error' && errorDepth === 0;
+
+            if (safeToEmitError) {
+              // Guard against emitting 'api:call' from error handlers and vice-versa tight loops
+              const isApiCall = event === 'api:call';
+              if (isApiCall) {
+                // If api:call handler threw, we will emit a single 'error', but we must not allow it to cause more api:call in the same tick
+                this.emit('error', { event, error, subscription: subscription.id });
+              } else {
+                // For other events, emit a single error as well
+                this.emit('error', { event, error, subscription: subscription.id });
+              }
+            }
           }
         }
-      });
+      }
+    } finally {
+      // Decrement depth counter
+      this._inFlightCounts.set(event, currentDepth - 1);
     }
   }
 

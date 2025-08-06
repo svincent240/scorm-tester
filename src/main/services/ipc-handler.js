@@ -143,6 +143,11 @@ class IpcHandler extends BaseService {
       
       // SN Service handlers
       this.registerHandler('sn:getStatus', this.handleSNGetStatus.bind(this));
+      this.registerHandler('sn:getSequencingState', this.handleSNGetSequencingState.bind(this));
+      this.registerHandler('sn:initialize', this.handleSNInitialize.bind(this));
+      this.registerHandler('sn:processNavigation', this.handleSNProcessNavigation.bind(this));
+      this.registerHandler('sn:updateActivityProgress', this.handleSNUpdateActivityProgress.bind(this));
+      this.registerHandler('sn:reset', this.handleSNReset.bind(this));
       
       // LMS and testing handlers
       this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
@@ -776,6 +781,56 @@ class IpcHandler extends BaseService {
     } else {
       return { success: false, error: 'SN service not available' };
     }
+  }
+
+  async handleSNGetSequencingState(event) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const state = snService.getSequencingState();
+    return { success: true, ...state };
+  }
+
+  async handleSNInitialize(event, { manifest, packageInfo } = {}) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = await snService.initialize(manifest, packageInfo || {});
+    return result;
+  }
+
+  async handleSNProcessNavigation(event, { navigationRequest, targetActivityId } = {}) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = await snService.processNavigation(navigationRequest, targetActivityId || null);
+    return result;
+  }
+
+  async handleSNUpdateActivityProgress(event, { activityId, progressData } = {}) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = snService.updateActivityProgress(activityId, progressData || {});
+    return result;
+  }
+
+  async handleSNReset(event) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    snService.reset();
+    return { success: true };
   }
 
   // --- End of merged IpcHandlers methods ---

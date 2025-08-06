@@ -17,7 +17,18 @@ class SNBridge {
   constructor() {
     this.isConnected = false;
     this.sessionId = null;
-    this.logger = console; // Simple logger for now
+    this.logger = {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    };
+    // Initialize renderer logger asynchronously with safe fallback
+    try {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        if (rendererLogger) this.logger = rendererLogger;
+      }).catch(() => {});
+    } catch (_) {}
   }
 
   /**
@@ -33,13 +44,13 @@ class SNBridge {
       const status = await this.invokeMain('sn:getStatus');
       if (status.success) {
         this.isConnected = true;
-        this.logger.debug('SNBridge: Connected to main process SN service');
+        try { this.logger.debug('SNBridge: Connected to main process SN service'); } catch (_) {}
         return { success: true };
       } else {
         throw new Error('Failed to connect to SN service');
       }
     } catch (error) {
-      this.logger.error('SNBridge: Failed to initialize:', error);
+      try { this.logger.error('SNBridge: Failed to initialize', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -52,11 +63,11 @@ class SNBridge {
       const result = await this.invokeMain('sn:initialize', { manifest, packageInfo });
       if (result.success) {
         this.sessionId = result.sessionId;
-        this.logger.debug('SNBridge: Course initialized with SN service');
+        try { this.logger.debug('SNBridge: Course initialized with SN service'); } catch (_) {}
       }
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Failed to initialize course:', error);
+      try { this.logger.error('SNBridge: Failed to initialize course', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -75,10 +86,10 @@ class SNBridge {
         targetActivityId
       });
 
-      this.logger.debug('SNBridge: Navigation processed:', result);
+      try { this.logger.debug('SNBridge: Navigation processed', result); } catch (_) {}
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Navigation processing failed:', error);
+      try { this.logger.error('SNBridge: Navigation processing failed', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -99,7 +110,7 @@ class SNBridge {
 
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Failed to update activity progress:', error);
+      try { this.logger.error('SNBridge: Failed to update activity progress', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -116,7 +127,7 @@ class SNBridge {
       const result = await this.invokeMain('sn:getSequencingState');
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Failed to get sequencing state:', error);
+      try { this.logger.error('SNBridge: Failed to get sequencing state', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -134,7 +145,7 @@ class SNBridge {
       this.sessionId = null;
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Failed to reset SN service:', error);
+      try { this.logger.error('SNBridge: Failed to reset SN service', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -147,7 +158,7 @@ class SNBridge {
       const result = await this.invokeMain('sn:getStatus');
       return result;
     } catch (error) {
-      this.logger.error('SNBridge: Failed to get status:', error);
+      try { this.logger.error('SNBridge: Failed to get status', error?.message || error); } catch (_) {}
       return { success: false, error: error.message };
     }
   }
@@ -165,7 +176,7 @@ class SNBridge {
       const result = await window.electronAPI.invoke(channel, data);
       return result;
     } catch (error) {
-      this.logger.error(`SNBridge: IPC call failed for ${channel}:`, error);
+      try { this.logger.error(`SNBridge: IPC call failed for ${channel}`, error?.message || error); } catch (_) {}
       throw error;
     }
   }

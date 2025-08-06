@@ -1,11 +1,14 @@
 /**
  * SCORM Client Service
- * 
+ *
  * Provides SCORM API implementation for the renderer process.
  * Handles IPC communication with main process while maintaining
  * synchronous SCORM API behavior through local caching.
- * 
+ *
  * @fileoverview SCORM API client for renderer process
+ *
+ * NOTE: This file must remain browser/renderer-safe. Avoid Node-only APIs like Buffer
+ * unless guarded. Where binary transforms are needed, prefer atob/btoa/Uint8Array.
  */
 
 import { eventBus } from './event-bus.js';
@@ -54,7 +57,12 @@ class ScormClient {
         isValidValue: validatorModule.isValidValue
       };
     } catch (error) {
-      console.error('Failed to load validator module:', error);
+      try {
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        rendererLogger.error('Failed to load validator module', error?.message || error);
+      } catch (_) {
+        // no-op
+      }
       // Fallback: create dummy validators that always return true
       this.validator = {
         isValidElement: () => true,
@@ -322,10 +330,16 @@ class ScormClient {
         // Pre-populate cache with common elements
         await this.preloadCommonElements();
       } else {
-        console.error('SCORM initialization failed:', result.errorCode);
+        try {
+          const { rendererLogger } = await import('../utils/renderer-logger.js');
+          rendererLogger.warn('SCORM initialization failed', result.errorCode);
+        } catch (_) {}
       }
     } catch (error) {
-      console.error('Error initializing SCORM session:', error);
+      try {
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        rendererLogger.error('Error initializing SCORM session', error?.message || error);
+      } catch (_) {}
     }
   }
 
@@ -368,7 +382,10 @@ class ScormClient {
         eventBus.emit('scorm:dataRefreshed', { element, value: result.value });
       }
     } catch (error) {
-      console.error(`Error getting SCORM value for ${element}:`, error);
+      try {
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        rendererLogger.error(`Error getting SCORM value for ${element}`, error?.message || error);
+      } catch (_) {}
     }
   }
 
@@ -517,28 +534,20 @@ class ScormClient {
     };
 
     this.uiState.addApiCall(apiCall);
-    
+
     // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
-    
+
     // Also emit via IPC for debug window (guard against rate limits)
     if (window.electronAPI && window.electronAPI.emitDebugEvent) {
       try {
-        // Use a single IPC emit; avoid excessive console logs that trigger extra IPC in preload bridges
         window.electronAPI.emitDebugEvent('api:call', apiCall);
       } catch (e) {
         const msg = (e && e.message) ? e.message : String(e);
         if (msg.includes('Rate limit exceeded')) {
           // Degrade gracefully: skip further emits for this tick
-        } else {
-          // Suppress legacy warn path to avoid extra IPC/log noise
         }
       }
-    }
-    
-    // Legacy IPC event for backward compatibility (non-critical)
-    if (window.electronAPI && window.electronAPI.log) {
-      // Suppress legacy non-critical IPC logging to reduce noise
     }
   }
 
@@ -666,6 +675,23 @@ class ScormClient {
      await this.asyncTerminate();
    } catch (_) {
      // swallow to avoid noisy shutdown
+   }
+ }
+
+ /**
+  * Renderer-safe utility to decode base64 into Uint8Array without Node Buffer.
+  * If running in environments that provide Buffer, it won't be used here.
+  */
+ decodeBase64ToBytes(base64) {
+   try {
+     const binary = atob(base64);
+     const len = binary.length;
+     const bytes = new Uint8Array(len);
+     for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+     return bytes;
+   } catch (_) {
+     // Fallback: return empty bytes on invalid input
+     return new Uint8Array(0);
    }
  }
 

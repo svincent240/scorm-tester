@@ -12,6 +12,7 @@ import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { scormClient } from '../../services/scorm-client.js';
 import { scormAPIBridge } from '../../services/scorm-api-bridge.js';
+import { rendererLogger } from '../../utils/renderer-logger.js';
 
 /**
  * SCORM Content Viewer Class
@@ -155,26 +156,40 @@ class ContentViewer extends BaseComponent {
    */
   bindEvents() {
     super.bindEvents();
-    
+
+    // Lazily create and persist bound handler references for add/remove symmetry
+    if (!this._boundHandlers) {
+      this._boundHandlers = {
+        onIframeLoad: this.handleIframeLoad.bind(this),
+        onIframeError: this.handleIframeError.bind(this),
+        onFullscreenBtnClick: this.toggleFullscreen.bind(this),
+        onRetryClick: this.retryLoad.bind(this),
+        onFsChange: this.handleFullscreenChange.bind(this),
+        onWebkitFsChange: this.handleFullscreenChange.bind(this),
+        onMozFsChange: this.handleFullscreenChange.bind(this),
+        onMsFsChange: this.handleFullscreenChange.bind(this)
+      };
+    }
+
     if (this.iframe) {
-      this.iframe.addEventListener('load', this.handleIframeLoad.bind(this));
-      this.iframe.addEventListener('error', this.handleIframeError.bind(this));
+      this.iframe.addEventListener('load', this._boundHandlers.onIframeLoad);
+      this.iframe.addEventListener('error', this._boundHandlers.onIframeError);
     }
-    
+
     if (this.fullscreenBtn) {
-      this.fullscreenBtn.addEventListener('click', this.toggleFullscreen);
+      this.fullscreenBtn.addEventListener('click', this._boundHandlers.onFullscreenBtnClick);
     }
-    
+
     const retryBtn = this.find('.error-retry-btn');
     if (retryBtn) {
-      retryBtn.addEventListener('click', this.retryLoad);
+      retryBtn.addEventListener('click', this._boundHandlers.onRetryClick);
     }
-    
-    // Listen for fullscreen changes
-    document.addEventListener('fullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', this.handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', this.handleFullscreenChange);
+
+    // Listen for fullscreen changes using stored references
+    document.addEventListener('fullscreenchange', this._boundHandlers.onFsChange);
+    document.addEventListener('webkitfullscreenchange', this._boundHandlers.onWebkitFsChange);
+    document.addEventListener('mozfullscreenchange', this._boundHandlers.onMozFsChange);
+    document.addEventListener('MSFullscreenChange', this._boundHandlers.onMsFsChange);
   }
 
   /**
@@ -184,7 +199,7 @@ class ContentViewer extends BaseComponent {
    */
   async loadContent(url, options = {}) {
     if (!url) {
-      this.showError('Invalid content URL');
+      this.showError('Invalid content URL', 'A valid content URL must be provided.');
       return;
     }
 
@@ -212,7 +227,7 @@ class ContentViewer extends BaseComponent {
       this.emit('contentLoadStarted', { url, options });
       
     } catch (error) {
-      this.showError('Failed to load content', error.message);
+      this.showError('Failed to load content', error?.message || String(error));
       this.emit('contentLoadError', { url, error });
     }
   }
@@ -255,7 +270,7 @@ class ContentViewer extends BaseComponent {
       });
       
     } catch (error) {
-      this.showError('Content initialization failed', error.message);
+      this.showError('Content initialization failed', error?.message || String(error));
     }
   }
 
@@ -463,9 +478,9 @@ class ContentViewer extends BaseComponent {
         contentBody.style.removeProperty('--scorm-inverse-scale-width');
         contentBody.style.removeProperty('--scorm-inverse-scale-height');
         this.appliedScaling = null;
-        console.log('ContentViewer: Content scaling removed');
+        rendererLogger.info('ContentViewer: Content scaling removed');
       } catch (error) {
-        console.warn('ContentViewer: Failed to remove scaling:', error.message);
+        rendererLogger.warn('ContentViewer: Failed to remove scaling:', error?.message || error);
       }
     }
   }
@@ -551,7 +566,7 @@ class ContentViewer extends BaseComponent {
    */
   retryLoad() {
     if (this.currentUrl) {
-      console.log('ContentViewer: Retrying content load:', this.currentUrl);
+      rendererLogger.info('ContentViewer: Retrying content load', this.currentUrl);
       this.clearError();
       this.loadContent(this.currentUrl);
     } else {
@@ -722,7 +737,8 @@ class ContentViewer extends BaseComponent {
    * Handle course error event
    */
   handleCourseError(data) {
-    this.showError('Course loading failed', data.message);
+    const msg = typeof data === 'string' ? data : (data?.message || 'Unknown error');
+    this.showError('Course loading failed', msg);
   }
 
   /**
@@ -918,23 +934,16 @@ class ContentViewer extends BaseComponent {
       setTimeout(() => {
         if (!responded) {
           window.removeEventListener('message', listener);
-          // Neither direct API nor bridge responded; notify user
-          this.uiState.showNotification({
-            type: 'error',
-            duration: 0,
-            message: 'SCORM API not found in content. The SCO did not expose API_1484_11 or API, and no postMessage bridge responded. The course may not be SCORM-enabled or is loading in a context that cannot access the API.'
-          });
-          this.uiState.setError({ message: 'SCORM API not found (no direct API or bridge response).' });
+          // Neither direct API nor bridge responded; standardize via showError
+          this.showError(
+            'SCORM API not found',
+            'The SCO did not expose API_1484_11 or API, and no postMessage bridge responded. The course may not be SCORM-enabled or is loading in a context that cannot access the API.'
+          );
           this.emit('scormApiMissing', { url: this.currentUrl });
         }
       }, 600);
     } catch (err) {
-      this.uiState.showNotification({
-        type: 'error',
-        duration: 0,
-        message: `SCORM API verification error: ${err.message || String(err)}`
-      });
-      this.uiState.setError(err);
+      this.showError('SCORM API verification error', err?.message || String(err));
     }
   }
 
@@ -976,13 +985,35 @@ class ContentViewer extends BaseComponent {
 
     // Stop observers/listeners
     this.stopResizeObserver();
-    
-    // Remove fullscreen event listeners
-    document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
-    document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
-    document.removeEventListener('mozfullscreenchange', this.handleFullscreenChange);
-    document.removeEventListener('MSFullscreenChange', this.handleFullscreenChange);
-    
+
+    // Remove event listeners using the same bound references to avoid leaks
+    if (this._boundHandlers) {
+      // Fullscreen change listeners
+      document.removeEventListener('fullscreenchange', this._boundHandlers.onFsChange);
+      document.removeEventListener('webkitfullscreenchange', this._boundHandlers.onWebkitFsChange);
+      document.removeEventListener('mozfullscreenchange', this._boundHandlers.onMozFsChange);
+      document.removeEventListener('MSFullscreenChange', this._boundHandlers.onMsFsChange);
+
+      // Iframe load/error
+      if (this.iframe) {
+        try { this.iframe.removeEventListener('load', this._boundHandlers.onIframeLoad); } catch (_) {}
+        try { this.iframe.removeEventListener('error', this._boundHandlers.onIframeError); } catch (_) {}
+      }
+
+      // Fullscreen button
+      if (this.fullscreenBtn) {
+        try { this.fullscreenBtn.removeEventListener('click', this._boundHandlers.onFullscreenBtnClick); } catch (_) {}
+      }
+
+      // Retry button (may or may not exist at destroy time)
+      try {
+        const retryBtn = this.find('.error-retry-btn');
+        if (retryBtn) retryBtn.removeEventListener('click', this._boundHandlers.onRetryClick);
+      } catch (_) {}
+
+      this._boundHandlers = null;
+    }
+
     this.clearContent();
     super.destroy();
   }

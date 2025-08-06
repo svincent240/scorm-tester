@@ -32,14 +32,29 @@ class FooterProgressBar extends BaseComponent {
     const progressData = data.data || data;
     const percentage = Math.round((progressData.progressMeasure || 0) * 100);
 
+    if (!this.element) {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterProgressBar: element not available for update');
+      }).catch(() => {});
+      return;
+    }
+
     const footerProgressFill = this.element.querySelector('#footer-progress-fill');
     if (footerProgressFill) {
       footerProgressFill.style.width = `${percentage}%`;
+    } else {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterProgressBar: #footer-progress-fill not found in DOM');
+      }).catch(() => {});
     }
     
     const footerProgressPercentage = this.element.querySelector('#footer-progress-percentage');
     if (footerProgressPercentage) {
       footerProgressPercentage.textContent = `${percentage}%`;
+    } else {
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('FooterProgressBar: #footer-progress-percentage not found in DOM');
+      }).catch(() => {});
     }
   }
 }

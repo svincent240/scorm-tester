@@ -216,7 +216,13 @@ const SECURITY_CONFIG = {
       'renderer-log-warn',
       'renderer-log-error',
       'renderer-log-debug',
-      'sn:getStatus', // SN service status channel
+      // SN channels
+      'sn:getStatus',
+      'sn:getSequencingState',
+      'sn:initialize',
+      'sn:processNavigation',
+      'sn:updateActivityProgress',
+      'sn:reset',
       'open-debug-window' // Open debug console window
     ]
   },

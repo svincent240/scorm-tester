@@ -30,6 +30,12 @@ class DebugPanel extends BaseComponent {
       level: 'all',
       search: ''
     };
+
+    // Bind methods to preserve instance context for event listeners
+    this.clearLog = this.clearLog.bind(this);
+    this.exportLog = this.exportLog.bind(this);
+    this.closePanel = this.closePanel.bind(this);
+    this.switchTab = this.switchTab.bind(this);
   }
 
   async setup() {
@@ -235,6 +241,13 @@ class DebugPanel extends BaseComponent {
       }).catch(() => {});
     }
     
+    // Bind events after DOM is created to ensure tabs and controls are interactive
+    try {
+      this.bindEvents();
+    } catch (_) {
+      // best-effort; BaseComponent may call this separately in its lifecycle
+    }
+
     // Initialize the panel with empty state
     this.refreshActiveTab();
 
@@ -265,9 +278,18 @@ class DebugPanel extends BaseComponent {
     if (this.exportBtn) this.exportBtn.addEventListener('click', this.exportLog);
     if (this.closeBtn) this.closeBtn.addEventListener('click', this.closePanel);
     
-    // Tab switching
+    // Tab switching (use delegation-safe dataset read)
     this.findAll('.debug-tab').forEach(tab => {
-      tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+      tab.addEventListener('click', (e) => {
+        const target = e.currentTarget || e.target;
+        const tabName = target?.dataset?.tab;
+        if (!tabName) return;
+        // low-noise log to app log
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('DebugPanel: switchTab', { tab: tabName });
+        }).catch(() => {});
+        this.switchTab(tabName);
+      });
     });
 
     // Attempt intents (guardrails applied via UIState selectors; emit intents to EventBus)
@@ -491,7 +513,9 @@ class DebugPanel extends BaseComponent {
   refreshApiCallsView() {
     // Safety check: ensure element references are available
     if (!this.apiLog) {
-      console.log('DEBUG PANEL: apiLog element not yet available, skipping refresh');
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug('DEBUG PANEL: apiLog element not yet available, skipping refresh');
+      }).catch(() => {});
       return;
     }
 
@@ -834,7 +858,9 @@ class DebugPanel extends BaseComponent {
   refreshSessionInfo() {
     // Safety check: ensure element references are available
     if (!this.sessionInfo) {
-      console.log('DEBUG PANEL: sessionInfo element not yet available, skipping refresh');
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug('DEBUG PANEL: sessionInfo element not yet available, skipping refresh');
+      }).catch(() => {});
       return;
     }
     
@@ -887,7 +913,9 @@ class DebugPanel extends BaseComponent {
   refreshErrorsView() {
     // Safety check: ensure element references are available
     if (!this.errorLog) {
-      console.log('DEBUG PANEL: errorLog element not yet available, skipping refresh');
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug('DEBUG PANEL: errorLog element not yet available, skipping refresh');
+      }).catch(() => {});
       return;
     }
 
@@ -940,7 +968,9 @@ class DebugPanel extends BaseComponent {
 
   loadApiCallHistory() {
     if (!this.uiState) {
-      console.warn('DebugPanel: uiState not yet initialized, skipping API call history load');
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.warn('DebugPanel: uiState not yet initialized, skipping API call history load');
+      }).catch(() => {});
       return;
     }
     const history = this.uiState.getState('apiCallHistory') || [];

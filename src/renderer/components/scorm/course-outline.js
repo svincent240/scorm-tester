@@ -196,7 +196,9 @@ class CourseOutline extends BaseComponent {
   }
 
   renderItem(item, depth) {
-    const hasChildren = item.children && item.children.length > 0;
+    // Normalize child collection: prefer 'items' then legacy 'children'
+    const childList = Array.isArray(item.items) ? item.items : (Array.isArray(item.children) ? item.children : []);
+    const hasChildren = childList.length > 0;
     const isExpanded = this.expandedItems.has(item.identifier);
     const isCurrent = this.currentItem === item.identifier;
     const progress = this.progressData.get(item.identifier) || {};
@@ -230,7 +232,7 @@ class CourseOutline extends BaseComponent {
           ` : ''}
         </div>
         
-        ${hasChildren && isExpanded ? this.renderItems(item.children, depth + 1) : ''}
+        ${hasChildren && isExpanded ? this.renderItems(childList, depth + 1) : ''}
       </li>
     `;
   }
@@ -329,9 +331,10 @@ class CourseOutline extends BaseComponent {
 
   addAllItemIds(items) {
     items.forEach(item => {
-      if (item.children && item.children.length > 0) {
+      const childList = Array.isArray(item.items) ? item.items : (Array.isArray(item.children) ? item.children : []);
+      if (childList.length > 0) {
         this.expandedItems.add(item.identifier);
-        this.addAllItemIds(item.children);
+        this.addAllItemIds(childList);
       }
     });
   }
@@ -468,8 +471,7 @@ class CourseOutline extends BaseComponent {
       if (structure) {
         this.setCourseStructure(structure);
         try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) {}
-        // Explicit re-render to avoid lifecycle races
-        this.renderCourseStructure();
+        // Avoid redundant explicit re-render; setCourseStructure already renders
       } else {
         try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) {}
         this.showEmptyState();
