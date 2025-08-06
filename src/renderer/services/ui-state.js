@@ -82,7 +82,14 @@ class UIStateManager {
       
       // Debug state
       apiCallHistory: [],
-      maxApiCallHistory: 100
+      maxApiCallHistory: 500,
+      debug: {
+        // placeholders for diagnostics and logger view snapshots
+        lastEvents: [],
+        maxEvents: 200,
+        lastLogs: [],
+        maxLogs: 500
+      }
     };
   }
 
@@ -239,7 +246,13 @@ class UIStateManager {
     // Emit specific dev mode change to keep EventBus in sync (Step 8)
     const nextDev = !!this.state.ui.devModeEnabled;
     if (nextDev !== prevDev) {
+      try {
+        // Gate EventBus debug mirroring on toggle
+        this.eventBus?.setDebugMode?.(nextDev);
+      } catch (_) { /* no-op */ }
       this.eventBus?.emit('ui:devModeChanged', { enabled: nextDev });
+      // Also emit a lightweight debug:update signal for panels listening
+      this.eventBus?.emit('debug:update', { mode: nextDev });
     }
   }
 
@@ -248,20 +261,26 @@ class UIStateManager {
    * @param {Object} apiCall - API call data
    */
   addApiCall(apiCall) {
-    const history = [...this.state.apiCallHistory];
-    history.push({
-      ...apiCall,
-      timestamp: Date.now(),
-      id: Date.now() + Math.random()
-    });
-    
-    // Limit history size
-    if (history.length > this.state.maxApiCallHistory) {
-      history.shift();
-    }
-    
+    const ts = Number(apiCall?.timestamp) || Date.now();
+    const id = apiCall?.id || (ts + Math.random());
+    const normalized = {
+      id,
+      timestamp: ts,
+      method: String(apiCall?.method || ''),
+      parameter: typeof apiCall?.parameter === 'string' ? apiCall.parameter : (apiCall?.parameter != null ? String(apiCall.parameter) : ''),
+      result: String(apiCall?.result ?? ''),
+      errorCode: String(apiCall?.errorCode ?? '0'),
+      seq: apiCall?.seq || ts
+    };
+
+    const history = [...this.state.apiCallHistory, normalized];
+    // Limit history size with ring semantics
+    const max = this.state.maxApiCallHistory || 500;
+    while (history.length > max) history.shift();
+
     this.setState({ apiCallHistory: history });
-    this.eventBus?.emit('api:call', apiCall);
+    // Emit normalized payload to EventBus for subscribers
+    this.eventBus?.emit('api:call', { data: normalized });
   }
 
   /**
@@ -331,6 +350,14 @@ class UIStateManager {
     this.updateUI({ error: errorData });
     
     if (error) {
+      // Mirror to diagnostics buffer for Debug Window
+      try {
+        const dbg = { ...(this.state.debug || {}), lastEvents: [...(this.state.debug?.lastEvents || [])] };
+        dbg.lastEvents.push({ event: 'error', data: errorData, timestamp: Date.now(), id: Date.now() + Math.random() });
+        const maxE = dbg.maxEvents || 200;
+        while (dbg.lastEvents.length > maxE) dbg.lastEvents.shift();
+        this.setState({ debug: dbg }, null, true);
+      } catch (_) { /* no-op */ }
       this.eventBus?.emit('error', errorData);
     }
   }
@@ -384,6 +411,64 @@ class UIStateManager {
       // This is already handled by notifyStateChange, but keeping for consistency if needed elsewhere
     });
 
+    // Mirror EventBus emissions into diagnostics buffer when dev mode is enabled
+    const mirror = (eventName) => {
+      this.eventBus.on(eventName, (payload) => {
+        try {
+          if (!this.state.ui?.devModeEnabled) return;
+          const dbg = { ...(this.state.debug || {}), lastEvents: [...(this.state.debug?.lastEvents || [])] };
+          dbg.lastEvents.push({
+            event: eventName,
+            data: payload,
+            timestamp: Date.now(),
+            id: Date.now() + Math.random()
+          });
+          const maxE = dbg.maxEvents || 200;
+          while (dbg.lastEvents.length > maxE) dbg.lastEvents.shift();
+          this.setState({ debug: dbg }, null, true);
+        } catch (_) { /* no-op */ }
+      });
+    };
+    // Core events to observe for diagnostics snapshotting
+    ['api:call', 'error', 'navigation:updated', 'progress:updated', 'course:loaded', 'session:updated', 'ui:updated']
+      .forEach(mirror);
+
+    // Expose lightweight enablement selectors for Attempt lifecycle controls
+    this.getRteStatus = () => {
+      const initialized = !!(window && window.scormClient && window.scormClient.getInitialized && window.scormClient.getInitialized());
+      // Temporary derivation until explicit lifecycle flags are surfaced
+      // TODO(rte): replace with main/RTE-surfaced lifecycle flags when available
+      let terminated = false;
+      let suspended = false;
+      try {
+        if (window && window.scormClient) {
+          // Heuristic: check cached data-model keys
+          const exitVal = window.scormClient.getCachedValue && window.scormClient.getCachedValue('cmi.exit');
+          const suspendData = window.scormClient.getCachedValue && window.scormClient.getCachedValue('cmi.suspend_data');
+          suspended = String(exitVal || '').toLowerCase() === 'suspend' || !!(suspendData && String(suspendData).length > 0);
+          terminated = typeof window.scormClient.getTerminated === 'function' ? !!window.scormClient.getTerminated() : false;
+        }
+      } catch (_) { /* no-op */ }
+      return { initialized, terminated, suspended };
+    };
+
+    this.getAttemptEnablement = () => {
+      const { initialized, terminated, suspended } = this.getRteStatus();
+      const canStart = !initialized;
+      const canSuspend = initialized && !terminated && !suspended;
+      const canResume = initialized && !terminated && suspended;
+      const canCommit = initialized && !terminated;
+      const canTerminate = initialized && !terminated;
+      const reasons = {
+        start: initialized ? 'Already initialized (RTE 3.2.1)' : '',
+        suspend: !initialized ? 'Initialize first (RTE 3.2.1)' : (terminated ? 'Terminated' : ''),
+        resume: !initialized ? 'Initialize first (RTE 3.2.1)' : (!suspended ? 'Not suspended' : ''),
+        commit: !initialized ? 'Initialize first (RTE 3.2.1)' : (terminated ? 'Terminated' : ''),
+        terminate: !initialized ? 'Initialize first (RTE 3.2.1)' : ''
+      };
+      return { canStart, canSuspend, canResume, canCommit, canTerminate, reasons };
+    };
+
     // Provide explicit API to toggle dev mode and broadcast (Step 8)
     // Consumers can call uiState.setDevModeEnabled(bool)
     if (!this.setDevModeEnabled) {
@@ -393,6 +478,11 @@ class UIStateManager {
         if (prev === next) return;
         this.updateUI({ devModeEnabled: next });
         // updateUI emits ui:devModeChanged when the flag changes
+        try {
+          // Keep EventBus in sync and broadcast a debug:update mode payload
+          this.eventBus?.setDebugMode?.(next);
+          this.eventBus?.emit?.('debug:update', { mode: next });
+        } catch (_) { /* no-op */ }
       };
     }
   }
@@ -428,43 +518,22 @@ class UIStateManager {
    */
   loadPersistedState() {
     try {
-      // DIAGNOSTIC: Log security context and localStorage availability
-      console.log('UI STATE: Loading persisted state...');
-      console.log('UI STATE: Current URL:', window.location.href);
-      console.log('UI STATE: Protocol:', window.location.protocol);
-      
       // Skip localStorage access in custom protocol context
       if (window.location.protocol === 'scorm-app:') {
-        console.log('UI STATE: Custom protocol detected, skipping localStorage access');
         return;
       }
-      
-      console.log('UI STATE: localStorage type:', typeof localStorage);
-      console.log('UI STATE: localStorage available:', typeof localStorage !== 'undefined');
-      
-      // Check if localStorage is available
       if (typeof localStorage === 'undefined') {
-        console.warn('UIStateManager: localStorage not available, skipping state restoration');
         return;
       }
-      
       const persisted = localStorage.getItem(this.persistenceKey);
-      console.log('UI STATE: Retrieved persisted data:', persisted ? 'found' : 'not found');
-      
       if (persisted) {
         const parsed = JSON.parse(persisted);
-        console.log('UI STATE: Parsed persisted data:', parsed);
-        
-        // Only restore UI preferences, not session data
         if (parsed.ui) {
           this.state.ui = { ...this.state.ui, ...parsed.ui };
-          console.log('UI STATE: Successfully restored UI preferences');
         }
       }
-    } catch (error) {
-      console.warn('UIStateManager: Failed to load persisted state:', error);
-      console.warn('UI STATE: Error details:', error.name, error.message);
-      console.log('UI STATE: Continuing with default state');
+    } catch (_e) {
+      // swallow to avoid console noise in renderer
     }
   }
 
@@ -488,23 +557,13 @@ class UIStateManager {
    */
   persistState() {
     try {
-      // DIAGNOSTIC: Log persistence attempt
-      console.log('UI STATE: Attempting to persist state...');
-      
       // Skip localStorage access in custom protocol context
       if (window.location.protocol === 'scorm-app:') {
-        console.log('UI STATE: Custom protocol detected, skipping localStorage persistence');
         return;
       }
-      
-      console.log('UI STATE: localStorage type:', typeof localStorage);
-      
-      // Check if localStorage is available
       if (typeof localStorage === 'undefined') {
-        console.warn('UIStateManager: localStorage not available, skipping state persistence');
         return;
       }
-      
       // Only persist UI preferences
       const toPersist = {
         ui: {
@@ -514,14 +573,9 @@ class UIStateManager {
           devModeEnabled: this.state.ui.devModeEnabled
         }
       };
-      
-      console.log('UI STATE: Data to persist:', toPersist);
       localStorage.setItem(this.persistenceKey, JSON.stringify(toPersist));
-      console.log('UI STATE: Successfully persisted state');
-    } catch (error) {
-      console.warn('UIStateManager: Failed to persist state:', error);
-      console.warn('UI STATE: Error details:', error.name, error.message);
-      console.log('UI STATE: Continuing with in-memory state only');
+    } catch (_e) {
+      // swallow to avoid console noise in renderer
     }
   }
 

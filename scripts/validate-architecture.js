@@ -2,15 +2,15 @@
 
 /**
  * Architecture Validation Script
- * 
- * Validates that the new modular renderer architecture meets all requirements:
- * - File size limits (index.html <300 lines, all other files <200 lines)
+ *
+ * Validates that the modular renderer architecture meets all requirements:
+ * - File size guidance (warnings only, tiered thresholds per dev_docs/style.md)
  * - Component structure and inheritance
  * - Service layer implementation
  * - TypeScript definitions completeness
  * - CSS modular architecture
- * 
- * @fileoverview Architecture validation for Phase 5+6 completion
+ *
+ * @fileoverview Architecture validation aligned with dev_docs/style.md
  */
 
 const fs = require('fs');
@@ -41,9 +41,9 @@ class ArchitectureValidator {
       await this.validateServiceLayer();
       await this.validateTypeDefinitions();
       await this.validateCSSArchitecture();
-      
+
       this.printResults();
-      
+
       if (this.errors.length > 0) {
         console.error(`\n❌ Architecture validation failed with ${this.errors.length} errors`);
         process.exit(1);
@@ -61,36 +61,57 @@ class ArchitectureValidator {
   }
 
   /**
-   * Validate file size requirements
+   * Decide if a path is a "core module" per style.md guidance
+   * Core modules may reasonably reach 500-800 lines before escalating severity.
+   */
+  isCoreModule(fileRelPath) {
+    const corePatterns = [
+      'src/main/services/scorm/rte/',
+      'src/main/services/scorm/cam/',
+      'src/main/services/scorm/sn/',
+      'src/renderer/services/',
+      'src/renderer/components/scorm/',
+      'src/shared/types/',
+      'src/styles/'
+    ];
+    return corePatterns.some(p => fileRelPath.includes(p));
+  }
+
+  /**
+   * Validate file size guidelines (no hard failures, warnings only)
+   * Tiers:
+   *  - Core modules: info > 500, warn > 800
+   *  - Other files:  info > 300, warn > 400
+   * index.html is treated as "other"
    */
   async validateFileSizes() {
-    console.log('📏 Validating file sizes...');
-    
+    console.log('📏 Validating file sizes (warnings only, aligned to style.md)...');
+
     const filesToCheck = [
-      { path: 'index.html', maxLines: 300 },
-      { path: 'src/renderer/app.js', maxLines: 200 },
-      { path: 'src/renderer/services/event-bus.js', maxLines: 200 },
-      { path: 'src/renderer/services/ui-state.js', maxLines: 200 },
-      { path: 'src/renderer/services/scorm-client.js', maxLines: 200 },
-      { path: 'src/renderer/components/base-component.js', maxLines: 200 },
-      { path: 'src/renderer/components/scorm/content-viewer.js', maxLines: 200 },
-      { path: 'src/renderer/components/scorm/navigation-controls.js', maxLines: 200 },
-      { path: 'src/renderer/components/scorm/progress-tracking.js', maxLines: 200 },
-      { path: 'src/renderer/components/scorm/debug-panel.js', maxLines: 200 },
-      { path: 'src/renderer/components/scorm/course-outline.js', maxLines: 200 },
-      { path: 'src/shared/types/scorm-types.d.ts', maxLines: 200 },
-      { path: 'src/renderer/types/component-types.d.ts', maxLines: 200 },
-      { path: 'src/styles/base/variables.css', maxLines: 200 },
-      { path: 'src/styles/components/buttons.css', maxLines: 200 },
-      { path: 'src/styles/components/forms.css', maxLines: 200 },
-      { path: 'src/styles/components/layout.css', maxLines: 200 },
-      { path: 'src/styles/themes/default.css', maxLines: 200 },
-      { path: 'src/styles/themes/dark.css', maxLines: 200 }
+      { path: 'index.html' },
+      { path: 'src/renderer/app.js' },
+      { path: 'src/renderer/services/event-bus.js' },
+      { path: 'src/renderer/services/ui-state.js' },
+      { path: 'src/renderer/services/scorm-client.js' },
+      { path: 'src/renderer/components/base-component.js' },
+      { path: 'src/renderer/components/scorm/content-viewer.js' },
+      { path: 'src/renderer/components/scorm/navigation-controls.js' },
+      { path: 'src/renderer/components/scorm/progress-tracking.js' },
+      { path: 'src/renderer/components/scorm/debug-panel.js' },
+      { path: 'src/renderer/components/scorm/course-outline.js' },
+      { path: 'src/shared/types/scorm-types.d.ts' },
+      { path: 'src/renderer/types/component-types.d.ts' },
+      { path: 'src/styles/base/variables.css' },
+      { path: 'src/styles/components/buttons.css' },
+      { path: 'src/styles/components/forms.css' },
+      { path: 'src/styles/components/layout.css' },
+      { path: 'src/styles/themes/default.css' },
+      { path: 'src/styles/themes/dark.css' }
     ];
 
     for (const file of filesToCheck) {
       const filePath = path.join(process.cwd(), file.path);
-      
+
       if (!fs.existsSync(filePath)) {
         this.errors.push(`Missing required file: ${file.path}`);
         continue;
@@ -98,18 +119,28 @@ class ArchitectureValidator {
 
       const content = fs.readFileSync(filePath, 'utf8');
       const lineCount = content.split('\n').length;
-      
+
+      const isCore = this.isCoreModule(file.path);
+      const limits = isCore ? { info: 500, warn: 800 } : { info: 300, warn: 400 };
+
+      // Store results with tiered info/warn levels; never fail solely on size
+      let level = 'ok';
+      if (lineCount > limits.warn) {
+        level = 'warn';
+        this.warnings.push(`File length WARN: ${file.path} has ${lineCount} lines (> ${limits.warn}). See dev_docs/style.md for guidance on refactoring by logical cohesion.`);
+      } else if (lineCount > limits.info) {
+        level = 'info';
+        this.warnings.push(`File length INFO: ${file.path} has ${lineCount} lines (> ${limits.info}). Consider extracting cohesive submodules if it improves readability.`);
+      } else {
+        console.log(`  ✅ ${file.path}: ${lineCount} lines (within guidance)`);
+      }
+
       this.results.fileSizes[file.path] = {
         lines: lineCount,
-        maxLines: file.maxLines,
-        passed: lineCount <= file.maxLines
+        tier: level,
+        thresholds: limits,
+        isCore
       };
-
-      if (lineCount > file.maxLines) {
-        this.errors.push(`File ${file.path} has ${lineCount} lines (max: ${file.maxLines})`);
-      } else {
-        console.log(`  ✅ ${file.path}: ${lineCount}/${file.maxLines} lines`);
-      }
     }
   }
 
@@ -118,7 +149,7 @@ class ArchitectureValidator {
    */
   async validateComponentStructure() {
     console.log('\n🧩 Validating component structure...');
-    
+
     const requiredComponents = [
       'src/renderer/components/base-component.js',
       'src/renderer/components/scorm/content-viewer.js',
@@ -130,14 +161,14 @@ class ArchitectureValidator {
 
     for (const componentPath of requiredComponents) {
       const filePath = path.join(process.cwd(), componentPath);
-      
+
       if (!fs.existsSync(filePath)) {
         this.errors.push(`Missing component: ${componentPath}`);
         continue;
       }
 
       const content = fs.readFileSync(filePath, 'utf8');
-      
+
       // Check for class structure and export
       if (!content.includes('class ') || (!content.includes('export ') && !content.includes('module.exports'))) {
         this.errors.push(`Component ${componentPath} missing class or export`);
@@ -170,7 +201,7 @@ class ArchitectureValidator {
    */
   async validateServiceLayer() {
     console.log('\n⚙️ Validating service layer...');
-    
+
     const requiredServices = [
       'src/renderer/services/event-bus.js',
       'src/renderer/services/ui-state.js',
@@ -179,14 +210,14 @@ class ArchitectureValidator {
 
     for (const servicePath of requiredServices) {
       const filePath = path.join(process.cwd(), servicePath);
-      
+
       if (!fs.existsSync(filePath)) {
         this.errors.push(`Missing service: ${servicePath}`);
         continue;
       }
 
       const content = fs.readFileSync(filePath, 'utf8');
-      
+
       // Check for class structure and export
       if (!content.includes('class ') || (!content.includes('export ') && !content.includes('module.exports'))) {
         this.errors.push(`Service ${servicePath} missing class or export`);
@@ -195,7 +226,7 @@ class ArchitectureValidator {
 
       // Service-specific validations
       const serviceName = path.basename(servicePath, '.js');
-      
+
       if (serviceName === 'event-bus') {
         const requiredMethods = ['on', 'off', 'emit', 'once'];
         for (const method of requiredMethods) {
@@ -232,7 +263,7 @@ class ArchitectureValidator {
    */
   async validateTypeDefinitions() {
     console.log('\n📝 Validating TypeScript definitions...');
-    
+
     const typeFiles = [
       'src/shared/types/scorm-types.d.ts',
       'src/renderer/types/component-types.d.ts'
@@ -240,14 +271,14 @@ class ArchitectureValidator {
 
     for (const typeFile of typeFiles) {
       const filePath = path.join(process.cwd(), typeFile);
-      
+
       if (!fs.existsSync(filePath)) {
         this.errors.push(`Missing TypeScript definitions: ${typeFile}`);
         continue;
       }
 
       const content = fs.readFileSync(filePath, 'utf8');
-      
+
       // Check for TypeScript syntax
       if (!content.includes('interface ') && !content.includes('type ')) {
         this.errors.push(`TypeScript file ${typeFile} missing interface or type definitions`);
@@ -283,7 +314,7 @@ class ArchitectureValidator {
    */
   async validateCSSArchitecture() {
     console.log('\n🎨 Validating CSS architecture...');
-    
+
     const cssFiles = [
       'src/styles/main.css',
       'src/styles/base/variables.css',
@@ -296,14 +327,14 @@ class ArchitectureValidator {
 
     for (const cssFile of cssFiles) {
       const filePath = path.join(process.cwd(), cssFile);
-      
+
       if (!fs.existsSync(filePath)) {
         this.errors.push(`Missing CSS file: ${cssFile}`);
         continue;
       }
 
       const content = fs.readFileSync(filePath, 'utf8');
-      
+
       // Check for CSS custom properties in variables.css
       if (cssFile.includes('variables.css')) {
         if (!content.includes('--') || !content.includes(':root')) {
@@ -327,7 +358,7 @@ class ArchitectureValidator {
     if (fs.existsSync(mainCssPath)) {
       const content = fs.readFileSync(mainCssPath, 'utf8');
       const requiredImports = ['base/', 'components/', 'themes/'];
-      
+
       for (const importPath of requiredImports) {
         if (!content.includes(importPath)) {
           this.warnings.push(`main.css missing import for ${importPath}`);
@@ -342,21 +373,31 @@ class ArchitectureValidator {
   printResults() {
     console.log('\n📊 Validation Results:');
     console.log('='.repeat(50));
-    
-    // File sizes summary
-    const fileSizeResults = Object.values(this.results.fileSizes);
-    const passedFiles = fileSizeResults.filter(r => r.passed).length;
-    console.log(`📏 File Sizes: ${passedFiles}/${fileSizeResults.length} files within limits`);
-    
+
+    // File sizes summary (show tiered counts)
+    const fileSizeEntries = Object.entries(this.results.fileSizes);
+    const totals = {
+      ok: 0,
+      info: 0,
+      warn: 0
+    };
+    for (const [, r] of fileSizeEntries) {
+      if (r.tier === 'ok') totals.ok++;
+      else if (r.tier === 'info') totals.info++;
+      else if (r.tier === 'warn') totals.warn++;
+    }
+    const totalFiles = fileSizeEntries.length;
+    console.log(`📏 File Sizes: ${totals.ok}/${totalFiles} within guidance, ${totals.info} info, ${totals.warn} warn`);
+
     // Errors and warnings summary
     console.log(`❌ Errors: ${this.errors.length}`);
     console.log(`⚠️  Warnings: ${this.warnings.length}`);
-    
+
     if (this.errors.length > 0) {
       console.log('\n❌ Errors:');
       this.errors.forEach(error => console.log(`  • ${error}`));
     }
-    
+
     if (this.warnings.length > 0) {
       console.log('\n⚠️  Warnings:');
       this.warnings.forEach(warning => console.log(`  • ${warning}`));

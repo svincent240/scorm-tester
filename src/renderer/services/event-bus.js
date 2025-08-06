@@ -18,6 +18,14 @@ class EventBus {
     this.history = [];
     this.maxHistorySize = 100;
     this.debugMode = false;
+
+    // Lightweight debug buffers for diagnostics without console usage
+    this.debug = {
+      lastEvents: [],
+      maxEvents: 200,
+      lastLogs: [],
+      maxLogs: 500
+    };
   }
 
   /**
@@ -98,10 +106,15 @@ class EventBus {
       this.history.shift();
     }
 
+    // Mirror into debug ring when debugMode enabled (no console)
     if (this.debugMode) {
+      try {
+        this.debug.lastEvents.push(eventData);
+        while (this.debug.lastEvents.length > (this.debug.maxEvents || 200)) this.debug.lastEvents.shift();
+      } catch (_) { /* no-op */ }
       import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.debug(`EventBus: Emitting '${event}'`, data);
-      });
+      }).catch(() => { /* no-op */ });
     }
 
     // Emit to subscribers
@@ -118,7 +131,7 @@ class EventBus {
         } catch (error) {
           import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
             rendererLogger.error(`EventBus: Error in event handler for '${event}'`, error?.message || error);
-          });
+          }).catch(() => { /* no-op */ });
           // CRITICAL FIX: Prevent infinite recursion by not emitting 'error' event
           // Only emit error event if it's not already an error event to prevent loops
           if (event !== 'error') {
@@ -254,6 +267,16 @@ class EventBus {
 
 // Create and export singleton instance
 const eventBus = new EventBus();
+ 
+// Provide lightweight debug selectors for diagnostics panels
+eventBus.getDebugSnapshot = (limit = 200) => {
+  try {
+    const arr = eventBus.debug?.lastEvents || [];
+    return arr.slice(-Math.max(1, Math.min(limit, eventBus.debug.maxEvents || 200)));
+  } catch (_) {
+    return [];
+  }
+};
 
 // Enable debug mode default off; UIState will control later (step 8).
 try {

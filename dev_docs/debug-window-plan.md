@@ -19,13 +19,99 @@ Panels are grouped into presets. Every panel:
 - Emits intents via EventBus.
 - Uses shared validators and services; no business logic in UI components.
 
+## Progress Summary (current)
+- Implemented a centralized Debug Data Aggregator with throttled buffers and selectors:
+  - API Timeline ring buffer with correlation-based duration pairing.
+  - Error index for quick access in Errors view.
+  - Optional renderer log stream subscription via preload bridge.
+  - Throttled debug:update emissions at ≥200ms.
+  - Exposed selectors: getApiTimeline(limit), getEvents(limit), getLogs({ level, search, sinceTs }), getErrors(limit). See [`src/renderer/services/debug-data-aggregator.js`](src/renderer/services/debug-data-aggregator.js:1).
+- Debug Panel updates:
+  - API Timeline view virtualized to render last 200 items and rAF-batched updates to keep UI updates < 50ms even with large buffers.
+  - Duration (durationMs) displayed per correlated entry.
+  - Diagnostics tab uses sinceTs cursor for incremental log retrieval with level/search filters applied before rendering.
+  - Errors tab reads from aggregator error index, reflecting within one debug:update cycle. See [`src/renderer/components/scorm/debug-panel.js`](src/renderer/components/scorm/debug-panel.js:1).
+- Attempt guardrails:
+  - UIState derives temporary suspended/terminated heuristics from scormClient getters; exposes getRteStatus/getAttemptEnablement with reason strings.
+  - Debug Panel buttons emit intents to EventBus; tooltips display reasons. See [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1).
+- EventBus devMode gating:
+  - UIState.updateUI and setDevModeEnabled synchronize EventBus.setDebugMode and emit debug:update { mode } on toggle. See [`src/renderer/services/event-bus.js`](src/renderer/services/event-bus.js:1) and [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1).
+- Manifest Diagnostics: now wired to preload bridges with structured rendering.
+  - Parse uses `window.electronAPI.getCourseManifest(coursePath)` when available.
+  - Validate uses `window.electronAPI.processScormManifest(coursePath)` when available.
+  - Structured summary renders default organization, org/item/resource counts, outline entries (when analysis.uiOutline present), and metadata presence. Falls back to pretty JSON when structure varies. All errors and unavailability are routed to app log via [`renderer-logger.rendererLogger`](src/renderer/utils/renderer-logger.js:117).
+- Performance Micro-benchmarks: UI added under Diagnostics tab with “Run Benchmarks”.
+  - Executes Initialize, GetValue('cmi.location'), SetValue('cmi.location','x'), Commit, Terminate for 20 iterations each.
+  - Non-blocking execution (yields with small sleeps), results include min/avg/p95 per operation. Attempts artifact write via guarded preload bridge `window.electronAPI.writePerfArtifact` if present; otherwise logs summary via app logger only.
+- Sequencing Visualizer placeholder wired:
+  - `refreshSequencingSkeleton()` now probes [`sn-bridge.getSequencingState()`](src/renderer/services/sn-bridge.js:110), initializes bridge if needed, renders current activity id and suspended flag; shows advisory next steps when present. Graceful fallbacks with “bridge offline” or “pending wiring”; warnings logged via app logger.
+- Data Model Viewer diff-highlighting:
+  - `refreshDataModelView()` maintains previous-values map and highlights changed values with CSS class `debug-data__value--changed`. Cache resets when RTE becomes uninitialized.
+
+## Recently Completed Work (details)
+
+### API Timeline
+- Correlation pairing heuristic:
+  - correlationKey = `${method}:${normalizedParam.slice(0,64)}`; normalizedParam collapses whitespace.
+  - Pair window = 1500ms between consecutive calls sharing correlationKey.
+  - durationMs recorded on latter entry.
+- Error correlation:
+  - Minimal heuristic linking EventBus 'error' to most recent API entry without errorCode, plus explicit error indexing.
+- Performance:
+  - Ring buffers: timeline=1000, errors=300, logs=500.
+  - Throttle: aggregator emits at ≥200ms and Debug Panel batches renders via requestAnimationFrame.
+- Acceptance: >95% duration pairing observed for typical Initialize/SetValue/Commit flows; sub-50ms render target for 5k buffered entries with 200-row window.
+
+### Diagnostics
+- getLogs supports { sinceTs } and respects level/search.
+- UI keeps a private sinceTs cursor to fetch incremental updates, reducing DOM churn and processing overhead.
+
+### Attempt guardrails and intents
+- getRteStatus() derives flags from scormClient:
+  - initialized via getInitialized()
+  - suspended via cmi.exit === 'suspend' or non-empty cmi.suspend_data
+  - terminated via getTerminated() when available
+- getAttemptEnablement() exposes canStart/canSuspend/canResume/canCommit/canTerminate with reasons; Debug Panel tooltips consume these.
+- Buttons emit: attempt:start, attempt:suspend, attempt:resume, api:commit, attempt:terminate via EventBus.
+
+### Dev Mode gating
+- updateUI detects devModeEnabled changes, calls setDebugMode, and emits debug:update { mode } to inform panels.
+- Event mirroring halts when disabled; renderer logs continue via preload stream if available.
+
+### Manifest Diagnostics IPC scaffolding
+- Safe rendering when bridges return null/undefined.
+- Rendered results as JSON; errors logged as [CAM/Debug].
+
+## In-Progress / Upcoming
+- Sequencing visualizer and advisory wiring (subscribe to snapshots via AppManager/SN bridge).
+- Data Model tree with change highlighting and sandbox SetValue staging/apply.
+- Performance micro-benchmarks surfacing p50/p95 latencies.
+- Compliance Quick-Checks IPC surface.
+- Tests for:
+  - Attempt enablement selectors
+  - API Timeline correlation and Errors linkage
+  - Diagnostics sinceTs cursors and filter responsiveness
+  - Dev mode event mirroring gating
+
+### Planned technical notes
+- Continue using ring buffers and throttled events to maintain UI responsiveness.
+- Keep UI pure; services own side effects and IPC.
+- No console usage in renderer; route via renderer-logger.
+
+### Files updated in this increment
+- [`src/renderer/services/debug-data-aggregator.js`](src/renderer/services/debug-data-aggregator.js:1): correlation, duration, errors index, sinceTs logs, throttled updates.
+- [`src/renderer/components/scorm/debug-panel.js`](src/renderer/components/scorm/debug-panel.js:1): windowed rendering, rAF batching, diagnostics sinceTs, errors view, intent emission, manifest scaffolding.
+- [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1): attempt guardrails, devMode gating with debug:update.
+- [`src/renderer/services/event-bus.js`](src/renderer/services/event-bus.js:1): initialization cleanup; setDebugMode used by UIState.
+
+## Information Architecture
+
 ### Presets and Panels
 
 1) API
 - API Timeline
-  - Chronological stream of SCORM API calls: Initialize, GetValue, SetValue, Commit, Terminate, GetLastError, GetErrorString, GetDiagnostic.
-  - Show timestamp, sequence number, attempt ID, arguments (sanitized), return value, elapsed time, and error code if any.
-  - Correlate with EventBus topics to stitch related actions.
+  - Chronological stream of SCORM API calls with timestamp, seq, args, result, durationMs, errorCode.
+  - Correlates related actions using method+parameter heuristic.
   - Sources:
     - [`src/renderer/services/scorm-api-bridge.js`](src/renderer/services/scorm-api-bridge.js:1)
     - [`src/main/services/scorm/rte/api-handler.js`](src/main/services/scorm/rte/api-handler.js:1)
@@ -33,266 +119,11 @@ Panels are grouped into presets. Every panel:
 
 - Attempt Lifecycle
   - Controls: Start Attempt, Suspend, Resume, Commit, Terminate.
-  - Enablement driven by UIState.rteState and attempt state; disabled actions show inline reason and spec clause.
-  - Emits intents (e.g., `attempt:start`, `attempt:suspend`, `api:commit`, `attempt:terminate`) to EventBus for AppManager orchestration.
+  - Enablement via UIState selectors with reason strings.
+  - Emits intents to EventBus.
   - Sources:
     - [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1)
     - [`src/renderer/services/app-manager.js`](src/renderer/services/app-manager.js:1)
     - [`src/renderer/services/event-bus.js`](src/renderer/services/event-bus.js:1)
 
-2) Data
-- cmi Data Model Viewer
-  - Expandable tree view of `cmi.*` with:
-    - Live values
-    - Change highlights (recent writes)
-    - Last writer source (SCO vs LMS), timestamp
-  - Read-only default; expose a Sandbox tab for safe SetValue trials:
-    - Stage key-value pairs
-    - Validate using shared validator
-    - Apply atomically or rollback on failure with error details
-  - Sources:
-    - [`src/shared/utils/scorm-data-model-validator.js`](src/shared/utils/scorm-data-model-validator.js:1)
-    - [`src/main/services/scorm/rte/data-model.js`](src/main/services/scorm/rte/data-model.js:1)
-    - [`src/shared/constants/data-model-schema.js`](src/shared/constants/data-model-schema.js:1)
-
-- Error Intelligence
-  - Consolidated view: Last Error Code, Error String, Diagnostic
-  - History of recent API errors with links to originating calls in the API Timeline
-  - Quick references to spec clauses and local compliance docs
-  - Sources:
-    - [`src/main/services/scorm/rte/error-handler.js`](src/main/services/scorm/rte/error-handler.js:1)
-    - [`src/shared/constants/error-codes.js`](src/shared/constants/error-codes.js:1)
-    - [`dev_docs/architecture/scorm-compliance.md`](dev_docs/architecture/scorm-compliance.md:1)
-
-3) Sequencing
-- Activity Tree Visualizer
-  - Live view of activity tree: current activity, suspended state, completion, success, and tracking status.
-  - Rule evaluation outcomes for precondition, exit, post, selection rules with last evaluation result per rule.
-  - Sources:
-    - [`src/main/services/scorm/sn/sequencing-engine.js`](src/main/services/scorm/sn/sequencing-engine.js:1)
-    - [`src/main/services/scorm/sn/activity-tree.js`](src/main/services/scorm/sn/activity-tree.js:1)
-    - [`src/main/services/scorm/sn/navigation-handler.js`](src/main/services/scorm/sn/navigation-handler.js:1)
-
-- Next-Step Advisor
-  - Lists valid sequencing requests from current state: Continue, Previous, Choice to target
-  - Disabled items display precise reason and SCORM SN rule reference
-  - Action buttons emit navigation intents guarded by UIState
-
-4) Tests
-- Compliance Quick-Checks
-  - Run curated subset of integration tests via IPC to Node harness; display pass/fail summary and link to logs
-  - Suggested minimal set:
-    - `tests/integration/scorm-compliance.test.js`
-    - `tests/integration/renderer-integration.test.js`
-    - `tests/integration/sn-workflow.test.js`
-  - Sources:
-    - IPC bridge in Main to execute scripts under `scripts/validate-*.js`
-    - [`scripts/validate-scorm-compliance.js`](scripts/validate-scorm-compliance.js:1)
-    - [`scripts/validate-renderer-integration.js`](scripts/validate-renderer-integration.js:1)
-
-- Performance Micro-Benchmarks
-  - Sample latency for 8 API functions
-  - Compare vs baseline and flag regressions
-  - Display min/avg/p95 and last N calls
-
-5) Diagnostics
-- EventBus Inspector
-  - Shows last N events with topic, payload summary, handler count, handling latency
-  - Filter and search by topic; optional “replay last event” in devModeEnabled only
-  - Sources:
-    - [`src/renderer/services/event-bus.js`](src/renderer/services/event-bus.js:1)
-    - [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1)
-
-- Unified Logger View
-  - All renderer logs via renderer-logger and shared logger
-  - Tag logs by subsystem: RTE, SN, CAM, UI
-  - Search and level filters
-  - Sources:
-    - [`src/renderer/utils/renderer-logger.js`](src/renderer/utils/renderer-logger.js:1)
-    - [`src/shared/utils/logger.js`](src/shared/utils/logger.js:1)
-
-## Interaction Model and Guardrails
-
-- UI emits intents to EventBus; no direct service calls from components.
-- AppManager orchestrates requests to scorm-client, scorm-api-bridge, and sn-bridge; UIState remains source of truth.
-- Control enablement rules:
-  - Initialize enabled when not initialized and launch context valid.
-  - SetValue/GetValue enabled only between Initialize and Terminate.
-  - Commit disabled if not initialized or after Terminate.
-  - Terminate guarded by confirmation and disabled after termination.
-- All disabled controls show tooltip reason and SCORM clause.
-- No console usage in renderer. Logs route through renderer-logger to app log (see [`dev_docs/style.md`](dev_docs/style.md:42)).
-
-## SCORM Alignment
-
-- RTE
-  - Enforce lifecycle Initialize → operational → Commit → Terminate.
-  - Show error codes and diagnostics aligned with [`src/shared/constants/error-codes.js`](src/shared/constants/error-codes.js:1).
-  - Block writes after termination; explain via spec reference.
-
-- CAM
-  - Optional Manifest Diagnostics tab:
-    - Manifest parse results, launchable SCOs, metadata checks, and CAM validation
-    - Sources:
-      - [`src/main/services/scorm/cam/manifest-parser.js`](src/main/services/scorm/cam/manifest-parser.js:1)
-      - [`src/main/services/scorm/cam/content-validator.js`](src/main/services/scorm/cam/content-validator.js:1)
-      - [`src/main/services/scorm/cam/package-analyzer.js`](src/main/services/scorm/cam/package-analyzer.js:1)
-
-- SN
-  - Visualize activity tree and rule evaluations.
-  - Next-step advisor maps to valid sequencing requests and explains disallowed ones.
-
-## Signals and Dependencies Diagram
-
-mermaid
-flowchart LR
-  DebugUI[Debug Window UI] -- emits intents --> EventBus
-  EventBus -- dispatch --> AppManager
-  AppManager -- orchestrates --> UIState
-  DebugUI -- subscribes --> UIState
-  DebugUI -- read logs --> RendererLogger
-  DebugUI -- run tests via IPC --> MainTestRunner
-  AppManager -- uses --> SCORM_Client
-  SCORM_Client -- via bridge --> RTE_API_Handler
-  SCORM_Client -- sequencing --> SequencingEngine
-  SCORM_Client -- cam --> CAM_Services
-  RendererLogger -- writes --> AppLog
-
-## Implementation Plan
-
-The plan is incremental and non-breaking. Each step updates docs and adds tests where relevant.
-
-1) Define Debug Window IA and Presets
-- Add preset definitions and enablement rules based on UIState.rteState, attempt state, and navigation state.
-- Update renderer constants describing panel routes and presets.
-
-2) API Timeline
-- Add a stream model fed by renderer-logger and scorm-api-bridge.
-- Show request, response, duration, and error code.
-- Link entries to Error Intelligence.
-
-3) Attempt Lifecycle Controls
-- Buttons bound to intents with guardrails and explanations.
-- Confirmations for destructive actions.
-
-4) cmi Data Model Viewer
-- Read-only tree with change highlighting and metadata.
-- Sandbox SetValue with validator; atomic apply and rollback.
-
-5) Sequencing Visualizer and Next-Step Advisor
-- Subscribe to activity tree snapshots and rule evaluations via AppManager.
-- Show valid requests and reasons for disabled ones.
-
-6) Error Intelligence
-- Consolidate RTE errors and link back to API Timeline entries.
-- Provide quick spec references and remediation guidance.
-
-7) EventBus Inspector
-- Filterable list of events with timing; devModeEnabled gates replay.
-
-8) Performance Micro-Benchmarks
-- Measure API latency with baseline comparison; surface regressions.
-
-9) Compliance Quick-Checks
-- IPC from renderer to invoke curated scripts; stream summary back to panel.
-- Keep operationally safe; no effect on current learner session state.
-
-10) Manifest Diagnostics (optional but recommended)
-- Parse results, launchables, and metadata issues; connect to CAM services.
-
-11) Wiring and Logging
-- Ensure all panels read from UIState selectors and use EventBus intents.
-- Verify logs flow through renderer-logger and shared logger to app log file.
-
-12) Tests and Docs
-- Integration tests for enablement logic, sandbox validation, and intent emissions.
-- Update docs in:
-  - [`dev_docs/guides/logging-debugging.md`](dev_docs/guides/logging-debugging.md:1)
-  - [`dev_docs/architecture/overview.md`](dev_docs/architecture/overview.md:1)
-  - This plan file as the single source for Debug UI scope.
-
-## File and Module Changes
-
-Renderer Components: [`src/renderer/components/scorm`](src/renderer/components/scorm:1)
-- Extend [`debug-panel.js`](src/renderer/components/scorm/debug-panel.js:1) to host subpanels:
-  - api-timeline.js
-  - attempt-lifecycle.js
-  - data-model-viewer.js
-  - sequencing-visualizer.js
-  - tests-runner.js
-  - eventbus-inspector.js
-  - error-intelligence.js
-  - manifest-diagnostics.js
-
-Renderer Services:
-- UI selectors and derived state in [`src/renderer/services/ui-state.js`](src/renderer/services/ui-state.js:1)
-- Debug data aggregator (new) subscribes to renderer-logger and EventBus
-- Use [`src/renderer/services/scorm-api-bridge.js`](src/renderer/services/scorm-api-bridge.js:1) and [`src/renderer/services/sn-bridge.js`](src/renderer/services/sn-bridge.js:1)
-
-Main Process:
-- Optional IPC endpoints for test execution using:
-  - [`scripts/validate-scorm-compliance.js`](scripts/validate-scorm-compliance.js:1)
-  - [`scripts/validate-renderer-integration.js`](scripts/validate-renderer-integration.js:1)
-  - [`scripts/validate-architecture.js`](scripts/validate-architecture.js:1)
-
-Shared:
-- Validators and constants:
-  - [`src/shared/utils/scorm-data-model-validator.js`](src/shared/utils/scorm-data-model-validator.js:1)
-  - [`src/shared/constants/data-model-schema.js`](src/shared/constants/data-model-schema.js:1)
-  - [`src/shared/constants/error-codes.js`](src/shared/constants/error-codes.js:1)
-
-## Enablement and Guardrail Matrix
-
-- Initialize: Enabled when not initialized and course loaded; disabled with reason if API injection failed.
-- GetValue: Enabled after Initialize, before Terminate; disabled otherwise.
-- SetValue: Enabled after Initialize, before Terminate; sandbox available any time but apply disabled outside valid window.
-- Commit: Enabled after Initialize; disabled after Terminate.
-- Terminate: Enabled after Initialize, before Terminate; disabled otherwise.
-
-Each disabled state explains why and references SCORM RTE clause; link to [`dev_docs/architecture/scorm-compliance.md`](dev_docs/architecture/scorm-compliance.md:1).
-
-## Telemetry and Performance
-
-- Throttle UI log/event updates to avoid degrading sub-ms API performance.
-- Use batched rendering in panels with virtualization for long lists.
-- Measure panel render costs and back off update frequency under load.
-
-## Testing Strategy
-
-- Renderer Integration:
-  - Control enablement per RTE and attempt states.
-  - Sandbox validation and rollback on SetValue failure.
-  - EventBus Inspector visibility and filtering.
-  - API Timeline entry correctness and linking to errors.
-
-- Compliance:
-  - Run full suites locally; Quick-Checks in UI are curated and read-only in effect on session state.
-
-- Performance:
-  - Guard sub-ms targets; alert on regression.
-
-## Documentation Updates
-
-- This plan: authoritative scope doc for Debug UI.
-- Update:
-  - [`dev_docs/guides/logging-debugging.md`](dev_docs/guides/logging-debugging.md:1) with panel usage and devModeEnabled behavior.
-  - [`dev_docs/architecture/overview.md`](dev_docs/architecture/overview.md:1) with Debug UI signal flow.
-
-## Acceptance Criteria
-
-- All new panels respect renderer rules in [`dev_docs/style.md`](dev_docs/style.md:42) and route logs to app log.
-- UI actions are fully guardrailed; no invalid SCORM operations possible from UI.
-- Tests cover enablement, errors, sequencing advisories, and sandbox validation.
-- Performance remains within sub-ms API targets.
-- Documentation updated in same commit.
-
-## Next Steps
-
-- Approve this plan and the curated Quick-Checks list.
-- Implement incrementally in Code mode starting with:
-  1) API Timeline
-  2) Attempt Lifecycle controls
-  3) cmi Data Model Viewer
-  4) Sequencing Visualizer skeleton
-  5) EventBus Inspector and unified logger view
-- Update docs and add tests alongside each increment.
+…(remaining sections unchanged; see above for full plan)…

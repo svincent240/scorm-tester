@@ -26,7 +26,6 @@ class ScormAPIBridge {
   setupMessageHandler() {
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'SCORM_API_CALL') {
-        // console.log('SCORM API Bridge: Received API call from iframe:', event.data); // Removed debug log
         this.handleScormAPICall(event.data, event.source);
       }
     });
@@ -60,18 +59,24 @@ class ScormAPIBridge {
       }
 
     } catch (error) {
-      console.error('SCORM API Bridge Error:', error);
-      
+      // Route renderer errors via centralized logger (no console.* in renderer)
+      try {
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        rendererLogger?.error('SCORM API Bridge Error', { method, message: error?.message || String(error) });
+      } catch (_) { /* no-op */ }
+
       // Log the error as an API call
       this.logApiCall(method, params, 'false', '101');
-      
+
       if (source && source.postMessage) {
-        source.postMessage({
-          type: 'SCORM_API_RESPONSE',
-          callId,
-          result: 'false',
-          error: error.message
-        }, '*');
+        try {
+          source.postMessage({
+            type: 'SCORM_API_RESPONSE',
+            callId,
+            result: 'false',
+            error: error?.message || String(error)
+          }, '*');
+        } catch (_e) { /* no-op */ }
       }
     }
   }
@@ -106,25 +111,35 @@ class ScormAPIBridge {
    * @private
    */
   logApiCall(method, params, result, errorCode = '0') {
+    const startedAt = Date.now();
+    // Normalize and sanitize args (avoid leaking large/sensitive payloads)
+    const parameter = params ? (Array.isArray(params) ? params.map(p => String(p).slice(0, 512)).join(', ') : String(params).slice(0, 512)) : '';
     const apiCall = {
+      id: startedAt + Math.random(),
+      seq: startedAt, // simple monotonic-ish base; aggregator may refine
       method,
-      parameter: params ? (Array.isArray(params) ? params.join(', ') : String(params)) : '',
+      parameter,
       result: String(result),
-      errorCode,
-      timestamp: Date.now()
+      errorCode: String(errorCode),
+      timestamp: startedAt
     };
- 
+
     // Emit event for debug panel in same window
     eventBus.emit('api:call', { data: apiCall });
     
     // Also emit via IPC for debug window
     if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      window.electronAPI.emitDebugEvent('api:call', apiCall);
+      try { window.electronAPI.emitDebugEvent('api:call', apiCall); } catch (_e) { /* no-op */ }
     }
     
+    // Route to centralized logger with subsystem tag
+    import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+      rendererLogger?.debug('[RTE/API] call', apiCall);
+    }).catch(() => { /* no-op */ });
+
     // Legacy IPC event for backward compatibility
     if (window.electronAPI && window.electronAPI.log) {
-      window.electronAPI.log('scorm-api-call', apiCall);
+      try { window.electronAPI.log('scorm-api-call', apiCall); } catch (_e) { /* no-op */ }
     }
   }
 }

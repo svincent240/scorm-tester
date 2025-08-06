@@ -101,9 +101,12 @@ describe('Perf: RTE API latency (non-gating)', () => {
       },
     };
 
-    await fs.writeFile(path.join(outDir, `${base}.json`), JSON.stringify(payload, null, 2), 'utf8');
+    const jsonPath = path.join(outDir, `${base}.json`);
+    const txtPath = path.join(outDir, `${base}.txt`);
+
+    await fs.writeFile(jsonPath, JSON.stringify(payload, null, 2), 'utf8');
     await fs.writeFile(
-      path.join(outDir, `${base}.txt`),
+      txtPath,
       [
         'RTE API Latency Perf Snapshot',
         `samples: ${samples}`,
@@ -117,6 +120,9 @@ describe('Perf: RTE API latency (non-gating)', () => {
       ].join('\n'),
       'utf8'
     );
+
+    // After writing, prune artifacts to keep most recent 5 JSON/TXT pairs for this suite
+    await prunePerfArtifacts(outDir, 'rte-api-latency-', 5);
 
     // Non-gating: only sanity-check non-negative timing
     expect(stats.min).toBeGreaterThanOrEqual(0);
@@ -176,5 +182,52 @@ function pickValue(key, rng) {
     }
     default:
       return '';
+  }
+}
+
+/**
+ * Prune artifacts/perf to keep most recent N JSON/TXT pairs per suite prefix.
+ * A "pair" is two files sharing the same basename and differing by .json/.txt.
+ * This function deletes older pairs atomically by basename.
+ *
+ * @param {string} outDir directory path like artifacts/perf
+ * @param {string} prefix suite-specific basename prefix e.g. 'rte-api-latency-'
+ * @param {number} keep how many most recent pairs to retain
+ */
+async function prunePerfArtifacts(outDir, prefix, keep) {
+  try {
+    const all = await fs.readdir(outDir);
+    // Filter by prefix and extension
+    const candidates = all.filter(n => n.startsWith(prefix) && (n.endsWith('.json') || n.endsWith('.txt')));
+
+    // Group by timestamped basename (without extension)
+    const groups = new Map();
+    for (const name of candidates) {
+      const ext = name.endsWith('.json') ? '.json' : '.txt';
+      const base = name.slice(0, -ext.length); // remove extension
+      if (!groups.has(base)) groups.set(base, new Set());
+      groups.get(base).add(ext);
+    }
+
+    // Consider only complete pairs that have both .json and .txt
+    const bases = Array.from(groups.entries())
+      .filter(([, exts]) => exts.has('.json') && exts.has('.txt'))
+      .map(([base]) => base);
+
+    // Sort bases descending by timestamp (lexicographic works due to ISO-like stamp)
+    bases.sort((a, b) => b.localeCompare(a));
+
+    // Determine deletions beyond "keep" newest
+    const toDelete = bases.slice(keep);
+
+    for (const base of toDelete) {
+      const jsonFile = path.join(outDir, `${base}.json`);
+      const txtFile = path.join(outDir, `${base}.txt`);
+      // Best-effort deletions; ignore errors
+      try { await fs.unlink(jsonFile); } catch (_) {}
+      try { await fs.unlink(txtFile); } catch (_) {}
+    }
+  } catch (_) {
+    // Non-gating; ignore errors
   }
 }
