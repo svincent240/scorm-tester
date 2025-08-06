@@ -94,20 +94,53 @@ function useFakeTimers(jestRef) {
   };
 }
 
+/**
+ * Create a mock session manager used by RTE tests.
+ * Minimal surface to satisfy tests expecting Initialize/Terminate and state flags.
+ */
+function createMockSessionManager() {
+  let initialized = false;
+  let terminated = false;
+  return {
+    get initialized() { return initialized; },
+    get terminated() { return terminated; },
+    markInitialized() { initialized = true; },
+    markTerminated() { terminated = true; },
+    reset() { initialized = false; terminated = false; }
+  };
+}
+
 // -------------------- Exports and Jest Globals --------------------
 
-global.__testUtils = {
+// Back-compat: many tests reference global.testUtils and expect createMockLogger().
+// Expose both global.__testUtils (new) and global.testUtils (legacy alias).
+const __testUtils = {
   createSeededRng,
   makeTempDir,
   rimraf,
   createLoggerSink,
-  useFakeTimers
+  useFakeTimers,
+  createMockSessionManager, // ensure available to all tests
+  // Shim expected by older tests: produce a mock logger compatible with shared logger shape.
+  createMockLogger() {
+    const sink = createLoggerSink();
+    // Provide logFile property as some tests assert presence/path (non-functional in-memory).
+    return {
+      logFile: '/tmp/test/scorm-tester.log',
+      info: sink.info,
+      warn: sink.warn,
+      error: sink.error,
+      debug: sink.debug,
+      entries: sink.entries,
+      clear: sink.clear
+    };
+  }
 };
 
+global.__testUtils = __testUtils;
+// Legacy alias
+global.testUtils = __testUtils;
+
 module.exports = {
-  createSeededRng,
-  makeTempDir,
-  rimraf,
-  createLoggerSink,
-  useFakeTimers
+  ...__testUtils
 };

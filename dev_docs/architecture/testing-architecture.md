@@ -153,6 +153,7 @@ Integration/Scenario Checklist
 - [ ] Temp filesystem only; cleaned up
 - [ ] IPC/Logger adapters plugged
 - [ ] Coverage of happy path and edge conditions
+- CAM uiOutline contract: Contract tests validate that analysis.uiOutline is constructed via the CAM public entry [src/main/services/scorm/cam/index.js](src/main/services/scorm/cam/index.js:1), using canonical minimal manifests. Tests also validate a resources-only fallback when organizations are absent. Proposed suite location: [tests/contract/cam-validator/cam-ui-outline.contract.test.js](tests/contract/cam-validator/cam-ui-outline.contract.test.js:1). Renderer integration must consume analysis.uiOutline as-is and must not reconstruct outlines.
 - [ ] Renderer logging and rate-limit rules asserted (where applicable)
 
 Perf Checklist

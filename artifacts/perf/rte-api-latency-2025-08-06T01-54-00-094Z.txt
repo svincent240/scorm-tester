@@ -1,0 +1,9 @@
+RTE API Latency Perf Snapshot
+samples: 200
+min(ms): 0.000
+avg(ms): 0.115
+p95(ms): 1.000
+seed: 24601
+burst writes: 5..5
+
+Non-gating: see dev_docs/guides/testing-migration-and-fixtures.md

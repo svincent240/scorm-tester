@@ -13,7 +13,11 @@
  * - Renderer logging policy: dev_docs/architecture/testing-architecture.md
  */
 
-jest.useRealTimers();
+jest.useFakeTimers({ legacyFakeTimers: true });
+// Ensure no console noise in tests; route to logger sink if necessary
+jest.spyOn(console, 'log').mockImplementation(() => {});
+jest.spyOn(console, 'warn').mockImplementation(() => {});
+jest.spyOn(console, 'error').mockImplementation(() => {});
 
 describe('Renderer/AppManager orchestrator integration (public entrypoint)', () => {
   let appManager;
@@ -43,6 +47,8 @@ describe('Renderer/AppManager orchestrator integration (public entrypoint)', () 
         openDebugWindow: jest.fn(),
         emitDebugEvent: jest.fn(),
       },
+      // Provide minimal location to satisfy any checks
+      location: { href: 'https://example.test/', protocol: 'https:' },
     };
 
     // DOM mount points required by AppManager components
@@ -64,6 +70,9 @@ describe('Renderer/AppManager orchestrator integration (public entrypoint)', () 
       remove: jest.fn(),
       setAttribute: jest.fn(),
       getAttribute: jest.fn(),
+      // Minimal selector APIs required by BaseComponent.showErrorState and others
+      querySelector: jest.fn(() => null),
+      querySelectorAll: jest.fn(() => []),
     });
 
     global.document = {
@@ -89,7 +98,11 @@ describe('Renderer/AppManager orchestrator integration (public entrypoint)', () 
         ]);
         return supported.has(id) ? elementStub() : null;
       }),
-      querySelector: jest.fn(() => null),
+      querySelector: jest.fn((sel) => {
+        // Provide an element for queries against mounted roots
+        const roots = ['#content-viewer', '#navigation-controls', '#progress-tracking', '#app-footer', '#course-outline', '#loading-overlay', '#loading-message', '#course-load-btn', '#debug-toggle', '#theme-toggle', '#sidebar-toggle', '#app-sidebar'];
+        return roots.includes(sel) ? elementStub() : null;
+      }),
       querySelectorAll: jest.fn(() => []),
       documentElement: {
         getAttribute: jest.fn(() => 'default'),
@@ -101,17 +114,27 @@ describe('Renderer/AppManager orchestrator integration (public entrypoint)', () 
       },
     };
 
-    // Import eventBus to validate app events
-    eventBus = require('../../src/renderer/services/event-bus.js');
+    // Import eventBus to validate app events (use dynamic import for ESM)
+    const eventBusMod = await import('../../src/renderer/services/event-bus.js');
+    eventBus = eventBusMod.eventBus || eventBusMod.default || eventBusMod;
 
-    // Import the orchestrator public entry (ES module default export pattern)
-    // In Node/Jest CJS, the compiled output from ESM export is available on .appManager
-    const appManagerModule = require('../../src/renderer/services/app-manager.js');
-    appManager = appManagerModule.appManager;
+    // Import the orchestrator public entry (ESM) via dynamic import
+    const appManagerModule = await import('../../src/renderer/services/app-manager.js');
+    appManager = appManagerModule.appManager || appManagerModule.default || appManagerModule;
   });
 
   afterEach(() => {
-    // Cleanup: reset mocks and allow GC
+    // Cleanup: flush and clear timers, reset mocks, and allow GC
+    try {
+      jest.runOnlyPendingTimers();
+    } catch (_) {}
+    try {
+      jest.clearAllTimers();
+    } catch (_) {}
+    try {
+      jest.useRealTimers();
+    } catch (_) {}
+  
     jest.clearAllMocks();
     if (global.gc) {
       try { global.gc(); } catch (_) {}

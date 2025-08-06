@@ -165,9 +165,24 @@ Checklist — Migration Progress
   - [tests/unit/scorm/sn/activity-tree.test.js](../../tests/unit/scorm/sn/activity-tree.test.js:1)
 - [x] Renderer integration includes TODO to migrate to orchestrator entrypoint
   - [tests/integration/renderer-integration.test.js](../../tests/integration/renderer-integration.test.js:1)
+- [x] Contract suites exist for RTE↔DataModel, CAM↔Validator, SN↔Navigation
+  - CAM: uiOutline contract added at [tests/contract/cam-validator/cam-ui-outline.contract.test.js](tests/contract/cam-validator/cam-ui-outline.contract.test.js:1) covering organizations-derived outline and resources fallback via public entry [src/main/services/scorm/cam/index.js](src/main/services/scorm/cam/index.js:1)
+- [x] Perf tests emit trend artifacts; budgets warnings enabled
+- [ ] Coverage meets thresholds and CI policy gates are active
+- [x] Document remaining exceptions and rationale
+  - Remaining deep-import acknowledged in [tests/integration/renderer-integration.test.js](tests/integration/renderer-integration.test.js:1) with planned migration to orchestrator [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:1)
+Planned next steps (normalized)
+- [ ] Coverage meets thresholds and CI policy gates are active
+- [ ] Document remaining exceptions and rationale (update as deep-imports are migrated)
+
+Planned next steps
+- Orchestrator scenario 2: Add AppManager-based scenario to validate renderer consumption of analysis.uiOutline and basic UI intents (headless, no console, logger sink). Proposed file: tests/integration/renderer-appmanager-outline-scenario.test.js
 - [ ] Contract suites exist for RTE↔DataModel, CAM↔Validator, SN↔Navigation
 - [ ] Perf tests emit trend artifacts; budgets warnings enabled
 - [ ] Coverage meets thresholds and CI policy gates are active
+- [ ] CAM uiOutline contract added: planned file [tests/contract/cam-validator/cam-ui-outline.contract.test.js](tests/contract/cam-validator/cam-ui-outline.contract.test.js:1) validates analysis.uiOutline construction via public CAM entry with canonical minimal manifests; includes resources fallback case.
+- [x] Deep-import audit pass on integration layer complete; remaining acknowledged deep-import in [tests/integration/renderer-integration.test.js](tests/integration/renderer-integration.test.js:1) with TODO to migrate to orchestrator [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:1)
+- [ ] Orchestrator scenarios expansion: add scenario covering renderer consumption of analysis.uiOutline and basic UI intents via AppManager (headless, logger sink, no console)
 - [ ] Document remaining exceptions and rationale
 
 Cross-References
