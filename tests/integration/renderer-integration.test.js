@@ -1,6 +1,19 @@
 /**
  * Renderer Integration Tests
  *
+ * IMPORTANT: Public entrypoint guidance
+ * This suite currently deep-imports renderer services (event-bus, ui-state,
+ * scorm-client) to validate renderer-layer integration. Per
+ * dev_docs/architecture/testing-architecture.md, integration tests SHOULD favor
+ * public orchestrator entrypoints where available. The preferred orchestrator
+ * for renderer flows is src/renderer/services/app-manager.js.
+ *
+ * TODO(migration): Migrate these integration flows to route through the
+ * AppManager orchestrator once its surface is stable across scenarios. When
+ * migrating, keep the no-console rule: use the shared logger adapter and the
+ * tests/setup logger sink if logging assertions are needed. Do not print to the
+ * browser console in tests; write to the app log sink only.
+ *
  * Tests the integration between the new modular renderer architecture
  * and the existing main process services. Validates IPC communication,
  * service interactions, and SCORM functionality.

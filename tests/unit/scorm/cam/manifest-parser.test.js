@@ -1,13 +1,20 @@
 /**
+ * Intentional internal import justification:
+ * This test suite validates the CAM manifest parser internals in isolation.
+ * Per dev_docs/architecture/testing-architecture.md, unit tests MAY deep-import
+ * internal modules to verify low-level behavior, while higher layers (contract/
+ * integration/scenario) MUST use public entrypoints. Do not refactor this test
+ * to use the service facade; that would change its layer and reduce isolation.
+ *
  * SCORM CAM Manifest Parser Unit Tests
- * 
+ *
  * Comprehensive test suite for the ManifestParser class covering:
  * - XML parsing and validation
  * - Namespace handling
  * - Manifest structure extraction
  * - Error handling and edge cases
  * - SCORM 2004 4th Edition compliance
- * 
+ *
  * @fileoverview Unit tests for ManifestParser
  */
 

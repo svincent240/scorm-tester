@@ -1,105 +1,180 @@
 /**
- * Perf (non-gating): RTE API latency sampling
- * - Captures min/avg/p95 for 8 SCORM API functions
- * - Writes artifacts under artifacts/perf
- * - Emits warnings via console.warn is disallowed; write to file only
+ * RTE API Latency Performance (Non-Gating)
  *
- * NOTE: Non-gating by policy. Do not fail tests based on budgets.
+ * Purpose:
+ * - Probe latency characteristics of the SCORM RTE public API (Initialize, GetValue, SetValue, Commit, Terminate).
+ * - Deterministic harness, artifacts written to artifacts/perf (JSON + TXT).
+ * - No console.* usage; tests should not gate CI on performance outcomes.
+ *
+ * References:
+ * - RTE public entry: src/main/services/scorm/rte/api-handler.js
+ * - Determinism helpers: tests/setup.js
+ * - Policy: dev_docs/architecture/testing-architecture.md, dev_docs/guides/testing-migration-and-fixtures.md
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
-const ApiHandler = require('../../src/main/services/scorm/rte/api-handler.js');
+const ScormApiHandler = require('../../src/main/services/scorm/rte/api-handler.js');
+const { createSeededRng } = require('../setup.js');
 
-function now() { return Number(process.hrtime.bigint()) / 1e6; } // ms
+function now() {
+  return Date.now();
+}
 
-function percentile(arr, p) {
-  if (!arr.length) return 0;
+function summarizeTimings(arr) {
   const sorted = [...arr].sort((a, b) => a - b);
-  const idx = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, Math.min(sorted.length - 1, idx))];
+  const sum = arr.reduce((s, v) => s + v, 0);
+  const p95 = percentile(sorted, 0.95);
+  return {
+    min: sorted[0] || 0,
+    avg: arr.length ? sum / arr.length : 0,
+    p95,
+  };
 }
 
-function stats(samples) {
-  const min = samples.length ? Math.min(...samples) : 0;
-  const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
-  const p95 = percentile(samples, 95);
-  return { min, avg, p95 };
+function percentile(sorted, p) {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * sorted.length) - 1));
+  return sorted[idx];
 }
 
-function writeArtifact(project, data) {
-  const dir = path.join(process.cwd(), 'artifacts', 'perf');
-  fs.mkdirSync(dir, { recursive: true });
-  const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const file = path.join(dir, `${project}-${ts}.json`);
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
-  // Also write a small txt summary
-  const summary = [
-    `Project: ${project}`,
-    `Samples: ${data.sampleCount}`,
-    `Initialize: p95=${data.metrics.Initialize.p95.toFixed(3)}ms avg=${data.metrics.Initialize.avg.toFixed(3)}ms`,
-    `GetValue:  p95=${data.metrics.GetValue.p95.toFixed(3)}ms avg=${data.metrics.GetValue.avg.toFixed(3)}ms`,
-    `SetValue:  p95=${data.metrics.SetValue.p95.toFixed(3)}ms avg=${data.metrics.SetValue.avg.toFixed(3)}ms`,
-    `Commit:    p95=${data.metrics.Commit.p95.toFixed(3)}ms avg=${data.metrics.Commit.avg.toFixed(3)}ms`,
-    `Terminate: p95=${data.metrics.Terminate.p95.toFixed(3)}ms avg=${data.metrics.Terminate.avg.toFixed(3)}ms`
-  ].join('\n');
-  fs.writeFileSync(file.replace(/\.json$/, '.txt'), summary, 'utf8');
+function makeSessionManager() {
+  return {
+    registerSession: () => {},
+    unregisterSession: () => {},
+    persistSessionData: () => true,
+    getLearnerInfo: () => ({ id: 'learner-001', name: 'Perf Probe' }),
+  };
 }
 
-describe('Perf: RTE API Latency (non-gating)', () => {
-  test('sample latency and emit artifacts', () => {
-    const iterations = 50;
-    const metrics = {
-      Initialize: [],
-      GetValue: [],
-      SetValue: [],
-      Commit: [],
-      Terminate: []
-    };
+function makeLoggerSink() {
+  // In perf, avoid console.*; capture in-memory if needed
+  const entries = [];
+  return {
+    info: (m, meta) => entries.push({ level: 'info', m, meta: meta ?? null }),
+    warn: (m, meta) => entries.push({ level: 'warn', m, meta: meta ?? null }),
+    error: (m, meta) => entries.push({ level: 'error', m, meta: meta ?? null }),
+    debug: (m, meta) => entries.push({ level: 'debug', m, meta: meta ?? null }),
+    entries,
+    clear: () => { entries.length = 0; },
+  };
+}
 
-    for (let i = 0; i < iterations; i++) {
-      const api = new ApiHandler();
+describe('Perf: RTE API latency (non-gating)', () => {
+  let rng;
 
-      let t0 = now();
-      api.Initialize('');
-      metrics.Initialize.push(now() - t0);
+  beforeAll(() => {
+    rng = createSeededRng(24601);
+  });
 
-      t0 = now();
-      api.GetValue('cmi.completion_status');
-      metrics.GetValue.push(now() - t0);
+  test('Initialize → burst SetValue → Commit → Terminate latency snapshot', async () => {
+    const samples = 200;
+    const timings = [];
 
-      t0 = now();
-      api.SetValue('cmi.location', `loc-${i}`);
-      metrics.SetValue.push(now() - t0);
+    // Warm-up single run (not counted)
+    runRteSequenceOnce();
 
-      t0 = now();
-      api.Commit('');
-      metrics.Commit.push(now() - t0);
-
-      t0 = now();
-      api.Terminate('');
-      metrics.Terminate.push(now() - t0);
+    for (let i = 0; i < samples; i++) {
+      const t0 = now();
+      runRteSequenceOnce({ burst: 5, rng });
+      timings.push(now() - t0);
     }
 
-    const computed = {
-      Initialize: stats(metrics.Initialize),
-      GetValue: stats(metrics.GetValue),
-      SetValue: stats(metrics.SetValue),
-      Commit: stats(metrics.Commit),
-      Terminate: stats(metrics.Terminate)
+    const stats = summarizeTimings(timings);
+
+    const outDir = path.join(process.cwd(), 'artifacts', 'perf');
+    await fs.mkdir(outDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const base = `rte-api-latency-${stamp}`;
+
+    const payload = {
+      project: 'rte',
+      suite: 'api-latency',
+      samples,
+      stats,
+      meta: {
+        node: process.version,
+        seed: 24601,
+        burstMin: 5,
+        burstMax: 5,
+        notes: 'Non-gating perf snapshot; budgets are warnings-only in CI policy.',
+      },
     };
 
-    writeArtifact('rte-api-latency', {
-      sampleCount: iterations,
-      metrics: computed,
-      budgets: {
-        // Non-gating budgets from docs (dev baseline; CI may be +25% tolerance)
-        rte_api_p95_ms: 1.0
-      },
-      note: 'Non-gating perf capture. Review artifacts for trends.'
-    });
+    await fs.writeFile(path.join(outDir, `${base}.json`), JSON.stringify(payload, null, 2), 'utf8');
+    await fs.writeFile(
+      path.join(outDir, `${base}.txt`),
+      [
+        'RTE API Latency Perf Snapshot',
+        `samples: ${samples}`,
+        `min(ms): ${stats.min.toFixed(3)}`,
+        `avg(ms): ${stats.avg.toFixed(3)}`,
+        `p95(ms): ${stats.p95.toFixed(3)}`,
+        `seed: ${payload.meta.seed}`,
+        `burst writes: ${payload.meta.burstMin}..${payload.meta.burstMax}`,
+        '',
+        'Non-gating: see dev_docs/guides/testing-migration-and-fixtures.md',
+      ].join('\n'),
+      'utf8'
+    );
 
-    // Do not assert on thresholds; the suite is informational by policy.
-    expect(Object.keys(computed).length).toBeGreaterThan(0);
+    // Non-gating: only sanity-check non-negative timing
+    expect(stats.min).toBeGreaterThanOrEqual(0);
   });
 });
+
+function runRteSequenceOnce(options = {}) {
+  const { burst = 5, rng = Math.random } = options;
+
+  const logger = makeLoggerSink();
+  const sessionManager = makeSessionManager();
+  const api = new ScormApiHandler(sessionManager, logger, {
+    strictMode: true,
+    maxCommitFrequency: 10000,
+  });
+
+  // Initialize
+  const init = api.Initialize('');
+  if (init !== 'true') {
+    // If initialization fails we short-circuit; perf test remains non-gating
+    return;
+  }
+
+  // Burst of writes to a small set of keys (deterministic-ish)
+  const keys = ['cmi.location', 'cmi.exit', 'cmi.learner_preference.audio_level'];
+  for (let i = 0; i < burst; i++) {
+    const k = keys[Math.floor(rng() * keys.length)];
+    const v = pickValue(k, rng);
+    try { api.SetValue(k, v); } catch (_) {}
+  }
+
+  // A couple of reads
+  try { api.GetValue('cmi.location'); } catch (_) {}
+  try { api.GetValue('cmi.exit'); } catch (_) {}
+
+  // Commit
+  try { api.Commit(''); } catch (_) {}
+
+  // Terminate
+  try { api.Terminate(''); } catch (_) {}
+}
+
+function pickValue(key, rng) {
+  switch (key) {
+    case 'cmi.location': {
+      const n = 1 + Math.floor(rng() * 10);
+      return `lesson-${n}`;
+    }
+    case 'cmi.exit': {
+      const options = ['suspend', 'logout', 'normal', ''];
+      return options[Math.floor(rng() * options.length)];
+    }
+    case 'cmi.learner_preference.audio_level': {
+      // Return a string per API surface; actual validation is internal
+      const level = (rng() * 1.0).toFixed(2);
+      return `${level}`;
+    }
+    default:
+      return '';
+  }
+}

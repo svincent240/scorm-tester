@@ -124,7 +124,9 @@ describe('CAM Integration Workflow', () => {
       await setupNoMetadataPackage(noMetadataPackagePath);
 
       try {
-        const result = await camService.processPackage(noMetadataPackagePath);
+        const noMetadataManifestPath = path.join(noMetadataPackagePath, 'imsmanifest.xml');
+        const noMetadataManifestContent = await fs.readFile(noMetadataManifestPath, 'utf8');
+        const result = await camService.processPackage(noMetadataPackagePath, noMetadataManifestContent);
 
         expect(result.manifest).toBeDefined();
         expect(result.metadata).toBeNull();
@@ -222,8 +224,9 @@ describe('CAM Integration Workflow', () => {
     });
 
     test('should handle multiple concurrent processing requests', async () => {
-      const promises = Array(5).fill().map(() => 
-        camService.processPackage(testPackagePath)
+      const manifestContent = await fs.readFile(testManifestPath, 'utf8');
+      const promises = Array(5).fill().map(() =>
+        camService.processPackage(testPackagePath, manifestContent)
       );
 
       const results = await Promise.all(promises);

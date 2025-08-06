@@ -1,9 +1,17 @@
 /**
+ * Intentional internal import justification:
+ * This test suite validates the SN Activity Tree internals (ActivityTreeManager,
+ * ActivityNode) in isolation. Per dev_docs/architecture/testing-architecture.md,
+ * unit tests MAY deep-import internal modules to verify low-level behavior.
+ * Contract/integration/scenario tests MUST use public entrypoints instead.
+ * Do not refactor this file to use the SN service facade; that would change its
+ * testing layer and reduce isolation of internal invariants.
+ *
  * Activity Tree Manager Unit Tests
- * 
+ *
  * Comprehensive test suite for SCORM 2004 4th Edition Activity Tree Manager
  * covering tree construction, activity management, and state tracking.
- * 
+ *
  * @fileoverview Activity Tree Manager unit tests
  */
 

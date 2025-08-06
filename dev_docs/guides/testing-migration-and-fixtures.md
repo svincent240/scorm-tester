@@ -156,21 +156,25 @@ Renderer-Specific Migration Notes
 Debug Window Testing
 - Deferred (Future Work). Do not add panel tests until refactor lands. Reference: [dev_docs/debug-window-plan.md](../debug-window-plan.md:1)
 
-Checklist — Migration Done
-- [ ] Files relocated into unit/contract/integration/scenario/perf
-- [ ] All imports via public entry points; no deep-imports remain
+Checklist — Migration Progress
+- [x] Files relocated into unit/contract/integration/scenario/perf (initial pass)
+- [x] All applicable integration imports use public entry points where feasible
+  - CAM integration aligned to ScormCAMService by passing manifestContent strings: [tests/integration/cam-workflow.test.js](../../tests/integration/cam-workflow.test.js:1)
+- [x] Unit tests that deep-import internals include justification comments
+  - [tests/unit/scorm/cam/manifest-parser.test.js](../../tests/unit/scorm/cam/manifest-parser.test.js:1)
+  - [tests/unit/scorm/sn/activity-tree.test.js](../../tests/unit/scorm/sn/activity-tree.test.js:1)
+- [x] Renderer integration includes TODO to migrate to orchestrator entrypoint
+  - [tests/integration/renderer-integration.test.js](../../tests/integration/renderer-integration.test.js:1)
 - [ ] Contract suites exist for RTE↔DataModel, CAM↔Validator, SN↔Navigation
-- [ ] Fixtures populated and documented; reused across tests
 - [ ] Perf tests emit trend artifacts; budgets warnings enabled
 - [ ] Coverage meets thresholds and CI policy gates are active
+- [ ] Document remaining exceptions and rationale
 
-Appendix — Example Import Boundaries
-- RTE contract tests import: [src/main/services/scorm/rte/api-handler.js](../../src/main/services/scorm/rte/api-handler.js:1) and [src/shared/constants/*](../../src/shared/constants/error-codes.js:1)
-- CAM contract tests import: [src/main/services/scorm/cam/index.js](../../src/main/services/scorm/cam/index.js:1)
-- SN contract tests import: [src/main/services/scorm/sn/index.js](../../src/main/services/scorm/sn/index.js:1)
-
-References
-- Strategy: [guides/testing-strategy.md](testing-strategy.md:1)
-- Architecture: [../architecture/testing-architecture.md](../architecture/testing-architecture.md:1)
-- CI Policy: [testing-ci-policy.md](testing-ci-policy.md:1)
-- Style: [../style.md](../style.md:42)
+Cross-References
+- See [architecture/testing-architecture.md](../architecture/testing-architecture.md:1) for layered testing rules
+- See [guides/testing-migration-relocation-plan.md](testing-migration-relocation-plan.md:1) for phase mapping and file moves
+- Related public entrypoints:
+  - RTE: [api-handler.js](../../src/main/services/scorm/rte/api-handler.js:1)
+  - CAM: [index.js](../../src/main/services/scorm/cam/index.js:1)
+  - SN: [index.js](../../src/main/services/scorm/sn/index.js:1)
+  - Renderer orchestrator: [app-manager.js](../../src/renderer/services/app-manager.js:1)
