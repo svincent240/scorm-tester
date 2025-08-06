@@ -427,8 +427,9 @@ class UIStateManager {
     for (const [id, subscriber] of this.subscribers) {
       try {
         if (subscriber.path) {
-          const prevValue = this.getNestedValue(previousState, subscriber.path);
-          const newValue = this.getNestedValue(newState, subscriber.path);
+          // Use imported helper instead of nonexistent instance method to avoid 'this' binding errors
+          const prevValue = getNestedValue(previousState, subscriber.path);
+          const newValue = getNestedValue(newState, subscriber.path);
           
           if (prevValue !== newValue) {
             subscriber.callback(newValue, prevValue, subscriber.path);

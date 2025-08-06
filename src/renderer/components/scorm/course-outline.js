@@ -291,8 +291,18 @@ class CourseOutline extends BaseComponent {
 
   navigateToItem(itemId) {
     if (!this.options.enableNavigation) return;
-    
+
     this.setCurrentItem(itemId);
+
+    // Emit centralized choice intent for AppManager orchestration
+    (async () => {
+      try {
+        const { eventBus } = await import('../../services/event-bus.js');
+        // SCORM SN uses "choice" requests with target activity
+        eventBus.emit('navigation:request', { type: 'choice', activityId: itemId, source: 'course-outline' });
+      } catch (_) { /* no-op */ }
+    })();
+
     this.emit('navigationRequested', { itemId });
   }
 

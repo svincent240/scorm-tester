@@ -60,7 +60,37 @@ class ScormSNService {
     try {
       this.logger?.info('Initializing SN service with manifest');
 
-      // Validate manifest has sequencing information
+      // Diagnostics: summarize orgs/items/sequencing presence prior to validation
+      try {
+        // Normalize organizations to a single array regardless of shape
+        const orgs = (Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization)
+          || (Array.isArray(manifest?.organizations?.organizations) && manifest.organizations.organizations)
+          || [];
+
+        const countItems = (items) => (Array.isArray(items) ? items.reduce((n, it) => n + 1 + countItems(it?.children || it?.items || []), 0) : 0);
+        const hasExplicitSeq = orgs.some(org => {
+          if (org?.sequencing) return true;
+          const stack = Array.isArray(org?.items) ? [...org.items] : [];
+          while (stack.length) {
+            const it = stack.pop();
+            if (!it) continue;
+            if (it.sequencing) return true;
+            const kids = (Array.isArray(it.children) ? it.children : (Array.isArray(it.items) ? it.items : []));
+            if (kids.length) stack.push(...kids);
+          }
+          return false;
+        });
+
+        const orgSummary = {
+          orgs: orgs.length,
+          items: orgs.reduce((sum, org) => sum + countItems(org?.items || []), 0),
+          explicitSequencing: hasExplicitSeq,
+          defaultOrg: manifest?.organizations?.default || null
+        };
+        this.logger?.info('SN.init: CAM manifest summary', orgSummary);
+      } catch (_) { /* best-effort diagnostics */ }
+
+      // Validate manifest has sequencing information (or defaults allowed)
       if (!this.validateManifestForSequencing(manifest)) {
         return { success: false, reason: 'Manifest does not contain valid sequencing information' };
       }
@@ -332,16 +362,70 @@ class ScormSNService {
   }
 
   /**
-   * Validate manifest contains sequencing information
+   * Validate manifest contains sufficient information to build an activity tree
+   * and apply SCORM 2004 sequencing defaults.
+   *
+   * SCORM 2004 (3rd/4th Ed.) does NOT require every item to have explicit
+   * imsss:sequencing. Default sequencing behaviors apply when sequencing is
+   * omitted. Therefore, SN should initialize if at least one organization
+   * with items exists, even if explicit sequencing elements are absent.
+   *
+   * Accept when:
+   *  - There is at least one organization with at least one item
+   *  - OR organizations exist and any org/item has imsss sequencing
+   *
+   * Reject only when no organizations exist or organizations have no items.
+   *
    * @private
-   * @param {Object} manifest - CAM manifest
-   * @returns {boolean} True if valid for sequencing
+   * @param {Object} manifest - CAM manifest (parsed by CAM)
+   * @returns {boolean} True if valid for sequencing/session initialization
    */
   validateManifestForSequencing(manifest) {
-    return manifest && 
-           manifest.organizations && 
-           manifest.organizations.organizations && 
-           manifest.organizations.organizations.length > 0;
+    try {
+      if (!manifest || !manifest.organizations) return false;
+
+      // Accept both shapes: { organizations: { organizations: [] } } and canonical { organizations: { organization: [] } }
+      const orgs =
+        (Array.isArray(manifest.organizations.organizations) && manifest.organizations.organizations)
+        || (Array.isArray(manifest.organizations.organization) && manifest.organizations.organization)
+        || [];
+
+      if (!Array.isArray(orgs) || orgs.length === 0) {
+        return false;
+      }
+
+      // If any explicit sequencing present at org or item level, accept.
+      const hasExplicitSequencing =
+        orgs.some(org => {
+          if (org && org.sequencing) return true;
+          const stack = Array.isArray(org?.items) ? [...org.items] : [];
+          while (stack.length) {
+            const it = stack.pop();
+            if (!it) continue;
+            if (it.sequencing) return true;
+            const kids = (Array.isArray(it.children) ? it.children : (Array.isArray(it.items) ? it.items : []));
+            if (kids.length) stack.push(...kids);
+          }
+          return false;
+        });
+
+      if (hasExplicitSequencing) {
+        return true;
+      }
+
+      // Otherwise ensure at least one item exists to apply default sequencing.
+      const hasAnyItems =
+        orgs.some(org => {
+          const items = Array.isArray(org?.items) ? org.items : [];
+          return items.length > 0;
+        });
+
+      return hasAnyItems;
+    } catch (e) {
+      this.logger?.warn('SN.validateManifestForSequencing: permissive accept due to error', { message: e?.message });
+      // On parser irregularities, be permissive and allow defaults to apply
+      return true;
+    }
   }
 
   /**

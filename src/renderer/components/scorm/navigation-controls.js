@@ -235,6 +235,14 @@ class NavigationControls extends BaseComponent {
    */
   async handlePreviousClick() {
     if (!this.isNavigationAvailable('previous')) return;
+
+    // Emit centralized intent for AppManager orchestration
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('navigation:request', { type: 'previous', source: 'navigation-controls' });
+    } catch (_) {
+      // fall through; component-local behavior remains
+    }
     
     this.emit('navigationRequested', { direction: 'previous' });
     await this.processNavigation('previous');
@@ -245,6 +253,14 @@ class NavigationControls extends BaseComponent {
    */
   async handleNextClick() {
     if (!this.isNavigationAvailable('continue')) return;
+
+    // Emit centralized intent for AppManager orchestration
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('navigation:request', { type: 'continue', source: 'navigation-controls' });
+    } catch (_) {
+      // fall through; component-local behavior remains
+    }
     
     this.emit('navigationRequested', { direction: 'next' });
     await this.processNavigation('continue');
@@ -342,6 +358,15 @@ class NavigationControls extends BaseComponent {
         activity: result.targetActivity,
         sequencing: result.sequencing
       });
+      // Broadcast centralized launch intent for other listeners
+      try {
+        const { eventBus } = await import('../../services/event-bus.js');
+        eventBus.emit('navigation:launch', {
+          activity: result.targetActivity,
+          sequencing: result.sequencing,
+          source: 'navigation-controls'
+        });
+      } catch (_) { /* no-op */ }
     }
     
     // Update available navigation options
@@ -358,6 +383,15 @@ class NavigationControls extends BaseComponent {
       }
       // Also reflect locally for immediate button state sync
       this.updateAvailableNavigation(result.availableNavigation);
+
+      // Emit centralized availability update to keep interested parties in sync
+      try {
+        const { eventBus } = await import('../../services/event-bus.js');
+        eventBus.emit('navigation:updated', {
+          ...normalized,
+          source: 'navigation-controls'
+        });
+      } catch (_) { /* no-op */ }
     }
   }
 

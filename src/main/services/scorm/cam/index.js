@@ -119,15 +119,18 @@ class ScormCAMService {
 
       // 3b. Build UI Outline for renderer (static, manifest-derived)
       try {
-        // Manifest stats logging prior to building outline
+        // Manifest stats logging prior to building outline (namespace-robust)
         const _toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
-        const orgListForStats = _toArray(manifest?.organizations?.organization);
-        const resListForStats = _toArray(manifest?.resources?.resource);
+        // Accept both canonical { organizations: { organization: [] } } and alternative shapes
+        const orgContainer = manifest?.organizations;
+        const orgListForStats = _toArray(orgContainer?.organization || orgContainer?.organizations || orgContainer);
+        const resContainer = manifest?.resources;
+        const resListForStats = _toArray(resContainer?.resource || resContainer?.resources || resContainer);
         const statsSample = {
           firstOrg: orgListForStats.length > 0 ? {
             identifier: orgListForStats[0]?.identifier || null,
             title: orgListForStats[0]?.title || null,
-            hasItems: !!orgListForStats[0]?.item
+            hasItems: !!(orgListForStats[0]?.item || orgListForStats[0]?.items || orgListForStats[0]?.children)
           } : null,
           firstResource: resListForStats.length > 0 ? {
             identifier: resListForStats[0]?.identifier || null,
@@ -138,24 +141,56 @@ class ScormCAMService {
         this.logger?.info('ScormCAMService: manifest org/resources counts', {
           orgCount: orgListForStats.length,
           resCount: resListForStats.length,
-          defaultOrg: manifest?.organizations?.default || null,
+          defaultOrg: orgContainer?.default || null,
           sample: statsSample
         });
 
         // Build outline from organizations FIRST and only fall back if organizations truly absent/empty
+        // SCORM 2004: default organization applies when explicit selection exists; items under that org form the course tree.
         analysis = analysis || {};
-        const hasCanonicalOrgs = Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization.length > 0;
+        const hasAnyOrgs = orgListForStats.length > 0;
         let usedFallback = false;
 
+        // Helper: count items recursively in org
+        const countOrgItems = (org) => {
+          const toArr = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+          const walk = (items) => {
+            const arr = toArr(items);
+            let n = 0;
+            for (const it of arr) {
+              n += 1;
+              n += walk(it && (it.item || it.items || []));
+            }
+            return n;
+          };
+          return walk(org && (org.item || org.items || []));
+        };
+
         let uiOutlineFromOrg = [];
-        if (hasCanonicalOrgs) {
-          uiOutlineFromOrg = this.buildUiOutlineFromManifest(manifest, packagePath) || [];
+        if (hasAnyOrgs) {
+          // Prefer default org if present and has items; otherwise first org with items
+          const defId = orgContainer?.default || null;
+          const pickOrg = (() => {
+            if (defId) {
+              const def = orgListForStats.find(o => (o && (o.identifier === defId)));
+              if (def && countOrgItems(def) > 0) return def;
+            }
+            // fallback to first org that has items
+            const withItems = orgListForStats.find(o => !!(o && (o.item || o.items || o.children)));
+            return withItems || orgListForStats[0] || null;
+          })();
+
+          // Build outline strictly from organizations branch
+          uiOutlineFromOrg = this.buildUiOutlineFromManifest({
+            ...manifest,
+            organizations: { default: pickOrg?.identifier || orgContainer?.default, organization: [pickOrg || orgListForStats[0]].filter(Boolean) }
+          }, packagePath) || [];
         }
 
-        if (hasCanonicalOrgs && uiOutlineFromOrg.length > 0) {
+        if ((hasAnyOrgs && uiOutlineFromOrg.length > 0)) {
           analysis.uiOutline = uiOutlineFromOrg;
         } else {
-          // No canonical orgs or failed to build org outline -> try resources-based fallback
+          // Only fall back to resources when no orgs or org had zero items
           const fallback = this.buildUiOutlineFromResources(manifest);
           analysis.uiOutline = Array.isArray(fallback) ? fallback : [];
           usedFallback = analysis.uiOutline.length > 0;
@@ -198,10 +233,10 @@ class ScormCAMService {
           hasOrganizations: !!cleanedManifest?.organizations,
           hasResources: !!cleanedManifest?.resources,
           orgKeyType: cleanedManifest?.organizations
-            ? (Array.isArray(cleanedManifest.organizations.organization) ? 'organization[]' : Object.keys(cleanedManifest.organizations))
+            ? 'organization[]'
             : 'none',
           resKeyType: cleanedManifest?.resources
-            ? (Array.isArray(cleanedManifest.resources.resource) ? 'resource[]' : Object.keys(cleanedManifest.resources))
+            ? 'resource[]'
             : 'none',
           orgCount: orgsArr.length,
           resCount: resArr.length

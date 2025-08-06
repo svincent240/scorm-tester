@@ -1,7 +1,7 @@
 RTE API Latency Perf Snapshot
 samples: 200
 min(ms): 0.000
-avg(ms): 0.155
+avg(ms): 0.080
 p95(ms): 1.000
 seed: 24601
 burst writes: 5..5

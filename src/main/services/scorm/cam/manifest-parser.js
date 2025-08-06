@@ -117,10 +117,15 @@ class ManifestParser {
         throw new Error('XML parsing error');
       }
 
-      if (!manifestElement || manifestElement.tagName !== 'manifest') {
+      if (!manifestElement) {
         console.error('ManifestParser: Invalid manifest structure');
-        console.error('ManifestParser: manifestElement exists:', !!manifestElement);
-        console.error('ManifestParser: tagName:', manifestElement?.tagName);
+        this.errorHandler?.setError('301', 'Invalid manifest: missing root element', 'parseManifestXML');
+        throw new Error('Invalid manifest structure');
+      }
+      // Accept namespaced manifest root; xmldom sets tagName with prefix, localName is stable
+      const rootLocal = manifestElement.localName || manifestElement.tagName;
+      if (rootLocal !== 'manifest') {
+        console.error('ManifestParser: Invalid manifest structure - unexpected root:', manifestElement.tagName);
         this.errorHandler?.setError('301', 'Invalid manifest: root element must be <manifest>', 'parseManifestXML');
         throw new Error('Invalid manifest structure');
       }
@@ -227,10 +232,15 @@ class ManifestParser {
     const organizationsElement = this.getChildElement(manifestElement, 'organizations');
     if (!organizationsElement) return null;
 
-    const defaultOrg = this.getAttribute(organizationsElement, 'default');
+    // default is unqualified attribute on imscp:organizations
+    const defaultOrg = organizationsElement.getAttributeNS
+      ? (organizationsElement.getAttributeNS(null, 'default') || organizationsElement.getAttribute('default'))
+      : this.getAttribute(organizationsElement, 'default');
     const organizations = [];
 
-    const orgElements = this.getChildElements(organizationsElement, 'organization');
+    // Only imscp:organization direct children
+    const orgElements = this.getChildElements(organizationsElement, 'imscp:organization')
+      .concat(this.getChildElements(organizationsElement, 'organization'));
     for (const orgElement of orgElements) {
       organizations.push(this.parseOrganization(orgElement, basePath));
     }
@@ -295,11 +305,26 @@ class ManifestParser {
     const xmlBase = this.getAttribute(resourceElement, 'xml:base') || '';
     const resolvedBase = path.resolve(basePath, xmlBase);
 
+    // Resolve attributes with namespace awareness for adlcp:scormType and xml:base
+    const getAttr = (el, qn, nsMap) => {
+      if (!el) return null;
+      if (qn.includes(':') && el.getAttributeNS) {
+        const [p, local] = qn.split(':');
+        const ns = nsMap[p];
+        const v = ns ? el.getAttributeNS(ns, local) : null;
+        return v || el.getAttribute(qn) || null;
+      }
+      // null namespace for unqualified
+      return (el.getAttributeNS ? el.getAttributeNS(null, qn) : null) || el.getAttribute(qn) || null;
+    };
+    const nsMap = this.namespaces;
+    const scormTypeAttr = getAttr(resourceElement, 'adlcp:scormType', nsMap) || getAttr(resourceElement, 'scormType', nsMap);
+    const hrefAttr = getAttr(resourceElement, 'href', nsMap);
     return {
-      identifier: this.getAttribute(resourceElement, 'identifier'),
-      type: this.getAttribute(resourceElement, 'type'),
-      scormType: this.getAttribute(resourceElement, 'adlcp:scormType'),
-      href: this.getAttribute(resourceElement, 'href'),
+      identifier: getAttr(resourceElement, 'identifier', nsMap),
+      type: getAttr(resourceElement, 'type', nsMap),
+      scormType: scormTypeAttr,
+      href: hrefAttr,
       xmlBase: xmlBase,
       resolvedBase: resolvedBase,
       files: this.parseFiles(resourceElement, resolvedBase),
@@ -319,24 +344,79 @@ class ManifestParser {
   }
 
   /**
-   * Helper method to get child element
-   * @param {Element} parent - Parent element
-   * @param {string} tagName - Tag name to find
-   * @returns {Element|null} Child element
+   * Helper method to get child element (namespace-aware and scoped)
+   * IMPORTANT: getElementsByTagName() is not namespace-aware and searches
+   * descendants globally. For SCORM/IMS (e.g., imsss:*), we must:
+   *  - Respect the namespace prefix in tagName when provided
+   *  - Restrict search to direct children to avoid picking deeper descendants
    */
   getChildElement(parent, tagName) {
-    const children = parent.getElementsByTagName(tagName);
-    return children.length > 0 ? children[0] : null;
+    if (!parent) return null;
+    const wantNs = tagName.includes(':') ? tagName.split(':')[0] : null;
+    const wantLocal = tagName.includes(':') ? tagName.split(':')[1] : tagName;
+
+    // iterate only direct child nodes
+    const childNodes = parent.childNodes || [];
+    for (let i = 0; i < childNodes.length; i++) {
+      const node = childNodes[i];
+      if (!node || node.nodeType !== 1 /* ELEMENT_NODE */) continue;
+
+      const local = node.localName || node.nodeName;
+      const prefix = node.prefix || (node.nodeName.includes(':') ? node.nodeName.split(':')[0] : null);
+
+      if (local === wantLocal) {
+        if (wantNs) {
+          if (prefix === wantNs) {
+            return node;
+          }
+          // If prefix differs but namespace URI matches our known mapping, accept
+          if (node.namespaceURI && this.namespaces[wantNs] && node.namespaceURI === this.namespaces[wantNs]) {
+            return node;
+          }
+        } else {
+          // No namespace expected
+          return node;
+        }
+      }
+    }
+    return null;
   }
 
   /**
-   * Helper method to get all child elements
-   * @param {Element} parent - Parent element
-   * @param {string} tagName - Tag name to find
-   * @returns {Array} Array of child elements
+   * Helper method to get all child elements (namespace-aware and scoped)
+   * Only returns direct children that match tagName (with optional prefix).
    */
   getChildElements(parent, tagName) {
-    return Array.from(parent.getElementsByTagName(tagName));
+    const results = [];
+    if (!parent) return results;
+
+    const wantNs = tagName.includes(':') ? tagName.split(':')[0] : null;
+    const wantLocal = tagName.includes(':') ? tagName.split(':')[1] : tagName;
+
+    const childNodes = parent.childNodes || [];
+    for (let i = 0; i < childNodes.length; i++) {
+      const node = childNodes[i];
+      if (!node || node.nodeType !== 1 /* ELEMENT_NODE */) continue;
+
+      const local = node.localName || node.nodeName;
+      const prefix = node.prefix || (node.nodeName.includes(':') ? node.nodeName.split(':')[0] : null);
+
+      if (local === wantLocal) {
+        if (wantNs) {
+          if (prefix === wantNs) {
+            results.push(node);
+            continue;
+          }
+          if (node.namespaceURI && this.namespaces[wantNs] && node.namespaceURI === this.namespaces[wantNs]) {
+            results.push(node);
+            continue;
+          }
+        } else {
+          results.push(node);
+        }
+      }
+    }
+    return results;
   }
 
   /**
@@ -361,15 +441,19 @@ class ManifestParser {
    */
   parseItems(parentElement, basePath) {
     const items = [];
-    const itemElements = this.getChildElements(parentElement, 'item');
+    // Only direct child items
+    // Direct children; support any prefix mapping for IMS CP
+    const itemElements = this.getChildElements(parentElement, 'imscp:item')
+      .concat(this.getChildElements(parentElement, 'item'));
     for (const itemElement of itemElements) {
       items.push({
         identifier: this.getAttribute(itemElement, 'identifier'),
         identifierref: this.getAttribute(itemElement, 'identifierref'),
-        isvisible: this.getAttribute(itemElement, 'isvisible') === 'true',
+        // SCORM default for isvisible is true; explicit "false" hides
+        isvisible: this.getAttribute(itemElement, 'isvisible') !== 'false',
         parameters: this.getAttribute(itemElement, 'parameters'),
         title: this.getElementText(itemElement, 'title'),
-        children: this.parseItems(itemElement, basePath), // Recursive call for nested items
+        children: this.parseItems(itemElement, basePath), // Recursive for nested items
         sequencing: this.parseSequencing(itemElement),
         metadata: this.parseMetadata(itemElement, basePath)
       });
@@ -383,7 +467,10 @@ class ManifestParser {
    * @returns {Object|null} Sequencing information
    */
   parseSequencing(element) {
-    const sequencingElement = this.getChildElement(element, 'imsss:sequencing');
+    // Namespace-aware lookup for sequencing
+    // Prefer imsss namespace; accept matching namespaceURI even if prefix differs
+    const sequencingElement = this.getChildElement(element, 'imsss:sequencing')
+      || this.getChildElement(element, 'sequencing'); // fallback if parser stripped prefix but namespaceURI matches in helper
     if (!sequencingElement) return null;
 
     return {
@@ -472,7 +559,8 @@ class ManifestParser {
    * @returns {Object|null} Control mode information
    */
   parseControlMode(sequencingElement) {
-    const controlModeElement = this.getChildElement(sequencingElement, 'imsss:controlMode');
+    const controlModeElement = this.getChildElement(sequencingElement, 'imsss:controlMode')
+      || this.getChildElement(sequencingElement, 'controlMode');
     if (!controlModeElement) return null;
 
     return {
@@ -528,12 +616,14 @@ class ManifestParser {
    * @returns {Object|null} Conditions information
    */
   parseConditions(ruleElement) {
-    const conditionsElement = this.getChildElement(ruleElement, 'imsss:ruleConditions');
+    const conditionsElement = this.getChildElement(ruleElement, 'imsss:ruleConditions')
+      || this.getChildElement(ruleElement, 'ruleConditions');
     if (!conditionsElement) return null;
 
     return {
       conditionCombination: this.getAttribute(conditionsElement, 'conditionCombination') || 'all',
-      conditions: this.getChildElements(conditionsElement, 'imsss:ruleCondition').map(conditionElement => ({
+      conditions: (this.getChildElements(conditionsElement, 'imsss:ruleCondition')
+        .concat(this.getChildElements(conditionsElement, 'ruleCondition'))).map(conditionElement => ({
         condition: this.getAttribute(conditionElement, 'condition'),
         operator: this.getAttribute(conditionElement, 'operator') || 'noOp',
         measureThreshold: this.getAttribute(conditionElement, 'measureThreshold'),
@@ -548,7 +638,8 @@ class ManifestParser {
    * @returns {Object|null} Rule actions information
    */
   parseRuleActions(ruleElement) {
-    const actionsElement = this.getChildElement(ruleElement, 'imsss:ruleActions');
+    const actionsElement = this.getChildElement(ruleElement, 'imsss:ruleActions')
+      || this.getChildElement(ruleElement, 'ruleActions');
     if (!actionsElement) return null;
 
     return {
@@ -578,7 +669,8 @@ class ManifestParser {
    * @returns {Object|null} Rollup rules information
    */
   parseRollupRules(sequencingElement) {
-    const rollupRulesElement = this.getChildElement(sequencingElement, 'imsss:rollupRules');
+    const rollupRulesElement = this.getChildElement(sequencingElement, 'imsss:rollupRules')
+      || this.getChildElement(sequencingElement, 'rollupRules');
     if (!rollupRulesElement) return null;
 
     return {
@@ -598,7 +690,8 @@ class ManifestParser {
    * @returns {Object|null} Rollup considerations information
    */
   parseRollupConsiderations(rollupRulesElement) {
-    const rollupConsiderationsElement = this.getChildElement(rollupRulesElement, 'imsss:rollupConsiderations');
+    const rollupConsiderationsElement = this.getChildElement(rollupRulesElement, 'imsss:rollupConsiderations')
+      || this.getChildElement(rollupRulesElement, 'rollupConsiderations');
     if (!rollupConsiderationsElement) return null;
 
     return {
@@ -617,7 +710,8 @@ class ManifestParser {
    * @returns {Object|null} Objectives information
    */
   parseObjectives(sequencingElement) {
-    const objectivesElement = this.getChildElement(sequencingElement, 'imsss:objectives');
+    const objectivesElement = this.getChildElement(sequencingElement, 'imsss:objectives')
+      || this.getChildElement(sequencingElement, 'objectives');
     if (!objectivesElement) return null;
 
     return {
@@ -633,7 +727,8 @@ class ManifestParser {
    * @returns {Object|null} Objective information
    */
   parseObjective(parentElement, tagName = 'imsss:objective') {
-    const objectiveElement = this.getChildElement(parentElement, tagName);
+    const objectiveElement = this.getChildElement(parentElement, tagName)
+      || (tagName === 'imsss:objective' ? this.getChildElement(parentElement, 'objective') : null);
     if (!objectiveElement) return null;
 
     return {
@@ -650,7 +745,8 @@ class ManifestParser {
    * @returns {Object|null} Map info information
    */
   parseMapInfo(objectiveElement) {
-    const mapInfoElement = this.getChildElement(objectiveElement, 'imsss:mapInfo');
+    const mapInfoElement = this.getChildElement(objectiveElement, 'imsss:mapInfo')
+      || this.getChildElement(objectiveElement, 'mapInfo');
     if (!mapInfoElement) return null;
 
     return {
@@ -668,7 +764,8 @@ class ManifestParser {
    * @returns {Object|null} Randomization controls information
    */
   parseRandomizationControls(sequencingElement) {
-    const randomizationControlsElement = this.getChildElement(sequencingElement, 'imsss:randomizationControls');
+    const randomizationControlsElement = this.getChildElement(sequencingElement, 'imsss:randomizationControls')
+      || this.getChildElement(sequencingElement, 'randomizationControls');
     if (!randomizationControlsElement) return null;
 
     return {
@@ -685,7 +782,8 @@ class ManifestParser {
    * @returns {Object|null} Delivery controls information
    */
   parseDeliveryControls(sequencingElement) {
-    const deliveryControlsElement = this.getChildElement(sequencingElement, 'imsss:deliveryControls');
+    const deliveryControlsElement = this.getChildElement(sequencingElement, 'imsss:deliveryControls')
+      || this.getChildElement(sequencingElement, 'deliveryControls');
     if (!deliveryControlsElement) return null;
 
     return {

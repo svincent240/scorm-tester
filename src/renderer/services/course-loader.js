@@ -138,15 +138,21 @@ class CourseLoader {
         rendererLogger.info('CourseLoader: structure pre-normalize snapshot', diag);
       } catch (_) {}
 
-      // Prefer CAM-provided uiOutline if available
+      // Prefer CAM-provided uiOutline if available AND manifest has organizations
       try {
         const { rendererLogger } = await import('../utils/renderer-logger.js');
         const uiOutline = Array.isArray(analysis?.uiOutline) ? analysis.uiOutline : null;
-        if (uiOutline && uiOutline.length > 0) {
-          rendererLogger.info('CourseLoader: using CAM-provided uiOutline', {
+        const orgCountDiag = Array.isArray(analysis?.manifest?.organizations?.organization)
+          ? analysis.manifest.organizations.organization.length
+          : (analysis?.manifest?.organizations?.organization ? 1 : 0);
+        if (uiOutline && uiOutline.length > 0 && orgCountDiag > 0) {
+          rendererLogger.info('CourseLoader: using CAM-provided uiOutline (organizations present)', {
             count: uiOutline.length,
+            orgCount: orgCountDiag,
             sample: { identifier: uiOutline[0]?.identifier, title: uiOutline[0]?.title, href: uiOutline[0]?.href, type: uiOutline[0]?.type }
           });
+        } else if (uiOutline && uiOutline.length > 0) {
+          rendererLogger.info('CourseLoader: CAM uiOutline present but organizations missing; will still normalize from uiOutline', { count: uiOutline.length, orgCount: orgCountDiag });
         } else {
           rendererLogger.info('CourseLoader: CAM-provided uiOutline not present; falling back to renderer normalization');
         }
@@ -289,20 +295,22 @@ class CourseLoader {
         };
       };
 
-      // Prefer CAM-provided structure when available, else build from manifest
-      // If CAM provided a uiOutline (array of nodes), wrap it into a structure shape directly
+      // Prefer CAM-provided structure from organizations when available; wrap uiOutline into structure
       let rawStructure;
       if (Array.isArray(analysis?.uiOutline) && analysis.uiOutline.length > 0) {
         rawStructure = {
-          title: manifest?.organizations?.organization?.title
+          title: (manifest?.organizations?.organization?.title)
+            || (Array.isArray(manifest?.organizations?.organization) ? manifest.organizations.organization[0]?.title : null)
             || manifest?.identifier
             || 'Course',
-          identifier: manifest?.organizations?.organization?.identifier
+          identifier: (manifest?.organizations?.organization?.identifier)
+            || (Array.isArray(manifest?.organizations?.organization) ? manifest.organizations.organization[0]?.identifier : null)
             || manifest?.identifier
             || 'course',
           items: analysis.uiOutline
         };
       } else {
+        // If CAM didn't provide uiOutline, build from manifest organizations before any resource fallback
         rawStructure = (analysis && analysis.structure) ? analysis.structure : buildStructureFromManifest(manifest);
       }
       let normalized = normalizeStructure(rawStructure);
@@ -350,7 +358,7 @@ class CourseLoader {
       };
 
       // FINAL SAFETY A: if uiStructure has zero items but manifest has organizations.organization.item,
-      // convert manifest directly as a last-resort path.
+      // convert manifest directly as a last-resort path. Never skip organizations in favor of resources if orgs+items exist.
       if (Array.isArray(uiStructure.items) && uiStructure.items.length === 0 && manifest?.organizations?.organization) {
         try {
           // Prefer default organization if specified
@@ -358,7 +366,7 @@ class CourseLoader {
             ? manifest.organizations.organization
             : [manifest.organizations.organization];
           const defaultOrgId = manifest.organizations.default;
-          const org = (defaultOrgId && organizations.find(o => o.identifier === defaultOrgId)) || organizations[0];
+          const pickOrg = (defaultOrgId && organizations.find(o => o.identifier === defaultOrgId)) || organizations.find(o => (o && (o.item || o.items))) || organizations[0];
 
           const resourceMap = buildResourceMap(manifest);
 
@@ -384,10 +392,10 @@ class CourseLoader {
             });
           };
 
-          const fallbackItems = mapItems(org?.item);
+          const fallbackItems = mapItems(pickOrg?.item);
           const fallbackStructure = {
-            title: org?.title || manifest?.identifier || 'Course',
-            identifier: org?.identifier || 'course',
+            title: pickOrg?.title || manifest?.identifier || 'Course',
+            identifier: pickOrg?.identifier || 'course',
             items: fallbackItems
           };
           if (Array.isArray(fallbackStructure.items) && fallbackStructure.items.length > 0) {
@@ -396,8 +404,8 @@ class CourseLoader {
         } catch (_) {}
       }
 
-      // FINAL SAFETY B: if still zero items and manifest has organizations but 0 organization nodes,
-      // derive items from manifest.resources as launchable SCOs, using default org id for root naming if available.
+      // FINAL SAFETY B: Only if organizations container exists but has no organization nodes at all,
+      // derive a flat list from resources (true org absence). Otherwise never override org-derived structure.
       if (Array.isArray(uiStructure.items) && uiStructure.items.length === 0 && manifest?.organizations && !manifest?.organizations?.organization) {
         try {
           const resourceMap = buildResourceMap(manifest);
@@ -501,6 +509,7 @@ class CourseLoader {
           itemsLen,
           itemLen
         });
+        // Ensure metrics reflect normalized manifest from CAM, not any post-fallback mutation
         rendererLogger.info('CourseLoader: manifest-derived metrics', {
           manifestOrgCount,
           resourcesCount,

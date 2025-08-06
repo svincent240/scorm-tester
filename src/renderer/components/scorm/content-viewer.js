@@ -221,7 +221,30 @@ class ContentViewer extends BaseComponent {
       
       // Load content in iframe
       if (this.iframe) {
-        this.iframe.src = url;
+        // Use a host frameset document so the API lives on the parent of the SCO,
+        // matching typical LMS embedding without modifying course code.
+        const hostHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>SCORM Host</title>
+    <style>
+      html, body { margin:0; padding:0; height:100%; width:100%; overflow:hidden; background:#fff; }
+      #scoFrame { border:0; width:100%; height:100%; }
+    </style>
+  </head>
+  <body>
+    <iframe id="scoFrame" name="scoFrame" src="about:blank" allow="fullscreen" sandbox="${this.options.sandbox}"></iframe>
+    <script>
+      // Placeholder - APIs will be injected by parent renderer synchronously after load
+    </script>
+  </body>
+</html>`;
+        // srcdoc sets the host document first; on load we will inject APIs and set child frame src to url
+        this.iframe.srcdoc = hostHtml;
+        // Stash target SCO URL for use when host becomes available
+        this._pendingScoUrl = url;
       }
       
       this.emit('contentLoadStarted', { url, options });
@@ -247,14 +270,72 @@ class ContentViewer extends BaseComponent {
       this.contentWindow = this.iframe.contentWindow;
       this.hideLoading();
       this.showContent();
-      
-      // Setup SCORM API in content window using the bridge
-      this.setupScormAPI();
 
-      // Verify SCORM API presence and fallbacks
-      setTimeout(() => {
-        this.verifyScormApiPresence();
-      }, 0);
+      try {
+        // Diagnostics: log initial content document state
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          const docReady = (() => {
+            try { return this.contentWindow?.document?.readyState || 'unknown'; } catch (_) { return 'err'; }
+          })();
+          rendererLogger.info('[ContentViewer] iframe load: contentWindow acquired', {
+            url: this.currentUrl,
+            loadTimeMs: loadTime,
+            docReadyState: docReady
+          });
+        }).catch(() => {});
+      } catch (_) {}
+
+      // If we used host frameset via srcdoc, we must await the host DOM and then:
+      // - inject canonical APIs into host (self)
+      // - mirror to host.parent/top/opener (within iframe context, as accessible)
+      // - set the child frame src to the SCO launch URL
+      const cw = this.contentWindow;
+      const hostDoc = cw?.document;
+      const useHost = !!(hostDoc && hostDoc.getElementById && hostDoc.getElementById('scoFrame'));
+      if (useHost) {
+        // Ensure host DOM is ready
+        const onHostReady = () => {
+          try {
+            // Inject canonical APIs into the host window and mirror to its ancestors within iframe context
+            this.setupScormAPI();
+
+            // Point child frame to the actual SCO URL
+            try {
+              const scoFrame = hostDoc.getElementById('scoFrame');
+              if (scoFrame && this._pendingScoUrl) {
+                scoFrame.src = this._pendingScoUrl;
+              }
+            } catch (_) {}
+
+            // Verify presence from host window perspective
+            setTimeout(() => { this.verifyScormApiPresence(); }, 0);
+
+            // Host initialized log
+            import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.info('[ContentViewer] host frameset initialized', {
+                url: this.currentUrl,
+                scoUrl: this._pendingScoUrl || null
+              });
+            }).catch(() => {});
+          } catch (e) {
+            try {
+              import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+                rendererLogger.error('[ContentViewer] host frameset init error', { message: e?.message || String(e) });
+              }).catch(() => {});
+            } catch (_) {}
+          }
+        };
+
+        if (hostDoc.readyState === 'complete' || hostDoc.readyState === 'interactive') {
+          onHostReady();
+        } else {
+          hostDoc.addEventListener('DOMContentLoaded', onHostReady, { once: true });
+        }
+      } else {
+        // Fallback: direct page load (non-srcdoc path)
+        this.setupScormAPI();
+        setTimeout(() => { this.verifyScormApiPresence(); }, 0);
+      }
       
       // Apply scaling after content loads
       setTimeout(() => {
@@ -306,14 +387,178 @@ class ContentViewer extends BaseComponent {
       // Create optimized SCORM API wrapper
       const apiWrapper = this.createOptimizedAPIWrapper();
       
-      // Prefer direct injection
-      this.contentWindow.API = apiWrapper.scorm12;           // SCORM 1.2
-      this.contentWindow.API_1484_11 = apiWrapper.scorm2004; // SCORM 2004
-      
-      this.emit('scormApiInjected', { contentWindow: this.contentWindow });
+      // Prefer direct injection into the content window
+      const win = this.contentWindow;
+      win.API = apiWrapper.scorm12;           // SCORM 1.2
+      win.API_1484_11 = apiWrapper.scorm2004; // SCORM 2004
+
+      // Strict spec exposure only: no overrides to course discovery functions.
+      // We expose canonical API objects; SCO's own discovery will locate them.
+      const defineDiscoveryShims = null; // intentionally not used to avoid patching course code
+
+      // Mirror canonical API onto self, parent, top, and opener when accessible (no function overrides)
+      let mirrorParentSet = false;
+      let mirrorTopSet = false;
+      let mirrorOpenerSet = false;
+      try {
+        const parent = win.parent;
+        if (parent && parent !== win) {
+          try {
+            if (!parent.API_1484_11) { parent.API_1484_11 = win.API_1484_11; mirrorParentSet = true; }
+            if (!parent.API) { parent.API = win.API; mirrorParentSet = true; }
+          } catch (_) {}
+        }
+        if (win.top && win.top !== win) {
+          try {
+            if (!win.top.API_1484_11) { win.top.API_1484_11 = win.API_1484_11; mirrorTopSet = true; }
+            if (!win.top.API) { win.top.API = win.API; mirrorTopSet = true; }
+          } catch (_) {}
+        }
+        if (win.opener) {
+          try {
+            if (!win.opener.API_1484_11) { win.opener.API_1484_11 = win.API_1484_11; mirrorOpenerSet = true; }
+            if (!win.opener.API) { win.opener.API = win.API; mirrorOpenerSet = true; }
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      // Diagnostics for parent/top mirroring and discovery patch
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          const has12 = !!(win && win.API && (typeof win.API.Initialize === 'function' || typeof win.API.LMSInitialize === 'function'));
+          const has2004 = !!(win && win.API_1484_11 && typeof win.API_1484_11.Initialize === 'function');
+          const hasFinders = !!(win && (typeof win.FindAPI === 'function' || typeof win.FindAPI_1484_11 === 'function'));
+          const parentHas = (() => { try { const p = win.parent; return !!(p && (p.API_1484_11 || p.API)); } catch (_) { return false; } })();
+          const topHas = (() => { try { const t = win.top; return !!(t && (t.API_1484_11 || t.API)); } catch (_) { return false; } })();
+          rendererLogger.info('[ContentViewer] SCORM API injected', {
+            url: this.currentUrl,
+            has12,
+            has2004,
+            hasFinders
+          });
+          rendererLogger.info('[ContentViewer] parent/top mirror diagnostics', {
+            url: this.currentUrl,
+            mirrorParentSet,
+            mirrorTopSet,
+            parentHasAny: parentHas,
+            topHasAny: topHas
+          });
+        }).catch(() => {});
+      } catch (_) {}
+
+      // Diagnostics: snapshot capabilities immediately after injection
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          const has12 = !!(win && win.API && (typeof win.API.Initialize === 'function' || typeof win.API.LMSInitialize === 'function'));
+          const has2004 = !!(win && win.API_1484_11 && typeof win.API_1484_11.Initialize === 'function');
+          rendererLogger.info('[ContentViewer] SCORM API injected', {
+            url: this.currentUrl,
+            has12,
+            has2004,
+            hasFinders: false
+          });
+        }).catch(() => {});
+      } catch (_) {}
+ 
+      // Strict mode: no normalization helpers and no invocation of SCO discovery.
+      let ensuredSelf = true; // we exposed canonical APIs already
+ 
+      // Strict mode: do not wrap or modify course functions. Only log presence.
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('[ContentViewer] strict mode active: no course overrides', { url: this.currentUrl });
+        }).catch(() => {});
+      } catch (_) {}
+ 
+      // Log ensure results
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('[ContentViewer] ensureScormAPI diagnostics', {
+            url: this.currentUrl,
+            ensuredSelf
+          });
+        }).catch(() => {});
+      } catch (_) {}
+
+      // Final compatibility: expose only canonical APIs and avoid course overrides.
+      // Also ensure any popup windows receive canonical APIs without touching their discovery functions.
+      try {
+        // Ensure global references on SCO window are present
+        try {
+          if (typeof win.API === 'undefined' || !win.API || typeof win.API.Initialize !== 'function') {
+            if (win.API_1484_11 && typeof win.API_1484_11.Initialize === 'function') {
+              win.API = win.API_1484_11;
+            } else {
+              win.API = apiWrapper.scorm12;
+            }
+          }
+          if (!win.API_1484_11 || typeof win.API_1484_11.Initialize !== 'function') {
+            win.API_1484_11 = apiWrapper.scorm2004;
+          }
+        } catch (_) {}
+
+        // Intercept window.open only to set canonical API objects on new windows
+        try {
+          if (!win.__scormWindowOpenPatched) {
+            const originalOpen = win.open;
+            win.open = function patchedOpen(url, name, specs) {
+              const popup = originalOpen ? originalOpen.call(win, url, name, specs) : null;
+              try {
+                const pw = popup && (popup.window || popup);
+                if (pw) {
+                  try {
+                    if (!pw.API_1484_11) pw.API_1484_11 = apiWrapper.scorm2004;
+                    if (!pw.API) pw.API = apiWrapper.scorm12;
+                  } catch (_) {}
+                }
+              } catch (_) {}
+              try {
+                import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+                  rendererLogger.info('[ContentViewer] window.open intercepted (canonical APIs set)', { url, name, injected: !!(popup && (popup.window || popup)) });
+                }).catch(() => {});
+              } catch (_) {}
+              return popup;
+            };
+            win.__scormWindowOpenPatched = true;
+          }
+        } catch (_) {}
+
+        // Enumerate immediate frames for visibility
+        try {
+          const framesInfo = [];
+          const doc = win.document;
+          if (doc && doc.getElementsByTagName) {
+            const iframes = doc.getElementsByTagName('iframe') || [];
+            for (let i = 0; i < iframes.length; i++) {
+              const node = iframes[i];
+              let name = '';
+              let src = '';
+              try { name = node.name || node.id || ''; } catch (_) {}
+              try { src = node.getAttribute('src') || ''; } catch (_) {}
+              framesInfo.push({ index: i, name, src });
+            }
+          }
+          import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+            rendererLogger.info('[ContentViewer] immediate frame enumeration', { url: this.currentUrl, count: framesInfo.length, frames: framesInfo });
+          }).catch(() => {});
+        } catch (_) {}
+      } catch (_) {}
+ 
+      // After injection, propagate API into same-origin descendant frames that the SCO might use
+      this.propagateApiToFrames(win, apiWrapper);
+ 
+      // Also observe for dynamically created iframes within the SCO
+      this.observeAndPropagateToNewIframes(win, apiWrapper);
+ 
+      this.emit('scormApiInjected', { contentWindow: win });
       
     } catch (error) {
       // Do not console.warn per logging rules; presence verification will notify/log
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error('[ContentViewer] SCORM API injection error', error?.message || String(error));
+        }).catch(() => {});
+      } catch (_) {}
     }
   }
 
@@ -900,6 +1145,17 @@ class ContentViewer extends BaseComponent {
       const has2004 = api2004 && typeof api2004.Initialize === 'function';
       const has12 = api12 && (typeof api12.Initialize === 'function' || typeof api12.LMSInitialize === 'function');
 
+      // Diagnostic snapshot before branching
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('[ContentViewer] verifyScormApiPresence snapshot', {
+            url: this.currentUrl,
+            has12,
+            has2004
+          });
+        }).catch(() => {});
+      } catch (_) {}
+
       if (has2004 || has12) {
         // API present; nothing further required
         this.emit('scormApiVerified', { mode: 'direct', has2004, has12 });
@@ -935,6 +1191,12 @@ class ContentViewer extends BaseComponent {
         if (!responded) {
           window.removeEventListener('message', listener);
           // Neither direct API nor bridge responded; standardize via showError
+          try {
+            import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.error('[ContentViewer] SCORM API missing after probe', { url: this.currentUrl });
+            }).catch(() => {});
+          } catch (_) {}
+
           this.showError(
             'SCORM API not found',
             'The SCO did not expose API_1484_11 or API, and no postMessage bridge responded. The course may not be SCORM-enabled or is loading in a context that cannot access the API.'
@@ -945,6 +1207,147 @@ class ContentViewer extends BaseComponent {
     } catch (err) {
       this.showError('SCORM API verification error', err?.message || String(err));
     }
+  }
+
+  /**
+   * Recursively propagate injected API into same-origin descendant frames
+   * and define discovery shims in those contexts.
+   * Best-effort, silently skips cross-origin frames.
+   * @private
+   */
+  propagateApiToFrames(rootWin, apiWrapper, depth = 0) {
+    try {
+      if (!rootWin || depth > 5) return; // prevent deep recursion
+      const wins = [];
+      try {
+        // Current window first
+        wins.push(rootWin);
+        // Descendant iframes
+        const doc = rootWin.document;
+        if (doc && doc.getElementsByTagName) {
+          const iframes = doc.getElementsByTagName('iframe') || [];
+          for (let i = 0; i < iframes.length; i++) {
+            const cw = iframes[i].contentWindow;
+            if (cw) wins.push(cw);
+          }
+        }
+      } catch (_) {}
+
+      const defineDiscoveryShims = (w) => {
+        try {
+          if (!w) return;
+          if (typeof w.FindAPI_1484_11 !== 'function') {
+            w.FindAPI_1484_11 = function (start) {
+              try {
+                if (start && start.API_1484_11) return start.API_1484_11;
+                let p = start ? start.parent : w.parent;
+                let hops = 0;
+                while (p && p !== start && hops < 10) {
+                  if (p.API_1484_11) return p.API_1484_11;
+                  p = p.parent;
+                  hops++;
+                }
+              } catch (_) {}
+              return w.API_1484_11 || null;
+            };
+          }
+          if (typeof w.GetAPI_1484_11 !== 'function') {
+            w.GetAPI_1484_11 = function () { return w.FindAPI_1484_11(w) || null; };
+          }
+          if (typeof w.FindAPI !== 'function') {
+            w.FindAPI = function (start) {
+              try {
+                if (start && start.API) return start.API;
+                let p = start ? start.parent : w.parent;
+                let hops = 0;
+                while (p && p !== start && hops < 10) {
+                  if (p.API) return p.API;
+                  p = p.parent;
+                  hops++;
+                }
+              } catch (_) {}
+              return w.API || null;
+            };
+          }
+          if (typeof w.GetAPI !== 'function') {
+            w.GetAPI = function () { return w.FindAPI(w) || null; };
+          }
+        } catch (_) {}
+      };
+
+      for (const w of wins) {
+        try {
+          if (w) {
+            if (!w.API_1484_11) w.API_1484_11 = apiWrapper.scorm2004;
+            if (!w.API) w.API = apiWrapper.scorm12;
+            defineDiscoveryShims(w);
+          }
+        } catch (_) { /* cross-origin frame or access denied */ }
+      }
+
+      // Recurse a level into discovered frames
+      for (const w of wins) {
+        try { this.propagateApiToFrames(w, apiWrapper, depth + 1); } catch (_) {}
+      }
+
+      // Log a brief snapshot for diagnostics
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        try {
+          const hasAny = !!(rootWin && (rootWin.API_1484_11 || rootWin.API));
+          rendererLogger.info('[ContentViewer] propagateApiToFrames completed', {
+            url: this.currentUrl,
+            depth,
+            rootHasAny: hasAny
+          });
+        } catch (_) {}
+      }).catch(() => {});
+    } catch (_) { /* swallow */ }
+  }
+
+  /**
+   * Observe the SCO document for newly added iframes and propagate API
+   * @private
+   */
+  observeAndPropagateToNewIframes(rootWin, apiWrapper) {
+    try {
+      const doc = rootWin && rootWin.document;
+      if (!doc || !doc.body || typeof MutationObserver !== 'function') return;
+
+      // Disconnect previous observer if any
+      if (this._iframeObserver) {
+        try { this._iframeObserver.disconnect(); } catch (_) {}
+        this._iframeObserver = null;
+      }
+
+      this._iframeObserver = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'childList' && m.addedNodes && m.addedNodes.length) {
+            for (const node of m.addedNodes) {
+              try {
+                if (node && node.tagName && node.tagName.toLowerCase() === 'iframe') {
+                  const cw = node.contentWindow;
+                  if (cw) {
+                    try {
+                      if (!cw.API_1484_11) cw.API_1484_11 = apiWrapper.scorm2004;
+                      if (!cw.API) cw.API = apiWrapper.scorm12;
+                    } catch (_) {}
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      });
+
+      this._iframeObserver.observe(doc.body, { childList: true, subtree: true });
+
+      // Also do a delayed pass to catch late loads
+      setTimeout(() => { try { this.propagateApiToFrames(rootWin, apiWrapper, 0); } catch (_) {} }, 300);
+
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.info('[ContentViewer] observeAndPropagateToNewIframes attached', { url: this.currentUrl });
+      }).catch(() => {});
+    } catch (_) { /* swallow */ }
   }
 
   /**

@@ -263,6 +263,138 @@ class AppManager {
         });
       } catch (_) {}
     });
+
+    // Debounce guard for navigation requests to avoid IPC rate limiting
+    this._lastNavAt = 0;
+    this._NAV_DEBOUNCE_MS = 300;
+
+    // Centralized navigation intents from UI components (NavigationControls, CourseOutline)
+    eventBus.on('navigation:request', async (payload) => {
+      const now = Date.now();
+      if (now - (this._lastNavAt || 0) < this._NAV_DEBOUNCE_MS) {
+        try { this.logger.warn('AppManager: navigation:request debounced'); } catch (_) {}
+        return;
+      }
+      this._lastNavAt = now;
+
+      try {
+        const type = payload && payload.type;
+        const activityId = payload && payload.activityId ? String(payload.activityId) : null;
+        this.logger.info('AppManager: navigation:request received', { type, activityId, source: payload && payload.source });
+
+        // Prefer NavigationControls SN flow (includes internal fallbacks)
+        const navControls = this.components.get('navigationControls');
+
+        // Decide path based on SN availability
+        const snBridgeModule = await import('./sn-bridge.js');
+        const snBridge = snBridgeModule.snBridge;
+        const init = await snBridge.initialize().catch(() => ({ success: false }));
+        const snAvailable = !!(init && init.success);
+
+        // Handle CHOICE when SN is unavailable: fall back to direct content load
+        if (type === 'choice' && activityId && !snAvailable) {
+          try {
+            const structure = this.uiState.getState('courseStructure');
+            const target = this._findItemById(structure, activityId);
+            const launchUrl = target && (target.href || target.launchUrl);
+            if (launchUrl) {
+              this.logger.warn('AppManager: SN unavailable; falling back to direct content load for choice', { activityId, launchUrl });
+              const contentViewer = this.components.get('contentViewer');
+              if (contentViewer && typeof contentViewer.loadContent === 'function') {
+                await contentViewer.loadContent(launchUrl);
+              }
+              // Heuristic availability: set next enabled, previous enabled to keep UI responsive
+              try { this.uiState.updateNavigation({ canNavigatePrevious: true, canNavigateNext: true, _fromComponent: true }); } catch (_) {}
+              // Emit launch signal for any listeners
+              eventBus.emit('navigation:launch', { activity: { identifier: activityId, launchUrl }, sequencing: null, source: 'app-manager-fallback' });
+              return;
+            } else {
+              this.logger.warn('AppManager: Could not resolve launchUrl for choice fallback', { activityId });
+            }
+          } catch (e) {
+            this.logger.error('AppManager: Choice fallback error', e?.message || e);
+          }
+          // If fallback unsuccessful, do not proceed to SN (since unavailable)
+          return;
+        }
+
+        // If SN available, execute via NavigationControls or directly via snBridge
+        if (navControls && typeof navControls.processNavigation === 'function') {
+          if (type === 'choice' && activityId) {
+            await navControls.processNavigation('choice', activityId);
+          } else if (type === 'previous') {
+            await navControls.processNavigation('previous');
+          } else if (type === 'continue' || type === 'next') {
+            await navControls.processNavigation('continue');
+          } else {
+            this.logger.warn('AppManager: Unknown navigation type; ignoring', type);
+          }
+          return;
+        }
+
+        if (!snAvailable) {
+          this.logger.warn('AppManager: SN bridge unavailable; navigation request cannot be processed');
+          return;
+        }
+
+        let requestType = null;
+        let targetId = null;
+        if (type === 'choice' && activityId) {
+          requestType = 'choice'; targetId = activityId;
+        } else if (type === 'previous') {
+          requestType = 'previous';
+        } else if (type === 'continue' || type === 'next') {
+          requestType = 'continue';
+        }
+
+        if (!requestType) {
+          this.logger.warn('AppManager: Invalid navigation request payload', payload);
+          return;
+        }
+
+        const result = await snBridge.processNavigation(requestType, targetId);
+        if (result && result.success) {
+          // Update availability in UIState (authoritative)
+          if (result.availableNavigation) {
+            const normalized = this.normalizeAvailableNavigation(result.availableNavigation);
+            try {
+              this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+            } catch (e) {
+              this.logger.warn('AppManager: Failed to update UIState after navigation', e?.message || e);
+            }
+          }
+          // Handle launch
+          if (result.targetActivity && result.action === 'launch') {
+            eventBus.emit('navigation:launch', {
+              activity: result.targetActivity,
+              sequencing: result.sequencing,
+              source: 'app-manager'
+            });
+            const contentViewer = this.components.get('contentViewer');
+            try {
+              if (contentViewer && typeof contentViewer.loadActivity === 'function') {
+                await contentViewer.loadActivity(result.targetActivity);
+              } else if (contentViewer && typeof contentViewer.loadContent === 'function' && result.targetActivity?.launchUrl) {
+                await contentViewer.loadContent(result.targetActivity.launchUrl);
+              }
+            } catch (e) {
+              this.logger.error('AppManager: Failed to instruct ContentViewer for launch', e?.message || e);
+            }
+          }
+        } else {
+          this.logger.warn('AppManager: Navigation request failed', result && (result.reason || 'unknown'));
+        }
+      } catch (err) {
+        try { this.logger.error('AppManager: Error handling navigation:request', err?.message || err); } catch (_) {}
+      }
+    });
+
+    // Optional: reflect navigation launch to components that rely on centralized signal
+    eventBus.on('navigation:launch', (data) => {
+      try {
+        this.logger.info('AppManager: navigation:launch propagated', { activityId: data?.activity?.id || data?.activity?.identifier || null, source: data?.source });
+      } catch (_) {}
+    });
  
     // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
@@ -575,6 +707,34 @@ class AppManager {
     } catch (error) {
       try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) {}
     }
+  }
+  /**
+   * Normalize availableNavigation array into booleans for UIState authority.
+   * Mirrors NavigationControls.normalizeAvailableNavigation to avoid duplication drift.
+   */
+  normalizeAvailableNavigation(availableNavigation = []) {
+    const a = Array.isArray(availableNavigation) ? availableNavigation : [];
+    const canNavigatePrevious = a.includes('previous') || a.includes('choice.previous');
+    const canNavigateNext = a.includes('continue') || a.includes('choice.next') || a.includes('choice');
+    return { canNavigatePrevious, canNavigateNext };
+  }
+
+  /**
+   * Find an item by identifier within a course structure tree.
+   */
+  _findItemById(structure, id) {
+    if (!structure) return null;
+    const stack = [];
+    if (Array.isArray(structure.items)) stack.push(...structure.items);
+    if (Array.isArray(structure.children)) stack.push(...structure.children);
+    while (stack.length) {
+      const node = stack.shift();
+      if (!node) continue;
+      if (node.identifier === id || node.identifierref === id) return node;
+      const kids = Array.isArray(node.items) ? node.items : (Array.isArray(node.children) ? node.children : []);
+      if (kids.length) stack.push(...kids);
+    }
+    return null;
   }
 }
 

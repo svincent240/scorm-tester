@@ -289,8 +289,8 @@ class IpcHandler extends BaseService {
           }
         }
 
-        // Rate limit check with channel policies
-        const rateAllowed = this.checkRateLimit(event.sender);
+        // Rate limit check with channel policies (pass channel for SCORM-aware exemptions)
+        const rateAllowed = this.checkRateLimit(event.sender, channel);
         if (!rateAllowed) {
           // Initialize per-channel suppression map once
           if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
@@ -482,31 +482,57 @@ class IpcHandler extends BaseService {
   /**
    * Check rate limiting for sender
    */
-  checkRateLimit(sender) {
+  /**
+   * Check rate limiting for sender with SCORM-aware exemptions.
+   * We allow a brief burst grace period for SCORM API calls immediately after Initialize,
+   * and we never rate-limit scorm-get-value during that grace window.
+   */
+  checkRateLimit(sender, channel = null) {
     if (!this.config.enableRateLimiting) {
       return true;
     }
-    
+
+    // SCORM-aware grace window: exempt scorm-get-value shortly after Initialize ACK
+    try {
+      if (channel === 'scorm-get-value') {
+        const scormService = this.getDependency('scormService');
+        if (scormService && typeof scormService.getAllSessions === 'function') {
+          const sessions = scormService.getAllSessions();
+          // Find any session that was initialized within the last 750ms
+          const nowTs = Date.now();
+          for (const s of sessions) {
+            const started = s && s.startTime ? new Date(s.startTime).getTime() : 0;
+            if (started && (nowTs - started) <= 750) {
+              // Allow early GetValue bursts during startup
+              return true;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // On any failure of exemption logic, fall back to generic limiter
+    }
+
     const senderId = sender.id;
     const now = Date.now();
     const windowStart = now - this.config.rateLimitWindow;
-    
+
     let rateLimitEntry = this.rateLimitMap.get(senderId);
     if (!rateLimitEntry) {
       rateLimitEntry = { requests: [], blocked: false };
       this.rateLimitMap.set(senderId, rateLimitEntry);
     }
-    
+
     rateLimitEntry.requests = rateLimitEntry.requests.filter(time => time > windowStart);
-    
+
     if (rateLimitEntry.requests.length >= this.config.rateLimitMax) {
       rateLimitEntry.blocked = true;
       return false;
     }
-    
+
     rateLimitEntry.requests.push(now);
     rateLimitEntry.blocked = false;
-    
+
     return true;
   }
 

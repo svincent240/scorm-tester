@@ -1,7 +1,7 @@
 SN Rule Evaluation Perf Snapshot
 samples: 200
 min(ms): 0.000
-avg(ms): 0.010
+avg(ms): 0.005
 p95(ms): 0.000
 seed: 1337
 manifest activities: 50
