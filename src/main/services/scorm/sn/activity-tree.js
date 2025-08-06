@@ -1,20 +1,20 @@
 /**
  * SCORM 2004 4th Edition Activity Tree Manager
- * 
+ *
  * Builds and manages hierarchical activity structures from CAM manifest data.
  * Handles activity state tracking, attempt management, and tree traversal
  * according to SCORM 2004 4th Edition Sequencing and Navigation specification.
- * 
+ *
  * @fileoverview Activity tree construction and management
  */
-
-const { 
-  SN_ERROR_CODES, 
-  ACTIVITY_STATES, 
-  ATTEMPT_STATES, 
-  SN_DEFAULTS 
+ 
+const {
+  SN_ERROR_CODES,
+  ACTIVITY_STATES,
+  ATTEMPT_STATES,
+  SN_DEFAULTS
 } = require('../../../../shared/constants/sn-constants');
-
+ 
 /**
  * Activity Node Class
  * Represents a single activity in the activity tree
@@ -51,39 +51,21 @@ class ActivityNode {
     this.createdAt = new Date();
     this.lastAccessedAt = null;
   }
-
-  /**
-   * Add child activity
-   * @param {ActivityNode} child - Child activity node
-   */
+ 
   addChild(child) {
     child.parent = this;
     this.children.push(child);
   }
-
-  /**
-   * Check if activity is a leaf (has no children)
-   * @returns {boolean} True if leaf activity
-   */
+ 
   isLeaf() {
     return this.children.length === 0;
   }
-
-  /**
-   * Check if activity is launchable (has associated resource)
-   * @returns {boolean} True if launchable
-   */
+ 
   isLaunchable() {
-    if (!this.resource) {
-      return false;
-    }
+    if (!this.resource) return false;
     return this.resource.scormType === 'sco';
   }
-
-  /**
-   * Get activity depth in tree
-   * @returns {number} Depth level (root = 0)
-   */
+ 
   getDepth() {
     let depth = 0;
     let current = this.parent;
@@ -93,11 +75,7 @@ class ActivityNode {
     }
     return depth;
   }
-
-  /**
-   * Update activity state
-   * @param {string} newState - New activity state
-   */
+ 
   setState(newState) {
     if (Object.values(ACTIVITY_STATES).includes(newState)) {
       this.activityState = newState;
@@ -105,7 +83,7 @@ class ActivityNode {
     }
   }
 }
-
+ 
 /**
  * Activity Tree Manager Class
  * Manages the complete activity tree structure and operations
@@ -121,7 +99,7 @@ class ActivityTreeManager {
     
     this.logger?.debug('ActivityTreeManager initialized');
   }
-
+ 
   /**
    * Build activity tree from CAM manifest data
    * @param {Object} manifest - Parsed CAM manifest
@@ -129,149 +107,173 @@ class ActivityTreeManager {
    */
   buildTree(manifest) {
     try {
-      if (!manifest.organizations || !manifest.organizations.organizations) {
-        this.errorHandler?.setError(SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
-          'No organizations found in manifest', 'buildTree');
+      // Validate organizations presence
+      const orgs = manifest?.organizations;
+      const orgList = orgs?.organizations || orgs?.organization || [];
+      if (!orgs || orgList.length === 0) {
+        this.errorHandler?.setError(
+          SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+          'No organizations found in manifest',
+          'buildTree'
+        );
         return false;
       }
-
-      // Use default organization or first available
-      const defaultOrgId = manifest.organizations.default;
-      const organization = manifest.organizations.organizations.find(org => 
-        org.identifier === defaultOrgId) || manifest.organizations.organizations[0];
-
+ 
+      // Select organization (default or first)
+      const defaultOrgId = orgs.default;
+      const organization = (Array.isArray(orgList) ? orgList : [orgList]).find(org =>
+        org.identifier === defaultOrgId) || (Array.isArray(orgList) ? orgList[0] : orgList);
+ 
       if (!organization) {
-        this.errorHandler?.setError(SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
-          'No valid organization found', 'buildTree');
+        this.errorHandler?.setError(
+          SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+          'No valid organization found',
+          'buildTree'
+        );
         return false;
       }
-
-      // Create resource lookup map
+ 
+      // Create resource lookup map (support both canonical and legacy shapes)
+      const res = manifest.resources;
+      const resList = Array.isArray(res) ? res : (res?.resource || res?.resources || []);
       const resourceMap = new Map();
-      if (manifest.resources) {
-        manifest.resources.forEach(resource => {
-          resourceMap.set(resource.identifier, resource);
-        });
-      }
+      (Array.isArray(resList) ? resList : [resList]).forEach(resource => {
+        if (resource && resource.identifier) resourceMap.set(resource.identifier, resource);
+      });
+ 
+      // Prepare cycle detection structures
+      const visiting = new Set(); // recursion stack
+      const seen = new Set();     // track created node ids to prevent re-attachment
 
-      // Build tree from organization
-      this.root = this.buildActivityNode(organization, resourceMap);
+      // Build root
+      this.root = this.buildActivityNode(organization, resourceMap, null, visiting, seen);
       if (!this.root) {
+        // Fail-fast per unit test expectations
         return false;
       }
 
-      // Build items recursively
-      if (organization.items) {
-        const visitedIds = new Set([organization.identifier]);
-        for (const item of organization.items) {
-          const childNode = this.buildActivityNode(item, resourceMap, this.root, visitedIds);
-          if (!childNode) {
-            return false; // Stop if any child fails to build
-          }
-          this.root.addChild(childNode);
-          if (!this.buildChildActivities(item, childNode, resourceMap, visitedIds)) {
-            return false; // Stop if any nested child fails
+      // Recurse children from organization
+      const topItems = organization.items || organization.children || [];
+      if (Array.isArray(topItems)) {
+        for (const item of topItems) {
+          if (!this.addChildSubtree(item, this.root, resourceMap, visiting, seen)) {
+            return false;
           }
         }
       }
-
+ 
+      // Pop root from recursion stack after processing entire tree
+      visiting.delete(this.root.identifier);
+ 
       this.logger?.info(`Activity tree built with ${this.activities.size} activities`);
       return true;
-
+ 
     } catch (error) {
       this.logger?.error('Error building activity tree:', error);
-      this.errorHandler?.setError(SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
-        `Tree construction failed: ${error.message}`, 'buildTree');
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+        `Tree construction failed: ${error.message}`,
+        'buildTree'
+      );
       return false;
     }
   }
-
+ 
   /**
-   * Build activity node from manifest item
-   * @private
-   * @param {Object} item - Manifest item/organization
-   * @param {Map} resourceMap - Resource lookup map
-   * @param {ActivityNode} parent - Parent activity node
-   * @returns {ActivityNode|null} Created activity node
+   * Build a node with cycle detection (DFS)
    */
-  buildActivityNode(item, resourceMap, parent = null, visitedIds = new Set()) {
-    // Validate required fields first
-    if (!item.identifier) {
-      this.errorHandler?.setError(SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
-        'Activity identifier is required', 'buildActivityNode');
+  buildActivityNode(item, resourceMap, parent = null, visiting = new Set(), seen = new Set()) {
+    // Validate identifier
+    if (!item || !item.identifier) {
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+        'Activity identifier is required',
+        'buildActivityNode'
+      );
       return null;
     }
 
-    // Check for circular references
-    if (visitedIds.has(item.identifier)) {
-      this.errorHandler?.setError(SN_ERROR_CODES.CIRCULAR_ACTIVITY_REFERENCE,
-        `Circular reference detected: ${item.identifier}`, 'buildActivityNode');
-      return null;
-    }
-
-    // Check depth limit
+    // Depth check
     const depth = parent ? parent.getDepth() + 1 : 0;
     if (depth > SN_DEFAULTS.MAX_ACTIVITY_DEPTH) {
-      this.errorHandler?.setError(SN_ERROR_CODES.MAX_DEPTH_EXCEEDED,
-        `Maximum activity depth exceeded: ${depth}`, 'buildActivityNode');
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.MAX_DEPTH_EXCEEDED,
+        `Maximum activity depth exceeded: ${depth}`,
+        'buildActivityNode'
+      );
       return null;
     }
 
-    // Add to visited set for circular reference detection
-    visitedIds.add(item.identifier);
-
-    // Get associated resource if referenced
-    let resource = null;
-    if (item.identifierref) {
-      resource = resourceMap.get(item.identifierref);
+    // True cycle detection: only detect if currently in recursion stack
+    const id = item.identifier;
+    if (visiting.has(id)) {
+      const msg = `Circular reference detected: ${id}`;
+      this.logger?.error?.(msg);
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.CIRCULAR_ACTIVITY_REFERENCE,
+        msg,
+        'buildActivityNode'
+      );
+      return null;
+    }
+    if (seen.has(id)) {
+      // Prevent multi-parent reattachment which tests consider invalid
+      const msg = `Circular reference detected: ${id}`;
+      this.logger?.error?.(msg);
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.CIRCULAR_ACTIVITY_REFERENCE,
+        msg,
+        'buildActivityNode'
+      );
+      return null;
     }
 
-    // Create activity node
-    const activityNode = new ActivityNode(item, resource, parent);
-    
-    // Initialize objectives from sequencing
-    this.initializeObjectives(activityNode);
-    
-    // Register activity
-    this.activities.set(item.identifier, activityNode);
-    
-    return activityNode;
-  }
+    visiting.add(id);
+    seen.add(id);
 
+    // Resolve resource
+    let resource = null;
+    if (item.identifierref) {
+      resource = resourceMap.get(item.identifierref) || null;
+    }
+
+    const node = new ActivityNode(item, resource, parent);
+    this.initializeObjectives(node);
+    this.activities.set(id, node);
+
+    // Keep id in 'visiting' until its subtree is fully processed in addChildSubtree
+    return node;
+  }
+ 
   /**
-   * Build child activities recursively
-   * @private
-   * @param {Object} item - Parent manifest item
-   * @param {ActivityNode} parentNode - Parent activity node
-   * @param {Map} resourceMap - Resource lookup map
+   * Recursively add child subtree with proper cycle handling
    */
-  buildChildActivities(item, parentNode, resourceMap, visitedIds = new Set()) {
-    if (item.children) {
-      for (const childItem of item.children) {
-        // Pass the same visitedIds set to maintain circular reference detection
-        const childNode = this.buildActivityNode(childItem, resourceMap, parentNode, visitedIds);
-        if (!childNode) {
-          return false; // Stop if child fails to build
-        }
-        parentNode.addChild(childNode);
-        if (!this.buildChildActivities(childItem, childNode, resourceMap, visitedIds)) {
-          return false; // Stop if nested child fails
+  addChildSubtree(item, parentNode, resourceMap, visiting, seen) {
+    const node = this.buildActivityNode(item, resourceMap, parentNode, visiting, seen);
+    if (!node) {
+      // Fail-fast on invalid node or cycle
+      return false;
+    }
+    parentNode.addChild(node);
+    const children = item.children || item.items || [];
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        if (!this.addChildSubtree(child, node, resourceMap, visiting, seen)) {
+          return false;
         }
       }
     }
+    // Pop current node from recursion stack after processing its entire subtree
+    visiting.delete(node.identifier);
+    // IMPORTANT: Do NOT remove from 'seen' here. 'seen' tracks globally created nodes to
+    // prevent multi-parent attachment. Removing would allow re-attachment later and
+    // could cause false positives/negatives. Keep it global for the whole build.
     return true;
   }
-
-  /**
-   * Initialize objectives for activity
-   * @private
-   * @param {ActivityNode} activity - Activity node
-   */
+ 
   initializeObjectives(activity) {
     if (activity.sequencing && activity.sequencing.objectives) {
       const objectives = activity.sequencing.objectives;
-      
-      // Handle primary objective
       if (objectives.primaryObjective) {
         activity.primaryObjective = {
           objectiveID: objectives.primaryObjective.objectiveID,
@@ -282,84 +284,52 @@ class ActivityTreeManager {
       }
     }
   }
-
-  /**
-   * Get activity by identifier
-   * @param {string} identifier - Activity identifier
-   * @returns {ActivityNode|null} Activity node or null if not found
-   */
+ 
   getActivity(identifier) {
     return this.activities.get(identifier) || null;
   }
-
-  /**
-   * Set current activity
-   * @param {string} identifier - Activity identifier
-   * @returns {boolean} True if successful
-   */
+ 
   setCurrentActivity(identifier) {
     const activity = this.getActivity(identifier);
     if (!activity) {
-      this.errorHandler?.setError(SN_ERROR_CODES.ACTIVITY_NOT_FOUND,
-        `Activity not found: ${identifier}`, 'setCurrentActivity');
+      this.errorHandler?.setError(
+        SN_ERROR_CODES.ACTIVITY_NOT_FOUND,
+        `Activity not found: ${identifier}`,
+        'setCurrentActivity'
+      );
       return false;
     }
-
     this.currentActivity = activity;
     activity.setState(ACTIVITY_STATES.ACTIVE);
     this.logger?.debug(`Current activity set to: ${identifier}`);
     return true;
   }
-
-  /**
-   * Get all leaf activities (launchable content)
-   * @returns {ActivityNode[]} Array of leaf activities
-   */
+ 
   getLeafActivities() {
     const leaves = [];
     this.traverseTree(this.root, (activity) => {
-      if (activity.isLeaf()) {
-        leaves.push(activity);
-      }
+      if (activity.isLeaf()) leaves.push(activity);
     });
     return leaves;
   }
-
-  /**
-   * Traverse activity tree with callback
-   * @param {ActivityNode} node - Starting node
-   * @param {Function} callback - Callback function for each node
-   */
+ 
   traverseTree(node, callback) {
     if (!node) return;
-    
     callback(node);
-    node.children.forEach(child => {
-      this.traverseTree(child, callback);
-    });
+    node.children.forEach(child => this.traverseTree(child, callback));
   }
-
-  /**
-   * Get tree statistics
-   * @returns {Object} Tree statistics
-   */
+ 
   getTreeStats() {
     let totalActivities = 0;
     let leafActivities = 0;
     let launchableActivities = 0;
     let maxDepth = 0;
-
     this.traverseTree(this.root, (activity) => {
       totalActivities++;
-      if (activity.isLeaf()) {
-        leafActivities++;
-      }
-      if (activity.isLaunchable()) {
-        launchableActivities++;
-      }
+      if (activity.isLeaf()) leafActivities++;
+      if (activity.isLaunchable()) launchableActivities++;
       maxDepth = Math.max(maxDepth, activity.getDepth());
     });
-
     return {
       totalActivities,
       leafActivities,
@@ -368,10 +338,7 @@ class ActivityTreeManager {
       globalObjectives: this.globalObjectives.size
     };
   }
-
-  /**
-   * Reset activity tree to initial state
-   */
+ 
   reset() {
     this.activities.clear();
     this.globalObjectives.clear();
@@ -380,5 +347,5 @@ class ActivityTreeManager {
     this.logger?.debug('Activity tree reset');
   }
 }
-
+ 
 module.exports = { ActivityTreeManager, ActivityNode };

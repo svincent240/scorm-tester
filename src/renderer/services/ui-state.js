@@ -8,9 +8,14 @@
  */
 
 
+import { deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState } from './ui-state.helpers.js';
+import { getInitialUIState } from './ui-state.initial.js';
+import { showNotification, removeNotification } from './ui-state.notifications.js';
+import { setupDebugMirroring } from './ui-state.debug.js';
+
 /**
  * UI State Manager Class
- * 
+ *
  * Centralized state management with event-driven updates and persistence.
  */
 class UIStateManager {
@@ -22,10 +27,23 @@ class UIStateManager {
     this.eventBus = null; // Will be loaded dynamically
     // Reentrancy guard to prevent progress:updated <-> state:changed ABAB cycles
     this._emittingProgress = false;
-    
+
+    // Environment flags
+    this.isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+
     this.loadPersistedState();
     // Event listeners that don't depend on eventBus can be set up here
-    this.setupGlobalEventListeners();
+    // Only attach DOM listeners when running in a browser/renderer context
+    if (this.isBrowser) {
+      this.setupGlobalEventListeners();
+    } else {
+      // Write to renderer/app log without using console (per logging rules)
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('UIStateManager: DOM environment not detected; global listeners disabled for non-browser context');
+        }).catch(() => {});
+      } catch (_) { /* no-op */ }
+    }
   }
 
   /**
@@ -33,66 +51,8 @@ class UIStateManager {
    * @returns {Object} Initial state object
    */
   getInitialState() {
-    return {
-      // Session state
-      currentSession: null,
-      sessionStartTime: null,
-      isConnected: true,
-      
-      // Course state
-      courseInfo: null,
-      courseStructure: null,
-      currentCoursePath: null,
-      entryPoint: null,
-      
-      // Navigation state
-      navigationState: {
-        canNavigatePrevious: false,
-        canNavigateNext: false,
-        currentItem: null,
-        isFlowOnly: false,
-        menuVisible: false
-      },
-      
-      // Progress state
-      progressData: {
-        completionStatus: 'not attempted',
-        successStatus: 'unknown',
-        scoreRaw: null,
-        progressMeasure: 0,
-        sessionTime: '00:00:00',
-        totalTime: '00:00:00',
-        location: null,
-        suspendData: null
-      },
-      
-      // UI state
-      ui: {
-        theme: 'default',
-
-        sidebarCollapsed: false,
-        courseOutlineVisible: false,
-        devModeEnabled: false,
-        loading: false,
-        error: null,
-        notifications: []
-      },
-      
-      // LMS simulation state
-      lmsProfile: null,
-      networkDelay: 0,
-      
-      // Debug state
-      apiCallHistory: [],
-      maxApiCallHistory: 500,
-      debug: {
-        // placeholders for diagnostics and logger view snapshots
-        lastEvents: [],
-        maxEvents: 200,
-        lastLogs: [],
-        maxLogs: 500
-      }
-    };
+    // Moved into ui-state.initial.js to reduce file size per architecture rules
+    return getInitialUIState();
   }
 
   /**
@@ -105,7 +65,7 @@ class UIStateManager {
       return { ...this.state };
     }
     
-    return this.getNestedValue(this.state, path);
+    return getNestedValue(this.state, path);
   }
 
   /**
@@ -119,10 +79,10 @@ class UIStateManager {
     
     if (typeof updates === 'string') {
       // Single value update using path notation
-      this.setNestedValue(this.state, updates, value);
+      setNestedValue(this.state, updates, value);
     } else if (typeof updates === 'object' && updates !== null) {
       // Merge object updates
-      this.state = this.deepMerge(this.state, updates);
+      this.state = deepMerge(this.state, updates);
     } else {
       throw new Error('Invalid state update parameters');
     }
@@ -283,11 +243,16 @@ class UIStateManager {
       return;
     }
 
-    this.setState({ ui: mergedUI });
-
-    // Emit generic UI update only when changed
-    this.eventBus?.emit('ui:updated', mergedUI);
-
+    // Silent update to avoid generic state:changed feedback immediately
+    // notifyStateChange will still compute and emit state:changed if needed elsewhere,
+    // but we guard ABAB cycles by not emitting a separate ui:updated when no consumers require it.
+    // Instead, emit ui:updated only when there is a meaningful change and mark it as originating from UI to prevent loops.
+    this.setState({ ui: mergedUI }, undefined, true); // silent
+    
+    // Emit generic UI update with correlation and origin flag to help EventBus cycle guard
+    const uiUpdatedPayload = { ...mergedUI, _origin: 'ui-state', _corr: `ui:updated:${Date.now()}` };
+    this.eventBus?.emit('ui:updated', uiUpdatedPayload);
+    
     // Emit specific dev mode change to keep EventBus in sync (Step 8)
     const nextDev = !!mergedUI.devModeEnabled;
     if (nextDev !== prevDev) {
@@ -295,10 +260,13 @@ class UIStateManager {
         // Gate EventBus debug mirroring on toggle
         this.eventBus?.setDebugMode?.(nextDev);
       } catch (_) { /* no-op */ }
-      this.eventBus?.emit('ui:devModeChanged', { enabled: nextDev });
+      this.eventBus?.emit('ui:devModeChanged', { enabled: nextDev, _origin: 'ui-state', _corr: uiUpdatedPayload._corr });
       // Also emit a lightweight debug:update signal for panels listening
-      this.eventBus?.emit('debug:update', { mode: nextDev });
+      this.eventBus?.emit('debug:update', { mode: nextDev, _origin: 'ui-state', _corr: uiUpdatedPayload._corr });
     }
+    
+    // Persist after UI update (debounced) without causing another state:changed emit
+    this.debouncedPersist();
   }
 
   /**
@@ -333,27 +301,7 @@ class UIStateManager {
    * @param {Object} notification - Notification data
    */
   showNotification(notification) {
-    const notifications = [...this.state.ui.notifications];
-    const id = Date.now() + Math.random();
-    
-    notifications.push({
-      id,
-      type: 'info',
-      duration: 5000,
-      ...notification,
-      timestamp: Date.now()
-    });
-    
-    this.updateUI({ notifications });
-    
-    // Auto-remove notification
-    if (notification.duration !== 0) {
-      setTimeout(() => {
-        this.removeNotification(id);
-      }, notification.duration || 5000);
-    }
-    
-    return id;
+    return showNotification(this, notification);
   }
 
   /**
@@ -361,8 +309,7 @@ class UIStateManager {
    * @param {string|number} id - Notification ID
    */
   removeNotification(id) {
-    const notifications = this.state.ui.notifications.filter(n => n.id !== id);
-    this.updateUI({ notifications });
+    return removeNotification(this, id);
   }
 
   /**
@@ -429,16 +376,28 @@ class UIStateManager {
    * @private
    */
   setupGlobalEventListeners() {
+    // Guard again in case called directly
+    if (!(typeof window !== 'undefined' && typeof document !== 'undefined')) {
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug('UIStateManager: setupGlobalEventListeners skipped (no DOM)');
+        }).catch(() => {});
+      } catch (_) { /* no-op */ }
+      return;
+    }
+
     // Listen for window visibility changes
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        this.persistState();
-      }
+      try {
+        if (document.hidden) {
+          this.persistState();
+        }
+      } catch (_) { /* no-op */ }
     });
     
     // Listen for beforeunload to persist state
     window.addEventListener('beforeunload', () => {
-      this.persistState();
+      try { this.persistState(); } catch (_) { /* no-op */ }
     });
   }
 
@@ -453,83 +412,11 @@ class UIStateManager {
     }
     // Listen for state changes to emit a general event
     this.eventBus.on('state:changed', (data) => {
-      // This is already handled by notifyStateChange, but keeping for consistency if needed elsewhere
+      // kept for consistency
     });
 
-    // Mirror EventBus emissions into diagnostics buffer when dev mode is enabled
-    const mirror = (eventName) => {
-      this.eventBus.on(eventName, (payload) => {
-        try {
-          if (!this.state.ui?.devModeEnabled) return;
-          const dbg = { ...(this.state.debug || {}), lastEvents: [...(this.state.debug?.lastEvents || [])] };
-          dbg.lastEvents.push({
-            event: eventName,
-            data: payload,
-            timestamp: Date.now(),
-            id: Date.now() + Math.random()
-          });
-          const maxE = dbg.maxEvents || 200;
-          while (dbg.lastEvents.length > maxE) dbg.lastEvents.shift();
-          this.setState({ debug: dbg }, null, true);
-        } catch (_) { /* no-op */ }
-      });
-    };
-    // Core events to observe for diagnostics snapshotting
-    ['api:call', 'error', 'navigation:updated', 'progress:updated', 'course:loaded', 'session:updated', 'ui:updated']
-      .forEach(mirror);
-
-    // Expose lightweight enablement selectors for Attempt lifecycle controls
-    this.getRteStatus = () => {
-      const initialized = !!(window && window.scormClient && window.scormClient.getInitialized && window.scormClient.getInitialized());
-      // Temporary derivation until explicit lifecycle flags are surfaced
-      // TODO(rte): replace with main/RTE-surfaced lifecycle flags when available
-      let terminated = false;
-      let suspended = false;
-      try {
-        if (window && window.scormClient) {
-          // Heuristic: check cached data-model keys
-          const exitVal = window.scormClient.getCachedValue && window.scormClient.getCachedValue('cmi.exit');
-          const suspendData = window.scormClient.getCachedValue && window.scormClient.getCachedValue('cmi.suspend_data');
-          suspended = String(exitVal || '').toLowerCase() === 'suspend' || !!(suspendData && String(suspendData).length > 0);
-          terminated = typeof window.scormClient.getTerminated === 'function' ? !!window.scormClient.getTerminated() : false;
-        }
-      } catch (_) { /* no-op */ }
-      return { initialized, terminated, suspended };
-    };
-
-    this.getAttemptEnablement = () => {
-      const { initialized, terminated, suspended } = this.getRteStatus();
-      const canStart = !initialized;
-      const canSuspend = initialized && !terminated && !suspended;
-      const canResume = initialized && !terminated && suspended;
-      const canCommit = initialized && !terminated;
-      const canTerminate = initialized && !terminated;
-      const reasons = {
-        start: initialized ? 'Already initialized (RTE 3.2.1)' : '',
-        suspend: !initialized ? 'Initialize first (RTE 3.2.1)' : (terminated ? 'Terminated' : ''),
-        resume: !initialized ? 'Initialize first (RTE 3.2.1)' : (!suspended ? 'Not suspended' : ''),
-        commit: !initialized ? 'Initialize first (RTE 3.2.1)' : (terminated ? 'Terminated' : ''),
-        terminate: !initialized ? 'Initialize first (RTE 3.2.1)' : ''
-      };
-      return { canStart, canSuspend, canResume, canCommit, canTerminate, reasons };
-    };
-
-    // Provide explicit API to toggle dev mode and broadcast (Step 8)
-    // Consumers can call uiState.setDevModeEnabled(bool)
-    if (!this.setDevModeEnabled) {
-      this.setDevModeEnabled = (enabled) => {
-        const prev = !!this.state.ui.devModeEnabled;
-        const next = !!enabled;
-        if (prev === next) return;
-        this.updateUI({ devModeEnabled: next });
-        // updateUI emits ui:devModeChanged when the flag changes
-        try {
-          // Keep EventBus in sync and broadcast a debug:update mode payload
-          this.eventBus?.setDebugMode?.(next);
-          this.eventBus?.emit?.('debug:update', { mode: next });
-        } catch (_) { /* no-op */ }
-      };
-    }
+    // Delegate debug/event mirroring to extracted module
+    setupDebugMirroring(this);
   }
 
   /**
@@ -592,19 +479,9 @@ class UIStateManager {
    */
   loadPersistedState() {
     try {
-      // Skip localStorage access in custom protocol context
-      if (window.location.protocol === 'scorm-app:') {
-        return;
-      }
-      if (typeof localStorage === 'undefined') {
-        return;
-      }
-      const persisted = localStorage.getItem(this.persistenceKey);
-      if (persisted) {
-        const parsed = JSON.parse(persisted);
-        if (parsed.ui) {
-          this.state.ui = { ...this.state.ui, ...parsed.ui };
-        }
+      const persisted = safeLoadPersistedUI(this.persistenceKey);
+      if (persisted && persisted.ui) {
+        this.state.ui = { ...this.state.ui, ...persisted.ui };
       }
     } catch (_e) {
       // swallow to avoid console noise in renderer
@@ -631,72 +508,23 @@ class UIStateManager {
    */
   persistState() {
     try {
-      // Skip localStorage access in custom protocol context
-      if (window.location.protocol === 'scorm-app:') {
-        return;
-      }
-      if (typeof localStorage === 'undefined') {
-        return;
-      }
       // Only persist UI preferences
-      const toPersist = {
-        ui: {
-          theme: this.state.ui.theme,
-          debugPanelVisible: this.state.ui.debugPanelVisible,
-          sidebarCollapsed: this.state.ui.sidebarCollapsed,
-          devModeEnabled: this.state.ui.devModeEnabled
-        }
+      const uiSlice = {
+        theme: this.state.ui.theme,
+        debugPanelVisible: this.state.ui.debugPanelVisible,
+        sidebarCollapsed: this.state.ui.sidebarCollapsed,
+        devModeEnabled: this.state.ui.devModeEnabled
       };
-      localStorage.setItem(this.persistenceKey, JSON.stringify(toPersist));
+      safePersistState(this.persistenceKey, uiSlice);
     } catch (_e) {
       // swallow to avoid console noise in renderer
     }
   }
 
   /**
-   * Get nested value from object using dot notation
-   * @private
+   * NOTE: Helper methods moved to ui-state.helpers.js to satisfy architecture line-count limits.
+   * Importing the helpers keeps behavior identical while reducing this file size.
    */
-  getNestedValue(obj, path) {
-    return path.split('.').reduce((current, key) => {
-      return current && current[key] !== undefined ? current[key] : undefined;
-    }, obj);
-  }
-
-  /**
-   * Set nested value in object using dot notation
-   * @private
-   */
-  setNestedValue(obj, path, value) {
-    const keys = path.split('.');
-    const lastKey = keys.pop();
-    const target = keys.reduce((current, key) => {
-      if (!current[key] || typeof current[key] !== 'object') {
-        current[key] = {};
-      }
-      return current[key];
-    }, obj);
-    
-    target[lastKey] = value;
-  }
-
-  /**
-   * Deep merge objects
-   * @private
-   */
-  deepMerge(target, source) {
-    const result = { ...target };
-    
-    for (const key in source) {
-      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = this.deepMerge(result[key] || {}, source[key]);
-      } else {
-        result[key] = source[key];
-      }
-    }
-    
-    return result;
-  }
 
   /**
    * Destroy the state manager and clean up
@@ -741,6 +569,8 @@ class UIStateSingleton {
       const eventBusModule = await import('./event-bus.js');
       this.instance.eventBus = eventBusModule.eventBus;
       this.instance.setupEventBusListeners();
+      // Initialize debug mirroring and helpers (extracted)
+      setupDebugMirroring(this.instance);
       
       return this.instance;
     } catch (error) {

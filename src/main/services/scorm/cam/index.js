@@ -142,19 +142,23 @@ class ScormCAMService {
           sample: statsSample
         });
 
-        // Build outline from organizations
-        const uiOutlineFromOrg = this.buildUiOutlineFromManifest(manifest, packagePath);
+        // Build outline from organizations FIRST and only fall back if organizations truly absent/empty
         analysis = analysis || {};
-        analysis.uiOutline = Array.isArray(uiOutlineFromOrg) ? uiOutlineFromOrg : [];
-
-        // If empty, try resources-based fallback with expanded coercions
+        const hasCanonicalOrgs = Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization.length > 0;
         let usedFallback = false;
-        if (analysis.uiOutline.length === 0) {
+
+        let uiOutlineFromOrg = [];
+        if (hasCanonicalOrgs) {
+          uiOutlineFromOrg = this.buildUiOutlineFromManifest(manifest, packagePath) || [];
+        }
+
+        if (hasCanonicalOrgs && uiOutlineFromOrg.length > 0) {
+          analysis.uiOutline = uiOutlineFromOrg;
+        } else {
+          // No canonical orgs or failed to build org outline -> try resources-based fallback
           const fallback = this.buildUiOutlineFromResources(manifest);
-          if (Array.isArray(fallback) && fallback.length > 0) {
-            analysis.uiOutline = fallback;
-            usedFallback = true;
-          }
+          analysis.uiOutline = Array.isArray(fallback) ? fallback : [];
+          usedFallback = analysis.uiOutline.length > 0;
         }
 
         const itemCount = Array.isArray(analysis.uiOutline) ? analysis.uiOutline.length : 0;
@@ -181,9 +185,32 @@ class ScormCAMService {
       }
 
       // Create clean response object (avoid circular references and non-serializable data)
+      const cleanedManifest = this.cleanManifestForSerialization(manifest);
+      // Diagnostics: log cleaned manifest key shapes and counts (app log)
+      try {
+        const orgsArr = Array.isArray(cleanedManifest?.organizations?.organization)
+          ? cleanedManifest.organizations.organization
+          : [];
+        const resArr = Array.isArray(cleanedManifest?.resources?.resource)
+          ? cleanedManifest.resources.resource
+          : [];
+        this.logger?.info('ScormCAMService: Cleaned manifest shapes', {
+          hasOrganizations: !!cleanedManifest?.organizations,
+          hasResources: !!cleanedManifest?.resources,
+          orgKeyType: cleanedManifest?.organizations
+            ? (Array.isArray(cleanedManifest.organizations.organization) ? 'organization[]' : Object.keys(cleanedManifest.organizations))
+            : 'none',
+          resKeyType: cleanedManifest?.resources
+            ? (Array.isArray(cleanedManifest.resources.resource) ? 'resource[]' : Object.keys(cleanedManifest.resources))
+            : 'none',
+          orgCount: orgsArr.length,
+          resCount: resArr.length
+        });
+      } catch (_) { /* swallow diagnostics errors */ }
+
       const response = {
         success: true,
-        manifest: this.cleanManifestForSerialization(manifest),
+        manifest: cleanedManifest,
         validation,
         analysis,
         metadata
@@ -207,18 +234,107 @@ class ScormCAMService {
    */
   cleanManifestForSerialization(manifest) {
     try {
-      // Create a deep copy and remove any potential DOM elements or functions
-      const cleaned = JSON.parse(JSON.stringify(manifest));
-      this.logger?.debug('ScormCAMService: Manifest cleaned for serialization');
-      return cleaned;
+      // Deep clone to strip functions/DOM refs
+      const cloned = JSON.parse(JSON.stringify(manifest));
+
+      // Normalize to canonical SCORM-like keys expected by tests and analyzers:
+      // organizations: { default, organization: Organization[] }
+      // resources: { resource: Resource[] }
+      const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+      const norm = {};
+
+      // Basic attributes
+      norm.identifier = cloned?.identifier || null;
+      norm.version = cloned?.version || null;
+      norm.metadata = cloned?.metadata || null;
+
+      // Organizations normalization
+      let orgDefault = null;
+      let orgArray = [];
+      if (cloned?.organizations) {
+        // Accept either { organizations: [...] } or { organization: [...] } or array or single object
+        const orgContainer = cloned.organizations;
+
+        // default attribute
+        orgDefault = orgContainer?.default || null;
+
+        if (Array.isArray(orgContainer?.organizations)) {
+          orgArray = orgContainer.organizations;
+        } else if (Array.isArray(orgContainer?.organization)) {
+          orgArray = orgContainer.organization;
+        } else if (Array.isArray(orgContainer)) {
+          orgArray = orgContainer;
+        } else if (orgContainer?.organizations) {
+          orgArray = toArray(orgContainer.organizations);
+        } else if (orgContainer?.organization) {
+          orgArray = toArray(orgContainer.organization);
+        } else if (typeof orgContainer === 'object') {
+          // Unknown object shape: try values that look like orgs
+          const vals = Object.values(orgContainer).flat();
+          orgArray = vals.filter(v => v && (v.items || v.item || v.title || v.identifier));
+        }
+
+        // Map item children keys from "children" to "item" to align with buildUiOutlineFromManifest expectations
+        const remapItems = (node) => {
+          if (!node || typeof node !== 'object') return node;
+          const out = { ...node };
+          if (Array.isArray(out.children) && !out.item) {
+            out.item = out.children;
+          }
+          if (Array.isArray(out.items) && !out.item) {
+            out.item = out.items;
+          }
+          // Recurse for child items
+          if (Array.isArray(out.item)) {
+            out.item = out.item.map(remapItems);
+          }
+          return out;
+        };
+        orgArray = orgArray.map(remapItems);
+      }
+
+      // Resources normalization
+      let resArray = [];
+      if (cloned?.resources) {
+        const resContainer = cloned.resources;
+        if (Array.isArray(resContainer?.resource)) {
+          resArray = resContainer.resource;
+        } else if (Array.isArray(resContainer)) {
+          resArray = resContainer;
+        } else if (resContainer?.resources) {
+          resArray = toArray(resContainer.resources);
+        } else if (resContainer?.resource) {
+          resArray = toArray(resContainer.resource);
+        } else if (typeof resContainer === 'object') {
+          const vals = Object.values(resContainer).flat();
+          resArray = vals.filter(v => v && (v.href || v.identifier || v.files));
+        }
+      }
+
+      norm.organizations = (orgArray.length > 0 || orgDefault)
+        ? { default: orgDefault || undefined, organization: orgArray }
+        : null;
+
+      norm.resources = (resArray.length > 0)
+        ? { resource: resArray }
+        : (cloned?.resources ? { resource: [] } : null);
+
+      this.logger?.debug('ScormCAMService: Manifest cleaned and normalized for serialization', {
+        orgCount: Array.isArray(norm.organizations?.organization) ? norm.organizations.organization.length : 0,
+        resCount: Array.isArray(norm.resources?.resource) ? norm.resources.resource.length : 0
+      });
+
+      return norm;
     } catch (error) {
       this.logger?.error('ScormCAMService: Failed to clean manifest for serialization:', error);
-      // Return a minimal safe object
+      // Minimal safe object preserving canonical keys
       return {
         identifier: manifest?.identifier || null,
         version: manifest?.version || null,
-        organizations: manifest?.organizations || null,
-        resources: manifest?.resources || null,
+        organizations: manifest?.organizations
+          ? { default: manifest.organizations.default || undefined, organization: [] }
+          : null,
+        resources: manifest?.resources ? { resource: [] } : null,
         metadata: manifest?.metadata || null
       };
     }

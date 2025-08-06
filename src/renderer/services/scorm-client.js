@@ -556,6 +556,17 @@ class ScormClient {
    * @private
    */
   setupEventListeners() {
+    // Only run in real browser/renderer environments to avoid open handles in Jest/Node
+    const hasDom = (typeof window !== 'undefined') && (typeof document !== 'undefined');
+    const isTest = (typeof process !== 'undefined') && (process.env && process.env.NODE_ENV === 'test');
+
+    if (!hasDom || isTest) {
+      // Defer interval creation in non-DOM or test environments
+      // Avoid console; renderer logger may not be available synchronously here.
+      this.sessionTimer = null;
+      return;
+    }
+
     // Listen for session timer updates (renderer-only UI update; no IPC here)
     this.sessionTimer = setInterval(() => {
       if (this.isInitialized && this.sessionId) {
