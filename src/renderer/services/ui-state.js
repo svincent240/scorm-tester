@@ -20,6 +20,8 @@ class UIStateManager {
     this.persistenceKey = 'scorm-tester-ui-state';
     this.debounceTimeout = null;
     this.eventBus = null; // Will be loaded dynamically
+    // Reentrancy guard to prevent progress:updated <-> state:changed ABAB cycles
+    this._emittingProgress = false;
     
     this.loadPersistedState();
     // Event listeners that don't depend on eventBus can be set up here
@@ -219,14 +221,38 @@ class UIStateManager {
    * @param {Object} progressData - Progress data
    */
   updateProgress(progressData) {
-    this.setState({
-      progressData: {
-        ...this.state.progressData,
-        ...progressData
+    // Compute shallow diff on progress slice to avoid redundant emits
+    const prev = this.state.progressData || {};
+    const next = { ...prev, ...progressData };
+    const changed = (() => {
+      const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+      for (const k of keys) {
+        if (JSON.stringify(prev[k]) !== JSON.stringify(next[k])) return true;
       }
-    });
-    
-    this.eventBus?.emit('progress:updated', this.state.progressData);
+      return false;
+    })();
+
+    if (!changed) {
+      // Log via renderer logger (no console) that emit is skipped
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug('UIState.updateProgress: no-op (no diff); emit skipped');
+        });
+      } catch (_) { /* no-op */ }
+      return;
+    }
+
+    // Mark this transaction as a progress-originating update to prevent ABAB with state:changed
+    this._emittingProgress = true;
+    try {
+      // Silent state update: avoid notifyStateChange; progress-specific event covers subscribers
+      this.setState({ progressData: next }, undefined, true);
+      // Only emit when changed to prevent state:changed <-> progress:updated loops
+      this.eventBus?.emit('progress:updated', next);
+    } finally {
+      // Release guard after current microtask
+      setTimeout(() => { this._emittingProgress = false; }, 0);
+    }
   }
 
   /**
@@ -234,17 +260,36 @@ class UIStateManager {
    * @param {Object} uiData - UI data
    */
   updateUI(uiData) {
-    const prevDev = !!this.state.ui.devModeEnabled;
-    this.setState({
-      ui: {
-        ...this.state.ui,
-        ...uiData
+    // Compute shallow diff on ui slice to avoid redundant emits
+    const prevUI = this.state.ui || {};
+    const mergedUI = { ...prevUI, ...uiData };
+    const uiChanged = (() => {
+      const keys = new Set([...Object.keys(prevUI), ...Object.keys(mergedUI)]);
+      for (const k of keys) {
+        if (JSON.stringify(prevUI[k]) !== JSON.stringify(mergedUI[k])) return true;
       }
-    });
-    // Emit generic UI update
-    this.eventBus?.emit('ui:updated', uiData);
+      return false;
+    })();
+
+    const prevDev = !!prevUI.devModeEnabled;
+
+    if (!uiChanged) {
+      // Skip state update and emit if there is no actual UI change
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.debug('UIState.updateUI: no-op (no diff); emit skipped');
+        });
+      } catch (_) { /* no-op */ }
+      return;
+    }
+
+    this.setState({ ui: mergedUI });
+
+    // Emit generic UI update only when changed
+    this.eventBus?.emit('ui:updated', mergedUI);
+
     // Emit specific dev mode change to keep EventBus in sync (Step 8)
-    const nextDev = !!this.state.ui.devModeEnabled;
+    const nextDev = !!mergedUI.devModeEnabled;
     if (nextDev !== prevDev) {
       try {
         // Gate EventBus debug mirroring on toggle
@@ -505,11 +550,40 @@ class UIStateManager {
           subscriber.callback(newState, previousState);
         }
       } catch (error) {
-        console.error('UIStateManager: Error in state subscriber:', error);
+        // Route to renderer logger; avoid console in renderer
+        try {
+          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+            rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error);
+          });
+        } catch (_) { /* no-op */ }
       }
     }
-    
-    this.eventBus?.emit('state:changed', { previous: previousState, current: newState });
+
+    // Emit 'state:changed' but include a minimal diff hint to aid diagnostics
+    try {
+      const uiPrev = previousState?.ui || {};
+      const uiCurr = newState?.ui || {};
+      const progressPrev = previousState?.progressData || {};
+      const progressCurr = newState?.progressData || {};
+      const uiChanged = JSON.stringify(uiPrev) !== JSON.stringify(uiCurr);
+      const progressChanged = JSON.stringify(progressPrev) !== JSON.stringify(progressCurr);
+
+      // If this tick originated from updateProgress, suppress generic state:changed entirely
+      // to prevent ABAB with progress:updated.
+      if (this._emittingProgress) {
+        return;
+      }
+
+      this.eventBus?.emit('state:changed', {
+        previous: previousState,
+        current: newState,
+        _diagnostic: { uiChanged, progressChanged }
+      });
+    } catch (_) {
+      // fallback without diagnostics; still respect the guard
+      if (this._emittingProgress) return;
+      this.eventBus?.emit('state:changed', { previous: previousState, current: newState });
+    }
   }
 
   /**

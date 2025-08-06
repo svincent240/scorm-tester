@@ -133,11 +133,23 @@ class EventBus {
       }
     } catch (_) { /* no-op */ }
 
+    // Attach a lightweight correlation token for key events to help trace feedback paths
+    const correlation = (() => {
+      try {
+        const base = (data && typeof data === 'object') ? (data._corr || null) : null;
+        const token = base || (`${event}:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`);
+        return token;
+      } catch (_) {
+        return `${event}:${Date.now()}`;
+      }
+    })();
+
     const eventData = {
       event,
       data,
       timestamp: Date.now(),
-      id: Date.now() + Math.random()
+      id: Date.now() + Math.random(),
+      _corr: correlation
     };
 
     // Add to history

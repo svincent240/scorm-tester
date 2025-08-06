@@ -487,11 +487,9 @@ class DebugPanel extends BaseComponent {
   }
 
   addApiCall(apiCall) {
-    // Centralize through UIState history to allow cross-panel reuse
-    if (this.uiState?.addApiCall) {
-      this.uiState.addApiCall(apiCall);
-    }
-    // Maintain local ring buffer for immediate view responsiveness
+    // Avoid re-emitting into UIState to prevent api:call <-> state:changed feedback cycles.
+    // The centralized history and aggregator already consume eventBus 'api:call'.
+    // Maintain only a local ring buffer for immediate view responsiveness.
     this.apiCalls.push({
       ...apiCall,
       timestamp: apiCall.timestamp || Date.now(),

@@ -223,28 +223,84 @@ class IpcHandler extends BaseService {
    * Wrap handler with security and validation
    */
   wrapHandler(channel, handler) {
+    // Per-channel idempotency/debounce guards for "open-debug-window"
+    const OPEN_DEBUG_DEBOUNCE_MS = 500;
+    if (!this._openDebugGuards) {
+      this._openDebugGuards = { lastAttemptTs: 0, inFlight: false, timer: null, pending: false };
+    }
+
     return async (event, ...args) => {
       const requestId = ++this.requestCounter;
       const startTime = Date.now();
-      
+
       try {
         if (!this.validateRequest(event, channel, args)) {
           throw new Error('Request validation failed');
         }
 
-        // Rate limit check with "soft-ok" for selected channels
-        if (!this.checkRateLimit(event.sender)) {
+        // Special-case: ensure open-debug-window always results in a focus/create
+        if (channel === 'open-debug-window') {
+          try {
+            const windowManager = this.getDependency('windowManager');
+            if (windowManager) {
+              const existing = windowManager.getWindow('debug');
+              if (existing) {
+                // Focus existing window immediately
+                try { existing.focus(); } catch (_) {}
+                this.recordOperation('open-debug-window:focused_existing', true);
+                return { success: true, alreadyOpen: true, focused: true, action: 'focused' };
+              }
+            }
+          } catch (_) {
+            // Non-fatal; continue
+          }
+
+          const nowTs = Date.now();
+          // Coalesce multiple invocations within debounce window, but guarantee trailing execution
+          if ((nowTs - this._openDebugGuards.lastAttemptTs) < OPEN_DEBUG_DEBOUNCE_MS || this._openDebugGuards.inFlight) {
+            this._openDebugGuards.pending = true;
+            // refresh debounce timer
+            if (this._openDebugGuards.timer) {
+              clearTimeout(this._openDebugGuards.timer);
+            }
+            this._openDebugGuards.timer = setTimeout(async () => {
+              try {
+                // trailing attempt: re-check and create/focus
+                const wm = this.getDependency('windowManager');
+                if (wm) {
+                  const ex = wm.getWindow('debug');
+                  if (ex) {
+                    try { ex.focus(); } catch (_) {}
+                    this.recordOperation('open-debug-window:trailing_focus', true);
+                  } else {
+                    this.recordOperation('open-debug-window:trailing_create', true);
+                    await wm.createDebugWindow();
+                  }
+                }
+              } catch (_) {
+                // swallow to avoid noise
+              } finally {
+                this._openDebugGuards.pending = false;
+                this._openDebugGuards.timer = null;
+              }
+            }, OPEN_DEBUG_DEBOUNCE_MS);
+            this.recordOperation('open-debug-window:coalesced_trailing', true);
+            return { success: true, coalesced: true, deferred: true };
+          }
+        }
+
+        // Rate limit check with channel policies
+        const rateAllowed = this.checkRateLimit(event.sender);
+        if (!rateAllowed) {
           // Initialize per-channel suppression map once
           if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
           const markSuppressed = (ch) => {
-            // track firstSeenAt and suppressed flag per channel
             let st = this._rateLimitLogState.get(ch);
             if (!st) {
               st = { firstSeenAt: Date.now(), notified: false, suppressed: false };
               this._rateLimitLogState.set(ch, st);
             }
             if (!st.notified) {
-              // Emit a single notice then suppress forever for this session
               st.notified = true;
               st.suppressed = true;
               this.logger?.info(`IpcHandler: rate-limit engaged on ${ch}; further rate-limit logs suppressed for this session`);
@@ -263,57 +319,122 @@ class IpcHandler extends BaseService {
             channel === 'scorm-terminate';
 
           if (isRendererLogChannel || isScormChannel) {
-            // Mark suppression and silently soft-ok without logging spam
             markSuppressed(channel);
             this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
             return { success: true, rateLimited: true };
           }
 
-          // Otherwise, enforce rate limit strictly
+          if (channel === 'open-debug-window') {
+            // For debug window: schedule trailing attempt rather than silently OK
+            markSuppressed(channel);
+            this._openDebugGuards.pending = true;
+            if (this._openDebugGuards.timer) clearTimeout(this._openDebugGuards.timer);
+            this._openDebugGuards.timer = setTimeout(async () => {
+              try {
+                const wm = this.getDependency('windowManager');
+                if (wm) {
+                  const ex = wm.getWindow('debug');
+                  if (ex) {
+                    try { ex.focus(); } catch (_) {}
+                    this.recordOperation('open-debug-window:rate_limited_trailing_focus', true);
+                  } else {
+                    this.recordOperation('open-debug-window:rate_limited_trailing_create', true);
+                    await wm.createDebugWindow();
+                  }
+                }
+              } catch (_) {
+                // swallow
+              } finally {
+                this._openDebugGuards.pending = false;
+                this._openDebugGuards.timer = null;
+              }
+            }, OPEN_DEBUG_DEBOUNCE_MS);
+            this.recordOperation('open-debug-window:rate_limited_deferred', true);
+            return { success: true, rateLimited: true, deferred: true };
+          }
+
+          // Otherwise, enforce
           throw new Error('Rate limit exceeded');
         }
-        
+
         this.activeRequests.set(requestId, { channel, startTime, event });
-        
+
+        // Mark in-flight for open-debug-window to prevent bursts
+        if (channel === 'open-debug-window') {
+          this._openDebugGuards.inFlight = true;
+          this._openDebugGuards.lastAttemptTs = Date.now();
+        }
+
         this.logger?.debug(`IpcHandler: Processing ${channel} request ${requestId}`);
         this.emit(SERVICE_EVENTS.IPC_MESSAGE_RECEIVED, { channel, requestId });
-        
+
         const result = await handler(event, ...args);
-        
+
         const duration = Date.now() - startTime;
         this.recordOperation(`${channel}:success`, true);
         this.logger?.debug(`IpcHandler: ${channel} request ${requestId} completed in ${duration}ms`);
-        
+
         return result;
-        
+
       } catch (error) {
         const duration = Date.now() - startTime;
 
-        // Downgrade known, non-fatal flow-control conditions to warnings for selected channels
         const isRateLimit = (error && typeof error.message === 'string' && error.message.includes('Rate limit exceeded'));
         const isScormChannel = (channel === 'scorm-set-value' || channel === 'scorm-commit' || channel === 'scorm-terminate');
 
         if (isRateLimit && isScormChannel) {
-          // Silent soft-ok for SCORM channels with one-time suppression notice handled above
           this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
           return { success: true, rateLimited: true };
         }
 
-        // Default: preserve error handling for all other cases
+        if (isRateLimit && channel === 'open-debug-window') {
+          // As a final guard: schedule trailing create/focus
+          try {
+            if (!this._openDebugGuards.timer) {
+              this._openDebugGuards.timer = setTimeout(async () => {
+                try {
+                  const wm = this.getDependency('windowManager');
+                  if (wm) {
+                    const ex = wm.getWindow('debug');
+                    if (ex) {
+                      try { ex.focus(); } catch (_) {}
+                      this.recordOperation('open-debug-window:error_trailing_focus', true);
+                    } else {
+                      this.recordOperation('open-debug-window:error_trailing_create', true);
+                      await wm.createDebugWindow();
+                    }
+                  }
+                } catch (_) {
+                } finally {
+                  this._openDebugGuards.pending = false;
+                  this._openDebugGuards.timer = null;
+                }
+              }, OPEN_DEBUG_DEBOUNCE_MS);
+            }
+          } catch (_) {}
+          this.recordOperation('open-debug-window:rate_limited_soft_ok', true);
+          return { success: true, rateLimited: true, deferred: true };
+        }
+
+        // Default error path
         this.recordOperation(`${channel}:error`, false);
-        
+
         this.errorHandler?.setError(
           MAIN_PROCESS_ERRORS.IPC_MESSAGE_ROUTING_FAILED,
           `IPC ${channel} handler failed: ${error.message}`,
           `IpcHandler.${channel}`
         );
-        
+
         this.logger?.error(`IpcHandler: ${channel} request ${requestId} failed after ${duration}ms:`, error);
         this.emit(SERVICE_EVENTS.IPC_ERROR, { channel, requestId, error: error.message });
-        
+
         throw error;
-        
+
       } finally {
+        // Clear in-flight flag for open-debug-window
+        if (channel === 'open-debug-window') {
+          this._openDebugGuards.inFlight = false;
+        }
         this.activeRequests.delete(requestId);
       }
     };

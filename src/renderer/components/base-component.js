@@ -341,7 +341,8 @@ class BaseComponent {
       data
     };
     
-    this.eventBus.emit(`component:${event}`, eventData);
+    // Emit only a namespaced event to avoid ABAB cycles between generic and namespaced events.
+    // Global/generic emissions should be explicit at the service level if needed.
     this.eventBus.emit(`${this.constructor.name.toLowerCase()}:${event}`, eventData);
   }
 
