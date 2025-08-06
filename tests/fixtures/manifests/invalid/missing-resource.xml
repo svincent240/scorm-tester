@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="INVALID_MISSING_RESOURCE" version="1.0"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
+  xmlns:imsss="http://www.imsglobal.org/xsd/imsss"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+    http://www.imsglobal.org/xsd/imscp_v1p1                 imscp_v1p1.xsd
+    http://www.adlnet.org/xsd/adlcp_v1p3                    adlcp_v1p3.xsd
+    http://www.imsglobal.org/xsd/imsss                      imsss_v1p0.xsd">
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>2004 4th Edition</schemaversion>
+  </metadata>
+  <organizations default="ORG-1">
+    <organization identifier="ORG-1" adlcp:scormType="hierarchical">
+      <title>Invalid Missing Resource</title>
+      <item identifier="ITEM-1" identifierref="RES-MISSING" isvisible="true">
+        <title>Broken SCO ref</title>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <!-- RES-MISSING is referenced by item but not declared here -->
+  </resources>
+</manifest>

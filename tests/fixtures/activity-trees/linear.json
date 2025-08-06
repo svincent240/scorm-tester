@@ -1,0 +1,26 @@
+{
+  "id": "root",
+  "title": "Linear Course",
+  "children": [
+    {
+      "id": "sco-1",
+      "title": "Lesson 1",
+      "delivery": { "tracked": true, "choice": false }
+    },
+    {
+      "id": "sco-2",
+      "title": "Lesson 2",
+      "delivery": { "tracked": true, "choice": false }
+    },
+    {
+      "id": "sco-3",
+      "title": "Lesson 3",
+      "delivery": { "tracked": true, "choice": false }
+    }
+  ],
+  "sequencing": {
+    "flow": true,
+    "forwardOnly": false,
+    "choice": false
+  }
+}

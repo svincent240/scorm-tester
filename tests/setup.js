@@ -1,236 +1,113 @@
 /**
- * Jest Test Setup
- * 
- * Global test configuration and setup for SCORM Tester test suite.
- * Provides common utilities, mocks, and test environment configuration.
- * 
- * @fileoverview Jest test setup and configuration
+ * Global test setup utilities
+ * - Seeded RNG helpers
+ * - Temp directory helpers
+ * - Logger test sink helpers
+ * - Fake timer utilities
+ *
+ * Notes:
+ * - Renderer console must not be used. Tests should route logs via shared logger or a sink.
+ * - Keep utilities deterministic and side-effect free where possible.
  */
 
-// Global test timeout
-jest.setTimeout(10000);
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
-// Mock console methods to reduce noise in tests
-global.console = {
-  ...console,
-  // Uncomment to suppress console output during tests
-  // log: jest.fn(),
-  // debug: jest.fn(),
-  // info: jest.fn(),
-  // warn: jest.fn(),
-  // error: jest.fn(),
-};
+// -------------------- Seeded RNG --------------------
 
-// Global test utilities
-global.testUtils = {
-  /**
-   * Create a mock logger for testing
-   * @returns {Object} Mock logger instance
-   */
-  createMockLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    logs: []
-  }),
-
-  /**
-   * Create a mock session manager for testing
-   * @returns {Object} Mock session manager instance
-   */
-  createMockSessionManager: () => ({
-    sessions: new Map(),
-    persistedData: new Map(),
-    
-    registerSession: jest.fn(),
-    unregisterSession: jest.fn(),
-    persistSessionData: jest.fn().mockResolvedValue(true),
-    getLearnerInfo: jest.fn(() => ({
-      id: 'test_learner',
-      name: 'Test Learner'
-    }))
-  }),
-
-  /**
-   * Wait for a specified amount of time
-   * @param {number} ms - Milliseconds to wait
-   * @returns {Promise} Promise that resolves after the specified time
-   */
-  wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-
-  /**
-   * Generate a random string for testing
-   * @param {number} length - Length of the string
-   * @returns {string} Random string
-   */
-  randomString: (length = 10) => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  },
-
-  /**
-   * Create test SCORM data for testing
-   * @returns {Object} Test SCORM data
-   */
-  createTestScormData: () => ({
-    completion_status: 'completed',
-    success_status: 'passed',
-    score: {
-      raw: '85',
-      max: '100',
-      min: '0',
-      scaled: '0.85'
-    },
-    location: 'page5',
-    suspend_data: JSON.stringify({
-      currentPage: 5,
-      userAnswers: ['a', 'b', 'c'],
-      timeSpent: 1800
-    }),
-    interactions: [
-      {
-        id: 'question1',
-        type: 'choice',
-        learner_response: 'a',
-        result: 'correct'
-      },
-      {
-        id: 'question2', 
-        type: 'true-false',
-        learner_response: 'true',
-        result: 'correct'
-      }
-    ]
-  })
-};
-
-// Global SCORM test constants
-global.SCORM_TEST_CONSTANTS = {
-  VALID_COMPLETION_STATUSES: ['completed', 'incomplete', 'not attempted', 'unknown'],
-  VALID_SUCCESS_STATUSES: ['passed', 'failed', 'unknown'],
-  VALID_EXIT_STATUSES: ['time-out', 'suspend', 'logout', 'normal', ''],
-  VALID_ENTRY_STATUSES: ['ab-initio', 'resume', ''],
-  VALID_LESSON_MODES: ['normal', 'browse', 'review'],
-  VALID_CREDIT_VALUES: ['credit', 'no-credit'],
-  VALID_INTERACTION_TYPES: [
-    'true-false', 'choice', 'fill-in', 'long-fill-in',
-    'matching', 'performance', 'sequencing', 'likert',
-    'numeric', 'other'
-  ],
-  VALID_INTERACTION_RESULTS: ['correct', 'incorrect', 'unanticipated', 'neutral'],
-  VALID_NAV_REQUESTS: [
-    'continue', 'previous', 'exit', 'exitAll', 'abandon',
-    'abandonAll', 'suspendAll', 'start', 'resumeAll'
-  ]
-};
-
-// Mock Electron modules if needed
-if (typeof window === 'undefined') {
-  global.window = {};
+/**
+ * Create a deterministic pseudo-random number generator (LCG).
+ * @param {number} seed
+ */
+function createSeededRng(seed = 123456789) {
+  let s = seed >>> 0;
+  return function next() {
+    // LCG parameters (Numerical Recipes)
+    s = (1664525 * s + 1013904223) >>> 0;
+    // Convert to [0,1)
+    return s / 0xffffffff;
+  };
 }
 
-// Setup custom matchers for SCORM testing
-expect.extend({
-  /**
-   * Check if a value is a valid SCORM error code
-   * @param {string} received - The error code to check
-   * @returns {Object} Jest matcher result
-   */
-  toBeValidScormErrorCode(received) {
-    const errorCode = parseInt(received, 10);
-    const isValid = !isNaN(errorCode) && errorCode >= 0 && errorCode <= 999;
-    
-    return {
-      message: () => `expected ${received} to be a valid SCORM error code (0-999)`,
-      pass: isValid
-    };
-  },
+// -------------------- Temp Directory Helpers --------------------
 
-  /**
-   * Check if a value is a valid SCORM boolean string
-   * @param {string} received - The value to check
-   * @returns {Object} Jest matcher result
-   */
-  toBeScormBoolean(received) {
-    const isValid = received === 'true' || received === 'false';
-    
-    return {
-      message: () => `expected ${received} to be a SCORM boolean ("true" or "false")`,
-      pass: isValid
-    };
-  },
+/**
+ * Create a unique temp directory for a test and return its path.
+ * Caller should clean up when appropriate.
+ * @param {string} prefix
+ */
+function makeTempDir(prefix = 'scorm-tester-') {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  return dir;
+}
 
-  /**
-   * Check if a value is within SCORM scaled score range
-   * @param {string} received - The score to check
-   * @returns {Object} Jest matcher result
-   */
-  toBeValidScaledScore(received) {
-    const score = parseFloat(received);
-    const isValid = !isNaN(score) && score >= -1 && score <= 1;
-    
-    return {
-      message: () => `expected ${received} to be a valid scaled score (-1 to 1)`,
-      pass: isValid
-    };
-  },
-
-  /**
-   * Check if a value is a valid ISO 8601 duration
-   * @param {string} received - The duration to check
-   * @returns {Object} Jest matcher result
-   */
-  toBeValidTimeInterval(received) {
-    const timeIntervalRegex = /^PT(\d+H)?(\d+M)?(\d+(\.\d+)?S)?$/;
-    const isValid = timeIntervalRegex.test(received);
-    
-    return {
-      message: () => `expected ${received} to be a valid ISO 8601 duration`,
-      pass: isValid
-    };
+/**
+ * Recursively delete a directory (best-effort).
+ * @param {string} dir
+ */
+function rimraf(dir) {
+  if (!dir || !fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    const stat = fs.lstatSync(full);
+    if (stat.isDirectory()) {
+      rimraf(full);
+    } else {
+      try { fs.unlinkSync(full); } catch (_) {}
+    }
   }
-});
+  try { fs.rmdirSync(dir); } catch (_) {}
+}
 
-// Global error handler for unhandled promise rejections in tests
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit process in tests, just log the error
-});
+// -------------------- Logger Test Sink --------------------
 
-// Handle uncaught exceptions in tests
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception in tests:', error);
-  // Don't exit process in tests, just log the error
-});
+/**
+ * Create a simple in-memory logger sink compatible with the shared logger shape.
+ * Tests can assert on captured entries without using console in renderer.
+ */
+function createLoggerSink() {
+  const entries = [];
+  const sink = {
+    info: (msg, meta) => entries.push({ level: 'info', msg, meta: meta ?? null, ts: Date.now() }),
+    warn: (msg, meta) => entries.push({ level: 'warn', msg, meta: meta ?? null, ts: Date.now() }),
+    error: (msg, meta) => entries.push({ level: 'error', msg, meta: meta ?? null, ts: Date.now() }),
+    debug: (msg, meta) => entries.push({ level: 'debug', msg, meta: meta ?? null, ts: Date.now() }),
+    entries,
+    clear: () => { entries.length = 0; }
+  };
+  return sink;
+}
 
-// Clean up after each test
-afterEach(() => {
-  jest.clearAllMocks();
-  
-  // Clear any remaining timers
-  jest.clearAllTimers();
-  
-  // Force garbage collection if available
-  if (global.gc) {
-    global.gc();
-  }
-});
+// -------------------- Fake Timer Utilities --------------------
 
-// Global cleanup after all tests
-afterAll(() => {
-  // Final cleanup
-  jest.clearAllMocks();
-  jest.clearAllTimers();
-  
-  // Force garbage collection if available
-  if (global.gc) {
-    global.gc();
-  }
-});
+/**
+ * Jest fake timers wrapper with sane defaults.
+ * Consumers can advance timers deterministically.
+ */
+function useFakeTimers(jestRef) {
+  jestRef.useFakeTimers();
+  return {
+    advance(ms) { jestRef.advanceTimersByTime(ms); },
+    runAll() { jestRef.runAllTimers(); },
+    useReal() { jestRef.useRealTimers(); }
+  };
+}
 
-console.log('SCORM Tester test environment initialized');
+// -------------------- Exports and Jest Globals --------------------
+
+global.__testUtils = {
+  createSeededRng,
+  makeTempDir,
+  rimraf,
+  createLoggerSink,
+  useFakeTimers
+};
+
+module.exports = {
+  createSeededRng,
+  makeTempDir,
+  rimraf,
+  createLoggerSink,
+  useFakeTimers
+};

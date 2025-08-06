@@ -1,10 +1,16 @@
 /**
  * SCORM Performance Benchmark Integration Tests
- * 
+ *
  * Tests performance characteristics of the Sequencing and Navigation implementation
  * to ensure it meets production requirements for responsiveness and scalability.
- * 
+ *
  * @fileoverview Integration tests for SCORM performance benchmarks
+ *
+ * Migration Note:
+ * This integration test overlaps with the new non-gating perf layer in tests/perf/.
+ * Do not delete yet. We will gradually migrate metrics to tests/perf/* and keep this
+ * file focused on end-to-end validations. Avoid console.* usage; prefer file-based
+ * artifact sinks when capturing performance summaries.
  */
 
 const { ScormSNService } = require('../../src/main/services/scorm/sn');

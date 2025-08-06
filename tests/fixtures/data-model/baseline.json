@@ -1,0 +1,36 @@
+{
+  "cmi": {
+    "core": {
+      "student_id": "learner-001",
+      "student_name": "Test Learner",
+      "lesson_location": "",
+      "lesson_status": "not attempted",
+      "score": {
+        "raw": null,
+        "min": null,
+        "max": null,
+        "scaled": null
+      },
+      "credit": "no-credit",
+      "entry": "ab-initio",
+      "total_time": "PT0H0M0S",
+      "lesson_mode": "normal",
+      "exit": "",
+      "session_time": "PT0H0M0S"
+    },
+    "completion_status": "unknown",
+    "success_status": "unknown",
+    "suspend_data": "",
+    "launch_data": "",
+    "location": "",
+    "progress_measure": null,
+    "score": {
+      "scaled": null,
+      "raw": null,
+      "min": null,
+      "max": null
+    },
+    "objectives": [],
+    "interactions": []
+  }
+}
