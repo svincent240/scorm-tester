@@ -73,11 +73,12 @@ class PathUtils {
   /**
    * Resolve SCORM content URL for iframe loading
    * @param {string} contentPath - Content path from manifest (relative or absolute)
-   * @param {string} extractionPath - SCORM package extraction directory
+   * @param {string} extractionPath - SCORM package extraction directory OR user-selected folder for unzipped flow
    * @param {string} appRoot - Application root directory
+   * @param {string|null} allowedBase - Optional additional allowed base outside appRoot (e.g., selected folder path)
    * @returns {Object} Resolution result with URL and metadata
    */
-  static resolveScormContentUrl(contentPath, extractionPath, appRoot) {
+  static resolveScormContentUrl(contentPath, extractionPath, appRoot, allowedBase = null) {
     try {
       if (!contentPath || !extractionPath || !appRoot) {
         throw new Error('Content path, extraction path, and app root are required');
@@ -102,18 +103,36 @@ class PathUtils {
         resolvedPath = this.normalize(resolvedPath);
       }
 
-      // Validate the resolved path exists and is within app root
+      // Validate the resolved path exists and is within an allowed base
       const normalizedAppRoot = this.normalize(appRoot);
-      if (!resolvedPath.startsWith(normalizedAppRoot)) {
-        throw new Error(`Resolved path outside app root: ${resolvedPath}`);
+      const normalizedAllowedBase = allowedBase ? this.normalize(allowedBase) : null;
+
+      const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
+      const withinAllowedBase = normalizedAllowedBase ? resolvedPath.startsWith(normalizedAllowedBase) : false;
+
+      if (!withinAppRoot && !withinAllowedBase) {
+        const bases = normalizedAllowedBase ? `${normalizedAppRoot} OR ${normalizedAllowedBase}` : normalizedAppRoot;
+        throw new Error(`Resolved path outside allowed roots (${bases}): ${resolvedPath}`);
       }
 
       if (!fs.existsSync(resolvedPath)) {
         throw new Error(`File does not exist: ${resolvedPath}`);
       }
 
+      // Determine which base to use for protocol URL construction
+      const protocolBase = withinAppRoot ? appRoot : (normalizedAllowedBase || appRoot);
+
       // Convert to protocol URL
-      let protocolUrl = this.toScormProtocolUrl(resolvedPath, appRoot);
+      let protocolUrl;
+      if (withinAppRoot) {
+        protocolUrl = this.toScormProtocolUrl(resolvedPath, appRoot);
+      } else {
+        // For external allowedBase, we cannot rely on appRoot-based protocol resolution.
+        // Encode absolute path using an 'abs/' scheme that the protocol handler will decode.
+        // Example: scorm-app://abs/C|/Users/name/Folder/index.html
+        const encodedAbs = this.normalize(resolvedPath).replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
+        protocolUrl = `scorm-app://abs/${encodedAbs}`;
+      }
       
       // Add query string back if present
       if (queryString) {
@@ -126,7 +145,8 @@ class PathUtils {
         resolvedPath: resolvedPath,
         originalPath: contentPath,
         hasQuery: !!queryString,
-        queryString: queryString || null
+        queryString: queryString || null,
+        usedBase: withinAppRoot ? 'appRoot' : 'allowedBase'
       };
 
     } catch (error) {
@@ -134,7 +154,8 @@ class PathUtils {
         success: false,
         error: error.message,
         originalPath: contentPath,
-        extractionPath: extractionPath
+        extractionPath: extractionPath,
+        allowedBase: allowedBase || null
       };
     }
   }
@@ -182,7 +203,7 @@ class PathUtils {
     try {
       // Extract the path from the custom protocol URL
       let requestedPath = protocolUrl.substr(12); // Remove 'scorm-app://'
-      
+
       // CRITICAL FIX: Handle undefined paths from SCORM content JavaScript
       if (requestedPath.includes('/undefined')) {
         console.warn(`PathUtils: UNDEFINED PATH DETECTED - Blocking request: ${requestedPath}`);
@@ -190,45 +211,97 @@ class PathUtils {
         return {
           success: false,
           error: 'Undefined path detected - SCORM content JavaScript variable is undefined',
-          requestedPath: requestedPath,
+          requestedPath,
           resolvedPath: null,
           isUndefinedPath: true
         };
       }
-      
+
       // CRITICAL FIX: Handle double temp/ paths that SCORM content sometimes generates
       if (requestedPath.includes('temp/temp/')) {
-        const originalPath = requestedPath;
         requestedPath = requestedPath.replace(/temp\/temp\//g, 'temp/');
       }
-      
+
       // Remove query parameters for file resolution
-      const [filePath, queryString] = requestedPath.split('?');
-      
-      // Normalize app root
+      let [filePath, queryString] = requestedPath.split('?');
+
+      // Normalize double abs prefixes that can occur when subresources are resolved relative to an abs URL
+      if (filePath.startsWith('abs/abs/')) {
+        filePath = filePath.replace(/^abs\/abs\//, 'abs/');
+      }
+
+      // Branch 1: Absolute-path encoded scheme for external folders
+      if (filePath.startsWith('abs/')) {
+        // Extract the encoded absolute path portion after 'abs/'
+        let encoded = filePath.substring(4);
+
+        // First, decode URI components to handle %7C, %20, etc.
+        try {
+          // decodeURIComponent may throw on malformed sequences; guard it
+          encoded = decodeURIComponent(encoded);
+        } catch (_) {
+          // If decoding fails, proceed with raw string
+        }
+
+        // Restore Windows drive colon if encoded with pipe or percent form
+        // Accept both 'C|/...' and 'C:/...' variants
+        encoded = encoded.replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`);
+
+        // Normalize to fs path
+        const absPath = this.normalize(encoded);
+
+        // Basic traversal guard: no '..' segments after normalization
+        if (absPath.includes('..')) {
+          return {
+            success: false,
+            error: 'Invalid or inaccessible path',
+            requestedPath,
+            resolvedPath: absPath
+          };
+        }
+
+        // Ensure file exists
+        if (!fs.existsSync(absPath)) {
+          return {
+            success: false,
+            error: 'Invalid or inaccessible path',
+            requestedPath,
+            resolvedPath: absPath
+          };
+        }
+
+        return {
+          success: true,
+          resolvedPath: absPath,
+          requestedPath,
+          queryString: queryString || null,
+          usedBase: 'allowedBase'
+        };
+      }
+
+      // Branch 2: Legacy appRoot-relative behavior
       const normalizedAppRoot = this.normalize(appRoot);
-      
-      // Resolve the full file path
       const fullPath = path.join(normalizedAppRoot, filePath);
       const normalizedPath = this.normalize(fullPath);
-      
+
       // Validate path security and existence
       if (!this.validatePath(normalizedPath, normalizedAppRoot)) {
         return {
           success: false,
           error: 'Invalid or inaccessible path',
-          requestedPath: requestedPath,
+          requestedPath,
           resolvedPath: normalizedPath
         };
       }
-      
+
       return {
         success: true,
         resolvedPath: normalizedPath,
-        requestedPath: requestedPath,
-        queryString: queryString || null
+        requestedPath,
+        queryString: queryString || null,
+        usedBase: 'appRoot'
       };
-      
+
     } catch (error) {
       return {
         success: false,

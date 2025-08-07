@@ -56,11 +56,17 @@
         </div>
         
         <nav class="header__nav">
-          <button id="course-load-btn" class="btn btn--primary" title="Load SCORM Course">
+          <button id="course-load-btn" class="btn btn--primary" title="Load SCORM Course (ZIP)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
             </svg>
-            Load Course
+            Load ZIP
+          </button>
+          <button id="course-folder-btn" class="btn btn--secondary" title="Load SCORM Course Folder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4H10Z"/>
+            </svg>
+            Load Folder
           </button>
         </nav>
         
@@ -155,16 +161,28 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
                     </svg>
-                    Load SCORM Course
+                    Load ZIP
+                  </button>
+
+                  <button class="btn btn--outline btn--lg" id="welcome-folder-btn" onclick="document.getElementById('course-folder-btn').click()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4H10Z"/>
+                    </svg>
+                    Load Folder
                   </button>
                   
-                  <button class="btn btn--outline btn--lg" id="sample-course-btn">
+                  <button class="btn btn--ghost btn--lg" id="sample-course-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z"/>
                     </svg>
                     Try Sample Course
                   </button>
                 </div>
+
+                <section class="welcome-recents" aria-labelledby="recent-courses-title" style="margin-top: 20px;">
+                  <h2 id="recent-courses-title" class="h3">Recent Courses</h2>
+                  <div id="recent-courses" class="recent-courses"></div>
+                </section>
                 
                 <div class="welcome-features">
                   <div class="feature">

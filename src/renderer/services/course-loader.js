@@ -19,6 +19,11 @@ class CourseLoader {
   constructor() {
     this.currentCourse = null;
     this.loadingState = false;
+
+    // Lazy init logger
+    import('../utils/renderer-logger.js')
+      .then(({ rendererLogger }) => { this.logger = rendererLogger; })
+      .catch(() => { this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} }; });
   }
 
   /**
@@ -52,6 +57,28 @@ class CourseLoader {
   }
 
   /**
+   * Select a SCORM folder and load it (unzipped flow)
+   */
+  async handleFolderLoad() {
+    try {
+      if (typeof window.electronAPI === 'undefined') {
+        throw new Error('Electron API not available');
+      }
+
+      const result = await window.electronAPI.selectScormFolder();
+      if (!result || !result.success) {
+        return; // cancelled or failed; errors already logged in main
+      }
+
+      await this.loadCourseFromFolder(result.folderPath);
+    } catch (error) {
+      console.error('CourseLoader: Error in handleFolderLoad:', error);
+      eventBus.emit('course:loadError', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * Load course from file path
    */
   async loadCourseFromPath(filePath) {
@@ -69,6 +96,127 @@ class CourseLoader {
       throw error;
     } finally {
       this.setLoadingState(false);
+    }
+  }
+
+  /**
+   * Load course from a selected folder path (unzipped)
+   */
+  async loadCourseFromFolder(folderPath) {
+    try {
+      this.setLoadingState(true);
+      eventBus.emit('course:loadStart', { folderPath });
+
+      if (typeof window.electronAPI === 'undefined') {
+        throw new Error('Electron API not available');
+      }
+
+      // Validate manifest presence and read it
+      const manifestContentResult = await window.electronAPI.getCourseManifest(folderPath);
+      if (!manifestContentResult.success) {
+        throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
+      }
+      const manifestContent = manifestContentResult.manifestContent;
+
+      // Process manifest via CAM in main
+      const processManifestResult = await window.electronAPI.processScormManifest(folderPath, manifestContent);
+      if (!processManifestResult.success) {
+        throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
+      }
+      const { manifest, validation, analysis } = processManifestResult;
+
+      // Determine entry point from CAM analysis
+      const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
+        ? analysis.launchSequence[0].href
+        : null;
+      if (!firstLaunchHref) {
+        throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
+      }
+      // Pass allowedBase to permit loading directly from user-selected folder
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, folderPath, { allowedBase: folderPath });
+      if (!entryResult.success) {
+        throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
+      }
+
+      // Build UI structure as passthrough of uiOutline
+      const uiOutline = Array.isArray(analysis?.uiOutline) ? analysis.uiOutline : [];
+      const orgsCanon = Array.isArray(manifest?.organizations?.organization)
+        ? manifest.organizations.organization
+        : (manifest?.organizations?.organization ? [manifest.organizations.organization] : []);
+      const defaultOrgId = manifest?.organizations?.default || null;
+      const pickedOrg = defaultOrgId
+        ? (orgsCanon.find(o => o?.identifier === defaultOrgId) || orgsCanon[0] || null)
+        : (orgsCanon[0] || null);
+
+      const rootTitle = pickedOrg?.title || manifest?.identifier || 'Course';
+      const rootId = pickedOrg?.identifier || manifest?.identifier || 'course';
+
+      const passthroughNode = (n) => ({
+        identifier: n?.identifier || n?.id || n?.identifierref || `node_${Math.random().toString(36).slice(2,10)}`,
+        title: (typeof n?.title === 'string' && n.title.trim()) ? n.title.trim() : (n?.identifier || 'Untitled'),
+        type: n?.type || (n?.identifierref ? 'sco' : (Array.isArray(n?.items) && n.items.length > 0 ? 'cluster' : 'asset')),
+        href: n?.href,
+        items: Array.isArray(n?.items) ? n.items.map(passthroughNode) : []
+      });
+
+      const uiStructure = {
+        title: rootTitle,
+        identifier: rootId,
+        items: uiOutline.map(passthroughNode)
+      };
+
+      const courseData = {
+        info: {
+          title: (manifest?.organizations?.organizations?.[0]?.title)
+                 || manifest?.organizations?.organization?.title
+                 || manifest?.identifier
+                 || 'Course',
+          version: manifest?.version,
+          scormVersion: manifest?.metadata?.schemaversion || 'Unknown',
+          hasManifest: true,
+          manifestSize: manifestContent.length
+        },
+        structure: uiStructure,
+        path: folderPath,
+        entryPoint: entryResult.resolvedPath,
+        launchUrl: entryResult.url,
+        originalFilePath: null,
+        validation,
+        analysis
+      };
+  
+      this.currentCourse = courseData;
+      const uiState = await uiStatePromise;
+      uiState.updateCourse(courseData);
+      // Update MRU
+      try {
+        const { recentCoursesStore } = await import('./recent-courses.js');
+        const title = courseData?.info?.title || 'Course';
+        recentCoursesStore.addOrUpdate({ type: 'folder', path: folderPath, displayName: title, meta: { title } });
+      } catch (_) { /* no-op */ }
+    } catch (error) {
+      console.error('CourseLoader: Error in loadCourseFromFolder:', error);
+      eventBus.emit('course:loadError', { error: error.message });
+      throw error;
+    } finally {
+      this.setLoadingState(false);
+    }
+  }
+
+  /**
+   * Load by source descriptor
+   * @param {{type:'zip'|'folder', path:string}} source
+   */
+  async loadCourseBySource(source) {
+    if (!source || !source.type || !source.path) {
+      throw new Error('Invalid source descriptor');
+    }
+    if (source.type === 'zip') {
+      await this.loadCourseFromPath(source.path);
+    } else if (source.type === 'folder') {
+      await this.loadCourseFromFolder(source.path);
+    } else {
+      throw new Error(`Unknown source type: ${source.type}`);
     }
   }
 
@@ -291,10 +439,16 @@ class CourseLoader {
       this.currentCourse = courseData;
       const uiState = await uiStatePromise; // Await the promise
       uiState.updateCourse(courseData);
-
+      // Update MRU
+      try {
+        const { recentCoursesStore } = await import('./recent-courses.js');
+        const title = courseData?.info?.title || 'Course';
+        recentCoursesStore.addOrUpdate({ type: 'zip', path: filePath, displayName: title, meta: { title } });
+      } catch (_) { /* no-op */ }
+  
       // Do NOT emit course:loaded directly here; UIState.updateCourse already emits it.
       // This avoids duplicate event paths and potential double render/update races.
-
+  
       // console.log('CourseLoader: Course processing completed successfully!'); // Removed debug log
 
     } catch (error) {

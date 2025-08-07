@@ -106,6 +106,14 @@ const electronAPI = {
   getAllSessions: () => safeInvoke('get-all-sessions'),
   deleteSession: (sessionId) => safeInvoke('delete-session', sessionId),
   
+  // Recent Courses
+  recentCourses: {
+    get: () => safeInvoke('recent:get'),
+    addOrUpdate: (course) => safeInvoke('recent:addOrUpdate', course),
+    remove: (type, path) => safeInvoke('recent:remove', type, path),
+    clear: () => safeInvoke('recent:clear')
+  },
+
   // Navigation
   scormNavigationRequest: (sessionId, request) => safeInvoke('scorm-navigation-request', sessionId, request),
   
@@ -132,7 +140,8 @@ const electronAPI = {
     toFileUrl: (filePath) => safeInvoke('path-to-file-url', filePath),
     normalize: (filePath) => safeInvoke('path-normalize', filePath),
     join: (...paths) => safeInvoke('path-join', ...paths),
-    resolveScormUrl: (contentPath, extractionPath) => safeInvoke('resolve-scorm-url', contentPath, extractionPath)
+    // Accept optional options to carry allowedBase for folder-based loads
+    resolveScormUrl: (contentPath, extractionPath, options = null) => safeInvoke('resolve-scorm-url', contentPath, extractionPath, options)
   },
   
   // Development/Debug

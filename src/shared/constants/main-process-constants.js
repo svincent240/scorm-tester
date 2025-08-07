@@ -189,6 +189,7 @@ const SECURITY_CONFIG = {
       'scorm-commit',
       'scorm-terminate',
       'select-scorm-package',
+      'select-scorm-folder',
       'extract-scorm',
       'save-temporary-file',
       'find-scorm-entry',
@@ -223,7 +224,12 @@ const SECURITY_CONFIG = {
       'sn:processNavigation',
       'sn:updateActivityProgress',
       'sn:reset',
-      'open-debug-window' // Open debug console window
+      'open-debug-window', // Open debug console window
+      // Recent Courses channels
+      'recent:get',
+      'recent:addOrUpdate',
+      'recent:remove',
+      'recent:clear'
     ]
   },
   

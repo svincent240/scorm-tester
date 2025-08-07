@@ -141,12 +141,19 @@ class IpcHandler extends BaseService {
       
       // File operation handlers
       this.registerHandler('select-scorm-package', this.handleSelectScormPackage.bind(this));
+      this.registerHandler('select-scorm-folder', this.handleSelectScormFolder.bind(this));
       this.registerHandler('extract-scorm', this.handleExtractScorm.bind(this));
       this.registerHandler('save-temporary-file', this.handleSaveTemporaryFile.bind(this));
       this.registerHandler('find-scorm-entry', this.handleFindScormEntry.bind(this));
       this.registerHandler('get-course-info', this.handleGetCourseInfo.bind(this));
       this.registerHandler('get-course-manifest', this.handleGetCourseManifest.bind(this));
       
+      // Recent Courses handlers
+      this.registerHandler('recent:get', this.handleRecentGet.bind(this));
+      this.registerHandler('recent:addOrUpdate', this.handleRecentAddOrUpdate.bind(this));
+      this.registerHandler('recent:remove', this.handleRecentRemove.bind(this));
+      this.registerHandler('recent:clear', this.handleRecentClear.bind(this));
+
       // Validation and session handlers
       this.registerHandler('validate-scorm-compliance', this.handleValidateScormCompliance.bind(this));
       this.registerHandler('analyze-scorm-content', this.handleAnalyzeScormContent.bind(this));
@@ -712,6 +719,15 @@ class IpcHandler extends BaseService {
     return await fileManager.selectScormPackage();
   }
 
+  async handleSelectScormFolder(event) {
+    const fileManager = this.getDependency('fileManager');
+    if (!fileManager || typeof fileManager.selectScormFolder !== 'function') {
+      this.logger?.error('IpcHandler: FileManager.selectScormFolder not available');
+      return { success: false, error: 'FileManager.selectScormFolder not available' };
+    }
+    return await fileManager.selectScormFolder();
+  }
+
   async handleExtractScorm(event, zipPath) {
     const fileManager = this.getDependency('fileManager');
     return await fileManager.extractScorm(zipPath);
@@ -853,9 +869,11 @@ class IpcHandler extends BaseService {
     return PathUtils.toScormProtocolUrl(filePath, appRoot);
   }
 
-  async handleResolveScormUrl(event, contentPath, extractionPath) {
+  // Allow optional options param to pass an allowedBase for folder-based loads
+  async handleResolveScormUrl(event, contentPath, extractionPath, options = null) {
     const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
+    const allowedBase = options && options.allowedBase ? options.allowedBase : null;
+    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot, allowedBase);
   }
 
   async handlePathNormalize(event, filePath) {
@@ -1068,6 +1086,43 @@ class IpcHandler extends BaseService {
     }
     snService.reset();
     return { success: true };
+  }
+
+  // Recent Courses handlers
+  async handleRecentGet() {
+    const recentCoursesService = this.getDependency('recentCoursesService');
+    if (!recentCoursesService) {
+      return { success: false, error: 'RecentCoursesService not available' };
+    }
+    const recents = await recentCoursesService.getRecents();
+    return { success: true, recents };
+  }
+
+  async handleRecentAddOrUpdate(_event, course) {
+    const recentCoursesService = this.getDependency('recentCoursesService');
+    if (!recentCoursesService) {
+      return { success: false, error: 'RecentCoursesService not available' };
+    }
+    const recents = await recentCoursesService.addOrUpdateRecent(course);
+    return { success: true, recents };
+  }
+
+  async handleRecentRemove(_event, type, coursePath) {
+    const recentCoursesService = this.getDependency('recentCoursesService');
+    if (!recentCoursesService) {
+      return { success: false, error: 'RecentCoursesService not available' };
+    }
+    const recents = await recentCoursesService.removeRecent(type, coursePath);
+    return { success: true, recents };
+  }
+
+  async handleRecentClear() {
+    const recentCoursesService = this.getDependency('recentCoursesService');
+    if (!recentCoursesService) {
+      return { success: false, error: 'RecentCoursesService not available' };
+    }
+    const recents = await recentCoursesService.clearRecents();
+    return { success: true, recents };
   }
 
   // --- End of merged IpcHandlers methods ---

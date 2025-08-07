@@ -147,6 +147,54 @@ class FileManager extends BaseService {
   }
 
   /**
+   * Select a SCORM course folder (unzipped) ensuring imsmanifest.xml exists.
+   * @returns {Promise<Object>} Result object with success and folderPath
+   */
+  async selectScormFolder() {
+    try {
+      this.logger?.info('FileManager: Opening SCORM folder selection dialog');
+
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory']
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        this.logger?.info('FileManager: SCORM folder selection cancelled');
+        this.recordOperation('selectScormFolder', true);
+        return { success: false, cancelled: true };
+      }
+
+      const folderPath = result.filePaths[0];
+
+      if (!this.validateFolderPath(folderPath)) {
+        this.recordOperation('selectScormFolder', false);
+        return { success: false, error: 'Invalid folder path' };
+      }
+
+      const manifestCheck = await this.findScormEntry(folderPath);
+      if (!manifestCheck.success) {
+        this.logger?.warn('FileManager: Selected folder does not contain imsmanifest.xml');
+        this.recordOperation('selectScormFolder', false);
+        return { success: false, error: 'imsmanifest.xml not found in selected folder' };
+      }
+
+      this.logger?.info(`FileManager: SCORM folder selected: ${path.basename(folderPath)}`);
+      this.recordOperation('selectScormFolder', true);
+      return { success: true, folderPath };
+
+    } catch (error) {
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
+        `SCORM folder selection failed: ${error.message}`,
+        'FileManager.selectScormFolder'
+      );
+      this.logger?.error('FileManager: SCORM folder selection failed:', error);
+      this.recordOperation('selectScormFolder', false);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Extract SCORM package
    * @param {string} zipPath - Path to ZIP file
    * @returns {Promise<Object>} Result object with success and path properties

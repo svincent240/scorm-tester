@@ -14,6 +14,7 @@ const WindowManager = require('./services/window-manager');
 const IpcHandler = require('./services/ipc-handler');
 const FileManager = require('./services/file-manager');
 const ScormService = require('./services/scorm-service');
+const RecentCoursesService = require('./services/recent-courses-service');
 
 // Shared utilities
 const ScormErrorHandler = require('./services/scorm/rte/error-handler');
@@ -113,12 +114,19 @@ class MainProcess {
       throw new Error('ScormService initialization failed');
     }
     this.services.set('scormService', scormService);
+
+    const recentCoursesService = new RecentCoursesService(this.errorHandler, this.logger);
+    if (!await recentCoursesService.initialize(new Map())) {
+      throw new Error('RecentCoursesService initialization failed');
+    }
+    this.services.set('recentCoursesService', recentCoursesService);
     
     const ipcHandler = new IpcHandler(this.errorHandler, this.logger);
     const ipcDependencies = new Map([
       ['fileManager', fileManager],
       ['scormService', scormService],
-      ['windowManager', windowManager]
+      ['windowManager', windowManager],
+      ['recentCoursesService', recentCoursesService]
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');
@@ -202,7 +210,7 @@ class MainProcess {
     this.logger?.info('SCORM Tester: Starting graceful shutdown');
     
     try {
-      const shutdownOrder = ['ipcHandler', 'scormService', 'fileManager', 'windowManager'];
+      const shutdownOrder = ['ipcHandler', 'scormService', 'recentCoursesService', 'fileManager', 'windowManager'];
       
       for (const serviceName of shutdownOrder) {
         const service = this.services.get(serviceName);

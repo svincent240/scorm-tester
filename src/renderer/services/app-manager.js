@@ -605,10 +605,10 @@ class AppManager {
   /**
    * Setup UI event listeners
    */
-  setupUIEventListeners() {
+  async setupUIEventListeners() {
     // console.log('AppManager: Setting up UI event listeners...'); // Removed debug log
     
-    // Course load button
+    // Course load button (Open ZIP)
     const courseLoadBtn = document.getElementById('course-load-btn');
     if (courseLoadBtn) {
       courseLoadBtn.addEventListener('click', () => {
@@ -618,8 +618,18 @@ class AppManager {
       });
       // console.log('AppManager: Course load button listener attached'); // Removed debug log
     }
+
+    // New: Open Folder button
+    const openFolderBtn = document.getElementById('course-folder-btn');
+    if (openFolderBtn) {
+      openFolderBtn.addEventListener('click', () => {
+        courseLoader.handleFolderLoad().catch(error => {
+          try { this.logger.error('AppManager: Folder load error', error?.message || error); } catch (_) {}
+        });
+      });
+    }
  
-    // Welcome page buttons
+    // Welcome page buttons (fallback wiring for legacy inline handlers)
     const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
     welcomeButtons.forEach((btn, index) => {
       btn.onclick = null; // Remove inline onclick
@@ -630,6 +640,9 @@ class AppManager {
       });
       // console.log(`AppManager: Welcome button ${index + 1} listener attached`); // Removed debug log
     });
+
+    // Render Recent Courses list if container exists
+    await this.renderRecentCourses();
  
     // Debug panel toggle
     const debugToggleBtn = document.getElementById('debug-toggle');
@@ -921,6 +934,65 @@ class AppManager {
     const canNavigatePrevious = a.includes('previous') || a.includes('choice.previous');
     const canNavigateNext = a.includes('continue') || a.includes('choice.next') || a.includes('choice');
     return { canNavigatePrevious, canNavigateNext };
+  }
+  
+  /**
+   * Render Recent Courses on welcome screen if container exists.
+   * Expects a container with id 'recent-courses'.
+   * Each item should have data-type ('zip'|'folder') and data-path.
+   */
+  async renderRecentCourses() {
+    const container = document.getElementById('recent-courses');
+    if (!container) {
+      try { this.logger.debug('AppManager: recent-courses container not found; skipping render'); } catch (_) {}
+      return;
+    }
+  
+    // Lazy-load store to avoid circular deps
+    const { recentCoursesStore } = await import('./recent-courses.js');
+    // Ensure the store has loaded its data from the main process
+    await recentCoursesStore._load(); // Explicitly await the load operation
+
+    const items = recentCoursesStore.getAll();
+    // Clear
+    container.innerHTML = '';
+    if (!Array.isArray(items) || items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'recent-empty';
+      empty.textContent = 'No recent courses';
+      container.appendChild(empty);
+      return;
+    }
+  
+      const list = document.createElement('ul');
+      list.className = 'recent-list';
+      items.forEach((rc) => {
+        const li = document.createElement('li');
+        li.className = 'recent-item';
+        li.dataset.type = rc.type;
+        li.dataset.path = rc.path;
+  
+        const title = rc.meta?.title || rc.displayName || rc.path.split(/[\\/]/).pop();
+        const kind = rc.type === 'zip' ? 'ZIP' : 'Folder';
+  
+        li.textContent = `${title} (${kind})`;
+        li.title = rc.path;
+  
+        li.addEventListener('click', async () => {
+          try {
+            await courseLoader.loadCourseBySource({ type: rc.type, path: rc.path });
+            await recentCoursesStore.touch(rc.path, rc.type); // Await touch as it saves
+            // refresh list to move to top
+            await this.renderRecentCourses(); // Await render as it loads
+          } catch (e) {
+            try { this.logger.error('AppManager: recent course load failed', e?.message || e); } catch (_) {}
+          }
+        });
+  
+        list.appendChild(li);
+      });
+  
+      container.appendChild(list);
   }
 
   /**
