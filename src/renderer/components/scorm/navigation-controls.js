@@ -892,11 +892,15 @@ class NavigationControls extends BaseComponent {
 
   /**
    * Normalize availableNavigation array into booleans used as single source of truth.
+   * This is the authoritative source for enabling/disabling flow (Prev/Next) buttons.
+   * SCORM distinguishes between 'flow' (continue, previous) and 'choice' navigation.
+   * The main navigation buttons should only handle flow navigation.
    */
   normalizeAvailableNavigation(availableNavigation = []) {
     const a = Array.isArray(availableNavigation) ? availableNavigation : [];
-    const canNavigatePrevious = a.includes('previous') || a.includes('choice.previous');
-    const canNavigateNext = a.includes('continue') || a.includes('choice.next') || a.includes('choice');
+    // Strict adherence to flow navigation requests. 'choice' is handled by outline/menu components.
+    const canNavigatePrevious = a.includes('previous');
+    const canNavigateNext = a.includes('continue');
     return { canNavigatePrevious, canNavigateNext };
   }
 
