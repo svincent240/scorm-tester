@@ -134,12 +134,14 @@ function getDefaultLogDir() {
   return require('os').tmpdir();
 }
 
-// Export a singleton instance with lazy init to match existing call sites expecting an object with methods
+// Export a singleton getter with optional first-init override for log directory.
+// This maintains a single shared logger instance and allows main to specify app.getPath('userData').
 let singleton = null;
-function getLogger() {
+function getLogger(logDirOverride) {
   if (singleton) return singleton;
-  singleton = new Logger(process.env.SCORM_TESTER_LOG_DIR);
+  const dir = logDirOverride || process.env.SCORM_TESTER_LOG_DIR;
+  singleton = new Logger(dir);
   return singleton;
 }
 
-module.exports = getLogger();
+module.exports = getLogger;

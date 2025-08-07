@@ -25,7 +25,9 @@ const { ParserError, ParserErrorCode } = require('../../../../shared/errors/pars
 // From this file (src/main/services/scorm/cam/manifest-parser.js), the correct relative path is:
 // src/main/services/scorm/cam -> up to src/main/services/scorm -> src/main/services -> src/main -> src
 // ../../../../shared/utils/logger
-const logger = require('../../../../shared/utils/logger');
+// The shared logger module exports a getter function; obtain the singleton instance.
+const getLogger = require('../../../../shared/utils/logger');
+const logger = getLogger();
 
 /**
  * SCORM Manifest Parser

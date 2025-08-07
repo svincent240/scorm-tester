@@ -28,22 +28,25 @@ describe('SCORM Error Handling Integration', () => {
 
   describe('Invalid Manifest Handling', () => {
     test('should handle null manifest', async () => {
-      const result = await snService.initialize(null);
-      expect(result.success).toBe(false);
-      expect(result.reason).toContain('sequencing');
+      await expect(snService.initialize(null)).rejects.toMatchObject({
+        name: 'ParserError',
+        code: expect.stringMatching(/PARSE_(XML_ERROR|EMPTY_INPUT|VALIDATION_ERROR)/)
+      });
     });
 
     test('should handle empty manifest', async () => {
-      const result = await snService.initialize({});
-      expect(result.success).toBe(false);
-      expect(result.reason).toContain('sequencing');
+      await expect(snService.initialize({})).rejects.toMatchObject({
+        name: 'ParserError',
+        code: expect.stringMatching(/PARSE_(XML_ERROR|EMPTY_INPUT|VALIDATION_ERROR)/)
+      });
     });
 
     test('should handle manifest without organizations', async () => {
-      const manifest = { resources: [] };
-      const result = await snService.initialize(manifest);
-      expect(result.success).toBe(false);
-      expect(result.reason).toContain('sequencing');
+      await expect(snService.initialize({ resources: [] })).rejects.toMatchObject({
+        name: 'ParserError',
+        code: expect.stringMatching(/PARSE_(VALIDATION_ERROR|XML_ERROR|EMPTY_INPUT)/),
+        message: expect.stringContaining('No items in default organization')
+      });
     });
 
     test('should handle circular references in manifest gracefully', async () => {
@@ -70,10 +73,9 @@ describe('SCORM Error Handling Integration', () => {
         resources: []
       };
       
-      const result = await snService.initialize(circularManifest);
-      // Service may handle circular references gracefully or detect them
-      expect(result).toBeDefined();
-      expect(typeof result.success).toBe('boolean');
+      await expect(snService.initialize(circularManifest)).resolves.toMatchObject({
+        success: expect.any(Boolean)
+      });
     });
   });
 

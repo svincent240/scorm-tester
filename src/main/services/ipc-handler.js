@@ -794,13 +794,12 @@ class IpcHandler extends BaseService {
 
   async handleLoadSharedLoggerAdapter(_event) {
     try {
-      // Lazy-require the CommonJS Logger class
+      // Lazy-require the shared singleton logger getter
       // eslint-disable-next-line global-require, import/no-commonjs
-      const LoggerClass = require('../../shared/utils/logger.js');
+      const getLogger = require('../../shared/utils/logger.js');
 
       // Prefer the same directory used by the main logger initialization
-      // If our BaseService logger is configured, assume it writes to the correct app.log already.
-      // The LoggerClass constructor requires a directory; we derive it from the existing logger if possible.
+      // Derive from the existing logger if possible so both write to the same app.log.
       let logDir = null;
 
       try {
@@ -823,9 +822,9 @@ class IpcHandler extends BaseService {
         }
       }
 
-      // Singleton the instance within this service
+      // Singleton the instance within this service (using shared getter ensures single process-wide instance)
       if (!this._sharedLoggerInstance) {
-        this._sharedLoggerInstance = new LoggerClass(logDir);
+        this._sharedLoggerInstance = getLogger(logDir);
       }
 
       const inst = this._sharedLoggerInstance;

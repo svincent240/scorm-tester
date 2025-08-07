@@ -17,7 +17,7 @@ const ScormService = require('./services/scorm-service');
 
 // Shared utilities
 const ScormErrorHandler = require('./services/scorm/rte/error-handler');
-const Logger = require('../shared/utils/logger');
+const getLogger = require('../shared/utils/logger');
 const { SERVICE_EVENTS } = require('../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../shared/constants/error-codes');
 
@@ -70,7 +70,8 @@ class MainProcess {
   async initializeCoreDependencies() {
     try {
       const logDir = app.getPath('userData');
-      this.logger = new Logger(logDir);
+      // Use singleton logger getter with explicit first-init directory
+      this.logger = getLogger(logDir);
       console.log(`SCORM Tester: Log file path: ${this.logger.logFile}`);
       
       this.errorHandler = new ScormErrorHandler(this.logger);

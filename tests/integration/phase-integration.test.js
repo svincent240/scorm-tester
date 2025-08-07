@@ -316,10 +316,13 @@ describe('Multi-Phase SCORM Integration', () => {
     });
 
     test('should handle error propagation across phases', async () => {
-      // Test error in SN propagating to shared error handler
-      const invalidManifest = null;
-      const initResult = await snService.initialize(invalidManifest);
-      expect(initResult.success).toBe(false);
+      const { ParserErrorCode } = require('../../src/shared/errors/parser-error');
+
+      // Test error in SN now throws ParserError under strict policy
+      await expect(snService.initialize(null)).rejects.toMatchObject({
+        name: 'ParserError',
+        code: expect.stringMatching(/PARSE_(EMPTY_INPUT|XML_ERROR|VALIDATION_ERROR)/)
+      });
 
       // Test error in RTE
       const invalidResult = apiHandler.Initialize('invalid_parameter');
@@ -439,9 +442,8 @@ describe('Multi-Phase SCORM Integration', () => {
       const apiHandler = new ScormApiHandler(sessionManager, logger);
 
       try {
-        // Simulate error condition
-        const invalidResult = await snService.initialize(null);
-        expect(invalidResult.success).toBe(false);
+        // Simulate error condition under strict policy: initialize(null) rejects with ParserError
+        await expect(snService.initialize(null)).rejects.toHaveProperty('name', 'ParserError');
 
         // Recovery with valid manifest
         const testManifest = createIntegrationTestManifest();

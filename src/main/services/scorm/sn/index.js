@@ -59,14 +59,14 @@ class ScormSNService {
   async initialize(manifest, packageInfo = {}) {
     try {
       this.logger?.info('Initializing SN service with manifest');
-
+ 
       // Diagnostics: summarize orgs/items/sequencing presence prior to validation
       try {
         // Normalize organizations to a single array regardless of shape
         const orgs = (Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization)
           || (Array.isArray(manifest?.organizations?.organizations) && manifest.organizations.organizations)
           || [];
-
+ 
         const countItems = (items) => (Array.isArray(items) ? items.reduce((n, it) => n + 1 + countItems(it?.children || it?.items || []), 0) : 0);
         const hasExplicitSeq = orgs.some(org => {
           if (org?.sequencing) return true;
@@ -80,7 +80,7 @@ class ScormSNService {
           }
           return false;
         });
-
+ 
         const orgSummary = {
           orgs: orgs.length,
           items: orgs.reduce((sum, org) => sum + countItems(org?.items || []), 0),
@@ -89,12 +89,34 @@ class ScormSNService {
         };
         this.logger?.info('SN.init: CAM manifest summary', orgSummary);
       } catch (_) { /* best-effort diagnostics */ }
-
+ 
       // Validate manifest has sequencing information (or defaults allowed)
       if (!this.validateManifestForSequencing(manifest)) {
-        return { success: false, reason: 'Manifest does not contain valid sequencing information' };
+        // Strict policy: throw ParserError with actionable message (no auto-correction/fallback)
+        const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
+        const defaultOrgId = manifest?.organizations?.default || null;
+        const orgs = (Array.isArray(manifest?.organizations?.organizations) && manifest.organizations.organizations)
+          || (Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization)
+          || [];
+        const defaultOrg = defaultOrgId
+          ? orgs.find(o => o?.identifier === defaultOrgId)
+          : orgs[0];
+        const topCount = Array.isArray(defaultOrg?.items) ? defaultOrg.items.length : 0;
+        throw new ParserError({
+          code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+          message: topCount === 0
+            ? 'No items in default organization'
+            : 'Manifest does not contain valid sequencing information',
+          detail: {
+            reason: 'EMPTY_ACTIVITY_TREE',
+            defaultOrgId,
+            orgCount: orgs.length,
+            topCount
+          },
+          phase: 'SN_INIT'
+        });
       }
-
+ 
       // Build activity tree from manifest
       const treeResult = this.activityTreeManager.buildTree(manifest);
       if (!treeResult) {
@@ -125,10 +147,23 @@ class ScormSNService {
       };
 
     } catch (error) {
+      // Strict policy: propagate ParserError so callers/tests can assert specific codes
+      if (error && (error.name === 'ParserError' || error.code)) {
+        this.logger?.error('Error initializing SN service (ParserError):', {
+          name: error.name,
+          code: error.code,
+          message: error.message,
+          detail: error.detail,
+          phase: 'SN_INIT'
+        });
+        throw error;
+      }
+
+      // Legacy generic errors: map to SN error handler and return structured failure
       this.logger?.error('Error initializing SN service:', error);
       this.errorHandler?.setError(SN_ERROR_CODES.SN_SERVICE_UNAVAILABLE,
         `SN initialization failed: ${error.message}`, 'initialize');
-      return { success: false, reason: 'SN initialization error', error: error.message };
+      throw error;
     }
   }
 

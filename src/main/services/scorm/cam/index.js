@@ -18,10 +18,10 @@ const ContentValidator = require('./content-validator');
 const MetadataHandler = require('./metadata-handler');
 const PackageAnalyzer = require('./package-analyzer');
 const { ParserError } = require('../../../../shared/errors/parser-error');
-// Use the shared logger utility. This module exports an object with methods: debug/info/warn/error.
+// Use the shared logger utility getter and obtain an instance.
 // From this file (src/main/services/scorm/cam/index.js), the correct relative path to src/shared/utils/logger.js is:
 // ../../../../shared/utils/logger
-const logger = require('../../../../shared/utils/logger');
+const getLogger = require('../../../../shared/utils/logger');
 
 /**
  * SCORM CAM Service
@@ -32,10 +32,10 @@ class ScormCAMService {
   constructor(errorHandler, loggerInstance) {
     this.errorHandler = errorHandler;
     // Ensure we always have a usable logger with info/warn/error/debug methods
-    const sharedLogger = require('../../../../shared/utils/logger');
-    this.logger = loggerInstance && typeof loggerInstance.info === 'function'
+    const getSharedLogger = require('../../../../shared/utils/logger');
+    this.logger = (loggerInstance && typeof loggerInstance.info === 'function')
       ? loggerInstance
-      : sharedLogger;
+      : getSharedLogger();
 
     // Initialize CAM sub-components
     this.manifestParser = new ManifestParser(errorHandler);
@@ -113,7 +113,7 @@ class ScormCAMService {
             packagePath,
             severity: 'info'
           };
-          logger.info('ScormCAMService: Parser snapshot', payload);
+          this.logger?.info('ScormCAMService: Parser snapshot', payload);
         } catch (e) {
           this.logger?.warn('ScormCAMService: Failed early org/items diagnostic', { message: e?.message || String(e) });
         }
@@ -250,10 +250,47 @@ class ScormCAMService {
           first = pickFirstHref(uiOutline);
         }
 
+        // Strict policy: if default organization exists but has zero top-level items, throw ParserError
+        try {
+          const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+          const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
+          const orgContainer = manifest?.organizations || null;
+          const orgs = toArray(orgContainer?.organizations);
+          const defId = safeStr(orgContainer?.default);
+          const defaultOrg = defId
+            ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
+            : (orgs[0] || null);
+          const topItems = toArray(defaultOrg?.items);
+          if (defaultOrg && topItems.length === 0) {
+            const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
+            throw new ParserError({
+              code: ParserErrorCode ? ParserErrorCode.PARSE_VALIDATION_ERROR : 'PARSE_VALIDATION_ERROR',
+              message: 'No items in default organization',
+              detail: {
+                reason: 'EMPTY_ORGANIZATION',
+                defaultOrgId: safeStr(defaultOrg?.identifier) || defId || null,
+                orgCount: orgs.length,
+                topCount: 0
+              },
+              phase: 'CAM_PROCESS'
+            });
+          }
+        } catch (guardErr) {
+          // If we threw a ParserError above, rethrow to fail the pipeline as per strict contract
+          if (guardErr && (guardErr.name === 'ParserError' || guardErr.code === 'PARSE_VALIDATION_ERROR')) {
+            throw guardErr;
+          }
+          // Otherwise, continue; non-critical guard errors shouldn't mask analysis
+        }
+
         analysis.uiOutline = uiOutline;
         analysis.launchSequence = first ? [first] : [];
       } catch (outlineError) {
         this.logger?.warn('ScormCAMService: Minimal pipeline failed:', outlineError?.message || outlineError);
+        // Re-throw ParserError from strict guard so tests can assert rejection
+        if (outlineError && (outlineError.name === 'ParserError' || outlineError.code === 'PARSE_VALIDATION_ERROR')) {
+          throw outlineError;
+        }
       }
 
       // 4. Extract Metadata (if any)
@@ -305,14 +342,21 @@ class ScormCAMService {
 
     } catch (error) {
       this.errorHandler?.setError('301', `SCORM package processing failed: ${error.message}`, 'ScormCAMService.processPackage');
-      // Normalize error objects to avoid "is not a function" when logger expects strings + payloads
       const payload = {
         type: error?.name || 'Error',
         message: error?.message || String(error),
+        code: error?.code || undefined,
         stackHead: typeof error?.stack === 'string' ? error.stack.split('\n').slice(0, 5) : null
       };
       this.logger?.error('ScormCAMService: Package processing error', payload);
       this.logger?.error('ScormCAMService: Error stack', { stack: error?.stack });
+
+      // Strict policy: propagate ParserError so callers can assert on it
+      if (error && (error.name === 'ParserError' || error.code === 'PARSE_VALIDATION_ERROR')) {
+        throw error;
+      }
+
+      // Fallback: return normalized failure
       return { success: false, error: error.message, reason: error.message };
     }
   }

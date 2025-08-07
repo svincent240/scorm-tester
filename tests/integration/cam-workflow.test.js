@@ -222,22 +222,16 @@ describe('CAM Integration Workflow', () => {
         'utf8'
       );
 
+      const { ParserErrorCode } = require('../../src/shared/errors/parser-error');
       try {
         jest.spyOn(mockErrorHandler, 'setError').mockImplementation(() => {});
         const corruptedManifestContent = await fs.readFile(corruptedManifestPath, 'utf8');
-        const result = await camService.processPackage(corruptedPackagePath, corruptedManifestContent);
-
-        // Guarded: some implementations may return undefined or partial result on corruption
-        if (result && result.validation) {
-          expect(result.validation.isValid).toBe(false);
-          expect(Array.isArray(result.validation.errors)).toBe(true);
-          expect(result.validation.errors.length).toBeGreaterThan(0);
-        } else {
-          // When no result or no validation returned, require error handler engagement instead
-          if (mockErrorHandler && jest.isMockFunction(mockErrorHandler.setError)) {
-            expect(mockErrorHandler.setError).toHaveBeenCalled();
-          }
-        }
+        await expect(
+          camService.processPackage(corruptedPackagePath, corruptedManifestContent)
+        ).rejects.toMatchObject({
+          name: 'ParserError',
+          code: ParserErrorCode.PARSE_XML_ERROR
+        });
       } finally {
         await cleanupTestPackage(corruptedPackagePath);
       }
