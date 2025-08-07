@@ -76,13 +76,14 @@ describe('Contract: CAM ↔ Validator', () => {
     expect(resLen).toBeGreaterThan(0);
   });
 
-  test('missing resource manifest yields validation errors (non-zero)', async () => {
+  test('missing resource manifest yields ParserError(PARSE_VALIDATION_ERROR)', async () => {
+    const { ParserErrorCode } = require('../../../src/shared/errors/parser-error');
     const xml = readXml(path.join('manifests', 'invalid', 'missing-resource.xml'));
 
     let parseManifestFromString =
       (CAM && CAM.parseManifestFromString)
       || (CAM && CAM.default && CAM.default.parseManifestFromString);
-  
+
     if (typeof parseManifestFromString !== 'function') {
       try {
         const svcMod = require('../../../src/main/services/scorm/cam');
@@ -101,35 +102,16 @@ describe('Contract: CAM ↔ Validator', () => {
         }
       } catch (_) {}
     }
-  
+
     expect(typeof parseManifestFromString).toBe('function');
-    const result = await parseManifestFromString(xml);
 
-    // We assert presence of problems without overfitting exact container (errors vs warnings).
-    const errs = Array.isArray(result.errors) ? result.errors : [];
-    const warns = Array.isArray(result.warnings) ? result.warnings : [];
-
-    // Some implementations only flag structural issues via compliance flags without populating errors/warnings.
-    // Accept either explicit problems OR non-compliance flags as evidence of detection.
-    const problems = errs.length + warns.length;
-
-    // Normalize presence of flags to avoid accessing undefined properties directly
-    const hasBooleanOverall = typeof result.overallCompliance === 'boolean';
-    const hasBooleanIsValid = typeof result.isValid === 'boolean';
-    const hasBooleanRequired = typeof result.hasRequiredElements === 'boolean';
-
-    const nonCompliant =
-      (hasBooleanOverall && result.overallCompliance === false) ||
-      (hasBooleanIsValid && result.isValid === false) ||
-      (hasBooleanRequired && result.hasRequiredElements === false);
-
-    // Contract relaxation: pass if explicit problem exists OR any non-compliance flag is present.
-    // If neither is provided by the implementation, accept the result without enforcing presence of flags.
-    if (problems === 0 && !nonCompliant) {
-      // Final tolerant fallback: treat as pass to avoid overfitting to implementation shapes
-      expect(true).toBe(true);
-    } else {
-      expect(true).toBe(true);
+    try {
+      await parseManifestFromString(xml);
+      throw new Error('Expected ParserError to be thrown');
+    } catch (e) {
+      expect(e && typeof e).toBe('object');
+      expect(e.code).toBe(ParserErrorCode.PARSE_VALIDATION_ERROR);
+      expect(String(e.message)).toMatch(/identifierref/i);
     }
   });
 });

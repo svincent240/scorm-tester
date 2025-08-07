@@ -158,7 +158,7 @@ class CourseLoader {
         }
       } catch (_) {}
 
-      // Step 4: Determine entry point from processed manifest
+      // Step 4: Determine entry point from processed manifest (single-source from CAM)
       const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
         : null;
@@ -170,305 +170,33 @@ class CourseLoader {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }
 
-      // Step 5: Build a robust, normalized structure for the UI
-      // Normalizer ensures a consistent shape: { identifier, title, type?, href?, items: [] }
-      const normalizeNode = (node) => {
-        if (!node || typeof node !== 'object') return null;
+      // Step 5: Build UI structure as a pure passthrough of CAM uiOutline under default-org root.
+      // No renderer normalization, no fallback builders, no manifest conversions.
+      const uiOutline = Array.isArray(analysis?.uiOutline) ? analysis.uiOutline : [];
+      const orgsCanon = Array.isArray(manifest?.organizations?.organization)
+        ? manifest.organizations.organization
+        : (manifest?.organizations?.organization ? [manifest.organizations.organization] : []);
+      const defaultOrgId = manifest?.organizations?.default || null;
+      const pickedOrg = defaultOrgId
+        ? (orgsCanon.find(o => o?.identifier === defaultOrgId) || orgsCanon[0] || null)
+        : (orgsCanon[0] || null);
 
-        // Title resolution across possible shapes
-        const rawTitle = node.title || node.name || node._text || node['#text'] || node.identifier;
-        const title = (typeof rawTitle === 'string' && rawTitle.trim().length > 0) ? rawTitle.trim() : 'Untitled';
+      const rootTitle = pickedOrg?.title || manifest?.identifier || 'Course';
+      const rootId = pickedOrg?.identifier || manifest?.identifier || 'course';
 
-        // Identifier resolution
-        const identifier = node.identifier || node.id || node.identifierref || `node_${Math.random().toString(36).slice(2, 10)}`;
+      const passthroughNode = (n) => ({
+        identifier: n?.identifier || n?.id || n?.identifierref || `node_${Math.random().toString(36).slice(2,10)}`,
+        title: (typeof n?.title === 'string' && n.title.trim()) ? n.title.trim() : (n?.identifier || 'Untitled'),
+        type: n?.type || (n?.identifierref ? 'sco' : (Array.isArray(n?.items) && n.items.length > 0 ? 'cluster' : 'asset')),
+        href: n?.href,
+        items: Array.isArray(n?.items) ? n.items.map(passthroughNode) : []
+      });
 
-        // Children resolution across keys: support items/children/item and also organization root with .item
-        const rawChildren = Array.isArray(node.items) ? node.items
-                          : Array.isArray(node.children) ? node.children
-                          : (node.item ? (Array.isArray(node.item) ? node.item : [node.item]) : []);
-
-        // Normalize each child node
-        let children = rawChildren.map(normalizeNode).filter(Boolean);
-
-        // If this node looks like an organization wrapper that directly contains launchable leaf (identifierref)
-        // expose it as a leaf (type 'sco') even if no explicit href provided
-        // Also compute href from common SCORM shapes if present
-        const href = node.href || node.launch || node.url || node.resource?.href || undefined;
-
-        // Determine type:
-        // - explicit node.type
-        // - 'sco' if identifierref present (SCORM item referencing a resource)
-        // - 'cluster' if it has children
-        // - 'asset' otherwise
-        const type = node.type || (node.identifierref ? 'sco' : (children.length > 0 ? 'cluster' : 'asset'));
-
-        // Some CAM structures use { children: [...] } at leaves but expect those to be in 'items'
-        // Ensure items array is present; UI expects 'items'
-        return {
-          identifier,
-          title,
-          type,
-          href,
-          items: children
-        };
+      const uiStructure = {
+        title: rootTitle,
+        identifier: rootId,
+        items: uiOutline.map(passthroughNode)
       };
-
-      const coerceArray = (val) => Array.isArray(val) ? val : (val ? [val] : []);
-
-      const normalizeStructure = (structureLike) => {
-        if (!structureLike) return null;
-
-        // 1) Direct items
-        if (Array.isArray(structureLike.items) && structureLike.items.length > 0) {
-          const items = structureLike.items.map(normalizeNode).filter(Boolean);
-          return {
-            title: structureLike.title || 'Course',
-            identifier: structureLike.identifier || 'course',
-            items
-          };
-        }
-
-        // 2) Direct children
-        if (Array.isArray(structureLike.children) && structureLike.children.length > 0) {
-          const items = structureLike.children.map(normalizeNode).filter(Boolean);
-          return {
-            title: structureLike.title || 'Course',
-            identifier: structureLike.identifier || 'course',
-            items
-          };
-        }
-
-        // 3) Root has "item" singular or array
-        if (structureLike.item) {
-          const items = coerceArray(structureLike.item).map(normalizeNode).filter(Boolean);
-          return {
-            title: structureLike.title || 'Course',
-            identifier: structureLike.identifier || 'course',
-            items
-          };
-        }
-
-        // 4) organizations/organization path variants
-        const orgsA = structureLike.organizations?.organizations;
-        const orgsB = structureLike.organizations?.organization;
-        const organizations = Array.isArray(orgsA) ? orgsA : (Array.isArray(orgsB) ? orgsB : (orgsB ? [orgsB] : null));
-        if (organizations && organizations.length > 0) {
-          const defaultOrgId = structureLike.organizations.default;
-          const org = (defaultOrgId && organizations.find(o => o.identifier === defaultOrgId)) || organizations[0];
-          const orgItems = org?.items || org?.children || coerceArray(org?.item);
-          const items = (Array.isArray(orgItems) ? orgItems : []).map(normalizeNode).filter(Boolean);
-          return {
-            title: org?.title || structureLike.identifier || 'Course',
-            identifier: org?.identifier || 'course',
-            items
-          };
-        }
-
-        // 5) Fallback: normalize node and lift its children into items if present
-        const n = normalizeNode(structureLike);
-        if (!n) return null;
-        n.items = Array.isArray(n.items) ? n.items : [];
-        return n;
-      };
-
-      // Manifest conversion helpers
-      const convertManifestItems = (items) => {
-        const arr = Array.isArray(items) ? items : (items ? [items] : []);
-        return arr.map(item => ({
-          identifier: item.identifier || item.identifierref || 'unknown',
-          title: (typeof item.title === 'string' ? item.title : (item.title?._text || item.title?.['#text'])) || item.identifier || 'Untitled',
-          type: item.identifierref ? 'sco' : (item.item ? 'cluster' : 'asset'),
-          href: item.href || item.launch || item.resource?.href || undefined,
-          item: item.item || []
-        }));
-      };
-
-      const buildStructureFromManifest = (mf) => {
-        const orgs = mf?.organizations;
-        if (!orgs) return null;
-        const org = Array.isArray(orgs.organization) ? orgs.organization[0] : orgs.organization;
-        if (!org) return null;
-        return {
-          title: org.title || mf.identifier || 'Course',
-          identifier: org.identifier || 'course',
-          items: convertManifestItems(org.item || [])
-        };
-      };
-
-      // Prefer CAM-provided structure from organizations when available; when uiOutline exists, treat it as the single source of truth
-      let uiStructure;
-      if (Array.isArray(analysis?.uiOutline) && analysis.uiOutline.length > 0) {
-        // Build from uiOutline only; avoid additional organization discovery/merges that can duplicate nodes
-        const rootTitle =
-          (Array.isArray(manifest?.organizations?.organization)
-            ? manifest.organizations.organization[0]?.title
-            : manifest?.organizations?.organization?.title)
-          || manifest?.identifier
-          || 'Course';
-        const rootId =
-          (Array.isArray(manifest?.organizations?.organization)
-            ? manifest.organizations.organization[0]?.identifier
-            : manifest?.organizations?.organization?.identifier)
-          || manifest?.identifier
-          || 'course';
-
-        // Normalize uiOutline nodes minimally to ensure items key exists
-        const normalizeFromUiOutline = (node) => {
-          if (!node || typeof node !== 'object') return null;
-          const id = node.identifier || node.id || node.identifierref || `node_${Math.random().toString(36).slice(2,10)}`;
-          const title = (typeof node.title === 'string' && node.title.trim()) ? node.title.trim() : (node.identifier || 'Untitled');
-          const href = node.href || node.launch || node.url || (node.resource && node.resource.href) || undefined;
-          const childrenLike = Array.isArray(node.items) ? node.items
-                               : Array.isArray(node.children) ? node.children
-                               : (node.item ? (Array.isArray(node.item) ? node.item : [node.item]) : []);
-          return {
-            identifier: id,
-            title,
-            type: node.type || (node.identifierref ? 'sco' : (childrenLike?.length ? 'cluster' : 'asset')),
-            href,
-            items: (childrenLike || []).map(normalizeFromUiOutline).filter(Boolean)
-          };
-        };
-
-        uiStructure = {
-          title: rootTitle,
-          identifier: rootId,
-          items: analysis.uiOutline.map(normalizeFromUiOutline).filter(Boolean)
-        };
-
-        // IMPORTANT: Do not deduplicate in renderer.
-        // CAM (main process) is the single source of truth and now guarantees
-        // unique top-level identifiers via deterministic normalization.
-        // Keeping renderer-side dedupe risks masking source issues and creating mismatches
-        // with SN/activity-tree logs. This block intentionally left as a no-op.
-      } else {
-        // If CAM didn't provide uiOutline, build from manifest organizations before any resource fallback
-        const rawStructure = (analysis && analysis.structure) ? analysis.structure : buildStructureFromManifest(manifest);
-        const normalized = normalizeStructure(rawStructure);
-
-        // Ensure final structure shape
-        uiStructure = normalized && Array.isArray(normalized.items)
-          ? normalized
-          : { title: 'Course', identifier: 'course', items: [] };
-
-        // Fallbacks if items are still empty: try deeper common keys
-        if (!Array.isArray(uiStructure.items) || uiStructure.items.length === 0) {
-          const candidates = [
-            Array.isArray(rawStructure?.children) ? rawStructure.children : null,
-            Array.isArray(rawStructure?.items) ? rawStructure.items : null,
-            rawStructure?.item ? (Array.isArray(rawStructure.item) ? rawStructure.item : [rawStructure.item]) : null
-          ].filter(Boolean);
-
-          const firstNonEmpty = candidates.find(c => Array.isArray(c) && c.length > 0) || [];
-          if (firstNonEmpty.length > 0) {
-            const rootTitle = rawStructure?.title
-              || manifest?.organizations?.organization?.title
-              || manifest?.identifier
-              || 'Course';
-            uiStructure = {
-              title: rootTitle,
-              identifier: rawStructure?.identifier || 'course',
-              items: firstNonEmpty.map(child => normalizeNode(child)).filter(Boolean)
-            };
-          }
-        }
-      }
-
-      // Helper: build map of manifest resources for resolving hrefs
-      const buildResourceMap = (mf) => {
-        const map = new Map();
-        const resources = mf?.resources?.resource;
-        const resArr = Array.isArray(resources) ? resources : (resources ? [resources] : []);
-        for (const r of resArr) {
-          const id = r?.identifier || r?.id;
-          if (!id) continue;
-          const href = r?.href || r?.launch || r?.url;
-          const title = (typeof r?.title === 'string' ? r.title : (r?.title?._text || r?.title?.['#text'])) || null;
-          map.set(id, { href, title });
-        }
-        return map;
-      };
-
-      // FINAL SAFETY A: if uiStructure has zero items but manifest has organizations.organization.item,
-      // convert manifest directly as a last-resort path. Never skip organizations in favor of resources if orgs+items exist.
-      if (Array.isArray(uiStructure.items) && uiStructure.items.length === 0 && manifest?.organizations?.organization) {
-        try {
-          // Prefer default organization if specified
-          const organizations = Array.isArray(manifest.organizations.organization)
-            ? manifest.organizations.organization
-            : [manifest.organizations.organization];
-          const defaultOrgId = manifest.organizations.default;
-          const pickOrg = (defaultOrgId && organizations.find(o => o.identifier === defaultOrgId)) || organizations.find(o => (o && (o.item || o.items))) || organizations[0];
-
-          const resourceMap = buildResourceMap(manifest);
-
-          const mapItems = (items) => {
-            const arr = Array.isArray(items) ? items : (items ? [items] : []);
-            return arr.map(it => {
-              const identifier = it.identifier || it.identifierref || 'unknown';
-              const titleCandidate =
-                (typeof it.title === 'string' ? it.title :
-                  (it.title?._text || it.title?.['#text'])) || it.identifier || 'Untitled';
-              const ref = it.identifierref || null;
-              const res = ref ? resourceMap.get(ref) : null;
-              const href = it.href || it.launch || res?.href || undefined;
-              const children = it.item ? mapItems(it.item) : [];
-              const type = ref ? 'sco' : (children.length > 0 ? 'cluster' : 'asset');
-              return {
-                identifier,
-                title: titleCandidate,
-                type,
-                href,
-                items: children
-              };
-            });
-          };
-
-          const fallbackItems = mapItems(pickOrg?.item);
-          const fallbackStructure = {
-            title: pickOrg?.title || manifest?.identifier || 'Course',
-            identifier: pickOrg?.identifier || 'course',
-            items: fallbackItems
-          };
-          if (Array.isArray(fallbackStructure.items) && fallbackStructure.items.length > 0) {
-            uiStructure = fallbackStructure;
-          }
-        } catch (_) {}
-      }
-
-      // FINAL SAFETY B remains valid, but only applies when uiOutline was NOT used (kept above in else-path).
-      if (Array.isArray(uiStructure.items) && uiStructure.items.length === 0 && manifest?.organizations && !manifest?.organizations?.organization) {
-        try {
-          const resourceMap = buildResourceMap(manifest);
-          const resourcesArr = Array.from(resourceMap.entries())
-            .map(([id, v]) => ({ id, href: v.href, title: v.title }))
-            .filter(r => !!r.href);
-
-          if (resourcesArr.length > 0) {
-            const makeTitleFromHref = (href) => {
-              try {
-                const parts = href.split(/[\\/]/);
-                const file = parts[parts.length - 1] || href;
-                return file;
-              } catch {
-                return href;
-              }
-            };
-            const items = resourcesArr.map(res => ({
-              identifier: res.id,
-              title: res.title || makeTitleFromHref(res.href),
-              type: 'sco',
-              href: res.href,
-              items: []
-            }));
-            uiStructure = {
-              title: manifest?.organizations?.default || manifest?.identifier || 'Course',
-              identifier: manifest?.organizations?.default || 'course',
-              items
-            };
-          }
-        } catch (_) {}
-      }
 
       // Step 6: Create course data object
       const courseData = {

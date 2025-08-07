@@ -4,14 +4,21 @@
 
 The Content Aggregation Model (CAM) module provides comprehensive SCORM 2004 4th Edition manifest parsing, content validation, metadata extraction, and package analysis capabilities. This module implements Phase 2 of the SCORM Tester refactoring project.
 
+Recent changes:
+- Parser is now strict and fail-fast on structural/spec violations.
+- Centralized ParserError with standardized codes and structured logging.
+- Namespace-first selection to avoid duplicate collections across mixed-prefixed manifests.
+- Identifierref validation against a resources map.
+- xml:base resolution for resource and file paths.
+
 ## Architecture
 
 ### Module Structure
 
 ```
 src/main/services/scorm/cam/
-├── index.js                 # Main CAM service entry point
-├── manifest-parser.js       # XML manifest parsing
+├── index.js                 # Main CAM service entry point (ScormCAMService)
+├── manifest-parser.js       # XML manifest parsing (strict, fail-fast)
 ├── content-validator.js     # Package validation
 ├── metadata-handler.js      # LOM metadata processing
 └── package-analyzer.js      # Structure analysis
@@ -73,15 +80,27 @@ Renderer requirements:
 
 **Purpose**: Parse and extract data from SCORM manifest XML files
 
-**Key Features**:
-- XML parsing with namespace support
-- SCORM 2004 4th Edition compliance
-- Comprehensive error handling
-- Support for all manifest elements
+**Key Features (strict mode)**:
+- XML parsing with namespace support (xmldom DOMParser with strict errorHandler)
+- SCORM 2004 4th Edition compliance with fail-fast validation
+- Centralized ParserError error modeling with structured logging
+- Namespace-first selection (prefer imscp: prefixed children; fallback to unprefixed only when zero matches)
+- Direct child-axis selection only (no global descendant queries)
+- Required structure enforcement (manifest root, organizations/resources existence, default org must resolve)
+- Uniqueness checks (sibling item identifiers, resource identifiers)
+- Resource validation (SCO requires href; scormType defaults to asset when missing)
+- identifierref validation (each item identifierref must resolve to a resource)
+- xml:base resolution for resource and file paths
+- Success diagnostics snapshot: manifestId, defaultOrgId, counts
 
 **Key Methods**:
-- [`parseManifestFile(manifestPath)`](../src/main/services/scorm/cam/manifest-parser.js:45) - Parse from file
-- [`parseManifestXML(xmlContent, basePath)`](../src/main/services/scorm/cam/manifest-parser.js:56) - Parse from string
+- [`parseManifestFile(manifestPath)`](../src/main/services/scorm/cam/manifest-parser.js:84) - Parse from file
+- [`parseManifestXML(xmlContent, basePath)`](../src/main/services/scorm/cam/manifest-parser.js:104) - Parse from string
+- Internal selection helpers:
+  - [`selectChildrenNS()`](../src/main/services/scorm/cam/manifest-parser.js:529) – namespace-first direct-children
+  - [`selectFirstNS()`](../src/main/services/scorm/cam/manifest-parser.js:538) – namespace-first single element
+- DFS item collector for validations:
+  - [`_collectItems()`](../src/main/services/scorm/cam/manifest-parser.js:1169)
 
 ### 3. ContentValidator
 
@@ -228,7 +247,23 @@ test('should process valid SCORM package successfully', async () => {
 
 ## Error Handling
 
+### ParserError Standardization
+
+Parser-level failures are modeled with ParserError and ParserErrorCode. These throw immediately (fail-fast) and auto-log a structured entry via the shared logger.
+
+- Location: [`src/shared/errors/parser-error.js`](src/shared/errors/parser-error.js:1)
+- Codes used by CAM parsing:
+  - PARSE_EMPTY_INPUT – empty or null XML input
+  - PARSE_XML_ERROR – XML parse warning/error/fatalError or parsererror nodes
+  - PARSE_UNSUPPORTED_STRUCTURE – invalid root element
+  - PARSE_VALIDATION_ERROR – structural/spec violations (missing required elements, duplicate IDs, unresolved identifierref, SCO without href)
+
+Structured log payload contract fields:
+- phase, code, message, detail, manifestId, defaultOrgId, stats, packagePath, severity
+
 ### CAM-Specific Error Codes
+
+Downstream CAM validation (outside strict parsing) continues to use CAM error codes where applicable:
 
 ```javascript
 const CAM_ERROR_CODES = {
@@ -243,10 +278,9 @@ const CAM_ERROR_CODES = {
 
 ### Error Recovery
 
-- Graceful degradation for non-critical errors
-- Detailed diagnostic information
-- Context-aware error messages
-- Validation warnings vs. errors
+- Parsing is strict: structural violations raise ParserError and short-circuit downstream processing.
+- Non-critical sub-components (e.g., optional metadata) may log INFO and continue with null.
+- All logs are written to the app log through the shared logger singleton; renderer must not use console.*.
 
 ## Configuration
 
@@ -316,7 +350,7 @@ npm run test:cam
 
 ### Planned Features
 
-- XSD schema validation
+- Optional XSD schema validation (in addition to current structural validations)
 - Advanced metadata queries
 - Package optimization suggestions
 - Accessibility compliance checking

@@ -112,10 +112,10 @@ describe('ManifestParser', () => {
 
       expect(() => {
         manifestParser.parseManifestXML(nonManifestXML);
-      }).toThrow('Invalid manifest structure');
+      }).toThrow(/Invalid manifest: root element must be <manifest>/);
       expect(mockErrorHandler.setError).toHaveBeenCalledWith(
-        '301', 
-        'Invalid manifest: root element must be <manifest>', 
+        '301',
+        'Invalid manifest: root element must be <manifest>',
         'parseManifestXML'
       );
     });
@@ -173,14 +173,18 @@ describe('ManifestParser', () => {
   describe('parseMetadata', () => {
     test('should parse metadata section', () => {
       const manifestWithMetadata = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="META-TEST">
           <metadata>
             <schema>ADL SCORM</schema>
             <schemaversion>2004 4th Edition</schemaversion>
             <location>metadata.xml</location>
           </metadata>
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources/>
         </manifest>`;
 
@@ -194,9 +198,13 @@ describe('ManifestParser', () => {
 
     test('should handle missing metadata', () => {
       const manifestWithoutMetadata = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="NO-META-TEST">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources/>
         </manifest>`;
 
@@ -231,33 +239,41 @@ describe('ManifestParser', () => {
       expect(result.organizations.organizations[0].title).toBe('Primary Organization');
     });
 
-    test('should handle missing organizations', () => {
+    test('should handle missing organizations (strict fail-fast)', () => {
       const manifestWithoutOrgs = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="NO-ORG-TEST">
           <resources/>
         </manifest>`;
 
-      const result = manifestParser.parseManifestXML(manifestWithoutOrgs);
-
-      expect(result.organizations).toBeNull();
+      expect(() => manifestParser.parseManifestXML(manifestWithoutOrgs))
+        .toThrow(/Manifest missing required organizations element/);
+      expect(mockErrorHandler.setError).toHaveBeenCalledWith(
+        '301',
+        'Manifest missing required organizations element',
+        'parseManifestXML'
+      );
     });
   });
 
   describe('parseResources', () => {
     test('should parse resources section', () => {
       const manifestWithResources = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
                   identifier="RES-TEST">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources>
-            <resource identifier="RES-1" type="webcontent" 
+            <resource identifier="RES-1" type="webcontent"
                       adlcp:scormType="sco" href="sco1.html">
               <file href="sco1.html"/>
               <file href="common.js"/>
             </resource>
-            <resource identifier="RES-2" type="webcontent" 
+            <resource identifier="RES-2" type="webcontent"
                       adlcp:scormType="asset" xml:base="assets/">
               <file href="image.jpg"/>
             </resource>
@@ -281,11 +297,15 @@ describe('ManifestParser', () => {
       expect(assetResource.xmlBase).toBe('assets/');
     });
 
-    test('should handle empty resources', () => {
+    test('should handle empty resources (with strict organizations present)', () => {
       const manifestWithEmptyResources = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="EMPTY-RES-TEST">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources/>
         </manifest>`;
 
@@ -357,9 +377,13 @@ describe('ManifestParser', () => {
                   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
                   xmlns:imsss="http://www.imsglobal.org/xsd/imsss"
                   identifier="NS-TEST">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources>
-            <resource identifier="RES-1" adlcp:scormType="sco">
+            <resource identifier="RES-1" adlcp:scormType="sco" href="test.html">
               <file href="test.html"/>
             </resource>
           </resources>
@@ -398,28 +422,36 @@ describe('ManifestParser', () => {
   });
 
   describe('Edge Cases', () => {
-    test('should handle manifest with only required elements', () => {
+    test('should handle manifest with only required elements (strict org presence)', () => {
       const minimalManifest = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="MINIMAL">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources/>
         </manifest>`;
 
       const result = manifestParser.parseManifestXML(minimalManifest);
 
       expect(result.identifier).toBe('MINIMAL');
-      expect(result.version).toBe('1.0'); // Default
-      expect(result.organizations).toBeNull();
+      expect(result.version).toBe('1.0');
+      expect(result.organizations).toBeDefined();
       expect(result.resources).toHaveLength(0);
     });
 
     test('should handle very large identifiers', () => {
       const longId = 'A'.repeat(4000); // Maximum allowed length
       const manifestWithLongId = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="${longId}">
-          <organizations/>
+          <organizations>
+            <organization identifier="ORG-1">
+              <title>X</title>
+            </organization>
+          </organizations>
           <resources/>
         </manifest>`;
 

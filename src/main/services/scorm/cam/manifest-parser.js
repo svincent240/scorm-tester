@@ -20,6 +20,12 @@ const fs = require('fs').promises;
 const path = require('path');
 const { DOMParser } = require('xmldom');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
+const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
+// Align with dev_docs: shared logger is at src/shared/utils/logger.js
+// From this file (src/main/services/scorm/cam/manifest-parser.js), the correct relative path is:
+// src/main/services/scorm/cam -> up to src/main/services/scorm -> src/main/services -> src/main -> src
+// ../../../../shared/utils/logger
+const logger = require('../../../../shared/utils/logger');
 
 /**
  * SCORM Manifest Parser
@@ -33,18 +39,32 @@ class ManifestParser {
     this.parser = new DOMParser({
       errorHandler: {
         warning: (msg) => {
-          console.warn('XML Warning:', msg);
-          // Treat warnings as errors for strict parsing
-          this.errorHandler?.setError('301', `XML Warning: ${msg}`, 'ManifestParser');
-          throw new Error(`XML Warning: ${msg}`);
+          // Strict: escalate as ParserError
+          const err = new ParserError({
+            code: ParserErrorCode.PARSE_XML_ERROR,
+            message: `XML Warning: ${msg}`,
+            detail: { where: 'DOMParser.warning' }
+          });
+          this.errorHandler?.setError('301', err.message, 'ManifestParser');
+          throw err;
         },
         error: (msg) => {
-          this.errorHandler?.setError('301', `XML Error: ${msg}`, 'ManifestParser');
-          throw new Error(`XML Error: ${msg}`);
+          const err = new ParserError({
+            code: ParserErrorCode.PARSE_XML_ERROR,
+            message: `XML Error: ${msg}`,
+            detail: { where: 'DOMParser.error' }
+          });
+          this.errorHandler?.setError('301', err.message, 'ManifestParser');
+          throw err;
         },
         fatalError: (msg) => {
-          this.errorHandler?.setError('301', `XML Fatal Error: ${msg}`, 'ManifestParser');
-          throw new Error(`XML Fatal Error: ${msg}`);
+          const err = new ParserError({
+            code: ParserErrorCode.PARSE_XML_ERROR,
+            message: `XML Fatal Error: ${msg}`,
+            detail: { where: 'DOMParser.fatalError' }
+          });
+          this.errorHandler?.setError('301', err.message, 'ManifestParser');
+          throw err;
         }
       }
     });
@@ -83,98 +103,104 @@ class ManifestParser {
    */
   parseManifestXML(xmlContent, basePath = '') {
     try {
-      console.log('ManifestParser: Starting XML parsing');
-      console.log('ManifestParser: xmlContent type:', typeof xmlContent);
-      console.log('ManifestParser: xmlContent length:', xmlContent?.length || 'undefined');
-      console.log('ManifestParser: basePath:', basePath);
+      logger.info('ManifestParser: start', { phase: 'CAM_PARSE', basePath, inputType: typeof xmlContent, len: xmlContent?.length || 0 });
 
-      // Check for null or empty content
       if (!xmlContent || xmlContent.trim() === '') {
-        console.error('ManifestParser: Empty or null XML content');
-        this.errorHandler?.setError('301', 'Empty or null XML content', 'parseManifestXML');
-        throw new Error('Empty or null XML content');
+        const err = new ParserError({
+          code: ParserErrorCode.PARSE_EMPTY_INPUT,
+          message: 'Empty or null XML content',
+          detail: { note: 'No content provided' }
+        });
+        this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+        throw err;
       }
 
-      // Log first 200 characters of XML for debugging
-      console.log('ManifestParser: XML content preview:', xmlContent.substring(0, 200) + '...');
+      logger.debug('ManifestParser: xml preview', { phase: 'CAM_PARSE', preview: String(xmlContent).substring(0, 200) });
 
-      console.log('ManifestParser: About to parse XML with DOMParser');
       const doc = this.parser.parseFromString(xmlContent, 'text/xml');
-      console.log('ManifestParser: DOMParser completed, doc:', !!doc);
-
       const manifestElement = doc.documentElement;
-      console.log('ManifestParser: documentElement:', !!manifestElement);
-      console.log('ManifestParser: documentElement tagName:', manifestElement?.tagName);
 
-      // Check for XML parsing errors
       const parserError = doc.getElementsByTagName('parsererror');
       if (parserError.length > 0) {
-        console.error('ManifestParser: XML parsing error detected, parsererror elements:', parserError.length);
+        const detail = [];
         for (let i = 0; i < parserError.length; i++) {
-          console.error('ManifestParser: Parser error', i, ':', parserError[i].textContent);
+          detail.push(String(parserError[i].textContent || '').substring(0, 500));
         }
-        this.errorHandler?.setError('301', 'XML parsing error', 'parseManifestXML');
-        throw new Error('XML parsing error');
+        const err = new ParserError({
+          code: ParserErrorCode.PARSE_XML_ERROR,
+          message: 'XML parsing error',
+          detail: { errors: detail, count: parserError.length }
+        });
+        this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+        throw err;
       }
 
       if (!manifestElement) {
-        console.error('ManifestParser: Invalid manifest structure');
-        this.errorHandler?.setError('301', 'Invalid manifest: missing root element', 'parseManifestXML');
-        throw new Error('Invalid manifest structure');
+        const err = new ParserError({
+          code: ParserErrorCode.PARSE_XML_ERROR,
+          message: 'Invalid manifest: missing root element'
+        });
+        this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+        throw err;
       }
-      // Accept namespaced manifest root; xmldom sets tagName with prefix, localName is stable
+
       const rootLocal = manifestElement.localName || manifestElement.tagName;
       if (rootLocal !== 'manifest') {
-        console.error('ManifestParser: Invalid manifest structure - unexpected root:', manifestElement.tagName);
-        this.errorHandler?.setError('301', 'Invalid manifest: root element must be <manifest>', 'parseManifestXML');
-        throw new Error('Invalid manifest structure');
+        const err = new ParserError({
+          code: ParserErrorCode.PARSE_UNSUPPORTED_STRUCTURE,
+          message: 'Invalid manifest: root element must be <manifest>',
+          detail: { tagName: manifestElement.tagName, localName: manifestElement.localName }
+        });
+        this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+        throw err;
       }
 
-      console.log('ManifestParser: Starting to extract manifest attributes and elements');
-
-      // Extract basic attributes
       const identifier = this.getAttribute(manifestElement, 'identifier');
       const version = this.getAttribute(manifestElement, 'version') || '1.0';
-      
-      console.log('ManifestParser: Basic attributes - identifier:', identifier, 'version:', version);
 
-      // Parse sub-elements with error handling
-      let metadata, organizations, resources, subManifests;
+      // Parse sub-elements with strict error handling
+      let metadata = null, organizations = null, resources = [], subManifests = [];
 
       try {
-        console.log('ManifestParser: Parsing metadata');
         metadata = this.parseMetadata(manifestElement, basePath);
-        console.log('ManifestParser: Metadata parsed successfully');
       } catch (metadataError) {
-        console.error('ManifestParser: Metadata parsing failed:', metadataError);
-        metadata = null;
+        // Metadata optional: log as info instead of warn to avoid noisy logs for common cases
+        logger.info('ManifestParser: metadata parse skipped/failed', { phase: 'CAM_PARSE', message: metadataError?.message || String(metadataError) });
+      }
+
+      organizations = this.parseOrganizations(manifestElement, basePath); // may throw ParserError
+      resources = this.parseResources(manifestElement, basePath); // may throw ParserError
+
+      // Build a resource map for identifierref validation
+      const resourceMap = new Map();
+      for (const r of resources) {
+        if (r?.identifier) resourceMap.set(r.identifier, r);
       }
 
       try {
-        console.log('ManifestParser: Parsing organizations');
-        organizations = this.parseOrganizations(manifestElement, basePath);
-        console.log('ManifestParser: Organizations parsed successfully');
-      } catch (orgError) {
-        console.error('ManifestParser: Organizations parsing failed:', orgError);
-        organizations = null;
-      }
-
-      try {
-        console.log('ManifestParser: Parsing resources');
-        resources = this.parseResources(manifestElement, basePath);
-        console.log('ManifestParser: Resources parsed successfully, count:', resources?.length || 0);
-      } catch (resourceError) {
-        console.error('ManifestParser: Resources parsing failed:', resourceError);
-        resources = [];
-      }
-
-      try {
-        console.log('ManifestParser: Parsing sub-manifests');
         subManifests = this.parseSubManifests(manifestElement, basePath);
-        console.log('ManifestParser: Sub-manifests parsed successfully');
       } catch (subManifestError) {
-        console.error('ManifestParser: Sub-manifests parsing failed:', subManifestError);
+        logger.info('ManifestParser: sub-manifests parse skipped/failed', { phase: 'CAM_PARSE', message: subManifestError?.message || String(subManifestError) });
         subManifests = [];
+      }
+
+      // Validate identifierref across all items in all organizations
+      const allItems = [];
+      for (const org of organizations.organizations || []) {
+        this._collectItems(org.items || [], allItems);
+      }
+      for (const it of allItems) {
+        if (it.identifierref) {
+          if (!resourceMap.has(it.identifierref)) {
+            const err = new ParserError({
+              code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+              message: `Item identifierref does not resolve to a resource: ${it.identifierref}`,
+              detail: { itemId: it.identifier, identifierref: it.identifierref, knownResourceIds: Array.from(resourceMap.keys()) }
+            });
+            this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+            throw err;
+          }
+        }
       }
 
       const result = {
@@ -186,20 +212,36 @@ class ManifestParser {
         manifest: subManifests
       };
 
-      console.log('ManifestParser: Manifest parsing completed successfully');
-      console.log('ManifestParser: Result structure:', {
-        hasIdentifier: !!result.identifier,
-        hasMetadata: !!result.metadata,
-        hasOrganizations: !!result.organizations,
-        hasResources: !!result.resources,
-        resourceCount: result.resources?.length || 0
+      // Success snapshot log per approved contract
+      const defaultOrgId = result.organizations?.default || null;
+      const defaultOrg = (result.organizations?.organizations || []).find(o => o.identifier === defaultOrgId) || (result.organizations?.organizations || [])[0] || null;
+      const topCount = Array.isArray(defaultOrg?.items) ? defaultOrg.items.length : 0;
+
+      logger.info('ManifestParser: success', {
+        phase: 'CAM_PARSE',
+        code: 'PARSE_SUCCESS',
+        message: 'Manifest parsed successfully',
+        manifestId: identifier || null,
+        defaultOrgId,
+        stats: {
+          orgCount: Array.isArray(result.organizations?.organizations) ? result.organizations.organizations.length : 0,
+          topCount
+        },
+        severity: 'INFO'
       });
 
       return result;
     } catch (error) {
-      console.error('ManifestParser: Parsing failed with error:', error);
-      console.error('ManifestParser: Error stack:', error.stack);
-      this.errorHandler?.setError('301', `Manifest parsing failed: ${error.message}`, 'parseManifestXML');
+      if (!(error instanceof ParserError)) {
+        const err = new ParserError({
+          code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+          message: `Manifest parsing failed: ${error.message}`,
+          detail: { stack: error.stack }
+        });
+        this.errorHandler?.setError('301', err.message, 'parseManifestXML');
+        throw err;
+      }
+      this.errorHandler?.setError('301', error.message, 'parseManifestXML');
       throw error;
     }
   }
@@ -229,29 +271,47 @@ class ManifestParser {
    * @returns {Object} Organizations information
    */
   parseOrganizations(manifestElement, basePath) {
-    const organizationsElement = this.getChildElement(manifestElement, 'organizations');
-    if (!organizationsElement) return null;
+    const organizationsElement =
+      this.selectFirstNS(manifestElement, ['imscp:organizations', 'organizations']);
+    if (!organizationsElement) {
+      throw new ParserError({
+        code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+        message: 'Manifest missing required organizations element',
+        detail: { path: 'manifest/organizations' }
+      });
+    }
 
-    // default is unqualified attribute on imscp:organizations
     const defaultOrg = organizationsElement.getAttributeNS
       ? (organizationsElement.getAttributeNS(null, 'default') || organizationsElement.getAttribute('default'))
       : this.getAttribute(organizationsElement, 'default');
-    const organizations = [];
 
-    // Only imscp:organization direct children
-    const orgElements = this.getChildElements(organizationsElement, 'imscp:organization')
-      .concat(this.getChildElements(organizationsElement, 'organization'));
+    const orgElements = this.selectChildrenNS(organizationsElement, ['imscp:organization', 'organization']);
+    const organizations = [];
     for (const orgElement of orgElements) {
       organizations.push(this.parseOrganization(orgElement, basePath));
     }
 
-    // Return null if no organizations found (to match test expectations)
-    if (organizations.length === 0 && !defaultOrg) {
-      return null;
+    if (organizations.length === 0) {
+      throw new ParserError({
+        code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+        message: 'No organizations found in manifest',
+        detail: { path: 'manifest/organizations' }
+      });
+    }
+
+    if (defaultOrg) {
+      const exists = organizations.some(o => (o.identifier || '') === defaultOrg);
+      if (!exists) {
+        throw new ParserError({
+          code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+          message: `Default organization not found: ${defaultOrg}`,
+          detail: { default: defaultOrg, orgIds: organizations.map(o => o.identifier) }
+        });
+      }
     }
 
     return {
-      default: defaultOrg,
+      default: defaultOrg || organizations[0]?.identifier || null,
       organizations
     };
   }
@@ -282,14 +342,35 @@ class ManifestParser {
    * @returns {Array} Array of resource objects
    */
   parseResources(manifestElement, basePath) {
-    const resourcesElement = this.getChildElement(manifestElement, 'resources');
-    if (!resourcesElement) return [];
+    const resourcesElement =
+      this.selectFirstNS(manifestElement, ['imscp:resources', 'resources']);
+    if (!resourcesElement) {
+      throw new ParserError({
+        code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+        message: 'Manifest missing required resources element',
+        detail: { path: 'manifest/resources' }
+      });
+    }
 
     const resources = [];
-    const resourceElements = this.getChildElements(resourcesElement, 'resource');
-    
+    const resourceElements = this.selectChildrenNS(resourcesElement, ['imscp:resource', 'resource']);
+
+    const ids = new Set();
     for (const resourceElement of resourceElements) {
-      resources.push(this.parseResource(resourceElement, basePath));
+      const r = this.parseResource(resourceElement, basePath);
+      if (r.identifier) {
+        if (ids.has(r.identifier)) {
+          throw new ParserError({
+            code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+            message: `Duplicate resource identifier: ${r.identifier}`
+          });
+        }
+        ids.add(r.identifier);
+      }
+      if (!r.scormType) {
+        r.scormType = 'asset';
+      }
+      resources.push(r);
     }
 
     return resources;
@@ -320,8 +401,24 @@ class ManifestParser {
     const nsMap = this.namespaces;
     const scormTypeAttr = getAttr(resourceElement, 'adlcp:scormType', nsMap) || getAttr(resourceElement, 'scormType', nsMap);
     const hrefAttr = getAttr(resourceElement, 'href', nsMap);
+    const identifier = getAttr(resourceElement, 'identifier', nsMap);
+
+    // Validate required attributes
+    if (!identifier) {
+      throw new ParserError({
+        code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+        message: 'Resource missing required identifier attribute'
+      });
+    }
+    if (String(scormTypeAttr || '').toLowerCase() === 'sco' && !hrefAttr) {
+      throw new ParserError({
+        code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+        message: `SCO resource must have href attribute (Resource: ${identifier})`
+      });
+    }
+
     return {
-      identifier: getAttr(resourceElement, 'identifier', nsMap),
+      identifier,
       type: getAttr(resourceElement, 'type', nsMap),
       scormType: scormTypeAttr,
       href: hrefAttr,
@@ -355,7 +452,6 @@ class ManifestParser {
     const wantNs = tagName.includes(':') ? tagName.split(':')[0] : null;
     const wantLocal = tagName.includes(':') ? tagName.split(':')[1] : tagName;
 
-    // iterate only direct child nodes
     const childNodes = parent.childNodes || [];
     for (let i = 0; i < childNodes.length; i++) {
       const node = childNodes[i];
@@ -369,12 +465,10 @@ class ManifestParser {
           if (prefix === wantNs) {
             return node;
           }
-          // If prefix differs but namespace URI matches our known mapping, accept
           if (node.namespaceURI && this.namespaces[wantNs] && node.namespaceURI === this.namespaces[wantNs]) {
             return node;
           }
         } else {
-          // No namespace expected
           return node;
         }
       }
@@ -427,12 +521,29 @@ class ManifestParser {
    */
   getElementText(parent, tagName) {
     const element = this.getChildElement(parent, tagName);
-    return element ? element.textContent.trim() : null;
+    if (!element) return null;
+    const text = element.textContent;
+    return typeof text === 'string' ? text.trim() : null;
   }
 
-  // Additional parsing methods would be implemented here
-  // (parseItems, parseSequencing, parseFiles, etc.)
-  // These are placeholder methods to keep under 200 lines
+  // Namespace-first selection helpers to avoid duplicated collections while
+  // still supporting unprefixed fallback when zero matches exist.
+  selectChildrenNS(parent, orderedQualifiedNames) {
+    // orderedQualifiedNames example: ['imscp:item', 'item']
+    for (const qn of orderedQualifiedNames) {
+      const arr = this.getChildElements(parent, qn);
+      if (arr.length > 0) return arr;
+    }
+    return [];
+  }
+
+  selectFirstNS(parent, orderedQualifiedNames) {
+    for (const qn of orderedQualifiedNames) {
+      const el = this.getChildElement(parent, qn);
+      if (el) return el;
+    }
+    return null;
+  }
   /**
    * Parse items recursively
    * @param {Element} parentElement - Parent element (organization or item)
@@ -441,19 +552,29 @@ class ManifestParser {
    */
   parseItems(parentElement, basePath) {
     const items = [];
-    // Only direct child items
-    // Direct children; support any prefix mapping for IMS CP
-    const itemElements = this.getChildElements(parentElement, 'imscp:item')
-      .concat(this.getChildElements(parentElement, 'item'));
+    const itemElements = this.selectChildrenNS(parentElement, ['imscp:item', 'item']);
+
+    const siblingIds = new Set();
     for (const itemElement of itemElements) {
+      const id = this.getAttribute(itemElement, 'identifier');
+      if (id) {
+        if (siblingIds.has(id)) {
+          throw new ParserError({
+            code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+            message: `Duplicate item identifier at same level: ${id}`,
+            detail: { parent: parentElement?.getAttribute?.('identifier') || parentElement?.localName || 'node' }
+          });
+        }
+        siblingIds.add(id);
+      }
+
       items.push({
-        identifier: this.getAttribute(itemElement, 'identifier'),
+        identifier: id,
         identifierref: this.getAttribute(itemElement, 'identifierref'),
-        // SCORM default for isvisible is true; explicit "false" hides
         isvisible: this.getAttribute(itemElement, 'isvisible') !== 'false',
         parameters: this.getAttribute(itemElement, 'parameters'),
         title: this.getElementText(itemElement, 'title'),
-        children: this.parseItems(itemElement, basePath), // Recursive for nested items
+        children: this.parseItems(itemElement, basePath),
         sequencing: this.parseSequencing(itemElement),
         metadata: this.parseMetadata(itemElement, basePath)
       });
@@ -1062,6 +1183,22 @@ class ManifestParser {
   }
 
   // Placeholder for LOM parsing methods
+
+  /**
+   * Depth-first collect all items from a starting items array into out array.
+   * @param {Array} items
+   * @param {Array} out
+   */
+  _collectItems(items, out) {
+    if (!Array.isArray(items)) return;
+    for (const it of items) {
+      if (!it) continue;
+      out.push(it);
+      if (Array.isArray(it.children) && it.children.length > 0) {
+        this._collectItems(it.children, out);
+      }
+    }
+  }
 }
 
 module.exports = ManifestParser;

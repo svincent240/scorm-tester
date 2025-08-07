@@ -19,3 +19,4 @@ yarn-error.log
 dev-startup.bat
 /temp
 /coverage
+/artifacts/perf

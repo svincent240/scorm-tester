@@ -16,7 +16,7 @@ class Logger {
             return Logger.instance;
         }
 
-        this.logFile = path.join(logDir, 'app.log');
+        this.logFile = path.join(logDir || getDefaultLogDir(), 'app.log');
         this.logLevel = process.env.LOG_LEVEL || 'info';
         this.initLogFile();
 
@@ -118,4 +118,28 @@ class Logger {
     }
 }
 
-module.exports = Logger;
+// Provide a default log directory resolver compatible with both main and renderer contexts
+function getDefaultLogDir() {
+  try {
+    // Use Electron app.getPath('userData') when available
+    const electron = require('electron');
+    const app = electron?.app || electron?.remote?.app;
+    if (app && typeof app.getPath === 'function') {
+      return app.getPath('userData');
+    }
+  } catch (_) {
+    // ignore resolution failure and fallback to OS tmp
+  }
+  // Fallback: OS temp directory
+  return require('os').tmpdir();
+}
+
+// Export a singleton instance with lazy init to match existing call sites expecting an object with methods
+let singleton = null;
+function getLogger() {
+  if (singleton) return singleton;
+  singleton = new Logger(process.env.SCORM_TESTER_LOG_DIR);
+  return singleton;
+}
+
+module.exports = getLogger();

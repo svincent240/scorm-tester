@@ -8,12 +8,36 @@ This document details how the SCORM Tester application implements full complianc
 
 ### Manifest Processing
 
+#### Parser Strictness and Fail-Fast Behavior
+The Manifest Parser is strict and fail-fast on structural/spec violations. It throws standardized ParserError exceptions and logs a single structured error entry per failure.
+
+- Root element must be `<manifest>` (localName = 'manifest').
+- Required sections:
+  - `<organizations>` with at least one `<organization>`.
+  - `<resources>` with at least one `<resource>`.
+- Default organization, when provided, must resolve to an existing organization identifier.
+- Sibling `<item>` identifiers must be unique at each level.
+- Resource identifiers must be unique.
+- SCO resources (adlcp:scormType="sco" or "sco") must have an href.
+- Each `<item identifierref>` must resolve to a resource identifier defined under `<resources>`.
+
+All ParserError throws are fail-fast; downstream CAM/SN processing is short-circuited.
+
+#### Namespace-First Selection
+To prevent duplicate collections and misclassification when manifests mix prefixed and unprefixed tags, the parser uses a namespace-first selection strategy:
+
+- Prefer namespaced children (e.g., imscp:item, imscp:organization, imscp:resources) on the direct child axis.
+- Fall back to unprefixed tags only when there are zero namespaced matches.
+- No global descendant queries are used for structural parsing; only direct children are considered.
+
+This resolves issues where mixed prefixes previously caused duplicate items or incorrect tree construction.
+
 #### imsmanifest.xml Structure Support
 - **Root Element**: Complete `<manifest>` element processing with identifier and version
-- **Metadata**: Support for both embedded and referenced LOM metadata
-- **Organizations**: Multiple organization support with default selection
-- **Resources**: Complete resource definition with dependencies and file listings
-- **Sequencing Collection**: Reusable sequencing definition support
+- **Metadata**: Support for both embedded and referenced LOM metadata (optional; failures logged at INFO)
+- **Organizations**: Multiple organization support with default selection and strict validation
+- **Resources**: Complete resource definition with dependencies and file listings; xml:base resolved
+- **Sequencing Collection**: Reusable sequencing definition support (namespace-aware)
 
 #### Application Profile Support
 ```javascript
@@ -55,6 +79,7 @@ const CAM_VALIDATION_RULES = {
 - **Organization Level**: Module/lesson specific metadata
 - **Resource Level**: SCO/Asset specific metadata
 - **Dublin Core**: Basic metadata element support
+- Parser tolerance: Metadata parsing is optional; metadata errors are logged at INFO and do not block core parsing.
 
 ## Run-Time Environment (RTE) Compliance
 
@@ -248,41 +273,27 @@ const NAVIGATION_MODEL = {
 };
 ```
 
-### Error Code Implementation
+### Parser Error Modeling
+Parsing and early validation failures use a standardized error model with automatic structured logging.
+
+- Class and codes:
+  - [`ParserError` + `ParserErrorCode`](src/shared/errors/parser-error.js:1)
+  - Codes used by CAM parsing:
+    - PARSE_EMPTY_INPUT – empty or null XML input
+    - PARSE_XML_ERROR – DOMParser warning/error/fatalError or parsererror nodes
+    - PARSE_UNSUPPORTED_STRUCTURE – invalid manifest root
+    - PARSE_VALIDATION_ERROR – structural/spec violations (e.g., missing organizations/resources, non-existent default org, duplicate IDs, unresolved identifierref, SCO without href)
+
+- Structured log payload fields (written to app log via shared logger):
+  - phase, code, message, detail, manifestId, defaultOrgId, stats, packagePath, severity
+
+RTE/SN continue to use SCORM error codes for API/data-model errors:
+
 ```javascript
 const SCORM_ERROR_CODES = {
-  // No Error
   0: "No Error",
-  
-  // General Errors (100-199)
   101: "General Exception",
-  102: "General Initialization Failure", 
-  103: "Already Initialized",
-  104: "Content Instance Terminated",
-  111: "General Termination Failure",
-  112: "Termination Before Initialization",
-  113: "Termination After Termination",
-  122: "Retrieve Data Before Initialization",
-  123: "Retrieve Data After Termination",
-  132: "Store Data Before Initialization", 
-  133: "Store Data After Termination",
-  142: "Commit Before Initialization",
-  143: "Commit After Termination",
-  
-  // Syntax Errors (200-299)
-  201: "General Argument Error",
-  
-  // Data Model Errors (400-499)
-  401: "General Get Failure",
-  402: "General Set Failure", 
-  403: "General Commit Failure",
-  404: "Undefined Data Model Element",
-  405: "Unimplemented Data Model Element",
-  406: "Data Model Element Value Not Initialized",
-  407: "Data Model Element Is Read Only",
-  408: "Data Model Element Is Write Only",
-  409: "Data Model Element Type Mismatch",
-  410: "Data Model Element Value Out Of Range",
+  // ...
   411: "Data Model Dependency Not Established"
 };
 ```
@@ -477,7 +488,7 @@ class ComplianceValidator {
   validateScormCompliance(implementation) {
     const results = {
       cam: this.validateCAM(implementation.cam),
-      rte: this.validateRTE(implementation.rte), 
+      rte: this.validateRTE(implementation.rte),
       sn: this.validateSN(implementation.sn)
     };
     
@@ -489,5 +500,10 @@ class ComplianceValidator {
   }
 }
 ```
+
+### Troubleshooting Mixed Namespace Manifests
+- Symptom: Duplicate items or unexpected counts when manifests mix prefixed and unprefixed tags.
+- Resolution: CAM parser uses namespace-first, direct-child selection; ensure manifests declare proper namespaces. Verify that organizations/resources are not duplicated in logs.
+- Diagnostics: On success, the parser logs a snapshot including defaultOrgId and topCount. On failure, a single structured error line is written with ParserError details.
 
 This comprehensive SCORM compliance implementation ensures the application meets all requirements of the SCORM 2004 4th Edition specification while providing a robust foundation for testing SCORM content packages.

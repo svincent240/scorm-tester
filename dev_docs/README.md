@@ -23,11 +23,11 @@ This documentation is designed to provide comprehensive context for AI-driven de
 
 ### Core Architecture
 - [`architecture/overview.md`](architecture/overview.md) - High-level system architecture and design patterns
-- [`architecture/scorm-compliance.md`](architecture/scorm-compliance.md) - SCORM 2004 4th Edition implementation details
+- [`architecture/scorm-compliance.md`](architecture/scorm-compliance.md) - SCORM 2004 4th Edition implementation details (updated with strict CAM parsing, namespace-first selection, and ParserError modeling)
 
 ### Module Documentation
 - [`modules/scorm-engine.md`](modules/scorm-engine.md) - Complete SCORM implementation (RTE, CAM, SN)
-- [`modules/cam-module.md`](modules/cam-module.md) - Content Aggregation Model implementation
+- [`modules/cam-module.md`](modules/cam-module.md) - Content Aggregation Model implementation (updated for strict parser behavior, error codes, and logging contract)
 - [`modules/sn-module.md`](modules/sn-module.md) - Sequencing and Navigation engine
 
 ### API Reference
@@ -107,6 +107,9 @@ This documentation is maintained as part of the application codebase and should 
   - [guides/renderer-imports.md](guides/renderer-imports.md) for dynamic import strategy, SCORM API injection precedence, API presence verification, and content scaling contracts
   - [architecture/overview.md](architecture/overview.md) for event-driven renderer architecture and state authority patterns
   - [guides/testing-strategy.md](guides/testing-strategy.md) for renderer integration scenarios
+- ✅ CAM Parser Strictness: The CAM manifest parser now enforces fail-fast behavior with standardized ParserError codes and structured logging; see:
+  - [modules/cam-module.md](modules/cam-module.md) for strict parser behavior and error codes
+  - [architecture/scorm-compliance.md](architecture/scorm-compliance.md) for namespace-first selection and troubleshooting mixed namespaces
 The temporary ui-improvement-plan.md has been absorbed into these documents and will be removed.
 
 For questions about SCORM compliance, refer to the specification guide and compliance documentation. For architectural decisions, see the detailed module documentation and design rationale sections.

@@ -435,16 +435,30 @@ class CourseOutline extends BaseComponent {
       hasItems: !!courseData?.structure?.items,
       itemCount: courseData?.structure?.items?.length || 0
     });
-    if (courseData.structure) {
+
+    // Single-source renderer: only accept provided structure; do not rebuild from manifest.
+    if (courseData.structure && Array.isArray(courseData.structure.items)) {
+      // Signature guard: avoid re-applying identical structure
+      try {
+        const topIds = courseData.structure.items.slice(0, 64).map(n => n?.identifier || 'unknown');
+        const sig = JSON.stringify({
+          root: courseData.structure.identifier || 'course',
+          count: courseData.structure.items.length,
+          ids: topIds
+        });
+        if (this._lastAppliedSig === sig) {
+          rendererLogger.debug('CourseOutline.handleCourseLoaded: identical structure signature; ignoring duplicate apply');
+          return;
+        }
+        this._lastAppliedSig = sig;
+      } catch (_) {}
+
       this.setCourseStructure(courseData.structure);
-    } else if (courseData.manifest) {
-      const converted = this.convertManifestToStructure(courseData.manifest);
-      rendererLogger.info('CourseOutline.handleCourseLoaded: converted manifest to structure', { itemCount: converted?.items?.length || 0 });
-      if (converted) this.setCourseStructure(converted);
-    } else {
-      rendererLogger.warn('CourseOutline.handleCourseLoaded: no structure or manifest found in payload');
-      this.showEmptyState();
+      return;
     }
+
+    rendererLogger.warn('CourseOutline.handleCourseLoaded: structure missing or invalid; showing empty state');
+    this.showEmptyState();
   }
 
   handleCourseCleared() {
@@ -496,32 +510,30 @@ class CourseOutline extends BaseComponent {
       if (!this.element.querySelector('.course-outline__container')) {
         this.renderContent();
       }
-      
-      // Extract structure from courseData
-      let structure = null;
-      
-      if (courseData?.structure) {
-        structure = courseData.structure;
-      } else if (courseData?.manifest && courseData.manifest.organizations) {
-        // Convert manifest to structure format
-        structure = this.convertManifestToStructure(courseData.manifest);
-      }
-      
+
+      // Single-source renderer: only accept provided structure; do not rebuild or convert from manifest.
+      const structure = (courseData && courseData.structure && Array.isArray(courseData.structure.items))
+        ? courseData.structure
+        : null;
+
       if (structure) {
-        // Diagnostics: log incoming structure before setting to catch duplication earlier
+        // Signature guard against double-apply
         try {
-          const ids = Array.isArray(structure?.items)
-            ? structure.items.slice(0, 48).map(n => n?.identifier || 'unknown')
-            : [];
-          rendererLogger.info('CourseOutline.updateWithCourse: incoming top-level IDs', {
-            count: ids.length,
+          const ids = structure.items.slice(0, 64).map(n => n?.identifier || 'unknown');
+          const sig = JSON.stringify({
+            root: structure.identifier || 'course',
+            count: structure.items.length,
             ids
           });
+          if (this._lastAppliedSig === sig) {
+            rendererLogger.debug('CourseOutline.updateWithCourse: identical structure signature; ignoring duplicate apply');
+            return;
+          }
+          this._lastAppliedSig = sig;
         } catch (_) {}
 
         this.setCourseStructure(structure);
         try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) {}
-        // Avoid redundant explicit re-render; setCourseStructure already renders
       } else {
         try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) {}
         this.showEmptyState();
@@ -537,20 +549,9 @@ class CourseOutline extends BaseComponent {
    * @param {Object} manifest - SCORM manifest data
    * @returns {Object} Course structure
    */
-  convertManifestToStructure(manifest) {
-    if (!manifest.organizations || !manifest.organizations.organization) {
-      return null;
-    }
-    
-    const org = Array.isArray(manifest.organizations.organization)
-      ? manifest.organizations.organization[0]
-      : manifest.organizations.organization;
-    
-    return {
-      title: org.title || 'Course',
-      identifier: org.identifier || 'course',
-      items: this.convertManifestItems(org.item || [])
-    };
+  // Removed manifest-to-structure conversion in renderer to keep single-source of truth from CAM.
+  convertManifestToStructure(_) {
+    return null;
   }
 
   /**
@@ -558,15 +559,8 @@ class CourseOutline extends BaseComponent {
    * @param {Array|Object} items - Manifest items
    * @returns {Array} Structure items
    */
-  convertManifestItems(items) {
-    const itemArray = Array.isArray(items) ? items : [items];
-    
-    return itemArray.map(item => ({
-      identifier: item.identifier || item.identifierref || 'unknown',
-      title: item.title || item.identifier || 'Untitled',
-      type: item.identifierref ? 'sco' : 'asset',
-      children: item.item ? this.convertManifestItems(item.item) : []
-    }));
+  convertManifestItems(_) {
+    return [];
   }
 
   destroy() {

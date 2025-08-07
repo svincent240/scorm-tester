@@ -17,6 +17,11 @@ const ManifestParser = require('./manifest-parser');
 const ContentValidator = require('./content-validator');
 const MetadataHandler = require('./metadata-handler');
 const PackageAnalyzer = require('./package-analyzer');
+const { ParserError } = require('../../../../shared/errors/parser-error');
+// Use the shared logger utility. This module exports an object with methods: debug/info/warn/error.
+// From this file (src/main/services/scorm/cam/index.js), the correct relative path to src/shared/utils/logger.js is:
+// ../../../../shared/utils/logger
+const logger = require('../../../../shared/utils/logger');
 
 /**
  * SCORM CAM Service
@@ -24,9 +29,13 @@ const PackageAnalyzer = require('./package-analyzer');
  * Provides unified interface for Content Aggregation Model operations
  */
 class ScormCAMService {
-  constructor(errorHandler, logger) {
+  constructor(errorHandler, loggerInstance) {
     this.errorHandler = errorHandler;
-    this.logger = logger;
+    // Ensure we always have a usable logger with info/warn/error/debug methods
+    const sharedLogger = require('../../../../shared/utils/logger');
+    this.logger = loggerInstance && typeof loggerInstance.info === 'function'
+      ? loggerInstance
+      : sharedLogger;
 
     // Initialize CAM sub-components
     this.manifestParser = new ManifestParser(errorHandler);
@@ -79,9 +88,58 @@ class ScormCAMService {
           hasResources: !!manifest?.resources,
           manifestType: typeof manifest
         });
+
+        // EARLY SNAPSHOT for diagnostics (duplicates now prevented at parser level)
+        try {
+          const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+          const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
+          const orgContainer = manifest?.organizations || null;
+          const orgs = toArray(orgContainer?.organizations);
+          const defId = safeStr(orgContainer?.default);
+          const defaultOrg = defId
+            ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
+            : (orgs[0] || null);
+          const top = defaultOrg ? toArray(defaultOrg.items) : [];
+          const ids = top.map(n => (safeStr(n?.identifier) || safeStr(n?.title) || 'node'));
+          const dupCount = ids.length - new Set(ids).size;
+          const payload = {
+            phase: 'CAM_PARSE',
+            code: 'PARSE_VALIDATION_ERROR',
+            message: 'Parser defaultOrg top-level snapshot',
+            detail: { topIds: ids },
+            manifestId: manifest?.identifier || null,
+            defaultOrgId: defId || (defaultOrg?.identifier || null),
+            stats: { orgCount: orgs.length, topCount: top.length },
+            packagePath,
+            severity: 'info'
+          };
+          logger.info('ScormCAMService: Parser snapshot', payload);
+        } catch (e) {
+          this.logger?.warn('ScormCAMService: Failed early org/items diagnostic', { message: e?.message || String(e) });
+        }
       } catch (parseError) {
-        this.logger?.error('ScormCAMService: Manifest parsing failed:', parseError);
-        throw new Error(`Manifest parsing failed: ${parseError.message}`);
+        // Ensure structured failure is logged once with approved contract
+        const payload = {
+          phase: 'CAM_PARSE',
+          code: 'PARSE_VALIDATION_ERROR',
+          message: parseError?.message || 'Manifest parsing failed',
+          detail: parseError?.detail || { note: 'no-detail' },
+          manifestId: undefined,
+          defaultOrgId: undefined,
+          stats: undefined,
+          packagePath,
+          severity: 'error'
+        };
+        this.logger?.error('ScormCAMService: parse failure', payload);
+        // Re-throw ParserError or wrap generically
+        if (parseError instanceof ParserError) {
+          throw parseError;
+        }
+        throw new ParserError({
+          code: 'PARSE_VALIDATION_ERROR',
+          message: `Manifest parsing failed: ${parseError?.message || String(parseError)}`,
+          detail: { stack: parseError?.stack }
+        });
       }
 
       // Validate manifest object before proceeding
@@ -117,111 +175,62 @@ class ScormCAMService {
         throw new Error(`Package analysis failed: ${analysisError.message}`);
       }
 
-      // 3b. Build UI Outline (simple) and compute launch directly from manifest structures (spec-aligned)
+      // 3b. Minimal, spec-aligned pipeline: single traversal and first launch resolution
       try {
         const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
         const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
-        const joinPath = (a, b) => {
-          const A = safeStr(a, '').replace(/\\/g, '/').replace(/\/+$/, '');
-          const B = safeStr(b, '').replace(/\\/g, '/').replace(/^\/+/, '');
-          if (!A) return B;
-          if (!B) return A;
-          return `${A}/${B}`;
-        };
 
         analysis = analysis || {};
-        let usedFallback = false;
 
-        // Manifest shapes from ManifestParser
+        // 1) Select default organization strictly from parser output
         const orgContainer = manifest?.organizations || null;
         const orgs = toArray(orgContainer?.organizations);
         const defId = safeStr(orgContainer?.default);
-        const pickOrg = defId ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null) : (orgs[0] || null);
+        const defaultOrg = defId
+          ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
+          : (orgs[0] || null);
 
-        // Resources array from ManifestParser
+        // 2) Build a resource map using effective href provided by the parser (resolvedBase + href already computed there)
         const resources = toArray(manifest?.resources);
-        // Build resource lookup and compute effective href using resource.xmlBase (resolvedBase) + href
         const resById = new Map();
         for (const r of resources) {
           const id = safeStr(r?.identifier);
           if (!id) continue;
-          const base = safeStr(r?.xmlBase) || safeStr(r?.resolvedBase);
-          const href = safeStr(r?.href);
-          const eff = href ? (r?.resolvedBase ? joinPath(r.resolvedBase, href) : joinPath(base, href)) : '';
+          const href = safeStr(r?.resolvedBase) && safeStr(r?.href)
+            ? `${safeStr(r.resolvedBase).replace(/\\/g,'/').replace(/\/+$/,'')}/${safeStr(r.href).replace(/\\/g,'/').replace(/^\/+/,'')}`
+            : safeStr(r?.href);
           const st = safeStr(r?.scormType).toLowerCase();
-          resById.set(id, { href: eff, scormType: st, rawHref: href, base: base || r?.resolvedBase || '' });
-          this.logger?.info('CAM: resource href resolved', {
-            resourceId: id,
-            xmlBaseContainer: null,
-            xmlBaseResource: base || null,
-            hrefOriginal: href || null,
-            hrefEffective: eff || null,
-            scormType: st || null
-          });
+          resById.set(id, { href: href || '', scormType: st || '' });
         }
 
-        // Build a minimal uiOutline: chosen org's direct children mapped to items, keeping wrapper if present
-        const outlineFromOrgItems = (org) => {
-          if (!org) return [];
-          const mapItem = (it) => {
-            const identifier = safeStr(it?.identifier) || safeStr(it?.title, 'Untitled');
-            const title = safeStr(it?.title, identifier);
-            const idref = safeStr(it?.identifierref);
-            let href = '';
-            let type = 'cluster';
-            if (idref && resById.has(idref)) {
-              const r = resById.get(idref);
-              href = safeStr(r.href);
-              type = r.scormType === 'sco' ? 'sco' : (r.scormType ? 'asset' : (href ? 'asset' : 'cluster'));
-              this.logger?.info('CAM: launch candidate (org item)', {
-                itemId: identifier,
-                identifierref: idref,
-                scormType: r.scormType || null,
-                xmlBaseResource: r.base || null,
-                xmlBaseContainer: null,
-                hrefOriginal: r.rawHref || null,
-                hrefEffective: href || null
-              });
-            }
-            const children = toArray(it?.children);
-            return { identifier, title, type, href, items: children.map(mapItem) };
-          };
-          const topChildren = toArray(org?.items);
-          return topChildren.map(mapItem);
+        // 3) Traverse defaultOrg.item[] with item.children[] only; never mix alternative axes
+        const mapItem = (it) => {
+          const identifier = safeStr(it?.identifier) || safeStr(it?.identifierref) || safeStr(it?.title, 'Untitled');
+          const title = safeStr(it?.title, identifier);
+          const idref = safeStr(it?.identifierref);
+          let href = '';
+          let type = 'cluster';
+
+          if (idref && resById.has(idref)) {
+            const r = resById.get(idref);
+            href = safeStr(r.href);
+            const st = safeStr(r.scormType).toLowerCase();
+            type = st === 'sco' ? 'sco' : (href ? 'asset' : 'cluster');
+          }
+
+          const children = toArray(it?.children).map(mapItem);
+          return { identifier, title, type, href, items: children };
         };
 
-        let uiOutline = outlineFromOrgItems(pickOrg);
+        const uiOutline = defaultOrg ? toArray(defaultOrg.items).map(mapItem) : [];
 
-        // Simplify one-level wrapper: surface children if single non-launchable cluster
-        if (Array.isArray(uiOutline) && uiOutline.length === 1) {
-          const only = uiOutline[0];
-          const isWrapper = (!only.href || only.href === '') && String(only.type || 'cluster').toLowerCase() === 'cluster';
-          if (isWrapper && Array.isArray(only.items) && only.items.length > 0) {
-            this.logger?.info('CAM: simplifying outline by lifting wrapper children', {
-              wrapperIdentifier: only.identifier, childCount: only.items.length
-            });
-            uiOutline = only.items;
-          }
-        }
-
-        if (!Array.isArray(uiOutline) || uiOutline.length === 0) {
-          // Last resort: resources flat
-          const fallback = this.buildUiOutlineFromResources(manifest);
-          uiOutline = Array.isArray(fallback) ? fallback : [];
-          usedFallback = uiOutline.length > 0;
-        }
-
-        analysis.uiOutline = uiOutline;
-
-        // Compute launchSequence directly from org items/resById: DFS prefer SCO, then first href
+        // 4) Compute launch by DFS preferring first SCO with href, else first href
         const pickFirstSco = (nodes) => {
-          if (!Array.isArray(nodes)) return null;
-          for (const n of nodes) {
-            const hasHref = !!(n && typeof n.href === 'string' && n.href.trim());
-            if (hasHref && String(n.type || '').toLowerCase() === 'sco') {
+          for (const n of nodes || []) {
+            if (n?.href && String(n.type || '').toLowerCase() === 'sco') {
               return { href: n.href.trim(), identifier: n.identifier || n.title || 'node', title: n.title || n.identifier || 'Untitled' };
             }
-            const child = pickFirstSco(n?.items);
+            const child = pickFirstSco(n.items);
             if (child) return child;
           }
           return null;
@@ -229,31 +238,22 @@ class ScormCAMService {
         let first = pickFirstSco(uiOutline);
         if (!first) {
           const pickFirstHref = (nodes) => {
-            if (!Array.isArray(nodes)) return null;
-            for (const n of nodes) {
-              const hasHref = !!(n && typeof n.href === 'string' && n.href.trim());
-              if (hasHref) {
+            for (const n of nodes || []) {
+              if (n?.href) {
                 return { href: n.href.trim(), identifier: n.identifier || n.title || 'node', title: n.title || n.identifier || 'Untitled' };
               }
-              const child = pickFirstHref(n?.items);
+              const child = pickFirstHref(n.items);
               if (child) return child;
             }
             return null;
           };
           first = pickFirstHref(uiOutline);
         }
-        analysis.launchSequence = first ? [first] : [];
-        this.logger?.info('CAM: launchSequence computed', { count: analysis.launchSequence.length, first: analysis.launchSequence[0] || null });
 
-        const itemCount = Array.isArray(analysis.uiOutline) ? analysis.uiOutline.length : 0;
-        const sample = itemCount > 0 ? analysis.uiOutline[0] : null;
-        this.logger?.info('ScormCAMService: UI outline built (default org children - direct)', {
-          itemCount,
-          usedFallback,
-          sample: sample ? { identifier: sample.identifier, title: sample.title, href: sample.href, type: sample.type } : null
-        });
+        analysis.uiOutline = uiOutline;
+        analysis.launchSequence = first ? [first] : [];
       } catch (outlineError) {
-        this.logger?.warn('ScormCAMService: Failed to build UI outline from manifest:', outlineError?.message || outlineError);
+        this.logger?.warn('ScormCAMService: Minimal pipeline failed:', outlineError?.message || outlineError);
       }
 
       // 4. Extract Metadata (if any)
@@ -305,8 +305,14 @@ class ScormCAMService {
 
     } catch (error) {
       this.errorHandler?.setError('301', `SCORM package processing failed: ${error.message}`, 'ScormCAMService.processPackage');
-      this.logger?.error('ScormCAMService: Package processing error:', error);
-      this.logger?.error('ScormCAMService: Error stack:', error.stack);
+      // Normalize error objects to avoid "is not a function" when logger expects strings + payloads
+      const payload = {
+        type: error?.name || 'Error',
+        message: error?.message || String(error),
+        stackHead: typeof error?.stack === 'string' ? error.stack.split('\n').slice(0, 5) : null
+      };
+      this.logger?.error('ScormCAMService: Package processing error', payload);
+      this.logger?.error('ScormCAMService: Error stack', { stack: error?.stack });
       return { success: false, error: error.message, reason: error.message };
     }
   }
@@ -670,29 +676,15 @@ class ScormCAMService {
     };
 
     const topLevelItems = (() => {
+      // Prefer 'item' (canonical), else 'items'. Do NOT mix with 'children' at org level.
       const a = toArray(rootOrg?.item);
       if (a.length > 0) return a.map(traverse);
       const b = toArray(rootOrg?.items);
       if (b.length > 0) return b.map(traverse);
-      const c = toArray(rootOrg?.children);
-      return c.map(traverse);
+      return [];
     })();
 
-    // Flatten top-level hidden/non-launchable wrapper if present to surface first-level SCOs
-    if (Array.isArray(topLevelItems) && topLevelItems.length === 1) {
-      const only = topLevelItems[0];
-      const isWrapper = (!only.href || only.href === '') && String(only.type || 'cluster').toLowerCase() === 'cluster';
-      const hasChildren = Array.isArray(only.items) && only.items.length > 0;
-      if (isWrapper && hasChildren) {
-        this.logger?.info('CAM: flattening top-level wrapper item to expose child items', {
-          wrapperIdentifier: only.identifier,
-          wrapperTitle: only.title,
-          childCount: only.items.length
-        });
-        return only.items;
-      }
-    }
-    // Do not write to manifest here; higher-level processPackage will compute analysis.launchSequence from uiOutline.
+    // Preserve structure; no wrapper flattening here.
     return topLevelItems;
   } // end buildUiOutlineFromManifest
 
