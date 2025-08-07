@@ -161,18 +161,18 @@ class ScormClient {
    */
   GetValue(element) {
     if (!this.isInitialized) {
-      this.setLastError('122'); // Get before initialization
+      this.setLastError('122', { element }); // Get before initialization
       return '';
     }
 
     if (!element || typeof element !== 'string') {
-      this.setLastError('201'); // Invalid argument
+      this.setLastError('201', { element }); // Invalid argument
       return '';
     }
 
     // Validate element name using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
-      this.setLastError('401'); // Undefined data model element
+      this.setLastError('401', { element }); // Undefined data model element
       return '';
     }
 
@@ -195,17 +195,17 @@ class ScormClient {
    */
   SetValue(element, value) {
     if (!this.isInitialized) {
-      this.setLastError('132'); // Set before initialization
+      this.setLastError('132', { element }); // Set before initialization
       return 'false';
     }
 
     if (!element || typeof element !== 'string') {
-      this.setLastError('201'); // Invalid argument
+      this.setLastError('201', { element }); // Invalid argument
       return 'false';
     }
 
     if (value === null || value === undefined) {
-      this.setLastError('201'); // Invalid argument
+      this.setLastError('201', { element }); // Invalid argument
       return 'false';
     }
 
@@ -214,13 +214,13 @@ class ScormClient {
 
     // Validate element name using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
-      this.setLastError('401'); // Undefined data model element
+      this.setLastError('401', { element }); // Undefined data model element
       return 'false';
     }
 
     // Validate value format using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidValue(element, value)) {
-      this.setLastError('405'); // Incorrect data type
+      this.setLastError('405', { element }); // Incorrect data type
       return 'false';
     }
 
@@ -515,9 +515,38 @@ class ScormClient {
    * Set last error code
    * @private
    */
-  setLastError(errorCode) {
+  setLastError(errorCode, context = {}) {
     this.lastError = errorCode;
-    eventBus.emit('scorm:error', { errorCode, message: this.GetErrorString(errorCode) });
+
+    // Downgrade SCORM 2004 401 (Undefined data model element) for adl.data.* access to WARN without emitting scorm:error
+    // Rationale:
+    // - Many sample SCOs probe optional ADL data model collections (adl.data.*) that are not required by core LMS/RTE.
+    // - Per spec, undefined elements should return 401 but are not fatal; avoid triggering app-level error loops.
+    try {
+      const element = typeof context.element === 'string' ? context.element : null;
+      const is401 = String(errorCode) === '401';
+      const isAdlDataProbe = !!(element && /^adl\.data(\.|$)/i.test(element));
+
+      if (is401 && isAdlDataProbe) {
+        // Log as WARN to the centralized renderer logger and suppress 'scorm:error' event emission
+        import('./utils/renderer-logger.js')
+          .then(({ rendererLogger }) => {
+            rendererLogger?.warn('[RTE] Ignoring undefined ADL data model probe', {
+              element,
+              errorCode: String(errorCode),
+              description: this.GetErrorString(String(errorCode))
+            });
+          })
+          .catch(() => { /* no-op */ });
+
+        return; // do not emit eventBus 'scorm:error' to prevent UI feedback loops
+      }
+    } catch (_) {
+      // Fall through to default emission if diagnostics fail
+    }
+
+    // Default behavior: emit scorm:error for all other cases
+    eventBus.emit('scorm:error', { code: String(errorCode), message: this.GetErrorString(String(errorCode)), source: 'renderer/scorm-client' });
   }
 
   /**
