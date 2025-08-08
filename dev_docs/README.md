@@ -49,7 +49,27 @@ This documentation is designed to provide comprehensive context for AI-driven de
 - **Comprehensive Testing**: 37/37 tests passing with full compliance validation
 
 ### 🏗️ Architecture Highlights
-- **Modern UI Architecture**: Recent UI improvements have further solidified the modular, event-driven, and service-oriented design. Key enhancements include centralized error/success notifications, refined CSS management for dynamic elements, decoupled progress tracking, and a consolidated debug console. These changes enhance maintainability, consistency, and user experience.
+- **Modular, Service-Oriented Design**: The application now features a significantly refined modular, event-driven, and service-oriented architecture across both main and renderer processes. Key enhancements include:
+  - **Declarative IPC**: Transitioned to a declarative IPC layer with a unified wrapper factory, profile-aware rate limiting, and singleflight/debounce utilities, making IPC handling predictable and robust.
+  - **Centralized Telemetry**: Introduction of a dedicated `DebugTelemetryStore` to centralize API call history and debug events, decoupling telemetry from individual services.
+  - **Streamlined Main Services**: Main process services (e.g., `FileManager`, `ScormService`, `WindowManager`) have been simplified with clearer responsibilities, standardized error envelopes, and consistent logging policies. `ScormService` now delegates RTE operations to a dedicated RTE module.
+  - **Renderer Micro-hardening**: Renderer-side components and services have undergone micro-hardening, including browser-safe data handling, lazy API bridge activation, and strict `console.*` usage removal, ensuring reliability and performance.
+  - **Single-Pass Initialization**: The main process entrypoint (`src/main/main.js`) now initializes services once with clean dependency injection, eliminating re-initialization and implicit dependencies.
+  - **Consistent Error Handling**: A standardized error envelope with SCORM-specific codes and references ensures clear, actionable messages for all course-related issues.
+
+### 📊 System Overview
+```mermaid
+flowchart LR
+  Renderer -- IPC Calls --> IpcHandler
+  IpcHandler -- Routes/Wrapper --> MainServices
+  MainServices -- File Ops --> FileManager
+  MainServices -- RTE API --> RTE
+  MainServices -- CAM Parse/Validate --> CAM
+  MainServices -- SN Nav --> SN
+  MainServices -- Logs --> DebugTelemetryStore
+  WindowManager -- Manages --> Main/Debug Windows
+  DebugTelemetryStore -- Flushes To --> DebugWindow
+```
 - **Modular Design**: Emphasizes logical cohesion and clear separation of concerns. Refer to [`style.md`](style.md) for file size guidelines.
 - **Event-Driven**: Component communication through centralized event bus
 - **Service-Oriented**: Clear separation of concerns with dependency injection
@@ -62,6 +82,15 @@ This documentation is designed to provide comprehensive context for AI-driven de
 - **Performance**: Sub-millisecond API response times
 - **Memory Management**: Optimized with proper cleanup and leak prevention
 - **Code Quality**: Comprehensive error handling and logging
+
+### 🚀 Rollout and Observability
+- **Feature Flag**: `IPC_REFACTOR_ENABLED` controls the new IPC/main services. Default `false` for initial release.
+- **Staged Rollout**: Enable in development builds and manual QA first.
+- **Key Metrics to Observe**:
+  - `ipc.rate_limited`: Monitor for channels hitting rate limits.
+  - `ipc.error`: Track errors in IPC communication.
+  - `ipc.success`: Monitor successful IPC operations and their `durationMs`.
+- **Rollback Guidance**: If regressions are observed, disable `IPC_REFACTOR_ENABLED` via environment toggle to revert to legacy paths. No UI changes are expected.
 
 ## 🎯 AI Tool Guidelines
 
@@ -102,15 +131,12 @@ This documentation is maintained as part of the application codebase and should 
 - ✅ **Production Ready**: Comprehensive testing and validation completed
 - ✅ **Maintenance Mode**: Focus on bug fixes, performance optimization, and feature enhancements
 - ✅ **Full Documentation**: Complete API reference and development guides available
-- ✅ UI Improvements: All planned renderer UI enhancements have been implemented and fully documented across permanent guides. See:
-  - [guides/logging-debugging.md](guides/logging-debugging.md) for centralized renderer logging, initialization error handling, and EventBus debug mode
-  - [guides/renderer-imports.md](guides/renderer-imports.md) for dynamic import strategy, SCORM API injection precedence, API presence verification, and content scaling contracts
-  - [architecture/overview.md](architecture/overview.md) for event-driven renderer architecture and state authority patterns
-  - [guides/testing-strategy.md](guides/testing-strategy.md) for renderer integration scenarios
-- ✅ CAM Parser Strictness: The CAM manifest parser now enforces fail-fast behavior with standardized ParserError codes and structured logging; see:
-  - [modules/cam-module.md](modules/cam-module.md) for strict parser behavior and error codes
-  - [architecture/scorm-compliance.md](architecture/scorm-compliance.md) for namespace-first selection and troubleshooting mixed namespaces
-The temporary ui-improvement-plan.md has been absorbed into these documents and will be removed.
+- ✅ **Core Refactoring Complete**: Major simplification efforts across IPC, Main Services, and Renderer are now complete. This includes:
+  - **IPC Layer**: Fully declarative routing, robust rate limiting, and centralized telemetry.
+  - **Main Services**: Streamlined responsibilities, standardized error handling, and improved file management.
+  - **Renderer**: Enhanced reliability through micro-hardening, browser-safe data handling, and strict logging policies.
+  - **Main Process Initialization**: Clean, single-pass service initialization with clear dependency injection.
+The temporary `ipc-simplification-plan.md`, `renderer-simplification-plan.md`, `main-services-simplification-plan.md`, `services-simplification-checklist.md`, and `plan-progress.md` documents have been absorbed into this documentation and will be removed.
 
 For questions about SCORM compliance, refer to the specification guide and compliance documentation. For architectural decisions, see the detailed module documentation and design rationale sections.
 

@@ -18,6 +18,17 @@ const {
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 const PathUtils = require('../../shared/utils/path-utils'); // Added PathUtils
+const IPC_ROUTES = (() => {
+  try {
+    return require('./ipc/routes');
+  } catch (e) {
+    return [];
+  }
+})();
+
+// Validation utilities
+const IPC_VALIDATION = require('../../shared/utils/ipc-validation');
+const IPC_RESULT = require('../../shared/utils/ipc-result');
 
 /**
  * IPC Handler Service Class
@@ -30,6 +41,19 @@ class IpcHandler extends BaseService {
     super('IpcHandler', errorHandler, logger, options);
     
     this.config = { ...SERVICE_DEFAULTS.IPC_HANDLER, ...options };
+    // IPC refactor feature flag (Phase 0)
+    this.ipcRefactorEnabled = !!(this.config && this.config.IPC_REFACTOR_ENABLED);
+    // Initialize singleflight for open-debug-window (Phase 3)
+    try {
+      const SingleflightFactory = require('../../shared/utils/singleflight');
+      this.openDebugSingleflight = (typeof SingleflightFactory === 'function') ? SingleflightFactory() : null;
+    } catch (e) {
+      this.openDebugSingleflight = null;
+    }
+    // Telemetry store, rate limiter, and SN snapshot service will be wired via dependencies (main)
+    this.telemetryStore = null;
+    this.rateLimiter = null;
+    this.snSnapshotService = null;
     this.handlers = new Map();
     this.activeRequests = new Map();
     this.requestCounter = 0;
@@ -37,24 +61,12 @@ class IpcHandler extends BaseService {
     this.securityConfig = SECURITY_CONFIG.IPC;
     // Removed this.handlerMethods = new IpcHandlers(this);
     this.rateLimitCleanupInterval = null;
-
-    // Persistent storage for all API calls during the session (from IpcHandlers)
-    this.apiCallHistory = [];
-    this.maxHistorySize = 5000; // Increased limit for persistent storage
+ 
+    // No local telemetry buffer: telemetry is delegated to DebugTelemetryStore (constructed in main)
+    this.maxHistorySize = 5000;
     this.sessionId = null; // Track current session for clearing
 
-    // Simple, centralized SN status cache managed ONLY by main-owned poller
-    this._sn = {
-      cache: { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] },
-      lastUpdateTs: 0,
-      pollTimer: null,
-      pollIntervalMs: 1000, // single cadence; simple and stable
-      running: false
-    };
-
-    // Clear history on startup (from IpcHandlers)
-    this.clearApiCallHistory();
-    this.logger?.info('[DEBUG EVENT] API call history cleared on startup');
+    // SNSnapshotService is owned and managed outside this handler (wired from main); no internal SN cache here
   }
 
   /**
@@ -88,11 +100,46 @@ class IpcHandler extends BaseService {
    */
   async doInitialize() {
     this.logger?.debug('IpcHandler: Starting initialization');
+
+    // Wire optional dependencies provided by main (telemetryStore, snSnapshotService)
+    try {
+      const telemetry = this.getDependency('telemetryStore');
+      if (telemetry) {
+        this.telemetryStore = telemetry;
+        // Ensure clean telemetry state on startup when telemetryStore is provided
+        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); this.logger?.info('[DEBUG EVENT] telemetryStore cleared on startup'); } } catch (_) {}
+      }
+    } catch (_) {}
+    try {
+      const snSnapshot = this.getDependency('snSnapshotService');
+      if (snSnapshot) this.snSnapshotService = snSnapshot;
+    } catch (_) {}
+
+    // Ensure a rate limiter exists (fallback to local if not provided)
+    if (!this.rateLimiter) {
+      try {
+        const RateLimiter = require('./rate-limiter');
+        this.rateLimiter = new RateLimiter({ rateLimitWindow: this.config?.rateLimitWindow, rateLimitMax: this.config?.rateLimitMax });
+      } catch (e) {
+        this.rateLimiter = null;
+      }
+    }
+
     this.registerHandlers();
     this.setupRateLimitCleanup();
 
-    // Start main-owned SN status poller (no renderer polling required)
-    this.startSnMainPoller();
+    // SNSnapshotService is preferred and owned by main; fetch SN status on-demand when not present.
+    if (this.snSnapshotService && typeof this.snSnapshotService.startPolling === 'function') {
+      this.logger?.info('IpcHandler: SNSnapshotService detected; delegating SN polling to it');
+    } else {
+      this.logger?.warn('IpcHandler: SNSnapshotService not present; SN status will be fetched on-demand (no internal poller)');
+    }
+
+    if (IPC_ROUTES && IPC_ROUTES.length) {
+      this.logger?.info(`IpcHandler: declarative routes loaded: ${IPC_ROUTES.length}`);
+    } else {
+      this.logger?.info('IpcHandler: no declarative routes loaded');
+    }
 
     this.logger?.debug('IpcHandler: Initialization completed');
   }
@@ -103,8 +150,14 @@ class IpcHandler extends BaseService {
   async doShutdown() {
     this.logger?.debug('IpcHandler: Starting shutdown');
 
-    // Stop SN poller
-    this.stopSnMainPoller();
+    // Stop SN poller (delegate to SNSnapshotService when available)
+    try {
+      if (this.snSnapshotService && typeof this.snSnapshotService.stopPolling === 'function') {
+        this.snSnapshotService.stopPolling();
+      }
+    } catch (_) {
+      // swallow to keep shutdown clean
+    }
 
     // 1) Terminate SCORM sessions FIRST (best-effort, silent)
     await this.terminateScormSessionsSafely();
@@ -131,6 +184,7 @@ class IpcHandler extends BaseService {
    * Register all IPC channel handlers
    */
   registerHandlers() {
+    const declarativeChannelSet = new Set((IPC_ROUTES || []).map(r => r.channel));
     try {
       // SCORM API handlers
       this.registerHandler('scorm-initialize', this.handleScormInitialize.bind(this));
@@ -183,8 +237,9 @@ class IpcHandler extends BaseService {
       this.registerHandler('resolve-scorm-url', this.handleResolveScormUrl.bind(this));
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
-      this.registerSyncHandler('log-message', this.handleLogMessage.bind(this));
-      this.registerSyncHandler('debug-event', this.handleDebugEvent.bind(this));
+      // Migrate previously-sync channels to async handlers to unify routing (preserves channel names)
+      this.registerHandler('log-message', this.handleLogMessage.bind(this));
+      this.registerHandler('debug-event', this.handleDebugEvent.bind(this));
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
 
       // Logger adapter loader for renderer fallback
@@ -216,6 +271,21 @@ class IpcHandler extends BaseService {
    * Register individual IPC handler
    */
   registerHandler(channel, handler) {
+    // Try declarative routing first
+    try {
+      const routes = IPC_ROUTES || [];
+      const route = routes.find(r => r.channel === channel);
+      if (route) {
+        const wrapped = require('./ipc/wrapper-factory').createWrappedHandler(route, this);
+        ipcMain.handle(channel, wrapped);
+        this.handlers.set(channel, wrapped);
+        this.logger?.debug(`IpcHandler: Registered declarative route for channel: ${channel}`);
+        return;
+      }
+    } catch (e) {
+      // Fall back to legacy routing on error
+    }
+    
     if (!this.securityConfig.allowedChannels.includes(channel)) {
       throw new Error(`Channel ${channel} not in allowed channels list`);
     }
@@ -234,82 +304,37 @@ class IpcHandler extends BaseService {
     if (!this.securityConfig.allowedChannels.includes(channel)) {
       throw new Error(`Channel ${channel} not in allowed channels list`);
     }
-    
-    const wrappedHandler = this.wrapSyncHandler(channel, handler);
-    ipcMain.on(channel, wrappedHandler);
-    this.handlers.set(channel, wrappedHandler);
-    
-    this.logger?.debug(`IpcHandler: Registered sync handler for channel: ${channel}`);
+
+    // Prefer registering sync channels via async handle wrapper to normalize behavior.
+    // This preserves channel names while avoiding blocking sync IPC listeners.
+    try {
+      const wrapped = this.wrapHandler(channel, handler);
+      ipcMain.handle(channel, wrapped);
+      this.handlers.set(channel, wrapped);
+      this.logger?.debug(`IpcHandler: Registered sync channel as async handler for channel: ${channel}`);
+      return;
+    } catch (e) {
+      // Fallback to legacy sync on error
+      const wrappedHandler = this.wrapSyncHandler(channel, handler);
+      ipcMain.on(channel, wrappedHandler);
+      this.handlers.set(channel, wrappedHandler);
+      this.logger?.debug(`IpcHandler: Registered sync handler (fallback) for channel: ${channel}`);
+    }
   }
 
   /**
    * Wrap handler with security and validation
    */
   wrapHandler(channel, handler) {
-    // Per-channel idempotency/debounce guards for "open-debug-window"
-    const OPEN_DEBUG_DEBOUNCE_MS = 500;
-    if (!this._openDebugGuards) {
-      this._openDebugGuards = { lastAttemptTs: 0, inFlight: false, timer: null, pending: false };
-    }
-
+    // Open-debug-window coalescing/debounce handled by the declarative routes + wrapper-factory.
+    // Legacy in-handler guards removed to centralize behavior.
     return async (event, ...args) => {
       const requestId = ++this.requestCounter;
       const startTime = Date.now();
-
+ 
       try {
         if (!this.validateRequest(event, channel, args)) {
           throw new Error('Request validation failed');
-        }
-
-        // Special-case: ensure open-debug-window always results in a focus/create
-        if (channel === 'open-debug-window') {
-          try {
-            const windowManager = this.getDependency('windowManager');
-            if (windowManager) {
-              const existing = windowManager.getWindow('debug');
-              if (existing) {
-                // Focus existing window immediately
-                try { existing.focus(); } catch (_) {}
-                this.recordOperation('open-debug-window:focused_existing', true);
-                return { success: true, alreadyOpen: true, focused: true, action: 'focused' };
-              }
-            }
-          } catch (_) {
-            // Non-fatal; continue
-          }
-
-          const nowTs = Date.now();
-          // Coalesce multiple invocations within debounce window, but guarantee trailing execution
-          if ((nowTs - this._openDebugGuards.lastAttemptTs) < OPEN_DEBUG_DEBOUNCE_MS || this._openDebugGuards.inFlight) {
-            this._openDebugGuards.pending = true;
-            // refresh debounce timer
-            if (this._openDebugGuards.timer) {
-              clearTimeout(this._openDebugGuards.timer);
-            }
-            this._openDebugGuards.timer = setTimeout(async () => {
-              try {
-                // trailing attempt: re-check and create/focus
-                const wm = this.getDependency('windowManager');
-                if (wm) {
-                  const ex = wm.getWindow('debug');
-                  if (ex) {
-                    try { ex.focus(); } catch (_) {}
-                    this.recordOperation('open-debug-window:trailing_focus', true);
-                  } else {
-                    this.recordOperation('open-debug-window:trailing_create', true);
-                    await wm.createDebugWindow();
-                  }
-                }
-              } catch (_) {
-                // swallow to avoid noise
-              } finally {
-                this._openDebugGuards.pending = false;
-                this._openDebugGuards.timer = null;
-              }
-            }, OPEN_DEBUG_DEBOUNCE_MS);
-            this.recordOperation('open-debug-window:coalesced_trailing', true);
-            return { success: true, coalesced: true, deferred: true };
-          }
         }
 
         // Do NOT apply generic rate limiting to core SN channels; let handlers/SN enforce correctness.
@@ -410,6 +435,8 @@ class IpcHandler extends BaseService {
         const result = await handler(event, ...args);
 
         const duration = Date.now() - startTime;
+        // IPC envelope log
+        this.logger?.info(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'success' }`);
         this.recordOperation(`${channel}:success`, true);
         this.logger?.debug(`IpcHandler: ${channel} request ${requestId} completed in ${duration}ms`);
 
@@ -417,7 +444,9 @@ class IpcHandler extends BaseService {
 
       } catch (error) {
         const duration = Date.now() - startTime;
-
+        // IPC envelope log for error case
+        this.logger?.error(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'error', error: ${error && error.message ? error.message : 'unknown'} }`);
+ 
         const isRateLimit = (error && typeof error.message === 'string' && error.message.includes('Rate limit exceeded'));
         const isScormChannel = (channel === 'scorm-set-value' || channel === 'scorm-commit' || channel === 'scorm-terminate');
 
@@ -527,53 +556,25 @@ class IpcHandler extends BaseService {
    * and we never rate-limit scorm-get-value during that grace window.
    */
   checkRateLimit(sender, channel = null) {
-    if (!this.config.enableRateLimiting) {
-      return true;
-    }
-
-    // SCORM-aware grace window: exempt scorm-get-value shortly after Initialize ACK
-    try {
-      if (channel === 'scorm-get-value') {
-        const scormService = this.getDependency('scormService');
-        if (scormService && typeof scormService.getAllSessions === 'function') {
-          const sessions = scormService.getAllSessions();
-          // Find any session that was initialized within the last 750ms
-          const nowTs = Date.now();
-          for (const s of sessions) {
-            const started = s && s.startTime ? new Date(s.startTime).getTime() : 0;
-            if (started && (nowTs - started) <= 750) {
-              // Allow early GetValue bursts during startup
-              return true;
-            }
-          }
-        }
-      }
-    } catch (_) {
-      // On any failure of exemption logic, fall back to generic limiter
-    }
-
-    const senderId = sender.id;
-    const now = Date.now();
-    const windowStart = now - this.config.rateLimitWindow;
-
-    let rateLimitEntry = this.rateLimitMap.get(senderId);
-    if (!rateLimitEntry) {
-      rateLimitEntry = { requests: [], blocked: false };
-      this.rateLimitMap.set(senderId, rateLimitEntry);
-    }
-
-    rateLimitEntry.requests = rateLimitEntry.requests.filter(time => time > windowStart);
-
-    if (rateLimitEntry.requests.length >= this.config.rateLimitMax) {
-      rateLimitEntry.blocked = true;
-      return false;
-    }
-
-    rateLimitEntry.requests.push(now);
-    rateLimitEntry.blocked = false;
-
+  if (!this.config.enableRateLimiting) {
     return true;
   }
+
+  // Route through rate limiter (Phase 2)
+  try {
+    const scormService = this.getDependency('scormService');
+    const allowed = this.rateLimiter ? this.rateLimiter.allow(sender, channel, { scormService }) : true;
+    if (!allowed) {
+      this.logger?.info(`IpcHandler: rate limit hit on channel ${channel} for sender ${sender?.id}`);
+      return false;
+    }
+  } catch (_) {
+    // If limiter fails, fall back to allowing (to avoid hard failures)
+  }
+
+  // Rate limiter handles SCORM grace window and SN exemptions internally
+  return true;
+}
 
   /**
    * Set up rate limit cleanup interval
@@ -593,68 +594,7 @@ class IpcHandler extends BaseService {
     }, this.config.rateLimitWindow);
   }
 
-  // --- Main-owned SN simple poller (single source of truth) ---
-  startSnMainPoller() {
-    if (this._sn.running) return;
-    this._sn.running = true;
-
-    const tick = async () => {
-      try {
-        const scormService = this.getDependency('scormService');
-        const snService = scormService && typeof scormService.getSNService === 'function'
-          ? scormService.getSNService()
-          : null;
-
-        if (!snService) {
-          // keep cache at not_initialized; do not log spam
-          this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
-          this._sn.lastUpdateTs = Date.now();
-          return;
-        }
-
-        // If SN exposes isInitialized, reflect that; otherwise rely on getStatus shape.
-        let initialized = true;
-        try {
-          if (typeof snService.isInitialized === 'function') {
-            initialized = !!snService.isInitialized();
-          }
-        } catch (_) { initialized = true; }
-
-        if (!initialized) {
-          this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
-          this._sn.lastUpdateTs = Date.now();
-          return;
-        }
-
-        const status = await Promise.resolve(
-          typeof snService.getStatus === 'function'
-            ? snService.getStatus()
-            : { initialized: true, sessionState: 'unknown', availableNavigation: [] }
-        );
-
-        this._sn.cache = { success: true, ...status };
-        this._sn.lastUpdateTs = Date.now();
-      } catch (e) {
-        // Never throw; maintain a safe cache
-        this._sn.cache = { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [], fallback: true };
-        this._sn.lastUpdateTs = Date.now();
-      }
-    };
-
-    // First tick immediately to populate cache quickly, then steady cadence
-    tick();
-    this._sn.pollTimer = setInterval(tick, this._sn.pollIntervalMs);
-    this.logger?.info('IpcHandler: SN main poller started (1s interval)');
-  }
-
-  stopSnMainPoller() {
-    if (this._sn.pollTimer) {
-      try { clearInterval(this._sn.pollTimer); } catch (_) {}
-      this._sn.pollTimer = null;
-    }
-    this._sn.running = false;
-    this.logger?.info('IpcHandler: SN main poller stopped');
-  }
+  // SNSnapshotService polling logic removed from IpcHandler; main-owned SNSnapshotService handles polling and caching.
 
   /**
    * Unregister all IPC handlers
@@ -967,48 +907,65 @@ class IpcHandler extends BaseService {
     }
   }
 
-  // Store API call in persistent history
+  // Store API call (delegates to telemetryStore). Legacy in-class buffering removed.
   storeApiCall(data) {
-    // Add timestamp if not present
-    if (data && typeof data === 'object' && !data.timestamp) {
-      data.timestamp = Date.now();
-    }
-    
-    this.apiCallHistory.push(data);
-    
-    // Limit history size to prevent memory issues
-    if (this.apiCallHistory.length > this.maxHistorySize) {
-      // Remove oldest calls when history is full
-      const removed = this.apiCallHistory.splice(0, this.apiCallHistory.length - this.maxHistorySize);
-      this.logger?.warn(`[DEBUG EVENT] History full, removed ${removed.length} oldest API calls`);
-    }
-    
-    this.logger?.debug(`[DEBUG EVENT] API call stored in history (${this.apiCallHistory.length} total)`);
-  }
-
-  // Send all stored API calls to debug window (called when debug window is created)
-  sendBufferedApiCalls(debugWindow) {
-    if (this.apiCallHistory.length > 0 && debugWindow && !debugWindow.isDestroyed()) {
-      this.logger?.info(`[DEBUG EVENT] Sending ${this.apiCallHistory.length} stored API calls to newly opened debug window`);
-      for (const storedCall of this.apiCallHistory) {
-        debugWindow.webContents.send('debug-event-received', 'api:call', storedCall);
+    try {
+      if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
+        this.telemetryStore.storeApiCall(data);
+        this.logger?.debug('[DEBUG EVENT] API call delegated to telemetryStore');
+        return;
       }
-      // Note: Do NOT clear the history after sending - keep it persistent
-    } else if (this.apiCallHistory.length === 0) {
-      this.logger?.debug(`[DEBUG EVENT] No stored API calls to send to debug window`);
+      // telemetryStore not available — do not buffer locally anymore to avoid unbounded memory growth.
+      this.logger?.warn && this.logger.warn('[DEBUG EVENT] telemetryStore not available; API call dropped');
+    } catch (e) {
+      this.logger?.warn && this.logger.warn('[DEBUG EVENT] Failed to store API call via telemetryStore', e?.message || e);
     }
   }
 
-  // Clear API call history (called on course load, reset, etc.)
-  clearApiCallHistory() {
-    const clearedCount = this.apiCallHistory.length;
-    this.apiCallHistory = [];
-    this.logger?.info(`[DEBUG EVENT] Cleared ${clearedCount} API calls from history`);
+  // Flush telemetry to debug window using the canonical telemetryStore.
+  sendBufferedApiCalls(debugWindow) {
+    try {
+      if (this.telemetryStore && typeof this.telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
+        try {
+          this.logger?.info('[DEBUG EVENT] Flushing telemetryStore to debug window');
+          this.telemetryStore.flushTo(debugWindow.webContents);
+          return;
+        } catch (e) {
+          this.logger?.warn('[DEBUG EVENT] telemetryStore.flushTo failed', e?.message || e);
+          return;
+        }
+      }
+      this.logger?.debug('[DEBUG EVENT] No telemetryStore available to flush to debug window');
+    } catch (e) {
+      this.logger?.warn('[DEBUG EVENT] Failed to flush telemetry to debug window', e?.message || e);
+    }
   }
 
-  // Get current API call history (for debugging)
+  // Clear API call history (delegates to telemetryStore). Local buffering removed.
+  clearApiCallHistory() {
+    try {
+      if (this.telemetryStore && typeof this.telemetryStore.clear === 'function') {
+        this.telemetryStore.clear();
+        this.logger?.info('[DEBUG EVENT] telemetryStore cleared API call history');
+        return;
+      }
+      this.logger?.debug('[DEBUG EVENT] No telemetryStore available to clear API call history');
+    } catch (e) {
+      this.logger?.warn('[DEBUG EVENT] telemetryStore.clear failed', e?.message || e);
+    }
+  }
+
+  // Get current API call history (for debugging) — delegate to telemetryStore if present.
   getApiCallHistory() {
-    return [...this.apiCallHistory]; // Return copy to prevent external modification
+    try {
+      if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
+        return this.telemetryStore.getHistory();
+      }
+    } catch (e) {
+      this.logger?.warn('[DEBUG EVENT] telemetryStore.getHistory failed', e?.message || e);
+    }
+    // Local buffering removed: return empty array when telemetryStore is not available.
+    return [];
   }
 
 
@@ -1032,10 +989,27 @@ class IpcHandler extends BaseService {
 
   // SN Service handlers
   async handleSNGetStatus(event) {
-    // Return the latest cached status immediately; no throttling, no coalescing needed
-    // because the main-owned poller is the single producer of status.
-    const payload = this._sn?.cache || { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
-    return payload;
+    // Prefer SNSnapshotService status if available
+    if (this.snSnapshotService && typeof this.snSnapshotService.getStatus === 'function') {
+      return this.snSnapshotService.getStatus();
+    }
+
+    // Fallback: attempt to call SN service directly on-demand (no internal poller/cache)
+    try {
+      const scormService = this.getDependency('scormService');
+      const snService = scormService && typeof scormService.getSNService === 'function'
+        ? scormService.getSNService()
+        : null;
+      if (snService && typeof snService.getStatus === 'function') {
+        const status = await Promise.resolve().then(() => snService.getStatus());
+        return { success: true, ...status };
+      }
+    } catch (_) {
+      // ignore and return safe default
+    }
+
+    // Safe default when no SN info available
+    return { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
   }
 
   async handleSNGetSequencingState(event) {

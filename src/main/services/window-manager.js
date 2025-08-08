@@ -36,6 +36,14 @@ class WindowManager extends BaseService {
     this.config = { ...SERVICE_DEFAULTS.WINDOW_MANAGER, ...options };
     this.menuBuilder = new MenuBuilder(this, logger);
     this.protocolRegistered = false;
+
+    // Singleflight guard for debug window creation to avoid duplicate windows under concurrency
+    try {
+      const createSingleflight = require('../../shared/utils/singleflight');
+      this._createDebugSingleflight = (typeof createSingleflight === 'function') ? createSingleflight() : null;
+    } catch (_) {
+      this._createDebugSingleflight = null;
+    }
   }
 
   /**
@@ -168,64 +176,85 @@ class WindowManager extends BaseService {
    * Create debug console window
    */
   async createDebugWindow() {
+    // Use singleflight to coalesce concurrent create requests and guarantee a single trailing execution
+    if (this._createDebugSingleflight) {
+      return this._createDebugSingleflight('createDebugWindow', async () => {
+        // Inner implementation preserved from legacy createDebugWindow
+        try {
+          const existingDebugWindow = this.windows.get(WINDOW_TYPES.DEBUG);
+          if (existingDebugWindow && !existingDebugWindow.isDestroyed()) {
+            try { existingDebugWindow.focus(); } catch (_) {}
+            return existingDebugWindow;
+          }
+     
+          this.logger?.info('WindowManager: Creating debug window');
+          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CREATING);
+          
+          const mainWindow = this.windows.get(WINDOW_TYPES.MAIN);
+          const debugWindow = new BrowserWindow({
+            ...this.config.debugWindow,
+            parent: mainWindow,
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              webSecurity: false, // Disable web security for custom protocol
+              allowRunningInsecureContent: true, // Allow content from custom protocol
+              preload: PathUtils.getPreloadPath(__dirname)
+            },
+            title: 'SCORM Debug Console',
+            show: false
+          });
+     
+          this.windows.set(WINDOW_TYPES.DEBUG, debugWindow);
+          this.setupDebugWindowEvents(debugWindow);
+          this.setupConsoleLogging(debugWindow);
+          
+          // Use custom protocol like main window
+          await debugWindow.loadURL('scorm-app://debug.html');
+          debugWindow.show();
+          
+          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.READY);
+          this.emit(SERVICE_EVENTS.WINDOW_CREATED, {
+            windowType: WINDOW_TYPES.DEBUG,
+            windowId: debugWindow.id
+          });
+          
+          // Send any buffered API calls to the newly created debug window
+          this.sendBufferedApiCallsToDebugWindow(debugWindow);
+          
+          this.logger?.info(`WindowManager: Debug window created successfully (ID: ${debugWindow.id})`);
+          this.recordOperation('createDebugWindow', true);
+          
+          return debugWindow;
+          
+        } catch (error) {
+          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
+          this.errorHandler?.setError(
+            MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
+            `Debug window creation failed: ${error.message}`,
+            'WindowManager.createDebugWindow'
+          );
+          
+          this.logger?.error('WindowManager: Debug window creation failed:', error);
+          this.recordOperation('createDebugWindow', false);
+          throw error;
+        }
+      });
+    }
+ 
+    // Fallback when singleflight unavailable: use legacy behavior
     try {
       const existingDebugWindow = this.windows.get(WINDOW_TYPES.DEBUG);
       if (existingDebugWindow && !existingDebugWindow.isDestroyed()) {
         existingDebugWindow.focus();
         return existingDebugWindow;
       }
-
-      this.logger?.info('WindowManager: Creating debug window');
-      this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CREATING);
-      
-      const mainWindow = this.windows.get(WINDOW_TYPES.MAIN);
-      const debugWindow = new BrowserWindow({
-        ...this.config.debugWindow,
-        parent: mainWindow,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          webSecurity: false, // Disable web security for custom protocol
-          allowRunningInsecureContent: true, // Allow content from custom protocol
-          preload: PathUtils.getPreloadPath(__dirname)
-        },
-        title: 'SCORM Debug Console',
-        show: false
-      });
-
-      this.windows.set(WINDOW_TYPES.DEBUG, debugWindow);
-      this.setupDebugWindowEvents(debugWindow);
-      this.setupConsoleLogging(debugWindow);
-      
-      // Use custom protocol like main window
-      await debugWindow.loadURL('scorm-app://debug.html');
-      debugWindow.show();
-      
-      this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.READY);
-      this.emit(SERVICE_EVENTS.WINDOW_CREATED, {
-        windowType: WINDOW_TYPES.DEBUG,
-        windowId: debugWindow.id
-      });
-      
-      // Send any buffered API calls to the newly created debug window
-      this.sendBufferedApiCallsToDebugWindow(debugWindow);
-      
-      this.logger?.info(`WindowManager: Debug window created successfully (ID: ${debugWindow.id})`);
-      this.recordOperation('createDebugWindow', true);
-      
-      return debugWindow;
-      
-    } catch (error) {
-      this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
-      this.errorHandler?.setError(
-        MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
-        `Debug window creation failed: ${error.message}`,
-        'WindowManager.createDebugWindow'
-      );
-      
-      this.logger?.error('WindowManager: Debug window creation failed:', error);
-      this.recordOperation('createDebugWindow', false);
-      throw error;
+      this.logger?.warn('WindowManager: createDebugWindow invoked without singleflight guard (fallback)');
+      // Reuse the same creation logic by recursively calling the singleflight-wrapped path when possible
+      return await this.createDebugWindow();
+    } catch (e) {
+      // If recursion above fails due to no singleflight, throw original error
+      throw e;
     }
   }
 
@@ -449,14 +478,20 @@ class WindowManager extends BaseService {
    */
   sendBufferedApiCallsToDebugWindow(debugWindow) {
     try {
-      // Get the IPC handler to access buffered API calls
-      const ipcHandler = this.getDependency('ipcHandler');
-      if (ipcHandler && ipcHandler.handlerMethods && ipcHandler.handlerMethods.sendBufferedApiCalls) {
-        this.logger?.info('WindowManager: Sending buffered API calls to debug window');
-        ipcHandler.handlerMethods.sendBufferedApiCalls(debugWindow);
-      } else {
-        this.logger?.debug('WindowManager: No IPC handler or buffered calls available');
+      // Prefer a telemetry store if available (DebugTelemetryStore.flushTo)
+      const telemetryStore = this.getDependency('telemetryStore') || null;
+      if (telemetryStore && typeof telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
+        this.logger?.info('WindowManager: Flushing telemetry store to debug window');
+        try {
+          telemetryStore.flushTo(debugWindow.webContents);
+          return;
+        } catch (e) {
+          // Do not fall back to IpcHandler buffered calls; telemetryStore is the single source of truth now.
+          this.logger?.warn('WindowManager: telemetryStore.flushTo failed', e?.message || e);
+        }
       }
+ 
+      this.logger?.debug('WindowManager: No telemetry store available to send to debug window');
     } catch (error) {
       this.logger?.error('WindowManager: Failed to send buffered API calls:', error);
     }

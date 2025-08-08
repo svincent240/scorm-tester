@@ -77,13 +77,13 @@ class ContentValidator {
    * @param {Object} manifest - Parsed manifest object
    */
   async validateManifestStructure(manifest) {
-    console.log('ContentValidator: Starting manifest structure validation');
-    console.log('ContentValidator: manifest type:', typeof manifest);
-    console.log('ContentValidator: manifest is null/undefined:', manifest == null);
+    this.logger?.debug && this.logger.debug('ContentValidator: Starting manifest structure validation');
+    this.logger?.debug && this.logger.debug('ContentValidator: manifest type:', typeof manifest);
+    this.logger?.debug && this.logger.debug('ContentValidator: manifest is null/undefined:', manifest == null);
     
     // Critical check: ensure manifest is not null/undefined
     if (!manifest) {
-      console.error('ContentValidator: Manifest is null or undefined!');
+      this.logger?.error && this.logger.error('ContentValidator: Manifest is null or undefined!');
       this.addError('Manifest object is null or undefined');
       this.hasRequiredElements = false;
       this.metadataCompliance = false;
@@ -91,14 +91,14 @@ class ContentValidator {
     }
 
     if (typeof manifest !== 'object') {
-      console.error('ContentValidator: Manifest is not an object, got:', typeof manifest);
+      this.logger?.error && this.logger.error('ContentValidator: Manifest is not an object, got:', typeof manifest);
       this.addError(`Manifest must be an object, got: ${typeof manifest}`);
       this.hasRequiredElements = false;
       this.metadataCompliance = false;
       return;
     }
 
-    console.log('ContentValidator: Manifest structure:', {
+    this.logger?.debug && this.logger.debug('ContentValidator: Manifest structure:', {
       hasIdentifier: 'identifier' in manifest,
       identifierValue: manifest.identifier,
       hasOrganizations: 'organizations' in manifest,
@@ -111,63 +111,63 @@ class ContentValidator {
     
     try {
       if (!manifest.identifier) {
-        console.log('ContentValidator: Missing identifier attribute');
+        this.logger?.debug && this.logger.debug('ContentValidator: Missing identifier attribute');
         this.addError('Manifest missing required identifier attribute');
         missingRequired = true;
       } else {
-        console.log('ContentValidator: Identifier found:', manifest.identifier);
+        this.logger?.debug && this.logger.debug('ContentValidator: Identifier found:', manifest.identifier);
       }
     } catch (error) {
-      console.error('ContentValidator: Error checking identifier:', error);
+      this.logger?.error && this.logger.error('ContentValidator: Error checking identifier:', error);
       this.addError('Error accessing manifest identifier');
       missingRequired = true;
     }
 
     try {
       if (!manifest.organizations) {
-        console.log('ContentValidator: Missing organizations element');
+        this.logger?.debug && this.logger.debug('ContentValidator: Missing organizations element');
         this.addError('Manifest missing required organizations element');
         missingRequired = true;
       } else {
-        console.log('ContentValidator: Organizations found');
+        this.logger?.debug && this.logger.debug('ContentValidator: Organizations found');
       }
     } catch (error) {
-      console.error('ContentValidator: Error checking organizations:', error);
+      this.logger?.error && this.logger.error('ContentValidator: Error checking organizations:', error);
       this.addError('Error accessing manifest organizations');
       missingRequired = true;
     }
 
     try {
       if (!manifest.resources) {
-        console.log('ContentValidator: Missing resources element');
+        this.logger?.debug && this.logger.debug('ContentValidator: Missing resources element');
         this.addError('Manifest missing required resources element');
         missingRequired = true;
       } else {
-        console.log('ContentValidator: Resources found, count:', manifest.resources?.length || 0);
+        this.logger?.debug && this.logger.debug('ContentValidator: Resources found, count:', manifest.resources?.length || 0);
       }
     } catch (error) {
-      console.error('ContentValidator: Error checking resources:', error);
+      this.logger?.error && this.logger.error('ContentValidator: Error checking resources:', error);
       this.addError('Error accessing manifest resources');
       missingRequired = true;
     }
 
     this.hasRequiredElements = !missingRequired;
-    console.log('ContentValidator: Required elements check completed, hasRequiredElements:', this.hasRequiredElements);
+    this.logger?.debug && this.logger.debug('ContentValidator: Required elements check completed, hasRequiredElements:', this.hasRequiredElements);
 
     // Metadata validation
     try {
       if (manifest.metadata) {
-        console.log('ContentValidator: Validating metadata structure');
+        this.logger?.debug && this.logger.debug('ContentValidator: Validating metadata structure');
         this.validateMetadataStructure(manifest.metadata);
         this.metadataCompliance = true; // Assuming valid if present and structure is validated
-        console.log('ContentValidator: Metadata validation completed');
+        this.logger?.debug && this.logger.debug('ContentValidator: Metadata validation completed');
       } else {
-        console.log('ContentValidator: No metadata found');
+        this.logger?.debug && this.logger.debug('ContentValidator: No metadata found');
         this.addWarning('Package missing recommended metadata section');
         this.metadataCompliance = false;
       }
     } catch (error) {
-      console.error('ContentValidator: Error validating metadata:', error);
+      this.logger?.error && this.logger.error('ContentValidator: Error validating metadata:', error);
       this.addError('Error validating manifest metadata');
       this.metadataCompliance = false;
     }
@@ -175,17 +175,17 @@ class ContentValidator {
     // Version validation
     try {
       if (manifest.version && !this.isValidVersion(manifest.version)) {
-        console.log('ContentValidator: Invalid version format:', manifest.version);
+        this.logger?.debug && this.logger.debug('ContentValidator: Invalid version format:', manifest.version);
         this.addWarning(`Invalid manifest version: ${manifest.version}`);
       } else if (manifest.version) {
-        console.log('ContentValidator: Valid version found:', manifest.version);
+        this.logger?.debug && this.logger.debug('ContentValidator: Valid version found:', manifest.version);
       }
     } catch (error) {
-      console.error('ContentValidator: Error checking version:', error);
+      this.logger?.error && this.logger.error('ContentValidator: Error checking version:', error);
       this.addWarning('Error validating manifest version');
     }
 
-    console.log('ContentValidator: Manifest structure validation completed');
+    this.logger?.debug && this.logger.debug('ContentValidator: Manifest structure validation completed');
   }
 
   /**

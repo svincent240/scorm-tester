@@ -49,7 +49,21 @@ class RecentCoursesService extends BaseService {
    * @returns {Array<Object>} An array of recent course objects.
    */
   async getRecents() {
-    return [...this._items];
+    // Annotate each item with an exists boolean (non-destructive check)
+    try {
+      const annotated = await Promise.all(this._items.map(async (item) => {
+        try {
+          await fs.stat(item.path);
+          return { ...item, exists: true };
+        } catch (_) {
+          return { ...item, exists: false };
+        }
+      }));
+      return annotated;
+    } catch (e) {
+      this.logger?.warn('RecentCoursesService: Failed to annotate exists flags on recents', e?.message || e);
+      return [...this._items];
+    }
   }
 
   /**
@@ -178,8 +192,11 @@ class RecentCoursesService extends BaseService {
     try {
       const dir = path.dirname(this.recentsFilePath);
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(this.recentsFilePath, JSON.stringify(this._items, null, 2), 'utf8');
-      this.logger?.debug('RecentCoursesService: Saved recent courses to file.');
+      // Write atomically: write to temp file then rename
+      const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}`;
+      await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');
+      await fs.rename(tempPath, this.recentsFilePath);
+      this.logger?.debug('RecentCoursesService: Saved recent courses to file (atomic write).');
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,

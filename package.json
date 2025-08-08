@@ -62,6 +62,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.0.5",
     "jest-environment-node": "^29.7.0",
+    "sinon": "^21.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
@@ -103,10 +104,11 @@
       "<rootDir>/tests/setup.js"
     ],
     "transform": {
-      "^.+\\.[jt]sx?$": "babel-jest"
+      "^.+\\.[jt]sx?$": "babel-jest",
+      "node_modules/sinon/.*\\.js$": "babel-jest"
     },
     "transformIgnorePatterns": [
-      "/node_modules/"
+      "/node_modules/(?!sinon)/"
     ],
     "moduleFileExtensions": [
       "js",

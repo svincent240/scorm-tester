@@ -25,6 +25,27 @@ class CourseLoader {
       .then(({ rendererLogger }) => { this.logger = rendererLogger; })
       .catch(() => { this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} }; });
   }
+/**
+   * Convert an ArrayBuffer to a Base64 string in a browser-safe way.
+   * Kept small and defensive to avoid referencing Node Buffer in the renderer.
+   */
+  arrayBufferToBase64(buf) {
+    try {
+      let binary = '';
+      const bytes = new Uint8Array(buf);
+      // Chunk to avoid call stack / argument length limits on large files
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        // Array.from ensures apply receives a proper array in environments where typed arrays can't be used directly
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      // btoa is available in browser renderer contexts
+      return btoa(binary);
+    } catch (_) {
+      return '';
+    }
+  }
 
   /**
    * Handle course load request - opens file dialog and processes selection
@@ -50,9 +71,9 @@ class CourseLoader {
       await this.loadCourseFromPath(result.filePath);
       
     } catch (error) {
-      console.error('CourseLoader: Error in handleCourseLoad:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in handleCourseLoad:', error);
       eventBus.emit('course:loadError', { error: error.message });
-      throw error;
+      return;
     }
   }
 
@@ -72,9 +93,9 @@ class CourseLoader {
 
       await this.loadCourseFromFolder(result.folderPath);
     } catch (error) {
-      console.error('CourseLoader: Error in handleFolderLoad:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in handleFolderLoad:', error);
       eventBus.emit('course:loadError', { error: error.message });
-      throw error;
+      return;
     }
   }
 
@@ -91,9 +112,9 @@ class CourseLoader {
       await this.processCourseFile(filePath);
       
     } catch (error) {
-      console.error('CourseLoader: Error in loadCourseFromPath:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in loadCourseFromPath:', error);
       eventBus.emit('course:loadError', { error: error.message });
-      throw error;
+      return;
     } finally {
       this.setLoadingState(false);
     }
@@ -195,9 +216,9 @@ class CourseLoader {
         recentCoursesStore.addOrUpdate({ type: 'folder', path: folderPath, displayName: title, meta: { title } });
       } catch (_) { /* no-op */ }
     } catch (error) {
-      console.error('CourseLoader: Error in loadCourseFromFolder:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in loadCourseFromFolder:', error);
       eventBus.emit('course:loadError', { error: error.message });
-      throw error;
+      return;
     } finally {
       this.setLoadingState(false);
     }
@@ -452,8 +473,9 @@ class CourseLoader {
       // console.log('CourseLoader: Course processing completed successfully!'); // Removed debug log
 
     } catch (error) {
-      console.error('CourseLoader: Error in processCourseFile:', error);
-      throw error;
+      this.logger?.error && this.logger.error('CourseLoader: Error in processCourseFile:', error);
+      eventBus.emit('course:loadError', { error: error.message });
+      return;
     }
   }
 
@@ -478,9 +500,9 @@ class CourseLoader {
       await this.processCourseFile(tempPath);
       
     } catch (error) {
-      console.error('CourseLoader: Error in loadCourse:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in loadCourse:', error);
       eventBus.emit('course:loadError', { error: error.message });
-      throw error;
+      return;
     } finally {
       this.setLoadingState(false);
     }
@@ -499,8 +521,8 @@ class CourseLoader {
 
       // Read file as ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
-      // Convert ArrayBuffer to Base64 string
-      const base64Data = Buffer.from(arrayBuffer).toString('base64');
+      // Convert ArrayBuffer to Base64 string (browser-safe helper)
+      const base64Data = this.arrayBufferToBase64(arrayBuffer);
 
       const result = await window.electronAPI.saveTemporaryFile(file.name, base64Data);
 
@@ -510,7 +532,7 @@ class CourseLoader {
 
       return result.path;
     } catch (error) {
-      console.error('CourseLoader: Error creating temporary file from blob:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error creating temporary file from blob:', error);
       throw error;
     }
   }

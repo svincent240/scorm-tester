@@ -14,10 +14,17 @@ module.exports = {
   },
   rules: {
     'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-    'no-console': 'off',
     'prefer-const': 'error',
     'no-var': 'error'
   },
+  overrides: [
+    {
+      files: ['src/renderer/**/*.js'],
+      rules: {
+        'no-console': 'error'
+      }
+    }
+  ],
   globals: {
     electronAPI: 'readonly',
     window: 'readonly',

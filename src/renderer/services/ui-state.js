@@ -407,7 +407,11 @@ class UIStateManager {
    */
   setupEventBusListeners() {
     if (!this.eventBus) {
-      console.warn('UIStateManager: EventBus not available for setting up listeners.');
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.warn('UIStateManager: EventBus not available for setting up listeners.');
+        }).catch(() => {});
+      } catch (_) { /* no-op */ }
       return;
     }
     // Listen for state changes to emit a general event
@@ -575,7 +579,11 @@ class UIStateSingleton {
       
       return this.instance;
     } catch (error) {
-      console.error('UIStateManager: Failed to initialize:', error);
+      try {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error('UIStateManager: Failed to initialize:', error);
+        }).catch(() => {});
+      } catch (_) { /* no-op */ }
       // Return a basic instance without EventBus
       this.instance = new UIStateManager();
       return this.instance;

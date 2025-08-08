@@ -217,10 +217,10 @@ class PackageAnalyzer {
    */
   checkComplianceSync(packagePath, manifest) {
     try {
-      console.log('PackageAnalyzer: Starting synchronous compliance check');
-      console.log('PackageAnalyzer: packagePath:', packagePath);
-      console.log('PackageAnalyzer: manifest type:', typeof manifest);
-      console.log('PackageAnalyzer: manifest is null/undefined:', manifest == null);
+      this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: Starting synchronous compliance check');
+      this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: packagePath:', packagePath);
+      this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: manifest type:', typeof manifest);
+      this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: manifest is null/undefined:', manifest == null);
 
       if (!manifest) {
         console.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');
@@ -256,7 +256,7 @@ class PackageAnalyzer {
         warnings: []
       };
 
-      console.log('PackageAnalyzer: Synchronous compliance check completed:', result);
+      this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: Synchronous compliance check completed:', result);
       return result;
     } catch (error) {
       console.error('PackageAnalyzer: Synchronous compliance check failed:', error);

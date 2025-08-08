@@ -446,19 +446,6 @@ class ContentViewer extends BaseComponent {
         }).catch(() => {});
       } catch (_) {}
 
-      // Diagnostics: snapshot capabilities immediately after injection
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          const has12 = !!(win && win.API && (typeof win.API.Initialize === 'function' || typeof win.API.LMSInitialize === 'function'));
-          const has2004 = !!(win && win.API_1484_11 && typeof win.API_1484_11.Initialize === 'function');
-          rendererLogger.info('[ContentViewer] SCORM API injected', {
-            url: this.currentUrl,
-            has12,
-            has2004,
-            hasFinders: false
-          });
-        }).catch(() => {});
-      } catch (_) {}
  
       // Strict mode: no normalization helpers and no invocation of SCO discovery.
       let ensuredSelf = true; // we exposed canonical APIs already
@@ -1173,6 +1160,9 @@ class ContentViewer extends BaseComponent {
         }
       };
       window.addEventListener('message', listener);
+
+      // Enable the SCORM API bridge before sending the probe
+      scormAPIBridge.enable();
 
       // Post a harmless probe request expected by bridge (Initialize with empty)
       try {

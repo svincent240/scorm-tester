@@ -10,7 +10,7 @@
  * @fileoverview File management service for SCORM Tester main process
  */
 
-const { dialog, shell } = require('electron');
+const { dialog, shell, app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const StreamZip = require('node-stream-zip');
@@ -218,20 +218,26 @@ class FileManager extends BaseService {
         throw new Error(`Package size ${this.formatBytes(stats.size)} exceeds limit ${this.formatBytes(this.config.maxPackageSize)}`);
       }
       
-      // Create extraction directory
-      const tempDir = path.join(__dirname, '../../../temp');
-      extractPath = path.join(tempDir, `scorm_${Date.now()}`);
+      // Create extraction directory using a canonical temp root
+      const tempRoot = path.join(app.getPath('temp'), 'scorm-tester');
+      extractPath = path.join(tempRoot, `scorm_${Date.now()}`);
       
       await this.ensureDirectory(extractPath);
       this.tempFiles.add(extractPath);
       
-      // Extract with validation
-      await this.extractZipWithValidation(zipPath, extractPath);
+      // Extract with validation (return counts and size for transparency)
+      const extractStats = await this.extractZipWithValidation(zipPath, extractPath);
       
-      this.logger?.info(`FileManager: SCORM extraction completed (${operationId}): ${path.basename(extractPath)}`);
+      this.logger?.info(`FileManager: SCORM extraction completed (${operationId}): ${path.basename(extractPath)} -- extracted=${extractStats.extractedCount} skipped=${extractStats.skippedCount} size=${this.formatBytes(extractStats.totalSize)}`);
       this.recordOperation('extractScorm', true);
       
-      return { success: true, path: extractPath };
+      return {
+        success: true,
+        path: extractPath,
+        extractedCount: extractStats.extractedCount,
+        skippedCount: extractStats.skippedCount,
+        totalSize: extractStats.totalSize
+      };
       
     } catch (error) {
       // Cleanup failed extraction
@@ -260,6 +266,26 @@ class FileManager extends BaseService {
   }
 
   /**
+   * Resolve and return the canonical manifest path for a given folder.
+   * Returns { success: true, manifestPath } when found, or { success: false, error }.
+   */
+  getManifestPath(folderPath) {
+    try {
+      if (!folderPath || typeof folderPath !== 'string') {
+        return { success: false, error: 'Invalid folder path' };
+      }
+      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
+      if (fs.existsSync(manifestPath)) {
+        return { success: true, manifestPath };
+      }
+      // No manifest in expected location — return not found
+      return { success: false, error: 'No imsmanifest.xml found' };
+    } catch (error) {
+      return { success: false, error: error.message || String(error) };
+    }
+  }
+
+  /**
    * Find SCORM entry point (file system check only)
    * @param {string} folderPath - Extracted folder path
    * @returns {Promise<Object>} Result object with success and manifestPath
@@ -268,20 +294,15 @@ class FileManager extends BaseService {
     try {
       this.logger?.info(`FileManager: Checking for imsmanifest.xml in ${path.basename(folderPath)}`);
       
-      if (!this.validateFolderPath(folderPath)) {
-        throw new Error('Invalid folder path');
-      }
-      
-      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
-      
-      if (!fs.existsSync(manifestPath)) {
+      const manifestResult = this.getManifestPath(folderPath);
+      if (!manifestResult.success) {
         this.recordOperation('findScormEntry', false);
-        return { success: false, error: 'No imsmanifest.xml found' };
+        return { success: false, error: manifestResult.error || 'No imsmanifest.xml found' };
       }
       
-      this.logger?.info(`FileManager: Found imsmanifest.xml at ${manifestPath}`);
+      this.logger?.info(`FileManager: Found imsmanifest.xml at ${manifestResult.manifestPath}`);
       this.recordOperation('findScormEntry', true);
-      return { success: true, manifestPath: manifestPath };
+      return { success: true, manifestPath: manifestResult.manifestPath };
       
     } catch (error) {
       this.errorHandler?.setError(
@@ -295,7 +316,7 @@ class FileManager extends BaseService {
       return { success: false, error: error.message };
     }
   }
-
+ 
   /**
    * Get course information (file system check only)
    * @param {string} folderPath - Course folder path
@@ -305,20 +326,15 @@ class FileManager extends BaseService {
     try {
       this.logger?.info(`FileManager: Checking for imsmanifest.xml for course info in ${path.basename(folderPath)}`);
       
-      if (!this.validateFolderPath(folderPath)) {
-        throw new Error('Invalid folder path');
-      }
-      
-      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
-      
-      if (!fs.existsSync(manifestPath)) {
+      const manifestResult = this.getManifestPath(folderPath);
+      if (!manifestResult.success) {
         this.recordOperation('getCourseInfo', false);
-        return { success: false, error: 'No imsmanifest.xml found' };
+        return { success: false, error: manifestResult.error || 'No imsmanifest.xml found' };
       }
       
-      this.logger?.info(`FileManager: Found imsmanifest.xml for course info at ${manifestPath}`);
+      this.logger?.info(`FileManager: Found imsmanifest.xml for course info at ${manifestResult.manifestPath}`);
       this.recordOperation('getCourseInfo', true);
-      return { success: true, manifestPath: manifestPath };
+      return { success: true, manifestPath: manifestResult.manifestPath };
       
     } catch (error) {
       this.errorHandler?.setError(
@@ -333,7 +349,7 @@ class FileManager extends BaseService {
       return { success: false, error: error.message };
     }
   }
-
+ 
   /**
    * Get course manifest content (file system check only)
    * @param {string} folderPath - Course folder path
@@ -343,18 +359,13 @@ class FileManager extends BaseService {
     try {
       this.logger?.info(`FileManager: Reading imsmanifest.xml content from ${path.basename(folderPath)}`);
       
-      if (!this.validateFolderPath(folderPath)) {
-        throw new Error('Invalid folder path');
-      }
-      
-      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
-      
-      if (!fs.existsSync(manifestPath)) {
+      const manifestResult = this.getManifestPath(folderPath);
+      if (!manifestResult.success) {
         this.recordOperation('getCourseManifest', false);
-        return { success: false, error: 'Manifest not found' };
+        return { success: false, error: manifestResult.error || 'Manifest not found' };
       }
       
-      const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+      const manifestContent = await fs.promises.readFile(manifestResult.manifestPath, 'utf8');
       
       this.logger?.info('FileManager: Course manifest content retrieved');
       this.recordOperation('getCourseManifest', true);
@@ -396,14 +407,14 @@ class FileManager extends BaseService {
         throw new Error('Invalid filename after sanitization');
       }
       
-      // Create temp directory if needed
-      const tempDir = path.join(__dirname, '../../../temp');
-      await this.ensureDirectory(tempDir);
+      // Use canonical temp root
+      const tempRoot = path.join(app.getPath('temp'), 'scorm-tester');
+      await this.ensureDirectory(tempRoot);
       
       // Generate unique filename
       const timestamp = Date.now();
       const tempFileName = `${timestamp}_${sanitizedName}`;
-      const tempFilePath = path.join(tempDir, tempFileName);
+      const tempFilePath = path.join(tempRoot, tempFileName);
       
       // Convert base64 to buffer
       const buffer = Buffer.from(base64Data, 'base64');
@@ -413,8 +424,8 @@ class FileManager extends BaseService {
         throw new Error(`File size ${this.formatBytes(buffer.length)} exceeds limit ${this.formatBytes(this.config.maxPackageSize)}`);
       }
       
-      // Write file
-      fs.writeFileSync(tempFilePath, buffer);
+      // Asynchronous write to avoid blocking main thread
+      await fs.promises.writeFile(tempFilePath, buffer);
       
       // Track temporary file
       this.tempFiles.add(tempFilePath);
@@ -450,8 +461,10 @@ class FileManager extends BaseService {
     try {
       // Get entries and validate
       const entries = await zip.entries();
-      const entryCount = Object.keys(entries).length;
-      
+      const entryNames = Object.keys(entries);
+      const entryCount = entryNames.length;
+      this.logger?.debug(`FileManager: extractZipWithValidation - Entry count: ${entryCount}`);
+
       if (entryCount === 0) {
         throw new Error('ZIP file is empty');
       }
@@ -460,26 +473,91 @@ class FileManager extends BaseService {
         throw new Error('ZIP file contains too many files');
       }
       
-      // Validate entries and calculate size
+      // Validate entries and calculate size, then extract safe entries only.
       let totalSize = 0;
-      for (const [entryName, entry] of Object.entries(entries)) {
-        // Security validation
-        if (entryName.includes('..') || entryName.includes('~')) {
-          this.logger?.warn(`FileManager: Skipping suspicious entry: ${entryName}`);
-          continue;
-        }
-        
-        totalSize += entry.size || 0;
-        if (totalSize > this.config.maxExtractedSize) {
-          throw new Error('Extracted content would exceed size limit');
+      let extractedCount = 0;
+      let skippedCount = 0;
+      const resolvedExtractRoot = path.resolve(extractPath);
+      this.logger?.debug(`FileManager: extractZipWithValidation - Resolved extract root: ${resolvedExtractRoot}`);
+      
+      for (const entryName of entryNames) {
+        const entry = entries[entryName];
+        this.logger?.debug(`FileManager: Processing entry: ${entryName}, isDirectory: ${entry.isDirectory}, size: ${entry.size}`);
+        try {
+          // Normalize entry name to use forward slashes for consistent checks
+          const normalizedEntry = entryName.replace(/\\/g, '/');
+  
+          // Skip directory entries
+          if (entry.isDirectory || normalizedEntry.endsWith('/')) {
+            this.logger?.debug(`FileManager: Skipping directory entry: ${entryName}`);
+            skippedCount++;
+            continue;
+          }
+  
+          // Basic suspicious name checks
+          if (normalizedEntry.includes('..') || normalizedEntry.includes('\0') || normalizedEntry.includes('~')) {
+            this.logger?.warn(`FileManager: Skipping suspicious entry name: ${entryName}`);
+            skippedCount++;
+            continue;
+          }
+
+          // Check for absolute paths within the zip entry name itself
+          if (path.isAbsolute(normalizedEntry)) {
+            this.logger?.warn(`FileManager: Skipping ZIP entry with absolute path: ${entryName}`);
+            skippedCount++;
+            continue;
+          }
+  
+          // Compute the target path for this entry and ensure it does not escape extractPath
+          const targetPath = path.join(extractPath, normalizedEntry);
+          const resolvedTarget = path.resolve(targetPath);
+          this.logger?.debug(`FileManager: Path validation - entryName: ${entryName}, targetPath: ${targetPath}, resolvedTarget: ${resolvedTarget}, resolvedExtractRoot: ${resolvedExtractRoot}, path.sep: ${path.sep}`);
+          const isWithinExtractRoot = resolvedTarget === resolvedExtractRoot || resolvedTarget.startsWith(resolvedExtractRoot + path.sep);
+          this.logger?.debug(`FileManager: Path validation - isWithinExtractRoot: ${isWithinExtractRoot}`);
+          // Ensure resolved target is within extract root
+          if (!isWithinExtractRoot) {
+            this.logger?.warn(`FileManager: Skipping ZIP entry that would extract outside target: ${entryName} -> ${resolvedTarget}`);
+            skippedCount++;
+            continue;
+          }
+  
+          // Size accounting and global extracted size guard
+          // Check size before extraction to prevent exceeding limit
+          if ((totalSize + (entry.size || 0)) > this.config.maxExtractedSize) {
+            this.logger?.error(`FileManager: Extracted content would exceed size limit: ${totalSize + (entry.size || 0)} > ${this.config.maxExtractedSize}`);
+            throw new Error('Extracted content would exceed size limit');
+          }
+
+          // Ensure destination directory exists for this entry
+          const destDir = path.dirname(resolvedTarget);
+          this.logger?.debug(`FileManager: Ensuring directory exists: ${destDir}`);
+          await fs.promises.mkdir(destDir, { recursive: true });
+
+          // Extract this single entry to the configured extractPath (StreamZip preserves internal path)
+          try {
+            this.logger?.debug(`FileManager: Extracting entry: ${entryName} to ${extractPath}`);
+            await zip.extract(entryName, extractPath);
+            totalSize += entry.size || 0; // Only add size if extraction is successful
+            extractedCount++;
+            this.logger?.debug(`FileManager: Successfully extracted entry: ${entryName}, extractedCount: ${extractedCount}, totalSize: ${totalSize}`);
+          } catch (e) {
+            this.logger?.warn(`FileManager: Failed to extract entry ${entryName}: ${e?.message || e}`);
+            skippedCount++;
+          }
+        } catch (e) {
+          // Re-throw if it's a size limit error, otherwise skip and continue
+          if (e.message === 'Extracted content would exceed size limit') {
+            throw e; // Re-throw the size limit error
+          }
+          this.logger?.warn(`FileManager: Skipping entry due to validation/extract error ${entryName}: ${e?.message || e}`);
+          skippedCount++;
         }
       }
+  
+      this.logger?.info(`FileManager: Extracted ${extractedCount} files, skipped ${skippedCount} suspicious/failed entries (${this.formatBytes(totalSize)})`);
       
-      // Extract files
-      await zip.extract(null, extractPath);
-      
-      this.logger?.info(`FileManager: Extracted ${entryCount} files (${this.formatBytes(totalSize)})`);
-      
+      // Return extraction statistics for callers and tests
+      return { extractedCount, skippedCount, totalSize };
     } finally {
       await zip.close();
     }
@@ -580,7 +658,7 @@ class FileManager extends BaseService {
    * @private
    */
   async ensureTempDirectory() {
-    const tempDir = path.join(__dirname, '../../../temp');
+    const tempDir = path.join(app.getPath('temp'), 'scorm-tester');
     await this.ensureDirectory(tempDir);
   }
 

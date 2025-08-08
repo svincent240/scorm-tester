@@ -39,7 +39,7 @@ class MainProcess {
    */
   async initialize() {
     try {
-      console.log('SCORM Tester: Starting main process initialization');
+      (this.logger || console).info('SCORM Tester: Starting main process initialization');
       
       await this.initializeCoreDependencies();
       await this.initializeServices();
@@ -50,7 +50,7 @@ class MainProcess {
       this.logger?.info('SCORM Tester: Main process initialization completed successfully');
       
     } catch (error) {
-      console.error('SCORM Tester: Main process initialization failed:', error);
+      (this.logger || console).error('SCORM Tester: Main process initialization failed:', error);
       
       if (this.errorHandler) {
         this.errorHandler.setError(
@@ -73,12 +73,12 @@ class MainProcess {
       const logDir = app.getPath('userData');
       // Use singleton logger getter with explicit first-init directory
       this.logger = getLogger(logDir);
-      console.log(`SCORM Tester: Log file path: ${this.logger.logFile}`);
+      (this.logger || console).info(`SCORM Tester: Log file path: ${this.logger && this.logger.logFile ? this.logger.logFile : 'unknown'}`);
       
       this.errorHandler = new ScormErrorHandler(this.logger);
       this.logger?.info('SCORM Tester: Core dependencies initialized');
     } catch (error) {
-      console.error('SCORM Tester: Failed to initialize core dependencies:', error);
+      (this.logger || console).error('SCORM Tester: Failed to initialize core dependencies:', error);
       // Continue without logger if it fails
       this.logger = {
         info: console.log,
@@ -108,37 +108,70 @@ class MainProcess {
       throw new Error('FileManager initialization failed');
     }
     this.services.set('fileManager', fileManager);
-    
+ 
+    // Core shared services: telemetry store and SN snapshot service
+    const DebugTelemetryStore = require('./services/debug/debug-telemetry-store');
+    const SNSnapshotService = require('./services/scorm/sn/snapshot-service');
+ 
+    // Pass the main logger into shared services so logs are consistent
+    const telemetryStore = new DebugTelemetryStore({ logger: this.logger });
+    // Create SNSnapshotService without scormService initially to avoid ordering issues; we'll wire scormService after it's created
+    const snSnapshotService = new SNSnapshotService(null, { logger: this.logger });
+ 
+    // Initialize ScormService after core shared services are available so it can publish telemetry
     const scormService = new ScormService(this.errorHandler, this.logger);
-    if (!await scormService.initialize(new Map([['windowManager', windowManager]]))) {
+    // Pass windowManager and telemetryStore/snSnapshotService via dependency map for initialization
+    const scormDeps = new Map([
+      ['windowManager', windowManager],
+      ['telemetryStore', telemetryStore],
+      ['snSnapshotService', snSnapshotService]
+    ]);
+    if (!await scormService.initialize(scormDeps)) {
       throw new Error('ScormService initialization failed');
     }
     this.services.set('scormService', scormService);
 
+    // Wire scormService into SNSnapshotService now that scormService is available.
+    try {
+      snSnapshotService.scormService = scormService;
+      // Optionally start polling if the SN service is present
+      if (typeof snSnapshotService.startPolling === 'function') {
+        snSnapshotService.startPolling();
+      }
+      this.logger?.info && this.logger.info('SCORM Tester: SNSnapshotService wired to ScormService and started');
+    } catch (e) {
+      this.logger?.warn && this.logger?.warn('SCORM Tester: Failed to wire SNSnapshotService to ScormService', e?.message || e);
+    }
+ 
     const recentCoursesService = new RecentCoursesService(this.errorHandler, this.logger);
     if (!await recentCoursesService.initialize(new Map())) {
       throw new Error('RecentCoursesService initialization failed');
     }
     this.services.set('recentCoursesService', recentCoursesService);
-    
-    const ipcHandler = new IpcHandler(this.errorHandler, this.logger);
+ 
+    // IPC handler (depends on many services including telemetry and SN snapshot)
+    const ipcHandler = new IpcHandler(this.errorHandler, this.logger, { IPC_REFACTOR_ENABLED: !!process.env.IPC_REFACTOR_ENABLED });
     const ipcDependencies = new Map([
       ['fileManager', fileManager],
       ['scormService', scormService],
       ['windowManager', windowManager],
-      ['recentCoursesService', recentCoursesService]
+      ['recentCoursesService', recentCoursesService],
+      ['telemetryStore', telemetryStore],
+      ['snSnapshotService', snSnapshotService]
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');
     }
     this.services.set('ipcHandler', ipcHandler);
-    
-    // Now update WindowManager with IpcHandler dependency for API call buffering
-    const windowManagerDependencies = new Map([['ipcHandler', ipcHandler]]);
-    if (!await windowManager.initialize(windowManagerDependencies)) {
-      throw new Error('WindowManager re-initialization with IpcHandler failed');
+ 
+    // Provide ipcHandler to SNSnapshotService now that it's available (some implementations expect it)
+    if (typeof snSnapshotService.setIpcHandler === 'function') {
+      snSnapshotService.setIpcHandler(ipcHandler);
+    } else {
+      snSnapshotService.ipcHandler = ipcHandler;
     }
-    
+ 
+    // Do NOT re-initialize WindowManager with IpcHandler; WindowManager was initialized once above.
     this.logger?.info(`SCORM Tester: ${this.services.size} services initialized successfully`);
   }
 
@@ -266,7 +299,11 @@ app.whenReady().then(async () => {
     mainProcess = new MainProcess();
     await mainProcess.initialize();
   } catch (error) {
-    console.error('SCORM Tester: Failed to start application:', error);
+    if (mainProcess && mainProcess.logger && typeof mainProcess.logger.error === 'function') {
+      mainProcess.logger.error('SCORM Tester: Failed to start application:', error);
+    } else {
+      console.error('SCORM Tester: Failed to start application:', error);
+    }
     app.quit();
   }
 });

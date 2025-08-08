@@ -17,18 +17,49 @@ import { eventBus } from './event-bus.js';
 class ScormAPIBridge {
   constructor() {
     this.sessionId = null;
-    this.setupMessageHandler();
+    // Lazy activation flag — message handler is installed only when enable() is called.
+    this.isEnabled = false;
+    this._boundMessageHandler = null;
   }
 
   /**
    * Set up message handler for SCORM API calls from iframe
+   *
+   * NOTE: Deprecated — prefer enable()/disable() for explicit control.
    */
   setupMessageHandler() {
-    window.addEventListener('message', (event) => {
+    // Backwards-compatible shim that simply enables the bridge.
+    if (!this.isEnabled) this.enable();
+  }
+
+  /**
+   * Enable the bridge: install the window message handler.
+   * Safe to call multiple times (idempotent).
+   */
+  enable() {
+    if (this.isEnabled) return;
+    this._boundMessageHandler = (event) => {
       if (event.data && event.data.type === 'SCORM_API_CALL') {
         this.handleScormAPICall(event.data, event.source);
       }
-    });
+    };
+    window.addEventListener('message', this._boundMessageHandler);
+    this.isEnabled = true;
+  }
+
+  /**
+   * Disable the bridge: remove the window message handler.
+   */
+  disable() {
+    if (!this.isEnabled) return;
+    try {
+      if (this._boundMessageHandler) {
+        window.removeEventListener('message', this._boundMessageHandler);
+      }
+    } finally {
+      this._boundMessageHandler = null;
+      this.isEnabled = false;
+    }
   }
 
   /**
@@ -146,5 +177,13 @@ class ScormAPIBridge {
 
 // Create and export singleton instance
 const scormAPIBridge = new ScormAPIBridge();
-
+ 
+// Export initialize helper for tests and instrumentation — consumers can opt-in to enable()
+export function initializeScormAPIBridge() {
+  if (scormAPIBridge && typeof scormAPIBridge.enable === 'function') {
+    scormAPIBridge.enable();
+  }
+  return scormAPIBridge;
+}
+ 
 export { ScormAPIBridge, scormAPIBridge };

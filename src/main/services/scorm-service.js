@@ -40,6 +40,8 @@ class ScormService extends BaseService {
     this.rteService = null;
     this.camService = null; // Will be initialized in initializeScormServices
     this.snService = null;
+    // Per-session RTE handler instances (system-of-record for data model)
+    this.rteInstances = new Map();
     
     // Session management
     this.sessions = new Map();
@@ -135,37 +137,78 @@ class ScormService extends BaseService {
       
       // Check if session already exists
       if (this.sessions.has(sessionId)) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           errorCode: '103', // Already initialized
-          reason: 'Session already initialized' 
+          reason: 'Session already initialized'
         };
       }
       
       // Check session limit
       if (this.sessions.size >= this.config.maxSessions) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           errorCode: '101', // General exception
-          reason: 'Maximum sessions exceeded' 
+          reason: 'Maximum sessions exceeded'
         };
       }
       
-      // Create session
+      // Create session metadata
       const session = {
         id: sessionId,
         startTime: new Date(),
         state: 'initialized',
-        data: {},
         apiCalls: [],
         errors: [],
         lmsProfile: null,
-        interactions: {},
-        objectives: {},
         lastActivity: Date.now()
       };
       
       this.sessions.set(sessionId, session);
+      
+      // Create and initialize a per-session RTE handler instance and map it
+      try {
+        // Lazy-require the RTE API handler class
+        // eslint-disable-next-line global-require, import/no-commonjs
+        const ScormApiHandler = require('./scorm/rte/api-handler');
+        const sessionManager = {
+          registerSession: (id, handler) => {
+            // store handler reference for debugging if needed
+            try { this.rteInstances.set(id, handler); } catch (_) {}
+            return true;
+          },
+          unregisterSession: (id) => {
+            try { this.rteInstances.delete(id); } catch (_) {}
+          },
+          persistSessionData: (id, data) => {
+            // Prefer telemetryStore for persistence/inspection
+            try {
+              const telemetry = this.getDependency && this.getDependency('telemetryStore');
+              if (telemetry && typeof telemetry.storeApiCall === 'function') {
+                telemetry.storeApiCall({ type: 'rte:commit', sessionId: id, data, timestamp: Date.now() });
+                return true;
+              }
+            } catch (e) {
+              this.logger?.warn('ScormService: telemetry store persist failed', e?.message || e);
+            }
+            // Fallback: log and succeed
+            this.logger?.info('ScormService: Persist session data (no telemetry store):', id);
+            return true;
+          },
+          getLearnerInfo: () => {
+            return { id: session.lmsProfile?.learnerId || 'unknown', name: session.lmsProfile?.learnerName || 'Learner' };
+          }
+        };
+        
+        const rte = new ScormApiHandler(sessionManager, this.logger, { strictMode: this.config.strictRteMode });
+        // Initialize RTE session and then bind its internal session id to our session id for mapping
+        try { rte.Initialize(''); } catch (_) {}
+        // Override generated sessionId with our provided sessionId for consistency
+        try { rte.sessionId = sessionId; } catch (_) {}
+        this.rteInstances.set(sessionId, rte);
+      } catch (e) {
+        this.logger?.warn('ScormService: Failed to initialize per-session RTE handler; falling back to session-local storage', e?.message || e);
+      }
       
       // Set default current activity in SN service if available
       if (this.snService) {
@@ -183,7 +226,7 @@ class ScormService extends BaseService {
         }
       }
       
-      // Notify debug window if available
+      // Notify debug/telemetry
       this.notifyDebugWindow('session-initialized', session);
       
       this.logger?.info(`ScormService: Session ${sessionId} initialized successfully`);
@@ -221,9 +264,24 @@ class ScormService extends BaseService {
       // Update last activity
       session.lastActivity = Date.now();
       
-      // Get value from session data
-      const value = session.data[element] || '';
-      const errorCode = value === '' && !session.data.hasOwnProperty(element) ? '401' : '0';
+      // Prefer RTE instance as system-of-record if available
+      const rte = this.rteInstances.get(sessionId);
+      let value = '';
+      let errorCode = '0';
+      try {
+        if (rte && typeof rte.GetValue === 'function') {
+          value = rte.GetValue(element);
+          errorCode = value === '' ? '401' : '0';
+        } else {
+          // Fallback to session-local data model if present
+          value = session.data ? (session.data[element] || '') : '';
+          errorCode = value === '' && !(session.data && session.data.hasOwnProperty(element)) ? '401' : '0';
+        }
+      } catch (e) {
+        this.logger?.warn(`ScormService: RTE GetValue failed for ${element}: ${e?.message || e}`);
+        value = '';
+        errorCode = '101';
+      }
       
       // Log API call
       this.logApiCall(session, 'GetValue', element, value, errorCode);
@@ -255,17 +313,32 @@ class ScormService extends BaseService {
       // Update last activity
       session.lastActivity = Date.now();
       
-      // Set value in session data
-      session.data[element] = value;
+      // Prefer RTE instance as system-of-record if available
+      const rte = this.rteInstances.get(sessionId);
+      let success = false;
+      try {
+        if (rte && typeof rte.SetValue === 'function') {
+          const res = rte.SetValue(element, String(value));
+          success = (res === 'true');
+        } else {
+          // Fallback to session-local data model
+          session.data = session.data || {};
+          session.data[element] = value;
+          success = true;
+        }
+      } catch (e) {
+        this.logger?.warn(`ScormService: RTE SetValue failed for ${element}: ${e?.message || e}`);
+        success = false;
+      }
       
       // Log API call
-      this.logApiCall(session, 'SetValue', element, value, '0');
+      this.logApiCall(session, 'SetValue', element, value, success ? '0' : '101');
       
-      // Process special elements
+      // Process special elements (ensure SN updates still happen)
       await this.processSpecialElement(session, element, value);
       
-      this.recordOperation('setValue', true);
-      return { success: true, errorCode: '0' };
+      this.recordOperation('setValue', success);
+      return { success, errorCode: success ? '0' : '101' };
       
     } catch (error) {
       this.logger?.error(`ScormService: SetValue failed for session ${sessionId}:`, error);
@@ -292,11 +365,30 @@ class ScormService extends BaseService {
       // Log API call
       this.logApiCall(session, 'Commit', '', '', '0');
       
-      // Notify debug window
-      this.notifyDebugWindow('data-committed', { sessionId, data: session.data });
+      // Prefer RTE commit when available
+      const rte = this.rteInstances.get(sessionId);
+      let success = true;
+      try {
+        if (rte && typeof rte.Commit === 'function') {
+          const res = rte.Commit('');
+          success = (res === 'true');
+        } else {
+          // Fallback: nothing to do, treat as success
+          success = true;
+        }
+      } catch (e) {
+        this.logger?.warn(`ScormService: RTE Commit failed for session ${sessionId}: ${e?.message || e}`);
+        success = false;
+      }
       
-      this.recordOperation('commit', true);
-      return { success: true, errorCode: '0' };
+      // Notify telemetry/debug via notifyDebugWindow (which delegates to telemetryStore)
+      try {
+        const payload = { sessionId, success, timestamp: Date.now() };
+        this.notifyDebugWindow('data-committed', payload);
+      } catch (_) {}
+      
+      this.recordOperation('commit', success);
+      return { success, errorCode: success ? '0' : '101' };
       
     } catch (error) {
       this.logger?.error(`ScormService: Commit failed for session ${sessionId}:`, error);
@@ -318,35 +410,51 @@ class ScormService extends BaseService {
         this.logger?.warn(`ScormService: Terminate called for non-existent session ${sessionId} (idempotent)`);
         return { success: true, errorCode: '0', alreadyTerminated: true };
       }
-
+ 
       // Guard against double-terminate races
       if (session.__terminating || session.state === 'terminated') {
         this.logger?.info(`ScormService: Session ${sessionId} already terminating/terminated (idempotent)`);
         // Ensure map no longer holds terminated
         this.sessions.delete(sessionId);
+        // Also cleanup associated RTE instance
+        try { this.rteInstances.delete(sessionId); } catch (_) {}
         return { success: true, errorCode: '0', alreadyTerminated: true };
       }
       session.__terminating = true;
-
+ 
       // Log API call
       this.logApiCall(session, 'Terminate', '', '', '0');
-
+ 
+      // Perform RTE termination if present
+      let rteSuccess = true;
+      try {
+        const rte = this.rteInstances.get(sessionId);
+        if (rte && typeof rte.Terminate === 'function') {
+          const res = rte.Terminate('');
+          rteSuccess = (res === 'true');
+        }
+      } catch (e) {
+        this.logger?.warn(`ScormService: RTE Terminate failed for session ${sessionId}: ${e?.message || e}`);
+        rteSuccess = false;
+      }
+ 
       // Update session state
       const preState = session.state;
       session.state = 'terminated';
       session.endTime = new Date();
-
-      // Notify debug window
-      this.notifyDebugWindow('session-terminated', { sessionId });
-
-      // Remove session
+ 
+      // Notify telemetry/debug
+      this.notifyDebugWindow('session-terminated', { sessionId, rteSuccess });
+ 
+      // Remove session and RTE instance
       this.sessions.delete(sessionId);
-
+      try { this.rteInstances.delete(sessionId); } catch (_) {}
+ 
       this.logger?.info(`ScormService: Session ${sessionId} terminated (prevState=${preState})`);
-      this.recordOperation('terminate', true);
-
-      return { success: true, errorCode: '0' };
-
+      this.recordOperation('terminate', rteSuccess);
+ 
+      return { success: rteSuccess, errorCode: '0' };
+ 
     } catch (error) {
       const msg = (error && error.message) ? error.message : String(error);
       // Benign shutdown races: downgrade to soft-ok
@@ -354,6 +462,7 @@ class ScormService extends BaseService {
         this.logger?.warn(`ScormService: Soft-ok terminate(${sessionId}) during shutdown/race: ${msg}`);
         // Ensure cleanup
         this.sessions.delete(sessionId);
+        try { this.rteInstances.delete(sessionId); } catch (_) {}
         this.recordOperation('terminate', true);
         return { success: true, errorCode: '0', softOk: true };
       }
@@ -703,23 +812,53 @@ class ScormService extends BaseService {
    */
   logApiCall(session, method, parameter, value, errorCode) {
     const logEntry = {
-      timestamp: new Date(),
+      timestamp: Date.now(),
       method,
       parameter,
       value,
       errorCode
     };
     
-    session.apiCalls.push(logEntry);
+    // Keep session-local trace for quick inspection
+    try {
+      session.apiCalls.push(logEntry);
+    } catch (_) {
+      // ignore push failures to avoid breaking API paths
+    }
     
-    // Notify debug window
-    this.notifyDebugWindow('api-call', {
-      sessionId: session.id,
-      method,
-      parameter,
-      value,
-      errorCode
-    });
+    // Publish to telemetry store when available (preferred)
+    try {
+      const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
+      if (telemetryStore && typeof telemetryStore.storeApiCall === 'function') {
+        telemetryStore.storeApiCall({
+          type: 'api:call',
+          sessionId: session.id,
+          method,
+          parameter,
+          value,
+          errorCode,
+          timestamp: logEntry.timestamp
+        });
+        this.logger?.debug('ScormService: API call published to telemetryStore');
+        return;
+      }
+    } catch (e) {
+      this.logger?.warn('ScormService: telemetryStore.storeApiCall failed, falling back to direct notify', e?.message || e);
+    }
+    
+    // Fallback: directly notify debug window (legacy behavior)
+    try {
+      this.notifyDebugWindow('api-call', {
+        sessionId: session.id,
+        method,
+        parameter,
+        value,
+        errorCode,
+        timestamp: logEntry.timestamp
+      });
+    } catch (_) {
+      // swallow to avoid breaking runtime
+    }
   }
 
   /**
@@ -781,12 +920,32 @@ class ScormService extends BaseService {
    * @param {Object} data - Event data
    */
   notifyDebugWindow(event, data) {
-    const windowManager = this.getDependency('windowManager');
-    if (windowManager) {
-      const debugWindow = windowManager.getWindow('debug');
-      if (debugWindow && !debugWindow.isDestroyed()) {
-        debugWindow.webContents.send(event, data);
+    // Prefer publishing to telemetryStore for consistent, bounded storage and later flushTo handling.
+    try {
+      const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
+      if (telemetryStore && typeof telemetryStore.storeApiCall === 'function') {
+        telemetryStore.storeApiCall({
+          type: event,
+          payload: data,
+          timestamp: Date.now()
+        });
+        return;
       }
+    } catch (e) {
+      this.logger?.warn('ScormService: telemetryStore.storeApiCall failed in notifyDebugWindow', e?.message || e);
+    }
+    
+    // Fallback to legacy direct debug-window send when telemetry store not available
+    try {
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager) {
+        const debugWindow = windowManager.getWindow('debug');
+        if (debugWindow && !debugWindow.isDestroyed()) {
+          debugWindow.webContents.send(event, data);
+        }
+      }
+    } catch (e) {
+      this.logger?.warn('ScormService: notifyDebugWindow fallback failed', e?.message || e);
     }
   }
 
