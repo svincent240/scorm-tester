@@ -130,10 +130,9 @@ const electronAPI = {
   
   // Event Listeners
   onMenuEvent: (callback) => safeOn('menu-event', callback),
-  onScormApiLog: (callback) => safeOn('scorm-api-log', callback),
   onCourseLoaded: (callback) => safeOn('course-loaded', callback),
   onSessionStateChanged: (callback) => safeOn('session-state-changed', callback),
-  onDebugEvent: (callback) => safeOn('debug-event-received', callback),
+  onScormApiCallLogged: (callback) => safeOn('scorm-api-call-logged', callback),
   
   // Utility
   pathUtils: {
@@ -147,7 +146,7 @@ const electronAPI = {
   // Development/Debug
   openDevTools: () => safeSend('open-dev-tools'),
   reloadWindow: () => safeSend('reload-window'),
-  emitDebugEvent: (eventType, data) => safeSend('debug-event', eventType, data),
+  emitDebugEvent: (eventType, data) => safeInvoke('debug-event', eventType, data),
   openDebugWindow: () => safeInvoke('open-debug-window'),
   
   // App Info

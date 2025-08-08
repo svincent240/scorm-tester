@@ -211,6 +211,7 @@ const SECURITY_CONFIG = {
       'path-join',
       'log-message',
       'debug-event',
+      'debug-get-history',
       'load-module', // Added new channel
       'load-shared-logger-adapter', // Renderer logger IPC fallback
       'renderer-log-info', // Direct renderer logging channels

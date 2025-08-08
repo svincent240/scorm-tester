@@ -26,6 +26,8 @@ const IPC_ROUTES = (() => {
   }
 })();
 
+const OPEN_DEBUG_DEBOUNCE_MS = 500; // Define debounce constant
+
 // Validation utilities
 const IPC_VALIDATION = require('../../shared/utils/ipc-validation');
 const IPC_RESULT = require('../../shared/utils/ipc-result');
@@ -65,6 +67,7 @@ class IpcHandler extends BaseService {
     // No local telemetry buffer: telemetry is delegated to DebugTelemetryStore (constructed in main)
     this.maxHistorySize = 5000;
     this.sessionId = null; // Track current session for clearing
+    this._openDebugGuards = { inFlight: false, lastAttemptTs: 0, pending: false, timer: null };
 
     // SNSnapshotService is owned and managed outside this handler (wired from main); no internal SN cache here
   }
@@ -110,6 +113,47 @@ class IpcHandler extends BaseService {
         try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); this.logger?.info('[DEBUG EVENT] telemetryStore cleared on startup'); } } catch (_) {}
       }
     } catch (_) {}
+    
+    // Diagnostic: log telemetry store wiring state for debug-event plumbing validation
+    try {
+      this.logger?.info(`[DEBUG EVENT] telemetryStore present: ${!!this.telemetryStore}, hasFlushTo: ${typeof this.telemetryStore?.flushTo === 'function'}`);
+    } catch (_) {}
+    
+    // Subscribe to scorm-api-call-logged events from ScormService
+    try {
+      const scormService = this.getDependency('scormService');
+      if (scormService && typeof scormService.onScormApiCallLogged === 'function') {
+        scormService.onScormApiCallLogged((payload) => {
+          this.logger?.debug('[IPC Handler] Received scorm-api-call-logged event from ScormService', payload);
+          this.broadcastScormApiCallLogged(payload);
+        });
+        this.logger?.info('[IPC Handler] Subscribed to scorm-api-call-logged events from ScormService');
+      } else {
+        this.logger?.warn('[IPC Handler] ScormService or onScormApiCallLogged not available; cannot subscribe to API call events.');
+      }
+
+      // Subscribe to course:loaded and session:reset events from ScormService
+      if (scormService && typeof scormService.eventEmitter === 'object' && typeof scormService.eventEmitter.on === 'function') {
+        scormService.eventEmitter.on('course:loaded', (payload) => {
+          this.logger?.info('[IPC Handler] Received course:loaded event from ScormService. Clearing telemetry store.');
+          if (this.telemetryStore) {
+            this.telemetryStore.clear();
+          }
+        });
+        scormService.eventEmitter.on('session:reset', (payload) => {
+          this.logger?.info('[IPC Handler] Received session:reset event from ScormService. Clearing telemetry store.');
+          if (this.telemetryStore) {
+            this.telemetryStore.clear();
+          }
+        });
+        this.logger?.info('[IPC Handler] Subscribed to course:loaded and session:reset events from ScormService');
+      } else {
+        this.logger?.warn('[IPC Handler] ScormService eventEmitter not available; cannot subscribe to course load/reset events.');
+      }
+    } catch (e) {
+      this.logger?.error('[IPC Handler] Error subscribing to ScormService events:', e?.message || e);
+    }
+
     try {
       const snSnapshot = this.getDependency('snSnapshotService');
       if (snSnapshot) this.snSnapshotService = snSnapshot;
@@ -125,6 +169,7 @@ class IpcHandler extends BaseService {
       }
     }
 
+    this.logger?.debug(`IpcHandler: handleDebugGetHistory is ${typeof this.handleDebugGetHistory}`);
     this.registerHandlers();
     this.setupRateLimitCleanup();
 
@@ -162,9 +207,7 @@ class IpcHandler extends BaseService {
     // 1) Terminate SCORM sessions FIRST (best-effort, silent)
     await this.terminateScormSessionsSafely();
 
-    // 2) Clear API call history (from IpcHandlers)
-    this.clearApiCallHistory();
-    this.logger?.info('[DEBUG EVENT] API call history cleared on app shutdown');
+    // 2) Clear API call history (from IpcHandlers) - now handled by DebugTelemetryStore
 
     // 3) Unregister handlers AFTER SCORM termination
     this.unregisterHandlers();
@@ -239,8 +282,9 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // Migrate previously-sync channels to async handlers to unify routing (preserves channel names)
       this.registerHandler('log-message', this.handleLogMessage.bind(this));
-      this.registerHandler('debug-event', this.handleDebugEvent.bind(this));
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
+      // Debug history fetch - returns newest-first entries with optional filters { limit, offset, sinceTs, methodFilter }
+      this.registerHandler('debug-get-history', this.handleDebugGetHistory.bind(this));
 
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
@@ -714,9 +758,6 @@ class IpcHandler extends BaseService {
     const scormService = this.getDependency('scormService');
     const result = await scormService.resetSession(sessionId);
     
-    // Clear API call history when session is reset
-    this.clearApiCallHistory();
-    this.logger?.info(`[DEBUG EVENT] API call history cleared due to session reset: ${sessionId}`);
     
     return result;
   }
@@ -829,6 +870,14 @@ class IpcHandler extends BaseService {
     this.logger?.log(level, `[Renderer] ${message}`, ...args);
   }
 
+  async handleDebugGetHistory(event, { limit, offset, sinceTs, methodFilter } = {}) {
+    this.logger?.debug(`IpcHandler: handleDebugGetHistory called with limit: ${limit}, offset: ${offset}, sinceTs: ${sinceTs}, methodFilter: ${methodFilter}`);
+    if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
+      return { success: true, history: this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter }) };
+    }
+    return { success: true, history: [] };
+  }
+
   /**
    * Gracefully terminate all SCORM sessions if available on scormService.
    * Used during app shutdown to avoid noisy termination errors.
@@ -866,120 +915,10 @@ class IpcHandler extends BaseService {
     }
   }
 
-  // Debug event handler
-  handleDebugEvent(event, eventType, data) {
-    try {
-      this.logger?.info(`[DEBUG EVENT] Received debug event: ${eventType}`, data);
-      
-      // Get the window manager to access debug window
-      const windowManager = this.getDependency('windowManager');
-      if (windowManager) {
-        this.logger?.info(`[DEBUG EVENT] WindowManager found, getting debug window`);
-        
-        const debugWindow = windowManager.getWindow('debug');
-        
-        // Always store API calls in persistent history
-        if (eventType === 'api:call') {
-          this.storeApiCall(data);
-        }
-        
-        // Handle special events for clearing history
-        if (eventType === 'course:loaded' || eventType === 'course:reset' || eventType === 'session:reset') {
-          this.clearApiCallHistory();
-          this.logger?.info(`[DEBUG EVENT] API call history cleared due to: ${eventType}`);
-        }
-        
-        if (debugWindow && !debugWindow.isDestroyed()) {
-          // Debug window is available - send event immediately
-          debugWindow.webContents.send('debug-event-received', eventType, data);
-          this.logger?.info(`[DEBUG EVENT] Event forwarded to debug window: ${eventType}`);
-        } else {
-          // Debug window not available - just log for non-API events
-          if (eventType !== 'api:call') {
-            this.logger?.warn(`[DEBUG EVENT] Debug window not available for event: ${eventType}`);
-          }
-        }
-      } else {
-        this.logger?.error(`[DEBUG EVENT] WindowManager not found`);
-      }
-    } catch (error) {
-      this.logger?.error('[DEBUG EVENT] Failed to handle debug event:', error);
-    }
-  }
-
-  // Store API call (delegates to telemetryStore). Legacy in-class buffering removed.
-  storeApiCall(data) {
-    try {
-      if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
-        this.telemetryStore.storeApiCall(data);
-        this.logger?.debug('[DEBUG EVENT] API call delegated to telemetryStore');
-        return;
-      }
-      // telemetryStore not available — do not buffer locally anymore to avoid unbounded memory growth.
-      this.logger?.warn && this.logger.warn('[DEBUG EVENT] telemetryStore not available; API call dropped');
-    } catch (e) {
-      this.logger?.warn && this.logger.warn('[DEBUG EVENT] Failed to store API call via telemetryStore', e?.message || e);
-    }
-  }
-
-  // Flush telemetry to debug window using the canonical telemetryStore.
-  sendBufferedApiCalls(debugWindow) {
-    try {
-      if (this.telemetryStore && typeof this.telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
-        try {
-          this.logger?.info('[DEBUG EVENT] Flushing telemetryStore to debug window');
-          this.telemetryStore.flushTo(debugWindow.webContents);
-          return;
-        } catch (e) {
-          this.logger?.warn('[DEBUG EVENT] telemetryStore.flushTo failed', e?.message || e);
-          return;
-        }
-      }
-      this.logger?.debug('[DEBUG EVENT] No telemetryStore available to flush to debug window');
-    } catch (e) {
-      this.logger?.warn('[DEBUG EVENT] Failed to flush telemetry to debug window', e?.message || e);
-    }
-  }
-
-  // Clear API call history (delegates to telemetryStore). Local buffering removed.
-  clearApiCallHistory() {
-    try {
-      if (this.telemetryStore && typeof this.telemetryStore.clear === 'function') {
-        this.telemetryStore.clear();
-        this.logger?.info('[DEBUG EVENT] telemetryStore cleared API call history');
-        return;
-      }
-      this.logger?.debug('[DEBUG EVENT] No telemetryStore available to clear API call history');
-    } catch (e) {
-      this.logger?.warn('[DEBUG EVENT] telemetryStore.clear failed', e?.message || e);
-    }
-  }
-
-  // Get current API call history (for debugging) — delegate to telemetryStore if present.
-  getApiCallHistory() {
-    try {
-      if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
-        return this.telemetryStore.getHistory();
-      }
-    } catch (e) {
-      this.logger?.warn('[DEBUG EVENT] telemetryStore.getHistory failed', e?.message || e);
-    }
-    // Local buffering removed: return empty array when telemetryStore is not available.
-    return [];
-  }
 
 
-  // Handle opening the debug window
-  async handleOpenDebugWindow(event) {
-    const windowManager = this.getDependency('windowManager');
-    if (windowManager) {
-      await windowManager.createDebugWindow();
-      return { success: true };
-    } else {
-      this.logger?.error('IpcHandler: WindowManager not available to open debug window');
-      return { success: false, error: 'WindowManager not available' };
-    }
-  }
+
+
 
   // SCORM CAM processing handler (new)
   async handleProcessScormManifest(event, folderPath, manifestContent) {
@@ -1100,6 +1039,73 @@ class IpcHandler extends BaseService {
   }
 
   // --- End of merged IpcHandlers methods ---
+  /**
+   * Broadcasts a SCORM API call logged event to all active renderer windows.
+   * @param {Object} payload - The event payload containing API call details.
+   */
+  /**
+   * Broadcasts a SCORM API call logged event to all active renderer windows.
+   * @param {Object} payload - The event payload containing API call details.
+   */
+  broadcastScormApiCallLogged(payload) {
+    try {
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager) {
+        const allWindows = windowManager.getAllWindows();
+        allWindows.forEach(window => {
+          if (window && !window.isDestroyed()) {
+            window.webContents.send('scorm-api-call-logged', payload);
+            this.logger?.debug(`[IPC Handler] Broadcasted scorm-api-call-logged to window ${window.id}`);
+          }
+        });
+      } else {
+        this.logger?.warn('[IPC Handler] WindowManager not available for broadcasting scorm-api-call-logged event.');
+      }
+    } catch (e) {
+      this.logger?.error('[IPC Handler] Error broadcasting scorm-api-call-logged event:', e?.message || e);
+    }
+  }
+
+  async handleOpenDebugWindow(event) {
+    const windowManager = this.getDependency('windowManager');
+    if (!windowManager) {
+      this.logger?.warn('IpcHandler: WindowManager dependency not available for open-debug-window');
+      return { success: false, error: 'WindowManager not available' };
+    }
+
+    // Coalesce/debounce multiple rapid calls to open-debug-window
+    // This is a client-side guard; server-side rate limiting is also applied.
+    const now = Date.now();
+    if (this._openDebugGuards.inFlight || (now - this._openDebugGuards.lastAttemptTs < OPEN_DEBUG_DEBOUNCE_MS && !this._openDebugGuards.pending)) {
+      this.logger?.debug('IpcHandler: open-debug-window call coalesced/debounced');
+      this.recordOperation('open-debug-window:coalesced', true);
+      return { success: true, coalesced: true };
+    }
+
+    this._openDebugGuards.inFlight = true;
+    this._openDebugGuards.lastAttemptTs = now;
+
+    try {
+      const debugWindow = windowManager.getWindow('debug');
+      if (debugWindow && !debugWindow.isDestroyed()) {
+        debugWindow.focus();
+        this.logger?.info('IpcHandler: Focused existing debug window');
+        this.recordOperation('open-debug-window:focused', true);
+        return { success: true, focused: true };
+      } else {
+        await windowManager.createDebugWindow();
+        this.logger?.info('IpcHandler: Created new debug window');
+        this.recordOperation('open-debug-window:created', true);
+        return { success: true, created: true };
+      }
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to open debug window:', error);
+      this.recordOperation('open-debug-window:error', false);
+      return { success: false, error: error.message };
+    } finally {
+      this._openDebugGuards.inFlight = false;
+    }
+  }
 }
 
 module.exports = IpcHandler;

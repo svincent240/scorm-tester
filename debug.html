@@ -73,11 +73,7 @@
             display: flex;
             flex-direction: column;
         }
-
-        .debug-panel__header {
-            display: none; /* Hide the component header since we have window header */
-        }
-
+ 
         .debug-panel__tabs {
             flex-shrink: 0;
             display: flex;
@@ -185,7 +181,7 @@
         
         <div class="debug-panel-container">
             <!-- The DebugPanel component will be rendered here -->
-            <div id="debug-panel"></div>
+            <div id="debug-panel-root"></div>
         </div>
     </div>
 
@@ -209,13 +205,37 @@
                     console.log('Debug Window: Initializing...');
                     
                     // Create the debug panel component
-                    this.debugPanel = new DebugPanel('debug-panel', {
+                    // Pass the root element ID to the DebugPanel constructor
+                    this.debugPanel = new DebugPanel('debug-panel-root', {
                         showTimestamps: true,
-                        enableExport: true
+                        enableExport: true,
+                        hideHeader: true
                     });
-
+ 
                     // Initialize the component
                     await this.debugPanel.initialize();
+ 
+                    // Fetch historic telemetry from main process (newest-first, capped)
+                    try {
+                        if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
+                            console.log('DEBUG WINDOW: Requesting historic telemetry via debug-get-history');
+                            const resp = await window.electronAPI.invoke('debug-get-history', { limit: 2000 });
+                            if (resp && resp.success && Array.isArray(resp.entries)) {
+                                // entries are newest-first per contract; add them oldest→newest into UI to preserve chronological order
+                                const entries = resp.entries.slice().reverse();
+                                for (const e of entries) {
+                                    try { this.debugPanel.addApiCall(e); } catch (_) {}
+                                }
+                                console.log(`DEBUG WINDOW: Loaded ${resp.entries.length} historic telemetry entries`);
+                            } else {
+                                console.warn('DEBUG WINDOW: debug-get-history returned no entries or failed', resp);
+                            }
+                        } else {
+                            console.warn('DEBUG WINDOW: electronAPI.invoke not available; skipping history fetch');
+                        }
+                    } catch (e) {
+                        console.error('DEBUG WINDOW: Failed to fetch debug history', e);
+                    }
                     
                     this.setupWindowControls();
                     this.setupIPC();
@@ -259,37 +279,19 @@
                 if (window.electronAPI) {
                     console.log('DEBUG WINDOW: Setting up IPC listeners...');
                     
-                    // Listen for debug events forwarded from main process
-                    if (window.electronAPI.onDebugEvent) {
-                        console.log('DEBUG WINDOW: Setting up debug event listener');
-                        window.electronAPI.onDebugEvent((eventType, data) => {
-                            console.log('DEBUG WINDOW: Received debug event:', eventType, data);
+                    // Listen for scorm-api-call-logged events from main process
+                    if (window.electronAPI.onScormApiCallLogged) {
+                        console.log('DEBUG WINDOW: Setting up scorm-api-call-logged listener');
+                        window.electronAPI.onScormApiCallLogged((payload) => {
+                            console.log('DEBUG WINDOW: Received scorm-api-call-logged event:', payload);
                             if (this.debugPanel) {
-                                this.debugPanel.handleApiCall({
-                                    method: eventType,
-                                    ...data
-                                });
+                                this.debugPanel.addApiCall(payload);
                             } else {
-                                console.warn('DEBUG WINDOW: Debug panel not available for debug event');
+                                console.warn('DEBUG WINDOW: Debug panel not available for scorm-api-call-logged event');
                             }
                         });
                     } else {
-                        console.warn('DEBUG WINDOW: onDebugEvent not available for debug events');
-                    }
-                    
-                    // Keep the legacy SCORM API log listener for backward compatibility
-                    if (window.electronAPI.onScormApiLog) {
-                        console.log('DEBUG WINDOW: Setting up legacy SCORM API log listener');
-                        window.electronAPI.onScormApiLog((data) => {
-                            console.log('DEBUG WINDOW: Received legacy SCORM API log:', data);
-                            if (this.debugPanel) {
-                                this.debugPanel.handleApiCall(data);
-                            } else {
-                                console.warn('DEBUG WINDOW: Debug panel not available for API call');
-                            }
-                        });
-                    } else {
-                        console.warn('DEBUG WINDOW: onScormApiLog not available');
+                        console.warn('DEBUG WINDOW: onScormApiCallLogged not available');
                     }
 
                     // Listen for course loaded events

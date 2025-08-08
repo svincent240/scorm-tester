@@ -13,6 +13,7 @@
 
 import { eventBus } from './event-bus.js';
 import { uiState as uiStatePromise } from './ui-state.js';
+import { sanitizeParam } from '../utils/payload-sanitizer.js';
 
 /**
  * SCORM Client Class
@@ -38,6 +39,8 @@ class ScormClient {
     this._SESSION_TIME_MIN_MS = 3000;   // min interval between session_time updates
     this._lastIpcRateLimitAt = 0;       // skip immediate retries after rate limit
     this._IPC_BACKOFF_MS = 1200;
+    // API telemetry sequencing for debug timeline
+    this._apiSeq = 0; // monotonic sequence within this renderer session
 
     this.setupEventListeners();
     this.loadValidator(); // Load validator dynamically
@@ -554,26 +557,39 @@ class ScormClient {
    * @private
    */
   logApiCall(method, parameter, result) {
+    const now = Date.now();
+
+    // Bump local monotonic sequence
+    try { this._apiSeq = (this._apiSeq || 0) + 1; } catch (_) { this._apiSeq = 1; }
+
+    // Sanitize parameter for telemetry
+    const safeParameter = sanitizeParam(parameter);
+
     const apiCall = {
+      id: `${this.sessionId || 'anon'}-${this._apiSeq}-${now}`,
+      seq: this._apiSeq,
+      sessionId: this.sessionId || null,
       method,
-      parameter,
-      result,
+      parameter: safeParameter,
+      result: String(result),
       errorCode: this.lastError,
-      timestamp: Date.now()
+      timestamp: now
     };
 
-    this.uiState.addApiCall(apiCall);
+    // Keep lightweight per-window UI state (existing code path)
+    try { this.uiState.addApiCall(apiCall); } catch (_) {}
 
     // Emit event for debug panel in same window
-    eventBus.emit('api:call', { data: apiCall });
+    try { eventBus.emit('api:call', { data: apiCall }); } catch (_) {}
 
     // Also emit via IPC for debug window (guard against rate limits)
     if (window.electronAPI && window.electronAPI.emitDebugEvent) {
       try {
-        window.electronAPI.emitDebugEvent('api:call', apiCall);
+        // Use promise-returning invoke but don't await to keep synchronous API behavior
+        Promise.resolve(window.electronAPI.emitDebugEvent('api:call', apiCall)).catch(() => { /* swallow */ });
       } catch (e) {
         const msg = (e && e.message) ? e.message : String(e);
-        if (msg.includes('Rate limit exceeded')) {
+        if (msg && msg.includes('Rate limit exceeded')) {
           // Degrade gracefully: skip further emits for this tick
         }
       }

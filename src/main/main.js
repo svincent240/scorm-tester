@@ -150,7 +150,7 @@ class MainProcess {
     this.services.set('recentCoursesService', recentCoursesService);
  
     // IPC handler (depends on many services including telemetry and SN snapshot)
-    const ipcHandler = new IpcHandler(this.errorHandler, this.logger, { IPC_REFACTOR_ENABLED: !!process.env.IPC_REFACTOR_ENABLED });
+    const ipcHandler = new IpcHandler(this.errorHandler, this.logger, { IPC_REFACTOR_ENABLED: true });
     const ipcDependencies = new Map([
       ['fileManager', fileManager],
       ['scormService', scormService],

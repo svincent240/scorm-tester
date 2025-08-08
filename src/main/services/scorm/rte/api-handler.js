@@ -21,6 +21,7 @@ const ScormDataModel = require('./data-model');
 const ScormErrorHandler = require('./error-handler');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
 const { COMMON_ERRORS } = require('../../../../shared/constants/error-codes');
+const EventEmitter = require('events');
 
 /**
  * SCORM API Handler Class
@@ -47,6 +48,7 @@ class ScormApiHandler {
     // Initialize core components
     this.errorHandler = new ScormErrorHandler(logger);
     this.dataModel = new ScormDataModel(this.errorHandler, logger);
+    this.eventEmitter = new EventEmitter();
     
     // API state tracking
     this.isInitialized = false;
@@ -67,6 +69,11 @@ class ScormApiHandler {
    * @returns {string} "true" if successful, "false" if error
    */
   Initialize(parameter) {
+    const startTime = process.hrtime.bigint();
+    let result = "false"; // Default to false
+    let errorCode = COMMON_ERRORS.GENERAL_EXCEPTION;
+    let errorMessage = `Initialize failed: Unknown error`;
+
     try {
       this.logger?.debug('Initialize called with parameter:', parameter);
 
@@ -74,13 +81,16 @@ class ScormApiHandler {
       if (parameter !== "") {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'Initialize parameter must be empty string', 'Initialize');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.NOT_INITIALIZED, 'Initialize')) {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Initialize session
@@ -107,13 +117,21 @@ class ScormApiHandler {
 
       this.logger?.info(`SCORM session initialized: ${this.sessionId}`);
       this.errorHandler.clearError();
-      return "true";
+      result = "true";
+      errorCode = "0"; // No error
+      errorMessage = "";
+      return result;
 
     } catch (error) {
       this.logger?.error('Error in Initialize:', error);
       this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
         `Initialize failed: ${error.message}`, 'Initialize');
-      return "false";
+      errorCode = this.errorHandler.getLastError();
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('Initialize', [parameter], result, errorCode, errorMessage, durationMs);
     }
   }
 
@@ -123,6 +141,11 @@ class ScormApiHandler {
    * @returns {string} "true" if successful, "false" if error
    */
   Terminate(parameter) {
+    const startTime = process.hrtime.bigint();
+    let result = "false"; // Default to false
+    let errorCode = COMMON_ERRORS.GENERAL_EXCEPTION;
+    let errorMessage = `Terminate failed: Unknown error`;
+
     try {
       this.logger?.debug('Terminate called with parameter:', parameter);
 
@@ -130,13 +153,16 @@ class ScormApiHandler {
       if (parameter !== "") {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'Terminate parameter must be empty string', 'Terminate');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'Terminate')) {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Perform final commit (but don't count it as a regular commit)
@@ -175,13 +201,21 @@ class ScormApiHandler {
 
       this.logger?.info(`SCORM session terminated: ${this.sessionId}`);
       this.errorHandler.clearError();
-      return "true";
+      result = "true";
+      errorCode = "0"; // No error
+      errorMessage = "";
+      return result;
 
     } catch (error) {
       this.logger?.error('Error in Terminate:', error);
       this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
         `Terminate failed: ${error.message}`, 'Terminate');
-      return "false";
+      errorCode = this.errorHandler.getLastError();
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('Terminate', [parameter], result, errorCode, errorMessage, durationMs);
     }
   }
 
@@ -191,37 +225,55 @@ class ScormApiHandler {
    * @returns {string} Element value or empty string on error
    */
   GetValue(element) {
+    const startTime = process.hrtime.bigint();
+    let result = ""; // Default to empty string
+    let errorCode = COMMON_ERRORS.GENERAL_EXCEPTION;
+    let errorMessage = `GetValue failed: Unknown error`;
+
     try {
       this.logger?.debug('GetValue called for element:', element);
 
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'GetValue')) {
-        return "";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Validate element parameter
       if (typeof element !== 'string') {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'GetValue element must be a string', 'GetValue');
-        return "";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Get value from data model
       const value = this.dataModel.getValue(element);
-      
-      // Log successful retrieval (only for non-empty values to reduce noise)
-      if (value && !this.errorHandler.hasError()) {
+      result = value;
+
+      if (!this.errorHandler.hasError()) {
+        errorCode = "0"; // No error
+        errorMessage = "";
         this.logger?.debug(`GetValue: ${element} = ${value}`);
+      } else {
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
       }
 
-      return value;
+      return result;
 
     } catch (error) {
       this.logger?.error('Error in GetValue:', error);
       this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
         `GetValue failed: ${error.message}`, 'GetValue');
-      return "";
+      errorCode = this.errorHandler.getLastError();
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('GetValue', [element], result, errorCode, errorMessage, durationMs);
     }
   }
 
@@ -232,43 +284,61 @@ class ScormApiHandler {
    * @returns {string} "true" if successful, "false" if error
    */
   SetValue(element, value) {
+    const startTime = process.hrtime.bigint();
+    let result = "false"; // Default to false
+    let errorCode = COMMON_ERRORS.GENERAL_EXCEPTION;
+    let errorMessage = `SetValue failed: Unknown error`;
+
     try {
       this.logger?.debug('SetValue called:', { element, value });
 
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'SetValue')) {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Validate parameters
       if (typeof element !== 'string') {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'SetValue element must be a string', 'SetValue');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       if (typeof value !== 'string') {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'SetValue value must be a string', 'SetValue');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Set value in data model
       const success = this.dataModel.setValue(element, value);
-      
+
       if (success) {
         this.logger?.debug(`SetValue successful: ${element} = ${value}`);
-        return "true";
+        result = "true";
+        errorCode = "0"; // No error
+        errorMessage = "";
       } else {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
       }
+      return result;
 
     } catch (error) {
       this.logger?.error('Error in SetValue:', error);
       this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
         `SetValue failed: ${error.message}`, 'SetValue');
-      return "false";
+      errorCode = this.errorHandler.getLastError();
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('SetValue', [element, value], result, errorCode, errorMessage, durationMs);
     }
   }
 
@@ -278,6 +348,11 @@ class ScormApiHandler {
    * @returns {string} "true" if successful, "false" if error
    */
   Commit(parameter) {
+    const startTime = process.hrtime.bigint();
+    let result = "false"; // Default to false
+    let errorCode = COMMON_ERRORS.GENERAL_EXCEPTION;
+    let errorMessage = `Commit failed: Unknown error`;
+
     try {
       this.logger?.debug('Commit called with parameter:', parameter);
 
@@ -285,38 +360,51 @@ class ScormApiHandler {
       if (parameter !== "") {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'Commit parameter must be empty string', 'Commit');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'Commit')) {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Check commit frequency (prevent spam)
       if (this.options.strictMode && !this.canCommit()) {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
           'Commit called too frequently', 'Commit');
-        return "false";
+        errorMessage = this.errorHandler.getErrorString(errorCode);
+        return result;
       }
 
       // Perform the commit
       const success = this.performCommit();
-      
+
       if (success) {
         this.logger?.debug('Commit successful');
         this.errorHandler.clearError();
-        return "true";
+        result = "true";
+        errorCode = "0"; // No error
+        errorMessage = "";
       } else {
-        return "false";
+        errorCode = this.errorHandler.getLastError();
+        errorMessage = this.errorHandler.getErrorString(errorCode);
       }
+      return result;
 
     } catch (error) {
       this.logger?.error('Error in Commit:', error);
       this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
         `Commit failed: ${error.message}`, 'Commit');
-      return "false";
+      errorCode = this.errorHandler.getLastError();
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('Commit', [parameter], result, errorCode, errorMessage, durationMs);
     }
   }
 
@@ -325,9 +413,21 @@ class ScormApiHandler {
    * @returns {string} Last error code as string
    */
   GetLastError() {
-    const errorCode = this.errorHandler.getLastError();
-    this.logger?.debug('GetLastError returned:', errorCode);
-    return errorCode;
+    const startTime = process.hrtime.bigint();
+    let result = "";
+    let errorCode = "0"; // Default to no error
+    let errorMessage = "";
+
+    try {
+      result = this.errorHandler.getLastError();
+      errorCode = result; // The result of GetLastError is the errorCode
+      errorMessage = this.errorHandler.getErrorString(errorCode);
+      this.logger?.debug('GetLastError returned:', result);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('GetLastError', [], result, errorCode, errorMessage, durationMs);
+    }
   }
 
   /**
@@ -336,9 +436,20 @@ class ScormApiHandler {
    * @returns {string} Error string or empty string if invalid
    */
   GetErrorString(errorCode) {
-    const errorString = this.errorHandler.getErrorString(errorCode);
-    this.logger?.debug('GetErrorString for', errorCode, ':', errorString);
-    return errorString;
+    const startTime = process.hrtime.bigint();
+    let result = "";
+    let eventErrorCode = errorCode; // The parameter is the error code for the event
+    let errorMessage = "";
+
+    try {
+      result = this.errorHandler.getErrorString(errorCode);
+      errorMessage = result; // The result is the error string for the event
+      this.logger?.debug('GetErrorString for', errorCode, ':', result);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('GetErrorString', [errorCode], result, eventErrorCode, errorMessage, durationMs);
+    }
   }
 
   /**
@@ -347,9 +458,20 @@ class ScormApiHandler {
    * @returns {string} Diagnostic information or empty string
    */
   GetDiagnostic(errorCode) {
-    const diagnostic = this.errorHandler.getDiagnostic(errorCode);
-    this.logger?.debug('GetDiagnostic for', errorCode, ':', diagnostic);
-    return diagnostic;
+    const startTime = process.hrtime.bigint();
+    let result = "";
+    let eventErrorCode = errorCode; // The parameter is the error code for the event
+    let errorMessage = "";
+
+    try {
+      result = this.errorHandler.getDiagnostic(errorCode);
+      errorMessage = result; // The result is the diagnostic message for the event
+      this.logger?.debug('GetDiagnostic for', errorCode, ':', result);
+      return result;
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      this._emitApiCallLoggedEvent('GetDiagnostic', [errorCode], result, eventErrorCode, errorMessage, durationMs);
+    }
   }
 
   /**
@@ -529,6 +651,31 @@ class ScormApiHandler {
     this.dataModel.reset();
     
     this.logger?.debug('ScormApiHandler reset to initial state');
+  }
+
+  /**
+   * Emits a custom event for SCORM API calls.
+   * @private
+   * @param {string} method - The name of the SCORM API method called.
+   * @param {Array} parameters - An array of parameters passed to the method.
+   * @param {string} result - The return value of the API method.
+   * @param {string} errorCode - The SCORM error code.
+   * @param {string} errorMessage - The corresponding error string or diagnostic message.
+   * @param {number} durationMs - The time taken for the API call to execute in milliseconds.
+   */
+  _emitApiCallLoggedEvent(method, parameters, result, errorCode, errorMessage, durationMs) {
+    const payload = {
+      method,
+      parameters,
+      result,
+      errorCode,
+      errorMessage,
+      timestamp: new Date().toISOString(),
+      sessionId: this.sessionId,
+      durationMs: parseFloat(durationMs.toFixed(3)) // Round to 3 decimal places
+    };
+    this.eventEmitter.emit('scorm-api-call-logged', payload);
+    this.logger?.debug(`Emitted scorm-api-call-logged event for ${method}`, payload);
   }
 }
 

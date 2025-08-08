@@ -8,6 +8,7 @@
 
 import { scormClient } from './scorm-client.js';
 import { eventBus } from './event-bus.js';
+import { sanitizeParam } from '../utils/payload-sanitizer.js';
 
 /**
  * SCORM API Bridge Class
@@ -78,7 +79,6 @@ class ScormAPIBridge {
       let result = this.executeScormMethod(method, params);
 
       // Emit API call event for debug panel
-      this.logApiCall(method, params, result);
 
       // Send response back to iframe
       if (source && source.postMessage) {
@@ -97,7 +97,6 @@ class ScormAPIBridge {
       } catch (_) { /* no-op */ }
 
       // Log the error as an API call
-      this.logApiCall(method, params, 'false', '101');
 
       if (source && source.postMessage) {
         try {
@@ -135,42 +134,6 @@ class ScormAPIBridge {
         return scormClient.GetDiagnostic(params[0]);
       default:
         return '0';
-    }
-  }
-  /**
-   * Log API call for debug panel
-   * @private
-   */
-  logApiCall(method, params, result, errorCode = '0') {
-    const startedAt = Date.now();
-    // Normalize and sanitize args (avoid leaking large/sensitive payloads)
-    const parameter = params ? (Array.isArray(params) ? params.map(p => String(p).slice(0, 512)).join(', ') : String(params).slice(0, 512)) : '';
-    const apiCall = {
-      id: startedAt + Math.random(),
-      seq: startedAt, // simple monotonic-ish base; aggregator may refine
-      method,
-      parameter,
-      result: String(result),
-      errorCode: String(errorCode),
-      timestamp: startedAt
-    };
-
-    // Emit event for debug panel in same window
-    eventBus.emit('api:call', { data: apiCall });
-    
-    // Also emit via IPC for debug window
-    if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      try { window.electronAPI.emitDebugEvent('api:call', apiCall); } catch (_e) { /* no-op */ }
-    }
-    
-    // Route to centralized logger with subsystem tag
-    import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-      rendererLogger?.debug('[RTE/API] call', apiCall);
-    }).catch(() => { /* no-op */ });
-
-    // Legacy IPC event for backward compatibility
-    if (window.electronAPI && window.electronAPI.log) {
-      try { window.electronAPI.log('scorm-api-call', apiCall); } catch (_e) { /* no-op */ }
     }
   }
 }

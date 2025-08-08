@@ -10,6 +10,7 @@
  * @fileoverview SCORM service integration layer for main process
  */
 
+const EventEmitter = require('events');
 const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
 const { ScormSNService } = require('./scorm/sn/index');
@@ -52,6 +53,7 @@ class ScormService extends BaseService {
     
     // Active workflows
     this.activeWorkflows = new Map();
+    this.eventEmitter = new EventEmitter(); // Add EventEmitter to ScormService
   }
 
   /**
@@ -206,6 +208,10 @@ class ScormService extends BaseService {
         // Override generated sessionId with our provided sessionId for consistency
         try { rte.sessionId = sessionId; } catch (_) {}
         this.rteInstances.set(sessionId, rte);
+        // Subscribe to scorm-api-call-logged events from this RTE instance
+        rte.eventEmitter.on('scorm-api-call-logged', (payload) => {
+          this.eventEmitter.emit('scorm-api-call-logged', payload);
+        });
       } catch (e) {
         this.logger?.warn('ScormService: Failed to initialize per-session RTE handler; falling back to session-local storage', e?.message || e);
       }
@@ -561,6 +567,7 @@ class ScormService extends BaseService {
         const snInitResult = await this.snService.initialize(result.manifest, { folderPath });
         if (snInitResult.success) {
           this.logger?.info(`ScormService: SN service initialized with manifest`);
+          this.eventEmitter.emit('course:loaded', { folderPath, manifest: result.manifest });
         } else {
           this.logger?.warn(`ScormService: SN service initialization failed: ${snInitResult.reason}`);
         }
@@ -598,6 +605,7 @@ class ScormService extends BaseService {
     if (this.sessions.has(sessionId)) {
       this.sessions.delete(sessionId);
       this.logger?.info(`ScormService: Session ${sessionId} reset`);
+      this.eventEmitter.emit('session:reset', { sessionId });
       return true;
     }
     return false;
@@ -973,6 +981,14 @@ class ScormService extends BaseService {
         }
       }
     }, 60000); // Check every minute
+  }
+
+  /**
+   * Subscribe to SCORM API call logged events from ScormService.
+   * @param {Function} callback - The callback function to be called when an event is emitted.
+   */
+  onScormApiCallLogged(callback) {
+    this.eventEmitter.on('scorm-api-call-logged', callback);
   }
 }
 

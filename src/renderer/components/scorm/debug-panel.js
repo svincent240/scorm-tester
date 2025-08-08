@@ -40,7 +40,7 @@ class DebugPanel extends BaseComponent {
 
   async setup() {
     this.uiState = await uiStatePromise;
-    this.loadApiCallHistory();
+    await this.loadApiCallHistory();
 
     // Initialize diagnostics cursors
     this._apiRafScheduled = false;
@@ -68,6 +68,7 @@ class DebugPanel extends BaseComponent {
       className: 'debug-panel',
       showTimestamps: true,
       enableExport: true,
+      hideHeader: false, // New option: hide the internal header
       attributes: { 'data-component': 'debug-panel' }
     };
   }
@@ -75,35 +76,37 @@ class DebugPanel extends BaseComponent {
 
   renderContent() {
     // Create the debug panel HTML structure if elements don't exist
-    if (!this.element.querySelector('.debug-tabs')) {
-      this.element.innerHTML = `
-        <div class="debug-panel__container">
-          <div class="debug-panel__header">
-            <h3>SCORM Debug Panel</h3>
-            <div class="debug-panel__controls">
-              <button id="debug-clear" class="debug-btn debug-btn--secondary">Clear</button>
-              <button id="debug-export" class="debug-btn debug-btn--secondary">Export</button>
-              <button id="debug-close" class="debug-btn debug-btn--close">×</button>
+    // The root element is passed in the constructor (this.element)
+    this.element.innerHTML = `
+      <div class="debug-panel__container">
+        ${this.options.hideHeader ? '' : `
+        <div class="debug-panel__header">
+          <h3>SCORM Debug Panel</h3>
+          <div class="debug-panel__controls">
+            <button id="debug-clear" class="debug-btn debug-btn--secondary">Clear</button>
+            <button id="debug-export" class="debug-btn debug-btn--secondary">Export</button>
+            <button id="debug-close" class="debug-btn debug-btn--close">×</button>
+          </div>
+        </div>
+        `}
+        
+        <div class="debug-tabs">
+          <button class="debug-tab debug-tab--active" data-tab="api-calls">API Timeline</button>
+          <button class="debug-tab" data-tab="attempt">Attempt</button>
+          <button class="debug-tab" data-tab="data-model">Data</button>
+          <button class="debug-tab" data-tab="sequencing">Sequencing</button>
+          <button class="debug-tab" data-tab="diagnostics">Diagnostics</button>
+          <button class="debug-tab" data-tab="errors">Errors</button>
+          <button class="debug-tab" data-tab="manifest">Manifest</button>
+        </div>
+        
+        <div class="debug-content-area">
+          <!-- API Timeline -->
+          <div id="debug-api-calls" class="debug-content debug-content--active">
+            <div id="api-calls-log" class="debug-log">
+              <div class="debug-log__empty">No API calls recorded</div>
             </div>
           </div>
-          
-          <div class="debug-tabs">
-            <button class="debug-tab debug-tab--active" data-tab="api-calls">API Timeline</button>
-            <button class="debug-tab" data-tab="attempt">Attempt</button>
-            <button class="debug-tab" data-tab="data-model">Data</button>
-            <button class="debug-tab" data-tab="sequencing">Sequencing</button>
-            <button class="debug-tab" data-tab="diagnostics">Diagnostics</button>
-            <button class="debug-tab" data-tab="errors">Errors</button>
-            <button class="debug-tab" data-tab="manifest">Manifest</button>
-          </div>
-          
-          <div class="debug-content-area">
-            <!-- API Timeline -->
-            <div id="debug-api-calls" class="debug-content debug-content--active">
-              <div id="api-calls-log" class="debug-log">
-                <div class="debug-log__empty">No API calls recorded</div>
-              </div>
-            </div>
 
             <!-- Attempt Lifecycle Controls -->
             <div id="debug-attempt" class="debug-content">
@@ -196,13 +199,12 @@ class DebugPanel extends BaseComponent {
           </div>
         </div>
       `;
-    }
     
     // Get references to elements
     this.clearBtn = this.element.querySelector('#debug-clear');
     this.exportBtn = this.element.querySelector('#debug-export');
     this.closeBtn = this.element.querySelector('#debug-close');
-    this.apiLog = this.element.querySelector('#api-calls-log');
+    this.apiTimelineLog = this.element.querySelector('#api-calls-log'); // Renamed from apiLog
     this.dataModelView = this.element.querySelector('#data-model-view');
     this.sessionInfo = this.element.querySelector('#session-info');
     this.errorLog = this.element.querySelector('#errors-log');
@@ -235,7 +237,7 @@ class DebugPanel extends BaseComponent {
       }).catch(() => {});
     }
     
-    if (!this.apiLog || !this.dataModelView || !this.sessionInfo || !this.errorLog) {
+    if (!this.apiTimelineLog || !this.dataModelView || !this.sessionInfo || !this.errorLog) { // Updated apiLog reference
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('DebugPanel: Some content areas not found after creation');
       }).catch(() => {});
@@ -487,17 +489,24 @@ class DebugPanel extends BaseComponent {
   }
 
   addApiCall(apiCall) {
+    // Keep the most recent entries at the front (newest-first) so the UI shows newest at top.
     // Avoid re-emitting into UIState to prevent api:call <-> state:changed feedback cycles.
     // The centralized history and aggregator already consume eventBus 'api:call'.
-    // Maintain only a local ring buffer for immediate view responsiveness.
-    this.apiCalls.push({
+    const entry = {
       ...apiCall,
       timestamp: apiCall.timestamp || Date.now(),
       id: apiCall.id || Date.now() + Math.random()
-    });
+    };
+
+    // Unshift to keep newest-first ordering locally
+    this.apiCalls.unshift(entry);
+
+    // Enforce max size
     if (this.apiCalls.length > this.maxApiCalls) {
-      this.apiCalls.shift();
+      this.apiCalls.length = this.maxApiCalls; // truncate oldest entries at the tail
     }
+
+    // If API tab visible, schedule a render (batched via RAF)
     if (this.activeTab === 'api-calls') {
       if (!this._apiRafScheduled) {
         this._apiRafScheduled = true;
@@ -510,9 +519,9 @@ class DebugPanel extends BaseComponent {
 
   refreshApiCallsView() {
     // Safety check: ensure element references are available
-    if (!this.apiLog) {
+    if (!this.apiTimelineLog) { // Updated apiLog reference
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.debug('DEBUG PANEL: apiLog element not yet available, skipping refresh');
+        rendererLogger.debug('DEBUG PANEL: apiTimelineLog element not yet available, skipping refresh'); // Updated log message
       }).catch(() => {});
       return;
     }
@@ -520,21 +529,37 @@ class DebugPanel extends BaseComponent {
     // Prefer aggregator-provided timeline; fallback to local buffer
     let rows = [];
     try {
-      rows = debugDataAggregator.getApiTimeline(200);
+      // Request a reasonable window (aggregator may return oldest→newest)
+      rows = debugDataAggregator.getApiTimeline(this.maxApiCalls) || [];
     } catch (_) {
-      rows = this.apiCalls.slice(-200);
+      rows = this.apiCalls.slice(0, this.maxApiCalls); // already newest-first locally
     }
 
     if (!rows || rows.length === 0) {
-      this.apiLog.innerHTML = '<div class="debug-log__empty">No API calls recorded</div>';
+      this.apiTimelineLog.innerHTML = '<div class="debug-log__empty">No API calls recorded</div>'; // Updated apiLog reference
       return;
     }
 
-    // Windowed rendering: render last 200 only
-    const windowed = rows.slice(-200);
+    // Ensure newest-first ordering for rendering. Aggregator may return oldest→newest, so normalize.
+    let windowed;
+    try {
+      // If the first entry is older than the last entry, assume oldest-first and reverse.
+      if (rows.length >= 2 && rows[0].timestamp <= rows[rows.length - 1].timestamp) {
+        windowed = rows.slice().reverse().slice(0, 200); // newest-first, limit to 200
+      } else {
+        windowed = rows.slice(0, 200); // already newest-first
+      }
+    } catch (_) {
+      windowed = rows.slice(0, 200);
+    }
+
     const html = windowed.map(call => this.formatApiCall(call)).join('');
-    this.apiLog.innerHTML = html;
-    this.apiLog.scrollTop = this.apiLog.scrollHeight;
+    this.apiTimelineLog.innerHTML = html; // Updated apiLog reference
+
+    // Keep scrollTop at 0 so newest (top) is visible. If user has scrolled, do not clobber.
+    if (!this._userScrolledApiLog) {
+      this.apiTimelineLog.scrollTop = 0; // Updated apiLog reference
+    }
   }
 
   formatApiCall(call) {
@@ -964,21 +989,56 @@ class DebugPanel extends BaseComponent {
     this.emit('panelClosed');
   }
 
-  loadApiCallHistory() {
-    if (!this.uiState) {
-      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.warn('DebugPanel: uiState not yet initialized, skipping API call history load');
-      }).catch(() => {});
-      return;
+  async loadApiCallHistory() {
+    // Try to obtain canonical history from main process (debug-get-history) when available.
+    // Fallback to uiState snapshot if IPC or preload wiring is not present.
+    try {
+      const { rendererLogger } = await import('../../utils/renderer-logger.js').catch(() => ({ rendererLogger: console }));
+      if (window && window.electronAPI && typeof window.electronAPI.invoke === 'function') {
+        try {
+          rendererLogger?.info && rendererLogger.info('DebugPanel: requesting debug-get-history from main');
+          const result = await window.electronAPI.invoke('debug-get-history', { limit: this.maxApiCalls });
+          // The handler returns an array (newest-first). If shape is { success, data } adjust accordingly.
+          let entries = [];
+          if (Array.isArray(result)) entries = result;
+          else if (result && Array.isArray(result.data)) entries = result.data;
+          else if (result && result.success && Array.isArray(result.entries)) entries = result.entries; // Corrected to 'entries'
+          else entries = [];
+
+          if (entries.length > 0) {
+            // Normalize timestamps and ids; ensure newest-first
+            this.apiCalls = entries.map(e => ({
+              ...e,
+              timestamp: e.timestamp || Date.now(),
+              id: e.id || (Date.now() + Math.random())
+            }));
+            // If telemetry returned oldest-first, detect and reverse
+            if (this.apiCalls.length >= 2 && this.apiCalls[0].timestamp < this.apiCalls[this.apiCalls.length - 1].timestamp) {
+              this.apiCalls = this.apiCalls.slice().reverse();
+            }
+            // Truncate to maxApiCalls
+            if (this.apiCalls.length > this.maxApiCalls) this.apiCalls.length = this.maxApiCalls;
+
+            // Visual hint: brief console info; UI highlight can be added later
+            rendererLogger?.info && rendererLogger.info(`DebugPanel: Loaded ${this.apiCalls.length} historic API entries from main`);
+            this.refreshActiveTab();
+            return;
+          } else {
+            rendererLogger?.debug && rendererLogger.debug('DebugPanel: debug-get-history returned no entries; falling back to uiState');
+          }
+        } catch (ipcErr) {
+          // Fall back quietly and continue
+          try { const { rendererLogger } = await import('../../utils/renderer-logger.js'); rendererLogger?.warn('DebugPanel: debug-get-history invoke failed', String(ipcErr?.message || ipcErr)); } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // ignore top-level import failures
     }
-    const history = this.uiState.getState('apiCallHistory') || [];
-    this.apiCalls = history;
-    this.refreshActiveTab();
+
   }
 
-  handleApiCall(data) {
-    // Normalize payload shape from scorm-api-bridge { data: apiCall } or direct apiCall
-    const payload = data && data.data ? data.data : data;
+  handleApiCall(payload) {
+    // The payload is now directly the API call object from the main process
     this.addApiCall(payload);
   }
 

@@ -45,11 +45,49 @@ class DebugTelemetryStore {
     this.logger?.info && this.logger.info(`[DebugTelemetryStore] Cleared ${cleared} entries`);
   }
 
-  getHistory() {
-    // Return a shallow copy to prevent external mutation.
-    return [...this.history];
+  /**
+   * getHistory(options)
+   * options: { limit, offset, sinceTs, methodFilter }
+   * Returns newest-first array of entries (shallow copies).
+   */
+  getHistory(options = {}) {
+    try {
+      const { limit = null, offset = 0, sinceTs = null, methodFilter = null } = options || {};
+      // work on a shallow copy in reversed order (newest-first)
+      let entries = [...this.history].reverse();
+
+      // Apply sinceTs filter (timestamp is ms)
+      if (sinceTs != null) {
+        const since = Number(sinceTs) || 0;
+        entries = entries.filter(e => (e.timestamp || 0) >= since);
+      }
+
+      // Apply methodFilter if provided (string or array)
+      if (methodFilter) {
+        const methods = Array.isArray(methodFilter) ? methodFilter.map(m => String(m)) : [String(methodFilter)];
+        entries = entries.filter(e => methods.includes(e.method));
+      }
+
+      // Apply offset + limit on newest-first array
+      const off = Math.max(0, Number(offset) || 0);
+      if (limit != null) {
+        const lim = Math.max(0, Number(limit) || 0);
+        entries = entries.slice(off, off + lim);
+      } else {
+        entries = entries.slice(off);
+      }
+
+      return entries;
+    } catch (e) {
+      try { this.logger?.warn && this.logger.warn('[DebugTelemetryStore] getHistory failed', e?.message || e); } catch (_) {}
+      return [];
+    }
   }
 
+  /**
+   * Flush current history to a debug window's webContents.
+   * Sends newest-first so the debug UI can render new entries at top without reordering.
+   */
   flushTo(webContents) {
     try {
       if (!webContents || (typeof webContents.send !== 'function')) {
@@ -57,8 +95,9 @@ class DebugTelemetryStore {
         return;
       }
 
-      this.logger?.info && this.logger.info(`[DebugTelemetryStore] Flushing ${this.history.length} entries to debug window`);
-      for (const entry of this.history) {
+      const entries = [...this.history].slice().reverse(); // newest-first
+      this.logger?.info && this.logger.info(`[DebugTelemetryStore] Flushing ${entries.length} entries to debug window (newest-first)`);
+      for (const entry of entries) {
         try {
           webContents.send('debug-event-received', 'api:call', entry);
         } catch (e) {
