@@ -193,6 +193,7 @@
         
         // Import the existing DebugPanel component using absolute protocol path
         import { DebugPanel } from 'scorm-app://src/renderer/components/scorm/debug-panel.js';
+        import { eventBus } from 'scorm-app://src/renderer/services/event-bus.js';
         
         class DebugWindow {
             constructor() {
@@ -283,11 +284,11 @@
                     if (window.electronAPI.onScormApiCallLogged) {
                         console.log('DEBUG WINDOW: Setting up scorm-api-call-logged listener');
                         window.electronAPI.onScormApiCallLogged((payload) => {
-                            console.log('DEBUG WINDOW: Received scorm-api-call-logged event:', payload);
-                            if (this.debugPanel) {
-                                this.debugPanel.addApiCall(payload);
-                            } else {
-                                console.warn('DEBUG WINDOW: Debug panel not available for scorm-api-call-logged event');
+                            console.log('DEBUG WINDOW: Received scorm-api-call-logged event, emitting to event bus:', payload);
+                            try {
+                                eventBus.emit('api:call', payload);
+                            } catch (e) {
+                                console.error('DEBUG WINDOW: Failed to emit api:call event', e);
                             }
                         });
                     } else {

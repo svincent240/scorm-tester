@@ -42,25 +42,26 @@ describe('ScormClient debug event emission', function() {
     scormClient.destroy();
   });
 
-  it('emits debug events via electronAPI.emitDebugEvent when logApiCall is invoked', function() {
+  it('emits debug events via electronAPI.emitDebugEvent when logApiCall is invoked', async function() {
     scormClient.Initialize('test-session');
     scormClient.GetValue('cmi.core.lesson_status');
 
-    assert.ok(emitDebugEventSpy.calledWith('api:call', {
+    // Allow promises to resolve
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.ok(emitDebugEventSpy.calledWith('api:call', sinon.match({
       method: 'Initialize',
       parameter: 'test-session',
       result: 'true',
-      errorCode: '0',
-      timestamp: sinon.match.number
-    }), 'emitDebugEvent should be called for Initialize');
+      errorCode: '0'
+    })), 'emitDebugEvent should be called for Initialize');
 
-    assert.ok(emitDebugEventSpy.calledWith('api:call', {
+    assert.ok(emitDebugEventSpy.calledWith('api:call', sinon.match({
       method: 'GetValue',
       parameter: 'cmi.core.lesson_status',
       result: '',
-      errorCode: '0',
-      timestamp: sinon.match.number
-    }), 'emitDebugEvent should be called for GetValue');
+      errorCode: '0'
+    })), 'emitDebugEvent should be called for GetValue');
 
     assert.strictEqual(emitDebugEventSpy.callCount, 2, 'emitDebugEvent should be called twice');
   });

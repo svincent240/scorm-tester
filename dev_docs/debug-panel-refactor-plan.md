@@ -61,17 +61,18 @@ This phase focuses on establishing a reliable and efficient data pipeline for SC
 
 #### Goal 1.4: Update `debug-panel.js` and `debug.html` to consume centralized events
 
-*   **Action:** Modify the debug window's renderer process to receive and display API call events from the new centralized main process source.
+*   **Action:** Modify the debug window's renderer process to receive and display API call events from the new centralized main process source using a robust event-driven approach.
 *   **Details:**
     *   **`src/preload.js`:** Expose a new `safeOn` listener for the `scorm-api-call-logged` event. This will allow the `debug.html` renderer to subscribe to this event.
     *   **`debug.html`:**
-        *   In the `<script type="module">` block, update the `setupIPC` method within the `DebugWindow` class.
-        *   Replace or update the existing `window.electronAPI.onDebugEvent` and `window.electronAPI.onScormApiLog` listeners to subscribe to the new `window.electronAPI.on('scorm-api-call-logged', ...)` event.
-        *   The callback for this new listener should call `this.debugPanel.addApiCall(data)`, ensuring the `DebugPanel` receives the API call data.
+        *   In the `<script type="module">` block, import the `eventBus` singleton.
+        *   Update the `setupIPC` method to subscribe to the `window.electronAPI.onScormApiCallLogged` event.
+        *   The callback for this listener will emit an `'api:call'` event on the `eventBus` with the received data payload. This decouples the IPC event reception from the UI components.
     *   **`src/renderer/components/scorm/debug-panel.js`:**
-        *   The `handleApiCall` method should be updated to expect the new `scorm-api-call-logged` event structure. Ensure it correctly parses the `method`, `parameters`, `result`, `errorCode`, etc., from the incoming `data` payload.
+        *   The `DebugPanel` component will subscribe to the `'api:call'` event on the `eventBus`.
+        *   The `handleApiCall` method will be triggered by this event and will add the API call to the panel's view.
         *   Modify `loadApiCallHistory` to fetch history directly from the main process's `DebugTelemetryStore`. This will involve a new IPC `invoke` call (e.g., `window.electronAPI.invoke('debug-get-api-history')`) that the main process's `IpcHandler` will respond to by querying `DebugTelemetryStore`.
-*   **Reasoning:** Ensures reliable and consistent data display in the debug panel, leveraging the authoritative data source in the main process.
+*   **Reasoning:** Using an event bus ensures reliable and consistent data display in the debug panel, leveraging the authoritative data source in the main process. This approach also prevents potential race conditions where IPC events could be received before the debug panel UI is fully initialized.
 
 #### Goal 1.5: Implement Historical Data Reset on Course Load
 
@@ -128,7 +129,9 @@ graph TD
 
     subgraph Debug Window Renderer
         K --> L(debug.html);
-        L --> M(DebugPanel.addApiCall);
+        L -- emits 'api:call' --> EB(eventBus);
+        EB --> M(DebugPanel);
+        EB --> DA(DebugDataAggregator);
     end
 
     subgraph Main Window Renderer
