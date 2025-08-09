@@ -149,6 +149,86 @@ class ScormDataModel {
   }
 
   /**
+   * Set value of a data model element internally, bypassing read-only checks.
+   * This method is intended for internal LMS/RTE initialization or state management.
+   * @private
+   * @param {string} element - Data model element name
+   * @param {string} value - Value to set
+   * @returns {boolean} True if successful, false on error
+   */
+  _setInternalValue(element, value) {
+    try {
+      // Validate element format (still important for internal sets)
+      if (!this.isValidElement(element)) {
+        this.logger?.warn(`_setInternalValue: Invalid data model element: ${element}`);
+        return false;
+      }
+
+      // Validate value format and type (still important for internal sets)
+      if (!this.validateValue(element, value)) {
+        this.logger?.warn(`_setInternalValue: Invalid value for ${element}: ${value}`);
+        return false;
+      }
+
+      // Handle collection elements (still need to manage collections correctly)
+      if (this.isCollectionElement(element)) {
+        return this.setCollectionValue(element, value);
+      }
+
+      // Directly set the value, bypassing read-only check
+      this.data.set(element, value);
+      this.logger?.debug(`_setInternalValue: Set ${element} = ${value} (internal)`);
+      this.errorHandler.clearError(); // Clear any previous error from this operation
+      return true;
+    } catch (error) {
+      this.logger?.error('Error in _setInternalValue:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get value of a data model element internally, bypassing write-only checks.
+   * This method is intended for internal LMS/RTE state management.
+   * @private
+   * @param {string} element - Data model element name
+   * @returns {string} Element value or empty string on error
+   */
+  _getInternalValue(element) {
+    try {
+      // Validate element format (still important for internal gets)
+      if (!this.isValidElement(element)) {
+        this.logger?.warn(`_getInternalValue: Invalid data model element: ${element}`);
+        return '';
+      }
+
+      // Handle collection elements
+      if (this.isCollectionElement(element)) {
+        return this.getCollectionValue(element);
+      }
+
+      // Directly get the value, bypassing write-only check
+      const value = this.data.get(element);
+      
+      // Check if value is initialized
+      if (value === undefined || value === null) {
+        const schema = this.getElementSchema(element);
+        if (schema && schema.defaultValue !== null) {
+          return String(schema.defaultValue);
+        }
+        this.logger?.warn(`_getInternalValue: Element not initialized: ${element}`);
+        return '';
+      }
+
+      this.logger?.debug(`_getInternalValue: Get ${element} = ${value} (internal)`);
+      this.errorHandler.clearError(); // Clear any previous error from this operation
+      return String(value);
+    } catch (error) {
+      this.logger?.error('Error in _getInternalValue:', error);
+      return '';
+    }
+  }
+
+  /**
    * Initialize data model with default values
    * @private
    */

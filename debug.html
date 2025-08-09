@@ -220,13 +220,13 @@
                         if (window.electronAPI && typeof window.electronAPI.invoke === 'function') {
                             console.log('DEBUG WINDOW: Requesting historic telemetry via debug-get-history');
                             const resp = await window.electronAPI.invoke('debug-get-history', { limit: 2000 });
-                            if (resp && resp.success && Array.isArray(resp.entries)) {
+                            if (resp && resp.success && Array.isArray(resp.history)) {
                                 // entries are newest-first per contract; add them oldest→newest into UI to preserve chronological order
-                                const entries = resp.entries.slice().reverse();
+                                const entries = resp.history.slice().reverse();
                                 for (const e of entries) {
                                     try { this.debugPanel.addApiCall(e); } catch (_) {}
                                 }
-                                console.log(`DEBUG WINDOW: Loaded ${resp.entries.length} historic telemetry entries`);
+                                console.log(`DEBUG WINDOW: Loaded ${resp.history.length} historic telemetry entries`);
                             } else {
                                 console.warn('DEBUG WINDOW: debug-get-history returned no entries or failed', resp);
                             }

@@ -53,6 +53,7 @@ class DebugTelemetryStore {
   getHistory(options = {}) {
     try {
       const { limit = null, offset = 0, sinceTs = null, methodFilter = null } = options || {};
+      this.logger?.debug && this.logger.debug(`[DebugTelemetryStore] getHistory called. Current history size: ${this.history.length}, options: ${JSON.stringify(options)}`);
       // work on a shallow copy in reversed order (newest-first)
       let entries = [...this.history].reverse();
 
@@ -60,12 +61,14 @@ class DebugTelemetryStore {
       if (sinceTs != null) {
         const since = Number(sinceTs) || 0;
         entries = entries.filter(e => (e.timestamp || 0) >= since);
+        this.logger?.debug && this.logger.debug(`[DebugTelemetryStore] getHistory after sinceTs filter: ${entries.length} entries`);
       }
 
       // Apply methodFilter if provided (string or array)
       if (methodFilter) {
         const methods = Array.isArray(methodFilter) ? methodFilter.map(m => String(m)) : [String(methodFilter)];
         entries = entries.filter(e => methods.includes(e.method));
+        this.logger?.debug && this.logger.debug(`[DebugTelemetryStore] getHistory after methodFilter: ${entries.length} entries`);
       }
 
       // Apply offset + limit on newest-first array
@@ -76,7 +79,7 @@ class DebugTelemetryStore {
       } else {
         entries = entries.slice(off);
       }
-
+      this.logger?.debug && this.logger.debug(`[DebugTelemetryStore] getHistory returning ${entries.length} entries`);
       return entries;
     } catch (e) {
       try { this.logger?.warn && this.logger.warn('[DebugTelemetryStore] getHistory failed', e?.message || e); } catch (_) {}

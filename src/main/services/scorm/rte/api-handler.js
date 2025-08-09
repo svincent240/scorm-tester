@@ -249,8 +249,14 @@ class ScormApiHandler {
         return result;
       }
 
-      // Get value from data model
-      const value = this.dataModel.getValue(element);
+      // Special handling for cmi.session_time (write-only, but internal read is needed)
+      let value;
+      if (element === 'cmi.session_time') {
+        value = this.dataModel._getInternalValue(element);
+      } else {
+        // Get value from data model (standard external access)
+        value = this.dataModel.getValue(element);
+      }
       result = value;
 
       if (!this.errorHandler.hasError()) {
@@ -481,13 +487,13 @@ class ScormApiHandler {
   initializeSessionData() {
     // Set entry mode based on previous session state
     const entryMode = this.determineEntryMode();
-    this.dataModel.setValue('cmi.entry', entryMode);
+    this.dataModel._setInternalValue('cmi.entry', entryMode);
 
     // Set credit mode (could come from launch parameters)
-    this.dataModel.setValue('cmi.credit', 'credit');
+    this.dataModel._setInternalValue('cmi.credit', 'credit');
 
     // Set lesson mode
-    this.dataModel.setValue('cmi.mode', 'normal');
+    this.dataModel._setInternalValue('cmi.mode', 'normal');
 
     // Initialize learner information if available
     if (this.sessionManager) {
@@ -532,7 +538,7 @@ class ScormApiHandler {
       const seconds = Math.floor((sessionDuration % (1000 * 60)) / 1000);
       
       const sessionTime = `PT${hours}H${minutes}M${seconds}S`;
-      this.dataModel.setValue('cmi.session_time', sessionTime);
+      this.dataModel._setInternalValue('cmi.session_time', sessionTime);
       
       this.logger?.debug('Session time calculated:', sessionTime);
     }

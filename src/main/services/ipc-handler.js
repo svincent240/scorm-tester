@@ -285,6 +285,15 @@ class IpcHandler extends BaseService {
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
       // Debug history fetch - returns newest-first entries with optional filters { limit, offset, sinceTs, methodFilter }
       this.registerHandler('debug-get-history', this.handleDebugGetHistory.bind(this));
+      // Handler for debug events from renderer (e.g., electronAPI.emitDebugEvent)
+      this.registerHandler('debug-event', async (_event, eventType, data) => {
+        if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
+          // Store as an API call for now; can refine event types later if needed
+          this.telemetryStore.storeApiCall({ method: eventType, ...data });
+          return { success: true };
+        }
+        return { success: false, error: 'Telemetry store not available' };
+      });
 
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
@@ -1051,13 +1060,13 @@ class IpcHandler extends BaseService {
     try {
       const windowManager = this.getDependency('windowManager');
       if (windowManager) {
-        const allWindows = windowManager.getAllWindows();
-        allWindows.forEach(window => {
+        // Iterate over all managed windows and send the event
+        for (const window of windowManager.windows.values()) {
           if (window && !window.isDestroyed()) {
             window.webContents.send('scorm-api-call-logged', payload);
             this.logger?.debug(`[IPC Handler] Broadcasted scorm-api-call-logged to window ${window.id}`);
           }
-        });
+        }
       } else {
         this.logger?.warn('[IPC Handler] WindowManager not available for broadcasting scorm-api-call-logged event.');
       }

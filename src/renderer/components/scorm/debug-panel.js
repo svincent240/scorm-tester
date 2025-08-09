@@ -230,18 +230,8 @@ class DebugPanel extends BaseComponent {
     this._benchSectionInjected = false;
 
     // Verify we have the elements we need
-    if (!this.clearBtn || !this.exportBtn || !this.closeBtn) {
-      // route to app log instead of console
-      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.warn('DebugPanel: Some control buttons not found after creation');
-      }).catch(() => {});
-    }
-    
-    if (!this.apiTimelineLog || !this.dataModelView || !this.sessionInfo || !this.errorLog) { // Updated apiLog reference
-      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.warn('DebugPanel: Some content areas not found after creation');
-      }).catch(() => {});
-    }
+    // The header buttons (clear, export, close) are conditionally rendered based on hideHeader option in debug.html
+    // The content areas are dynamically managed. Warnings are not needed here.
     
     // Bind events after DOM is created to ensure tabs and controls are interactive
     try {
@@ -500,6 +490,9 @@ class DebugPanel extends BaseComponent {
 
     // Unshift to keep newest-first ordering locally
     this.apiCalls.unshift(entry);
+    import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+      rendererLogger.debug(`DEBUG PANEL: addApiCall - apiCalls length: ${this.apiCalls.length}`);
+    }).catch(() => {});
 
     // Enforce max size
     if (this.apiCalls.length > this.maxApiCalls) {
@@ -518,6 +511,9 @@ class DebugPanel extends BaseComponent {
   }
 
   refreshApiCallsView() {
+    import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+      rendererLogger.debug('DEBUG PANEL: Entering refreshApiCallsView'); // New log
+    }).catch(() => {});
     // Safety check: ensure element references are available
     if (!this.apiTimelineLog) { // Updated apiLog reference
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
@@ -531,9 +527,19 @@ class DebugPanel extends BaseComponent {
     try {
       // Request a reasonable window (aggregator may return oldest→newest)
       rows = debugDataAggregator.getApiTimeline(this.maxApiCalls) || [];
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug(`DEBUG PANEL: refreshApiCallsView - rows from aggregator: ${rows.length}`);
+      }).catch(() => {});
     } catch (_) {
       rows = this.apiCalls.slice(0, this.maxApiCalls); // already newest-first locally
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger.debug(`DEBUG PANEL: refreshApiCallsView - fallback to local apiCalls: ${rows.length}`);
+      }).catch(() => {});
     }
+
+    import('../../utils/renderer-logger.js').then(({ rendererLogger }) => { // New log
+      rendererLogger.debug(`DEBUG PANEL: refreshApiCallsView - rows after aggregator/fallback: ${rows.length}`); // New log
+    }).catch(() => {});
 
     if (!rows || rows.length === 0) {
       this.apiTimelineLog.innerHTML = '<div class="debug-log__empty">No API calls recorded</div>'; // Updated apiLog reference
@@ -1002,7 +1008,7 @@ class DebugPanel extends BaseComponent {
           let entries = [];
           if (Array.isArray(result)) entries = result;
           else if (result && Array.isArray(result.data)) entries = result.data;
-          else if (result && result.success && Array.isArray(result.entries)) entries = result.entries; // Corrected to 'entries'
+          else if (result && result.success && Array.isArray(result.history)) entries = result.history; // Corrected to 'history'
           else entries = [];
 
           if (entries.length > 0) {
