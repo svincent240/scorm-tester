@@ -112,9 +112,8 @@ class Logger {
     }
 
     debug(message, ...args) {
-        if (this.logLevel === 'debug') {
-            this.log('debug', message, ...args);
-        }
+        // Temporarily force debug logs for troubleshooting
+        this.log('debug', message, ...args);
     }
 }
 

@@ -6,9 +6,6 @@
  * @fileoverview SCORM API bridge for iframe communication
  */
 
-import { scormClient } from './scorm-client.js';
-import { eventBus } from './event-bus.js';
-import { sanitizeParam } from '../utils/payload-sanitizer.js';
 
 /**
  * SCORM API Bridge Class
@@ -68,17 +65,12 @@ class ScormAPIBridge {
    */
   async handleScormAPICall(data, source) {
     const { method, params, callId } = data;
-    
+    let result;
+    let error = null;
+
     try {
-      // Initialize session if needed
-      if (!this.sessionId && method === 'Initialize') {
-        this.sessionId = 'session_' + Date.now();
-        scormClient.Initialize(this.sessionId);
-      }
-
-      let result = this.executeScormMethod(method, params);
-
-      // Emit API call event for debug panel
+      // Execute SCORM method
+      result = this.executeScormMethod(method, params);
 
       // Send response back to iframe
       if (source && source.postMessage) {
@@ -90,13 +82,6 @@ class ScormAPIBridge {
       }
 
     } catch (error) {
-      // Route renderer errors via centralized logger (no console.* in renderer)
-      try {
-        const { rendererLogger } = await import('../utils/renderer-logger.js');
-        rendererLogger?.error('SCORM API Bridge Error', { method, message: error?.message || String(error) });
-      } catch (_) { /* no-op */ }
-
-      // Log the error as an API call
 
       if (source && source.postMessage) {
         try {
@@ -114,10 +99,15 @@ class ScormAPIBridge {
   /**
    * Execute SCORM method and return result
    */
-  executeScormMethod(method, params) {
+  async executeScormMethod(method, params) {
+    const { scormClient } = await import('./scorm-client.js');
     switch (method) {
       case 'Initialize':
-        return scormClient.Initialize(this.sessionId || 'default');
+        // Generate session ID if not already set
+        if (!this.sessionId) {
+          this.sessionId = 'session_' + Date.now();
+        }
+        return scormClient.Initialize(this.sessionId);
       case 'Terminate':
         return scormClient.Terminate(params[0] || '');
       case 'GetValue':

@@ -53,7 +53,7 @@ class ScormClient {
   async loadValidator() {
     try {
       // Dynamic import of ES6 renderer validator
-      const validatorModule = await import('../utils/scorm-validator.js');
+      const validatorModule = await import(`${window.electronAPI.rendererBaseUrl}utils/scorm-validator.js`);
       
       this.validator = {
         isValidElement: validatorModule.isValidElement,
@@ -61,7 +61,7 @@ class ScormClient {
       };
     } catch (error) {
       try {
-        const { rendererLogger } = await import('../utils/renderer-logger.js');
+        const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
         rendererLogger.error('Failed to load validator module', error?.message || error);
       } catch (_) {
         // no-op
@@ -532,7 +532,7 @@ class ScormClient {
 
       if (is401 && isAdlDataProbe) {
         // Log as WARN to the centralized renderer logger and suppress 'scorm:error' event emission
-        import('./utils/renderer-logger.js')
+        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
           .then(({ rendererLogger }) => {
             rendererLogger?.warn('[RTE] Ignoring undefined ADL data model probe', {
               element,
@@ -582,18 +582,6 @@ class ScormClient {
     // Emit event for debug panel in same window
     try { eventBus.emit('api:call', { data: apiCall }); } catch (_) {}
 
-    // Also emit via IPC for debug window (guard against rate limits)
-    if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-      try {
-        // Use promise-returning invoke but don't await to keep synchronous API behavior
-        Promise.resolve(window.electronAPI.emitDebugEvent('api:call', apiCall)).catch(() => { /* swallow */ });
-      } catch (e) {
-        const msg = (e && e.message) ? e.message : String(e);
-        if (msg && msg.includes('Rate limit exceeded')) {
-          // Degrade gracefully: skip further emits for this tick
-        }
-      }
-    }
   }
 
   /**

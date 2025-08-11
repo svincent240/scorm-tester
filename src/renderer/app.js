@@ -8,6 +8,15 @@
  */
 
 /**
+ * SCORM Tester Application Entry Point
+ *
+ * Clean, modular application entry point that delegates to the AppManager service.
+ * Preserves critical debugging from troubleshooting while maintaining clean architecture.
+ *
+ * @fileoverview Main application entry point
+ */
+
+/**
  * Application Initialization
  *
  * Uses dynamic imports to work around Electron custom protocol ES6 module limitations.
@@ -18,8 +27,8 @@
  */
 async function initializeApplication() {
   try {
-    // Use dynamic import to load the AppManager
-    const { appManager } = await import('./services/app-manager.js');
+    // Use dynamic import to load the AppManager with absolute path
+    const { appManager } = await import(`${window.electronAPI.rendererBaseUrl}services/app-manager.js`);
     
     if (!appManager) {
       throw new Error('AppManager not available - check dynamic import');
@@ -27,6 +36,7 @@ async function initializeApplication() {
     
     // Initialize the application through AppManager
     await appManager.initialize();
+
     
   } catch (error) {
     // Centralized logging and UI notification (no inline HTML)

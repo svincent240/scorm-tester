@@ -9,6 +9,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 /**
  * Path Utilities Class
@@ -106,12 +107,15 @@ class PathUtils {
       // Validate the resolved path exists and is within an allowed base
       const normalizedAppRoot = this.normalize(appRoot);
       const normalizedAllowedBase = allowedBase ? this.normalize(allowedBase) : null;
-
+      // Treat the application's canonical temp extraction directory as an additional allowed base.
+      const normalizedTempRoot = this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+ 
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinAllowedBase = normalizedAllowedBase ? resolvedPath.startsWith(normalizedAllowedBase) : false;
-
-      if (!withinAppRoot && !withinAllowedBase) {
-        const bases = normalizedAllowedBase ? `${normalizedAppRoot} OR ${normalizedAllowedBase}` : normalizedAppRoot;
+      const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
+ 
+      if (!withinAppRoot && !withinAllowedBase && !withinTempRoot) {
+        const bases = normalizedAllowedBase ? `${normalizedAppRoot} OR ${normalizedAllowedBase} OR ${normalizedTempRoot}` : `${normalizedAppRoot} OR ${normalizedTempRoot}`;
         throw new Error(`Resolved path outside allowed roots (${bases}): ${resolvedPath}`);
       }
 
@@ -224,17 +228,22 @@ class PathUtils {
 
       // Remove query parameters for file resolution
       let [filePath, queryString] = requestedPath.split('?');
-
+      const rawFilePath = filePath; // preserve original for 'abs/' detection
+ 
       // Normalize double abs prefixes that can occur when subresources are resolved relative to an abs URL
-      if (filePath.startsWith('abs/abs/')) {
-        filePath = filePath.replace(/^abs\/abs\//, 'abs/');
+      // Do the 'abs' detection before path.normalize to avoid platform path-separator issues on Windows
+      const normalizedRawForAbs = rawFilePath.replace(/\\/g, '/');
+      if (normalizedRawForAbs.startsWith('abs/abs/')) {
+        filePath = normalizedRawForAbs.replace(/^abs\/abs\//, 'abs/');
+      } else {
+        filePath = normalizedRawForAbs;
       }
-
+ 
       // Branch 1: Absolute-path encoded scheme for external folders
       if (filePath.startsWith('abs/')) {
         // Extract the encoded absolute path portion after 'abs/'
         let encoded = filePath.substring(4);
-
+ 
         // First, decode URI components to handle %7C, %20, etc.
         try {
           // decodeURIComponent may throw on malformed sequences; guard it
@@ -242,14 +251,14 @@ class PathUtils {
         } catch (_) {
           // If decoding fails, proceed with raw string
         }
-
+ 
         // Restore Windows drive colon if encoded with pipe or percent form
         // Accept both 'C|/...' and 'C:/...' variants
         encoded = encoded.replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`);
-
-        // Normalize to fs path
-        const absPath = this.normalize(encoded);
-
+ 
+        // Normalize to fs path (convert forward slashes to platform separators)
+        const absPath = path.normalize(encoded);
+ 
         // Basic traversal guard: no '..' segments after normalization
         if (absPath.includes('..')) {
           return {
@@ -259,7 +268,7 @@ class PathUtils {
             resolvedPath: absPath
           };
         }
-
+ 
         // Ensure file exists
         if (!fs.existsSync(absPath)) {
           return {
@@ -269,7 +278,7 @@ class PathUtils {
             resolvedPath: absPath
           };
         }
-
+ 
         return {
           success: true,
           resolvedPath: absPath,
@@ -278,12 +287,14 @@ class PathUtils {
           usedBase: 'allowedBase'
         };
       }
-
+ 
       // Branch 2: Legacy appRoot-relative behavior
+      // Normalize the file path to handle '..' segments correctly for appRoot joins
+      const normalizedFilePath = path.normalize(filePath);
       const normalizedAppRoot = this.normalize(appRoot);
-      const fullPath = path.join(normalizedAppRoot, filePath);
+      const fullPath = path.join(normalizedAppRoot, normalizedFilePath);
       const normalizedPath = this.normalize(fullPath);
-
+ 
       // Validate path security and existence
       if (!this.validatePath(normalizedPath, normalizedAppRoot)) {
         return {

@@ -681,6 +681,7 @@ class ScormApiHandler {
       durationMs: parseFloat(durationMs.toFixed(3)) // Round to 3 decimal places
     };
     this.eventEmitter.emit('scorm-api-call-logged', payload);
+    this.logger?.info(`SCORM API Call [Session: ${payload.sessionId}]: ${method}(${parameters.map(p => JSON.stringify(p)).join(', ')}) -> Result: ${result}, ErrorCode: ${errorCode}, ErrorMessage: "${errorMessage}" (Duration: ${durationMs}ms)`);
     this.logger?.debug(`Emitted scorm-api-call-logged event for ${method}`, payload);
   }
 }

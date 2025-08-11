@@ -479,11 +479,11 @@ class WindowManager extends BaseService {
   sendBufferedApiCallsToDebugWindow(debugWindow) {
     try {
       // Prefer a telemetry store if available (DebugTelemetryStore.flushTo)
-      const telemetryStore = this.getDependency('telemetryStore') || null;
-      if (telemetryStore && typeof telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
+      // Use the directly set telemetryStore instance
+      if (this.telemetryStore && typeof this.telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
         this.logger?.info('WindowManager: Flushing telemetry store to debug window');
         try {
-          telemetryStore.flushTo(debugWindow.webContents);
+          this.telemetryStore.flushTo(debugWindow.webContents);
           return;
         } catch (e) {
           // Do not fall back to IpcHandler buffered calls; telemetryStore is the single source of truth now.
@@ -497,5 +497,15 @@ class WindowManager extends BaseService {
     }
   }
 }
-
+ 
+/**
+ * Set the telemetry store instance.
+ * This is called after the telemetry store is initialized in the main process.
+ * @param {DebugTelemetryStore} telemetryStore - The telemetry store instance.
+ */
+WindowManager.prototype.setTelemetryStore = function(telemetryStore) {
+  this.telemetryStore = telemetryStore;
+  this.logger?.debug('WindowManager: TelemetryStore instance set.');
+};
+ 
 module.exports = WindowManager;

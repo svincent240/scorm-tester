@@ -49,9 +49,11 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@babel/preset-env": "^7.25.0",
+    "@testing-library/jest-dom": "^6.6.4",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.0",
     "babel-jest": "^29.7.0",
+    "chai": "^5.2.1",
     "electron": "^24.0.0",
     "electron-builder": "^23.6.0",
     "eslint": "^8.36.0",
@@ -62,7 +64,9 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.0.5",
     "jest-environment-node": "^29.7.0",
+    "jest-esm-transformer": "^1.0.0",
     "sinon": "^21.0.0",
+    "spectron": "^19.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
@@ -81,6 +85,10 @@
       "**/__tests__/**/*.js",
       "**/?(*.)+(spec|test).js"
     ],
+    "moduleNameMapper": {
+      "^../base-component.js$": "<rootDir>/src/renderer/components/base-component.js",
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/**/*.test.js",
@@ -105,15 +113,22 @@
     ],
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest",
-      "node_modules/sinon/.*\\.js$": "babel-jest"
+      "node_modules/sinon/.*\\.js$": "babel-jest",
+      "node_modules/chai/.*\\.js$": "jest-esm-transformer"
     },
     "transformIgnorePatterns": [
-      "/node_modules/(?!sinon)/"
+      "/node_modules/(?!(sinon)/)"
     ],
     "moduleFileExtensions": [
       "js",
       "jsx",
-      "json"
+      "json",
+      "mjs",
+      "cjs"
+    ],
+    "moduleDirectories": [
+      "node_modules",
+      "src"
     ],
     "testTimeout": 30000,
     "forceExit": true,

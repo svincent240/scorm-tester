@@ -130,6 +130,16 @@ const SERVICE_DEFAULTS = {
 };
 
 /**
+ * Debug Telemetry Defaults
+ */
+const DEBUG_TELEMETRY_DEFAULTS = {
+  MAX_HISTORY_SIZE: 5000, // Max number of API calls to store in history
+  MAX_ERROR_HISTORY_SIZE: 300, // Max number of errors to store
+  MAX_LOG_HISTORY_SIZE: 500, // Max number of logs to store
+  THROTTLE_INTERVAL_MS: 200 // Throttle interval for debug:update emissions
+};
+
+/**
  * Service Events
  */
 const SERVICE_EVENTS = {
@@ -253,7 +263,8 @@ Object.freeze(SERVICE_DEFAULTS);
 Object.freeze(SERVICE_EVENTS);
 Object.freeze(PERFORMANCE_THRESHOLDS);
 Object.freeze(SECURITY_CONFIG);
-
+Object.freeze(DEBUG_TELEMETRY_DEFAULTS); // Freeze the new constant
+ 
 module.exports = {
   SERVICE_STATES,
   SERVICE_TYPES,
@@ -264,5 +275,6 @@ module.exports = {
   SERVICE_DEFAULTS,
   SERVICE_EVENTS,
   PERFORMANCE_THRESHOLDS,
-  SECURITY_CONFIG
+  SECURITY_CONFIG,
+  DEBUG_TELEMETRY_DEFAULTS // Export the new constant
 };

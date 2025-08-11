@@ -19,8 +19,9 @@ import { setupDebugMirroring } from './ui-state.debug.js';
  * Centralized state management with event-driven updates and persistence.
  */
 class UIStateManager {
-  constructor() {
-    this.state = this.getInitialState();
+  constructor(helpers) {
+    this.helpers = helpers; // Store dynamically loaded helpers
+    this.state = {}; // Initialize empty state
     this.subscribers = new Map();
     this.persistenceKey = 'scorm-tester-ui-state';
     this.debounceTimeout = null;
@@ -39,11 +40,18 @@ class UIStateManager {
     } else {
       // Write to renderer/app log without using console (per logging rules)
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('UIStateManager: DOM environment not detected; global listeners disabled for non-browser context');
-        }).catch(() => {});
+        this.helpers.rendererLogger.info('UIStateManager: DOM environment not detected; global listeners disabled for non-browser context');
       } catch (_) { /* no-op */ }
     }
+  }
+
+  /**
+   * Internal method to initialize the state after helpers are loaded.
+   * @private
+   */
+  _initializeState() {
+    this.state = this.getInitialState();
+    this.loadPersistedState(); // Load persisted state after initial state is set
   }
 
   /**
@@ -52,7 +60,7 @@ class UIStateManager {
    */
   getInitialState() {
     // Moved into ui-state.initial.js to reduce file size per architecture rules
-    return getInitialUIState();
+    return this.helpers.getInitialUIState();
   }
 
   /**
@@ -65,7 +73,7 @@ class UIStateManager {
       return { ...this.state };
     }
     
-    return getNestedValue(this.state, path);
+    return this.helpers.getNestedValue(this.state, path);
   }
 
   /**
@@ -79,10 +87,10 @@ class UIStateManager {
     
     if (typeof updates === 'string') {
       // Single value update using path notation
-      setNestedValue(this.state, updates, value);
+      this.helpers.setNestedValue(this.state, updates, value);
     } else if (typeof updates === 'object' && updates !== null) {
       // Merge object updates
-      this.state = deepMerge(this.state, updates);
+      this.state = this.helpers.deepMerge(this.state, updates);
     } else {
       throw new Error('Invalid state update parameters');
     }
@@ -195,9 +203,7 @@ class UIStateManager {
     if (!changed) {
       // Log via renderer logger (no console) that emit is skipped
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.debug('UIState.updateProgress: no-op (no diff); emit skipped');
-        });
+        this.helpers.rendererLogger.debug('UIState.updateProgress: no-op (no diff); emit skipped');
       } catch (_) { /* no-op */ }
       return;
     }
@@ -236,9 +242,7 @@ class UIStateManager {
     if (!uiChanged) {
       // Skip state update and emit if there is no actual UI change
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.debug('UIState.updateUI: no-op (no diff); emit skipped');
-        });
+        this.helpers.rendererLogger.debug('UIState.updateUI: no-op (no diff); emit skipped');
       } catch (_) { /* no-op */ }
       return;
     }
@@ -301,7 +305,7 @@ class UIStateManager {
    * @param {Object} notification - Notification data
    */
   showNotification(notification) {
-    return showNotification(this, notification);
+    return this.helpers.showNotification(this, notification);
   }
 
   /**
@@ -309,7 +313,7 @@ class UIStateManager {
    * @param {string|number} id - Notification ID
    */
   removeNotification(id) {
-    return removeNotification(this, id);
+    return this.helpers.removeNotification(this, id);
   }
 
   /**
@@ -379,9 +383,7 @@ class UIStateManager {
     // Guard again in case called directly
     if (!(typeof window !== 'undefined' && typeof document !== 'undefined')) {
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.debug('UIStateManager: setupGlobalEventListeners skipped (no DOM)');
-        }).catch(() => {});
+        this.helpers.rendererLogger.debug('UIStateManager: setupGlobalEventListeners skipped (no DOM)');
       } catch (_) { /* no-op */ }
       return;
     }
@@ -408,9 +410,7 @@ class UIStateManager {
   setupEventBusListeners() {
     if (!this.eventBus) {
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.warn('UIStateManager: EventBus not available for setting up listeners.');
-        }).catch(() => {});
+        this.helpers.rendererLogger.warn('UIStateManager: EventBus not available for setting up listeners.');
       } catch (_) { /* no-op */ }
       return;
     }
@@ -418,9 +418,9 @@ class UIStateManager {
     this.eventBus.on('state:changed', (data) => {
       // kept for consistency
     });
-
+ 
     // Delegate debug/event mirroring to extracted module
-    setupDebugMirroring(this);
+    this.helpers.setupDebugMirroring(this);
   }
 
   /**
@@ -432,8 +432,8 @@ class UIStateManager {
       try {
         if (subscriber.path) {
           // Use imported helper instead of nonexistent instance method to avoid 'this' binding errors
-          const prevValue = getNestedValue(previousState, subscriber.path);
-          const newValue = getNestedValue(newState, subscriber.path);
+          const prevValue = this.helpers.getNestedValue(previousState, subscriber.path);
+          const newValue = this.helpers.getNestedValue(newState, subscriber.path);
           
           if (prevValue !== newValue) {
             subscriber.callback(newValue, prevValue, subscriber.path);
@@ -444,9 +444,7 @@ class UIStateManager {
       } catch (error) {
         // Route to renderer logger; avoid console in renderer
         try {
-          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error);
-          });
+          this.helpers.rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error);
         } catch (_) { /* no-op */ }
       }
     }
@@ -484,7 +482,7 @@ class UIStateManager {
    */
   loadPersistedState() {
     try {
-      const persisted = safeLoadPersistedUI(this.persistenceKey);
+      const persisted = this.helpers.safeLoadPersistedUI(this.persistenceKey);
       if (persisted && persisted.ui) {
         this.state.ui = { ...this.state.ui, ...persisted.ui };
       }
@@ -520,7 +518,7 @@ class UIStateManager {
         sidebarCollapsed: this.state.ui.sidebarCollapsed,
         devModeEnabled: this.state.ui.devModeEnabled
       };
-      safePersistState(this.persistenceKey, uiSlice);
+      this.helpers.safePersistState(this.persistenceKey, uiSlice);
     } catch (_e) {
       // swallow to avoid console noise in renderer
     }
@@ -568,24 +566,38 @@ class UIStateSingleton {
 
   async initialize() {
     try {
-      this.instance = new UIStateManager();
+      const { deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState } = await import('./ui-state.helpers.js');
+      const { getInitialUIState } = await import('./ui-state.initial.js');
+      const { showNotification, removeNotification } = await import('./ui-state.notifications.js');
+      const { setupDebugMirroring } = await import('./ui-state.debug.js');
+
+      const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
+      this.instance = new UIStateManager({
+        deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState,
+        getInitialUIState, showNotification, removeNotification, setupDebugMirroring,
+        rendererLogger // Pass rendererLogger as a helper
+      });
       
       // Load EventBus synchronously to avoid timing issues
-      const eventBusModule = await import('./event-bus.js');
+      const eventBusModule = await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`);
       this.instance.eventBus = eventBusModule.eventBus;
       this.instance.setupEventBusListeners();
+      // Initialize the state after all helpers are loaded
+      this.instance._initializeState();
       // Initialize debug mirroring and helpers (extracted)
-      setupDebugMirroring(this.instance);
+      this.instance.helpers.setupDebugMirroring(this.instance);
       
       return this.instance;
     } catch (error) {
+      let localRendererLogger = { error: () => {}, info: () => {}, debug: () => {}, warn: () => {} }; // Default no-op logger
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('UIStateManager: Failed to initialize:', error);
-        }).catch(() => {});
+        const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
+        localRendererLogger = rendererLogger;
+        localRendererLogger.error('UIStateManager: Failed to initialize:', error);
       } catch (_) { /* no-op */ }
-      // Return a basic instance without EventBus
-      this.instance = new UIStateManager();
+      // Return a basic instance with at least a no-op logger
+      this.instance = new UIStateManager({ rendererLogger: localRendererLogger, getInitialUIState: () => ({}), safeLoadPersistedUI: () => ({}), safePersistState: () => ({}), deepMerge: (a,b) => ({...a,...b}), getNestedValue: () => undefined, setNestedValue: () => {}, showNotification: () => {}, removeNotification: () => {}, setupDebugMirroring: () => {} });
+      this.instance._initializeState(); // Attempt to initialize state even with fallback helpers
       return this.instance;
     }
   }

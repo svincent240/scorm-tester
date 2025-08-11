@@ -13,8 +13,8 @@
 
 class DebugTelemetryStore {
   constructor(options = {}) {
-    const { maxSize = 5000, logger = null } = options;
-    this.maxSize = Number(maxSize) || 5000;
+    const { maxHistorySize = 5000, logger = null } = options;
+    this.maxHistorySize = Number(maxHistorySize) || 5000;
     this.logger = logger || console;
     this.history = [];
   }
@@ -26,10 +26,10 @@ class DebugTelemetryStore {
       if (!entry.timestamp) entry.timestamp = Date.now();
       this.history.push(entry);
 
-      if (this.history.length > this.maxSize) {
-        const removeCount = this.history.length - this.maxSize;
+      if (this.history.length > this.maxHistorySize) {
+        const removeCount = this.history.length - this.maxHistorySize;
         this.history.splice(0, removeCount);
-        this.logger?.warn && this.logger.warn(`[DebugTelemetryStore] Trimmed ${removeCount} oldest entries (maxSize=${this.maxSize})`);
+        this.logger?.warn && this.logger.warn(`[DebugTelemetryStore] Trimmed ${removeCount} oldest entries (maxHistorySize=${this.maxHistorySize})`);
       }
 
       this.logger?.debug && this.logger.debug(`[DebugTelemetryStore] Stored api call (total=${this.history.length})`);
@@ -40,9 +40,9 @@ class DebugTelemetryStore {
   }
 
   clear() {
-    const cleared = this.history.length;
+    let clearedCount = this.history.length;
     this.history = [];
-    this.logger?.info && this.logger.info(`[DebugTelemetryStore] Cleared ${cleared} entries`);
+    this.logger?.info && this.logger.info(`[DebugTelemetryStore] Cleared ${clearedCount} entries`);
   }
 
   /**
@@ -102,7 +102,7 @@ class DebugTelemetryStore {
       this.logger?.info && this.logger.info(`[DebugTelemetryStore] Flushing ${entries.length} entries to debug window (newest-first)`);
       for (const entry of entries) {
         try {
-          webContents.send('debug-event-received', 'api:call', entry);
+          webContents.send('scorm-api-call-logged', entry);
         } catch (e) {
           // If a single send fails, log and continue sending the rest.
           this.logger?.warn && this.logger.warn('[DebugTelemetryStore] Failed to send entry to webContents', e?.message || e);

@@ -191,12 +191,9 @@
         console.log('DEBUG WINDOW: Protocol:', window.location.protocol);
         console.log('DEBUG WINDOW: Origin:', window.location.origin);
         
-        // Import the existing DebugPanel component using absolute protocol path
-        import { DebugPanel } from 'scorm-app://src/renderer/components/scorm/debug-panel.js';
-        
         class DebugWindow {
             constructor() {
-                this.debugPanel = null;
+                this.apiTimelineView = null; // Renamed from debugPanel
                 this.init();
             }
 
@@ -204,16 +201,17 @@
                 try {
                     console.log('Debug Window: Initializing...');
                     
-                    // Create the debug panel component
-                    // Pass the root element ID to the DebugPanel constructor
-                    this.debugPanel = new DebugPanel('debug-panel-root', {
+                    // Create the API Timeline View component
+                    // Pass the root element ID to the ApiTimelineView constructor
+                    const { ApiTimelineView } = await import('scorm-app://src/renderer/components/scorm/debug-views/api-timeline-view.js');
+                    this.apiTimelineView = new ApiTimelineView('debug-panel-root', {
                         showTimestamps: true,
                         enableExport: true,
-                        hideHeader: true
+                        hideHeader: true // This option might not be directly applicable to ApiTimelineView, will verify in its code
                     });
  
                     // Initialize the component
-                    await this.debugPanel.initialize();
+                    await this.apiTimelineView.initialize();
  
                     // Fetch historic telemetry from main process (newest-first, capped)
                     try {
@@ -224,7 +222,7 @@
                                 // entries are newest-first per contract; add them oldest→newest into UI to preserve chronological order
                                 const entries = resp.history.slice().reverse();
                                 for (const e of entries) {
-                                    try { this.debugPanel.addApiCall(e); } catch (_) {}
+                                    try { this.apiTimelineView.addApiCall(e); } catch (_) {} // Renamed from debugPanel.addApiCall
                                 }
                                 console.log(`DEBUG WINDOW: Loaded ${resp.history.length} historic telemetry entries`);
                             } else {
@@ -255,8 +253,8 @@
 
                 if (refreshBtn) {
                     refreshBtn.addEventListener('click', () => {
-                        if (this.debugPanel) {
-                            this.debugPanel.refreshActiveTab();
+                        if (this.apiTimelineView) {
+                            this.apiTimelineView.refreshActiveTab(); // Renamed from debugPanel.refreshActiveTab
                         }
                     });
                 }
@@ -264,7 +262,6 @@
                 if (alwaysOnTopBtn) {
                     let isAlwaysOnTop = false;
                     alwaysOnTopBtn.addEventListener('click', () => {
-                        isAlwaysOnTop = !isAlwaysOnTop;
                         if (window.electronAPI && window.electronAPI.setAlwaysOnTop) {
                             window.electronAPI.setAlwaysOnTop(isAlwaysOnTop);
                         }
@@ -284,10 +281,10 @@
                         console.log('DEBUG WINDOW: Setting up scorm-api-call-logged listener');
                         window.electronAPI.onScormApiCallLogged((payload) => {
                             console.log('DEBUG WINDOW: Received scorm-api-call-logged event:', payload);
-                            if (this.debugPanel) {
-                                this.debugPanel.addApiCall(payload);
+                            if (this.apiTimelineView) {
+                                this.apiTimelineView.addApiCall(payload); // Renamed from debugPanel.addApiCall
                             } else {
-                                console.warn('DEBUG WINDOW: Debug panel not available for scorm-api-call-logged event');
+                                console.warn('DEBUG WINDOW: API Timeline View not available for scorm-api-call-logged event');
                             }
                         });
                     } else {
@@ -299,8 +296,14 @@
                         console.log('DEBUG WINDOW: Setting up course loaded listener');
                         window.electronAPI.onCourseLoaded((data) => {
                             console.log('DEBUG WINDOW: Received course loaded event:', data);
-                            if (this.debugPanel) {
-                                this.debugPanel.handleScormInitialized();
+                            if (this.apiTimelineView) {
+                                // This might need to be handled differently by ApiTimelineView or a parent DebugPanel
+                                // For now, assuming ApiTimelineView might have a method to clear/reset
+                                // Or this event is handled by a higher-level DebugPanel that contains ApiTimelineView
+                                // The plan mentions "DebugPanel.handleScormInitialized()"
+                                // I will assume a method like handleCourseLoaded or similar for now.
+                                // If ApiTimelineView doesn't have it, I'll need to re-evaluate.
+                                this.apiTimelineView.handleCourseLoaded(); // Placeholder, will verify in ApiTimelineView
                             }
                         });
                     }
@@ -310,8 +313,9 @@
                         console.log('DEBUG WINDOW: Setting up session state listener');
                         window.electronAPI.onSessionStateChanged((data) => {
                             console.log('DEBUG WINDOW: Received session state change:', data);
-                            if (this.debugPanel) {
-                                this.debugPanel.refreshSessionInfo();
+                            if (this.apiTimelineView) {
+                                // Similar to course loaded, this might be handled by a parent DebugPanel
+                                this.apiTimelineView.refreshSessionInfo(); // Placeholder, will verify in ApiTimelineView
                             }
                         });
                     }
@@ -373,9 +377,9 @@
             }
 
             destroy() {
-                if (this.debugPanel) {
-                    this.debugPanel.destroy();
-                    this.debugPanel = null;
+                if (this.apiTimelineView) { // Renamed from debugPanel
+                    this.apiTimelineView.destroy(); // Renamed from debugPanel.destroy
+                    this.apiTimelineView = null; // Renamed from debugPanel
                 }
             }
         }

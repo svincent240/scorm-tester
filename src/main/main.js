@@ -74,6 +74,8 @@ class MainProcess {
       // Use singleton logger getter with explicit first-init directory
       this.logger = getLogger(logDir);
       (this.logger || console).info(`SCORM Tester: Log file path: ${this.logger && this.logger.logFile ? this.logger.logFile : 'unknown'}`);
+      (this.logger || console).info(`SCORM Tester: process.env.LOG_LEVEL: ${process.env.LOG_LEVEL}`);
+      (this.logger || console).info(`SCORM Tester: Logger logLevel: ${this.logger?.logLevel}`);
       
       this.errorHandler = new ScormErrorHandler(this.logger);
       this.logger?.info('SCORM Tester: Core dependencies initialized');
@@ -115,6 +117,8 @@ class MainProcess {
  
     // Pass the main logger into shared services so logs are consistent
     const telemetryStore = new DebugTelemetryStore({ logger: this.logger });
+    // Set the telemetry store in the window manager after it's created
+    windowManager.setTelemetryStore(telemetryStore); // NEW LINE
     // Create SNSnapshotService without scormService initially to avoid ordering issues; we'll wire scormService after it's created
     const snSnapshotService = new SNSnapshotService(null, { logger: this.logger });
  
@@ -157,7 +161,8 @@ class MainProcess {
       ['windowManager', windowManager],
       ['recentCoursesService', recentCoursesService],
       ['telemetryStore', telemetryStore],
-      ['snSnapshotService', snSnapshotService]
+      ['snSnapshotService', snSnapshotService],
+      ['handleOpenDebugWindow', this.handleOpenDebugWindow.bind(this)]
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');
@@ -173,6 +178,44 @@ class MainProcess {
  
     // Do NOT re-initialize WindowManager with IpcHandler; WindowManager was initialized once above.
     this.logger?.info(`SCORM Tester: ${this.services.size} services initialized successfully`);
+  }
+
+  /**
+   * Handle IPC request to open the debug window.
+   * This method is called by IpcHandler when 'open-debug-window' channel is invoked.
+   */
+  async handleOpenDebugWindow() {
+    this.logger?.info('SCORM Tester: Received request to open debug window');
+    const windowManager = this.services.get('windowManager');
+    const telemetryStore = this.services.get('telemetryStore');
+
+    if (!windowManager || !telemetryStore) {
+      this.logger?.error('SCORM Tester: Cannot open debug window: WindowManager or TelemetryStore not available.');
+      return;
+    }
+
+    try {
+      const debugWindow = await windowManager.createDebugWindow();
+      this.logger?.info(`SCORM Tester: Debug window created (ID: ${debugWindow.id})`);
+
+      // Flush existing history to the new debug window
+      telemetryStore.flushTo(debugWindow.webContents);
+
+      // Ensure ongoing API calls are sent to this window
+      // This assumes telemetryStore.flushTo also sets up a listener or is called for new events.
+      // If not, we'd need a mechanism here to subscribe the new window to new events.
+      // For now, relying on existing flushTo behavior.
+
+    } catch (error) {
+      this.logger?.error('SCORM Tester: Failed to open debug window:', error);
+      if (this.errorHandler) {
+        this.errorHandler.setError(
+          MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
+          `Failed to open debug window: ${error.message}`,
+          'MainProcess.handleOpenDebugWindow'
+        );
+      }
+    }
   }
 
   /**

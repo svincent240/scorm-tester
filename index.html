@@ -260,71 +260,8 @@
       </div>
     </footer>
     
-    <!-- Debug Panel -->
-    <div id="debug-panel" class="debug-panel hidden">
-      <div class="debug-panel__header">
-        <h3>Debug Panel</h3>
-        <div class="debug-panel__controls">
-          <button id="debug-clear" class="btn btn--sm btn--ghost" title="Clear Log">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
-            </svg>
-            Clear
-          </button>
-          <button id="debug-export" class="btn btn--sm btn--ghost" title="Export Log">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-            </svg>
-            Export
-          </button>
-          <button id="debug-close" class="btn-close" title="Close Debug Panel"></button>
-        </div>
-      </div>
-      
-      <div class="debug-panel__tabs">
-        <button class="debug-tab debug-tab--active" data-tab="api-calls">API Calls</button>
-        <button class="debug-tab" data-tab="data-model">Data Model</button>
-        <button class="debug-tab" data-tab="session">Session</button>
-        <button class="debug-tab" data-tab="errors">Errors</button>
-      </div>
-      
-      <div class="debug-panel__content">
-        <div id="debug-api-calls" class="debug-content debug-content--active">
-          <div class="debug-log" id="api-calls-log">
-            <div class="debug-log__empty">No API calls recorded</div>
-          </div>
-        </div>
-        
-        <div id="debug-data-model" class="debug-content">
-          <div class="debug-data" id="data-model-view">
-            <div class="debug-data__empty">No data model loaded</div>
-          </div>
-        </div>
-        
-        <div id="debug-session" class="debug-content">
-          <div class="debug-info" id="session-info">
-            <div class="debug-info__item">
-              <span class="debug-info__label">Status:</span>
-              <span class="debug-info__value" id="session-status">Not Connected</span>
-            </div>
-            <div class="debug-info__item">
-              <span class="debug-info__label">Duration:</span>
-              <span class="debug-info__value" id="session-duration">00:00:00</span>
-            </div>
-            <div class="debug-info__item">
-              <span class="debug-info__label">API Version:</span>
-              <span class="debug-info__value" id="api-version">Unknown</span>
-            </div>
-          </div>
-        </div>
-        
-        <div id="debug-errors" class="debug-content">
-          <div class="debug-log" id="errors-log">
-            <div class="debug-log__empty">No errors recorded</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Debug Panel Container (Component will render here) -->
+    <div id="debug-panel-container" class="debug-panel-container hidden"></div>
   </div>
   
   <!-- Loading Overlay -->

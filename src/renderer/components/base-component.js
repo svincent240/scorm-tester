@@ -112,8 +112,8 @@ class BaseComponent {
    */
   async loadDependencies() {
     try {
-      this.eventBus = (await import('../services/event-bus.js')).eventBus;
-      this.uiState = await (await import('../services/ui-state.js')).uiState;
+      this.eventBus = (await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`)).eventBus;
+      this.uiState = await (await import(`${window.electronAPI.rendererBaseUrl}services/ui-state.js`)).uiState;
     } catch (error) {
       try {
         import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
@@ -327,7 +327,7 @@ class BaseComponent {
   emit(event, data = null) {
     if (!this.eventBus) {
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
           rendererLogger.warn(`[${this.constructor.name}] EventBus not loaded. Cannot emit event: ${event}`);
         });
       } catch (_) {
@@ -652,7 +652,7 @@ class BaseComponent {
     } else {
       // Fallback to app log even if uiState not available
       try {
-        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
           rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
         });
       } catch (_) {
@@ -662,7 +662,7 @@ class BaseComponent {
 
     // Log via renderer logger to app log as single source of truth
     try {
-      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
+      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
         rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
       });
     } catch (_) {

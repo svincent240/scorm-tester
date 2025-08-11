@@ -334,7 +334,8 @@ class CourseLoader {
       if (!firstLaunchHref) {
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
       }
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath);
+      // Robustness: pass the extraction directory as an allowedBase so resolver will accept files under temp extraction roots
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath, { allowedBase: extractedPath });
       if (!entryResult.success) {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }

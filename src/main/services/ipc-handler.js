@@ -122,6 +122,11 @@ class IpcHandler extends BaseService {
     // Subscribe to scorm-api-call-logged events from ScormService
     try {
       const scormService = this.getDependency('scormService');
+      this.logger?.debug(`[IPC Handler] scormService in doInitialize: ${!!scormService}`);
+      this.logger?.debug(`[IPC Handler] typeof scormService.onScormApiCallLogged: ${typeof scormService?.onScormApiCallLogged}`);
+      this.logger?.debug(`[IPC Handler] typeof scormService.eventEmitter: ${typeof scormService?.eventEmitter}`);
+      this.logger?.debug(`[IPC Handler] typeof scormService.eventEmitter.on: ${typeof scormService?.eventEmitter?.on}`);
+
       if (scormService && typeof scormService.onScormApiCallLogged === 'function') {
         scormService.onScormApiCallLogged((payload) => {
           this.logger?.debug('[IPC Handler] Received scorm-api-call-logged event from ScormService', payload);
@@ -281,19 +286,9 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // Migrate previously-sync channels to async handlers to unify routing (preserves channel names)
-      this.registerHandler('log-message', this.handleLogMessage.bind(this));
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
       // Debug history fetch - returns newest-first entries with optional filters { limit, offset, sinceTs, methodFilter }
       this.registerHandler('debug-get-history', this.handleDebugGetHistory.bind(this));
-      // Handler for debug events from renderer (e.g., electronAPI.emitDebugEvent)
-      this.registerHandler('debug-event', async (_event, eventType, data) => {
-        if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
-          // Store as an API call for now; can refine event types later if needed
-          this.telemetryStore.storeApiCall({ method: eventType, ...data });
-          return { success: true };
-        }
-        return { success: false, error: 'Telemetry store not available' };
-      });
 
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));

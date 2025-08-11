@@ -10,7 +10,6 @@
  * No console usage; logs routed via renderer-logger if needed.
  */
  
-import { eventBus } from './event-bus.js';
  
 class DebugDataAggregator {
   constructor() {
@@ -42,12 +41,13 @@ class DebugDataAggregator {
     this._flush = this._flush.bind(this);
   }
  
-  start() {
+  async start() {
     if (this._inited) return;
     this._inited = true;
  
     // Seed from EventBus history if any
     try {
+      const { eventBus } = await import('./event-bus.js');
       const seed = eventBus.getHistory('api:call', 200) || [];
       for (const evt of seed) {
         const api = evt?.data?.data || evt?.data || evt;
@@ -56,11 +56,10 @@ class DebugDataAggregator {
         this._pushTimeline(norm);
         this._maybeIndexError(norm);
       }
+      // Subscribe to live events
+      this._unsubApi = eventBus.on('api:call', this._onApiCall);
+      this._unsubErr = eventBus.on('error', this._onError);
     } catch (_) { /* no-op */ }
- 
-    // Subscribe to live events
-    this._unsubApi = eventBus.on('api:call', this._onApiCall);
-    this._unsubErr = eventBus.on('error', this._onError);
  
     // Attempt to hook to renderer log stream (optional)
     try {
@@ -185,9 +184,10 @@ class DebugDataAggregator {
     setTimeout(this._flush, this._throttleMs);
   }
  
-  _flush() {
+  async _flush() {
     this._pending = false;
     try {
+      const { eventBus } = await import('./event-bus.js');
       eventBus.emit('debug:update', {
         counts: {
           api: this.timeline.length,
@@ -211,7 +211,8 @@ class DebugDataAggregator {
     return arr.slice(-limit);
   }
  
-  getEvents(limit = 200) {
+  async getEvents(limit = 200) {
+    const { eventBus } = await import('./event-bus.js');
     if (eventBus && typeof eventBus.getDebugSnapshot === 'function') {
       return eventBus.getDebugSnapshot(limit);
     }

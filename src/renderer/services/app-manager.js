@@ -7,19 +7,6 @@
  * @fileoverview Main application management service
  */
 
-import { eventBus } from './event-bus.js';
-import { uiState as uiStatePromise } from './ui-state.js';
-import { scormClient } from './scorm-client.js';
-import { scormAPIBridge } from './scorm-api-bridge.js';
-import { courseLoader } from './course-loader.js';
-
-import { BaseComponent } from '../components/base-component.js';
-import { ContentViewer } from '../components/scorm/content-viewer.js';
-import { NavigationControls } from '../components/scorm/navigation-controls.js';
-import { ProgressTracking } from '../components/scorm/progress-tracking.js';
-import { CourseOutline } from '../components/scorm/course-outline.js';
-import { FooterProgressBar } from '../components/scorm/footer-progress-bar.js';
-import { FooterStatusDisplay } from '../components/scorm/footer-status-display.js';
 
 /**
  * Application Manager Class
@@ -44,7 +31,7 @@ class AppManager {
     };
 
     // Initialize logger asynchronously but safely
-    import('../utils/renderer-logger.js')
+    import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
       .then(({ rendererLogger }) => {
         if (rendererLogger) {
           this.logger = rendererLogger;
@@ -62,9 +49,16 @@ class AppManager {
    */
   async initialize() {
     try {
+      // Dynamically import eventBus first as it's a core dependency
+      const { eventBus } = await import('./event-bus.js');
+      this.services.set('eventBus', eventBus); // Set it early
+      
+      // Dynamically import uiStatePromise
+      const { uiState: uiStatePromise } = await import('./ui-state.js');
       // Ensure logger is available (no-op fallback already set in constructor)
       this.uiState = await uiStatePromise; // Resolve the promise
       this.logger.debug('AppManager - uiState resolved');
+      const { scormClient } = await import('./scorm-client.js'); // Dynamically import scormClient
       scormClient.setUiState(this.uiState); // Pass resolved uiState to scormClient
 
       // Step 1: Initialize services
@@ -127,8 +121,13 @@ class AppManager {
   async initializeServices() {
     // console.log('AppManager: Initializing services...'); // Removed debug log
     
+    // Dynamically import services (eventBus already imported at top of initialize)
+    const { scormClient } = await import('./scorm-client.js');
+    const { scormAPIBridge } = await import('./scorm-api-bridge.js');
+    const { courseLoader } = await import('./course-loader.js');
+
     // Register services
-    this.services.set('eventBus', eventBus);
+    // eventBus is already set in initialize()
     this.services.set('uiState', this.uiState); // Use the resolved instance
     this.services.set('scormClient', scormClient);
     this.services.set('scormAPIBridge', scormAPIBridge);
@@ -150,6 +149,16 @@ class AppManager {
   async initializeComponents() {
     try { this.logger.info('AppManager: Initializing components...'); } catch (_) {}
 
+    // Dynamically import component classes
+    const { BaseComponent } = await import('../components/base-component.js');
+    const { ContentViewer } = await import('../components/scorm/content-viewer.js');
+    const { NavigationControls } = await import('../components/scorm/navigation-controls.js');
+    const { ProgressTracking } = await import('../components/scorm/progress-tracking.js');
+    const { CourseOutline } = await import('../components/scorm/course-outline.js');
+    const { FooterProgressBar } = await import('../components/scorm/footer-progress-bar.js');
+    const { FooterStatusDisplay } = await import('../components/scorm/footer-status-display.js');
+    const { DebugPanel } = await import('../components/scorm/debug-panel.js');
+
     const componentConfigs = [
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
@@ -157,7 +166,8 @@ class AppManager {
       { name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: false },
       { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'app-footer', required: true },
       { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'app-footer', required: true },
-      { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true }
+      { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true },
+      { name: 'debugPanel', class: DebugPanel, elementId: 'debug-panel-container', required: false, options: { hideHeader: false } } // Add DebugPanel, make non-required
     ];
 
     // DIAGNOSTIC: verify DOM mount points exist before instantiation
@@ -232,16 +242,26 @@ class AppManager {
    try { this.logger.debug('AppManager: Registering core event handlers'); } catch (_) {}
 
    // Course loading events
+   const eventBus = this.services.get('eventBus');
+   if (!eventBus) {
+     this.logger.error('AppManager: eventBus not found in services. Cannot set up event handlers.');
+     return;
+   }
    eventBus.on('course:loaded', (courseData) => {
      try { this.logger.debug('AppManager: eventBus course:loaded received'); } catch (_) {}
      this.handleCourseLoaded(courseData);
+     // Delegate to debug panel
+     const debugPanel = this.components.get('debugPanel');
+     if (debugPanel && typeof debugPanel.handleCourseLoaded === 'function') {
+       debugPanel.handleCourseLoaded();
+     }
    });
- 
+
     eventBus.on('course:loadError', (errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
       this.showError('Course Loading Error', (errorData && (errorData.error || errorData.message)) || 'Unknown error');
     });
- 
+
     eventBus.on('course:loadingStateChanged', (stateData) => {
       if (stateData.loading) {
         this.showLoading('Loading course...');
@@ -249,12 +269,12 @@ class AppManager {
         this.hideLoading();
       }
     });
- 
+
     // SCORM events
     eventBus.on('scorm:dataChanged', (data) => {
       // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
- 
+
     eventBus.on('scorm:error', (errorData) => {
       try {
         const safeMsg = (errorData && (errorData.message || errorData.error)) || 'Unknown SCORM error';
@@ -266,6 +286,22 @@ class AppManager {
         });
       } catch (_) {}
     });
+
+   // Listen for scorm-api-call-logged events from main process
+   eventBus.on('scorm-api-call-logged', (payload) => {
+     const debugPanel = this.components.get('debugPanel');
+     if (debugPanel && typeof debugPanel.addApiCall === 'function') {
+       debugPanel.addApiCall(payload);
+     }
+   });
+
+   // Listen for session state changes
+   eventBus.on('session:reset', (payload) => {
+     const debugPanel = this.components.get('debugPanel');
+     if (debugPanel && typeof debugPanel.refreshSessionInfo === 'function') {
+       debugPanel.refreshSessionInfo();
+     }
+   });
 
     // Debounce guard for navigation requests to avoid IPC rate limiting
     this._lastNavAt = 0;
@@ -289,7 +325,7 @@ class AppManager {
         const navControls = this.components.get('navigationControls');
 
         // Decide path based on SN availability
-        const snBridgeModule = await import('./sn-bridge.js');
+        const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
         const snBridge = snBridgeModule.snBridge;
         const init = await snBridge.initialize().catch(() => ({ success: false }));
         const snAvailable = !!(init && init.success);
@@ -551,6 +587,11 @@ class AppManager {
 
     // Lifecycle hooks
     // 1) Detect SN initialized
+    const eventBus = this.services.get('eventBus');
+    if (!eventBus) {
+      this.logger.error('AppManager: eventBus not found in services. Cannot set up SN polling controller.');
+      return;
+    }
     eventBus.on('sn:initialized', () => {
       this._snInitialized = true;
       this.startSnPolling();
@@ -608,6 +649,13 @@ class AppManager {
   async setupUIEventListeners() {
     // console.log('AppManager: Setting up UI event listeners...'); // Removed debug log
     
+    // Course load button (Open ZIP)
+    const courseLoader = this.services.get('courseLoader');
+    if (!courseLoader) {
+      this.logger.error('AppManager: courseLoader not found in services. Cannot set up UI event listeners for course loading.');
+      return;
+    }
+
     // Course load button (Open ZIP)
     const courseLoadBtn = document.getElementById('course-load-btn');
     if (courseLoadBtn) {
@@ -678,13 +726,6 @@ class AppManager {
     try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) {}
 
     try {
-      // Clear API call history when new course is loaded
-      if (window.electronAPI && window.electronAPI.emitDebugEvent) {
-        window.electronAPI.emitDebugEvent('course:loaded', {
-          courseTitle: courseData.info?.title || 'Course',
-          timestamp: Date.now()
-        });
-      }
 
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
@@ -843,10 +884,15 @@ class AppManager {
    * Toggle debug panel visibility
    */
   toggleDebugPanel() {
-    if (window.electronAPI && window.electronAPI.openDebugWindow) {
-      window.electronAPI.openDebugWindow();
+    const debugPanel = this.components.get('debugPanel');
+    if (debugPanel) {
+      if (debugPanel.isVisible()) {
+        debugPanel.hide();
+      } else {
+        debugPanel.show();
+      }
     } else {
-      try { this.logger.warn('AppManager: electronAPI or openDebugWindow not available. Cannot open debug window.'); } catch (_) {}
+      try { this.logger.warn('AppManager: DebugPanel component not available. Cannot toggle debug panel.'); } catch (_) {}
     }
   }
 
@@ -916,6 +962,7 @@ class AppManager {
       }
       
       // Cleanup services
+      const { eventBus } = await import('./event-bus.js');
       eventBus.destroy();
       
       this.initialized = false;
@@ -949,7 +996,7 @@ class AppManager {
     }
   
     // Lazy-load store to avoid circular deps
-    const { recentCoursesStore } = await import('./recent-courses.js');
+    const { recentCoursesStore } = await import(`${window.electronAPI.rendererBaseUrl}services/recent-courses.js`);
     // Ensure the store has loaded its data from the main process
     await recentCoursesStore._load(); // Explicitly await the load operation
 
@@ -980,6 +1027,11 @@ class AppManager {
   
         li.addEventListener('click', async () => {
           try {
+            const courseLoader = this.services.get('courseLoader');
+            if (!courseLoader) {
+              this.logger.error('AppManager: courseLoader not found in services. Cannot load course.');
+              return;
+            }
             await courseLoader.loadCourseBySource({ type: rc.type, path: rc.path });
             await recentCoursesStore.touch(rc.path, rc.type); // Await touch as it saves
             // refresh list to move to top
