@@ -28,6 +28,12 @@ class BaseComponent {
     this.childComponents = new Map();
     this.unsubscribeFunctions = [];
     
+    // Provide a safe rendererBaseUrl fallback for test environments where preload may not be present.
+    // In production the preload sets window.electronAPI.rendererBaseUrl; tests can run with './' base.
+    this.rendererBaseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
+      ? window.electronAPI.rendererBaseUrl
+      : './';
+
     this.bindMethods();
   }
 

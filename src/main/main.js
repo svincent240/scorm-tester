@@ -7,7 +7,7 @@
  * @fileoverview Simplified main process entry point for SCORM Tester
  */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, protocol } = require('electron');
 
 // Service imports
 const WindowManager = require('./services/window-manager');
@@ -301,6 +301,13 @@ class MainProcess {
     return this.services.get(serviceName) || null;
   }
 }
+
+// Register the scheme as privileged so it behaves more like a true origin.
+// This enables localStorage access and proper CORS behavior for SCORM content.
+// Must be called before app is ready.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+]);
 
 // Global main process instance
 let mainProcess = null;

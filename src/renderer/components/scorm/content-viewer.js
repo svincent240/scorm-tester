@@ -204,24 +204,42 @@ class ContentViewer extends BaseComponent {
     }
 
     // Convert local file paths to scorm-app:// protocol URLs
+    // Prefer asking main process (via preload) to canonicalize the URL instead of constructing it here.
     let processedUrl = url;
     if (typeof url === 'string' && (url.includes('\\') || url.startsWith('C:') || url.startsWith('/'))) {
-      // This looks like a local file path - convert to scorm-app:// protocol
       try {
-        // Use the same normalization and encoding as PathUtils.resolveScormContentUrl
-        const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
-        const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
-        processedUrl = `scorm-app://abs/${encodedPath}`;
-        
+        // Use the preload bridge to canonicalize to a scorm-app:// URL.
+        // The preload exposes pathUtils.toFileUrl which returns a protocol URL or a wrapper object.
+        const toFileUrlResult = await window.electronAPI.pathUtils.toFileUrl(url);
+        // toFileUrl may return a string (legacy) or an object { success, url }
+        if (typeof toFileUrlResult === 'string' && toFileUrlResult.length > 0) {
+          processedUrl = toFileUrlResult;
+        } else if (toFileUrlResult && toFileUrlResult.success && toFileUrlResult.url) {
+          processedUrl = toFileUrlResult.url;
+        } else {
+          // Fallback to best-effort encoding (should be rare if preload is correct)
+          const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
+          const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
+          processedUrl = `scorm-app://abs/${encodedPath}`;
+        }
+ 
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] Converted local path to protocol URL', {
+          rendererLogger.info('[ContentViewer] Converted local path to protocol URL via preload', {
             originalPath: url,
-            protocolUrl: processedUrl
+            protocolUrl: processedUrl,
+            via: 'pathUtils.toFileUrl'
           });
         }).catch(() => {});
       } catch (error) {
+        // If IPC fails, fall back to previous behavior but log the issue so we can fix preload usage.
+        try {
+          const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
+          const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
+          processedUrl = `scorm-app://abs/${encodedPath}`;
+        } catch (_) {}
+ 
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.warn('[ContentViewer] Failed to convert path to protocol URL', {
+          rendererLogger.warn('[ContentViewer] Failed to convert path via preload; using local fallback', {
             originalPath: url,
             error: error?.message || error
           });

@@ -7,20 +7,21 @@
  * @fileoverview Window management service for SCORM Tester main process
  */
 
-const { BrowserWindow, protocol, screen } = require('electron');
+const { BrowserWindow, screen } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
 const BaseService = require('./base-service');
 const MenuBuilder = require('./menu-builder');
 const PathUtils = require('../../shared/utils/path-utils');
-const { 
-  WINDOW_TYPES, 
-  WINDOW_STATES, 
+const {
+  WINDOW_TYPES,
+  WINDOW_STATES,
   SERVICE_DEFAULTS,
-  SERVICE_EVENTS 
+  SERVICE_EVENTS
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
+const { protocol } = require('electron'); // Add protocol import back for registerFileProtocol
 
 /**
  * Window Manager Service Class
@@ -267,23 +268,9 @@ class WindowManager extends BaseService {
     }
 
     try {
-      // Register the scheme as privileged so it behaves more like a true origin.
-      // This enables localStorage access and proper CORS behavior for SCORM content.
-      try {
-        // Register as privileged so Web APIs (fetch, localStorage semantics, service workers, etc.)
-        // behave more like a normal secure origin. Must be called before windows are created in many cases,
-        // but calling here is safe for our initialization sequence.
-        protocol.registerSchemesAsPrivileged([
-          { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
-        ]);
-        this.logger?.info('WindowManager: scorm-app scheme registered as privileged (storage-capable origin enabled)');
-      } catch (e) {
-        this.logger?.warn('WindowManager: Failed to register scorm-app as privileged scheme; continuing with existing handler', e?.message || e);
-      }
-
       // Register the custom protocol using consolidated PathUtils
-      // We continue to use registerFileProtocol for efficient file streaming; the privileged scheme
-      // above (when enabled) will improve origin semantics for renderer pages loaded via scorm-app://
+      // The privileged scheme registration has been moved to main.js (before app.whenReady())
+      // to ensure it's called at the correct time for Electron.
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
         const appRoot = PathUtils.getAppRoot(__dirname);
 
@@ -293,7 +280,7 @@ class WindowManager extends BaseService {
         // Attempt to resolve the protocol URL to a local filesystem path
         const result = PathUtils.handleProtocolRequest(request.url, appRoot);
 
-        // Diagnostic — structured result from PathUtils
+        // Diagnostic — structured result from PathUtils (include triedCandidates for abs/ diagnostics)
         try {
           this.logger?.debug('WindowManager: Protocol resolution result', {
             success: !!result?.success,
@@ -302,6 +289,7 @@ class WindowManager extends BaseService {
             error: result?.error || null,
             queryString: result?.queryString || null,
             usedBase: result?.usedBase || null,
+            triedCandidates: result?.triedCandidates || null,
             isUndefinedPath: !!result?.isUndefinedPath
           });
         } catch (logErr) {
