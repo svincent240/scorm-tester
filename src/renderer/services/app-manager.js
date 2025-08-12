@@ -499,14 +499,14 @@ class AppManager {
     const tick = async () => {
       // If deactivated, skip
       if (!this._snPollingActive) return;
-
+  
       // Enforce min spacing
       const now = Date.now();
       if (now - this._snLastTickAt < this._SN_MIN_INTERVAL_MS) {
         scheduleNext(this._SN_MIN_INTERVAL_MS - (now - this._snLastTickAt));
         return;
       }
-
+  
       // Lifecycle gates
       if (!canPoll()) {
         // If cannot poll, reschedule with min interval (or backoff if present)
@@ -514,13 +514,17 @@ class AppManager {
         scheduleNext(next);
         return;
       }
-
+  
       this._snLastTickAt = now;
       try { this.logger.debug('AppManager: SN polling tick'); } catch (_) {}
-
+  
       // Use scormAPIBridge if available, else scormClient as fallback
       let status = null;
       try {
+        // Resolve from the service registry to avoid referencing out-of-scope globals
+        const scormAPIBridge = this.services.get('scormAPIBridge');
+        const scormClient = this.services.get('scormClient');
+  
         if (scormAPIBridge && typeof scormAPIBridge.getStatus === 'function') {
           status = await scormAPIBridge.getStatus();
         } else if (scormClient && typeof scormClient.getStatus === 'function') {
@@ -540,10 +544,10 @@ class AppManager {
         scheduleNext(this._snBackoffMs);
         return;
       }
-
+  
       // Successful status retrieval
       resetBackoff();
-
+  
       // Reflect available navigation into UIState if present
       try {
         const available = status && (status.availableNavigation || status.available || []);
@@ -552,7 +556,7 @@ class AppManager {
       } catch (e) {
         try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) {}
       }
-
+  
       // Schedule next
       scheduleNext(this._SN_MIN_INTERVAL_MS);
     };

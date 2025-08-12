@@ -82,7 +82,11 @@ const SERVICE_DEFAULTS = {
       height: 1000,    // Increased to fit Learning Progress section comfortably
       minWidth: 1100,  // Increased minimum to ensure proper layout
       minHeight: 800,  // Increased to prevent section cut-off
-      webSecurity: false,
+      // Enable webSecurity by default to avoid insecure renderer warnings.
+      // Feature flags and privileged scheme registration can be used to
+      // allow storage-capable origins when needed (see USE_STORAGE_CAPABLE_ORIGIN).
+      webSecurity: true,
+      allowRunningInsecureContent: false,
       contextIsolation: true,
       nodeIntegration: false,
       // Add responsive window options

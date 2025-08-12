@@ -103,11 +103,11 @@ class WindowManager extends BaseService {
         maximizable: true,
         resizable: true,
         webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
+          nodeIntegration: !!this.config.mainWindow.nodeIntegration,
+          contextIsolation: !!this.config.mainWindow.contextIsolation,
           enableRemoteModule: false,
-          webSecurity: false, // Disable web security for custom protocol
-          allowRunningInsecureContent: true, // Allow content from custom protocol
+          webSecurity: !!this.config.mainWindow.webSecurity,
+          allowRunningInsecureContent: !!this.config.mainWindow.allowRunningInsecureContent,
           preload: PathUtils.getPreloadPath(__dirname)
         },
         show: false
@@ -195,10 +195,10 @@ class WindowManager extends BaseService {
             ...this.config.debugWindow,
             parent: mainWindow,
             webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              webSecurity: false, // Disable web security for custom protocol
-              allowRunningInsecureContent: true, // Allow content from custom protocol
+              nodeIntegration: !!this.config.debugWindow.nodeIntegration,
+              contextIsolation: !!this.config.debugWindow.contextIsolation,
+              webSecurity: typeof this.config.debugWindow.webSecurity !== 'undefined' ? !!this.config.debugWindow.webSecurity : !!this.config.mainWindow.webSecurity,
+              allowRunningInsecureContent: typeof this.config.debugWindow.allowRunningInsecureContent !== 'undefined' ? !!this.config.debugWindow.allowRunningInsecureContent : !!this.config.mainWindow.allowRunningInsecureContent,
               preload: PathUtils.getPreloadPath(__dirname)
             },
             title: 'SCORM Debug Console',
@@ -283,7 +283,26 @@ class WindowManager extends BaseService {
     }
 
     try {
+      // If enabled, register the scheme as privileged so it behaves more like a true origin.
+      // This is gated behind an environment flag to avoid accidental security changes.
+      const useStorageCapableOrigin = process.env.USE_STORAGE_CAPABLE_ORIGIN === 'true';
+      if (useStorageCapableOrigin) {
+        try {
+          // Register as privileged so Web APIs (fetch, localStorage semantics, service workers, etc.)
+          // behave more like a normal secure origin. Must be called before windows are created in many cases,
+          // but calling here is safe for our initialization sequence.
+          protocol.registerSchemesAsPrivileged([
+            { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+          ]);
+          this.logger?.info('WindowManager: scorm-app scheme registered as privileged (storage-capable origin enabled)');
+        } catch (e) {
+          this.logger?.warn('WindowManager: Failed to register scorm-app as privileged scheme; continuing with existing handler', e?.message || e);
+        }
+      }
+
       // Register the custom protocol using consolidated PathUtils
+      // We continue to use registerFileProtocol for efficient file streaming; the privileged scheme
+      // above (when enabled) will improve origin semantics for renderer pages loaded via scorm-app://
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
         const appRoot = PathUtils.getAppRoot(__dirname);
         const result = PathUtils.handleProtocolRequest(request.url, appRoot);
@@ -312,6 +331,9 @@ class WindowManager extends BaseService {
       if (success) {
         this.protocolRegistered = true;
         this.logger?.info('WindowManager: Custom protocol "scorm-app://" registered successfully');
+        if (useStorageCapableOrigin) {
+          this.logger?.info('WindowManager: Storage-capable origin feature is active (USE_STORAGE_CAPABLE_ORIGIN=true)');
+        }
       } else {
         throw new Error('Failed to register custom protocol');
       }

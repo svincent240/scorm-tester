@@ -53,8 +53,33 @@ export function setNestedValue(obj, path, value) {
  */
 export function safePersistState(persistenceKey, uiSlice) {
   try {
-    if (!(typeof window !== 'undefined' && typeof localStorage !== 'undefined')) return;
-    if (window.location?.protocol === 'scorm-app:') return;
+    // Guard: require window to exist
+    if (typeof window === 'undefined') return;
+
+    // Guard: localStorage may be unavailable in this protocol/environment
+    if (typeof localStorage === 'undefined') {
+      try {
+        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+          .then(({ rendererLogger }) => {
+            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
+          })
+          .catch(() => {});
+      } catch (_) {}
+      return;
+    }
+
+    // Guard: skip persistence when running under the scorm-app custom protocol
+    if (window.location?.protocol === 'scorm-app:') {
+      try {
+        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+          .then(({ rendererLogger }) => {
+            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
+          })
+          .catch(() => {});
+      } catch (_) {}
+      return;
+    }
+
     const payload = { ui: {
       theme: uiSlice?.theme,
       debugPanelVisible: uiSlice?.debugPanelVisible,
@@ -73,14 +98,46 @@ export function safePersistState(persistenceKey, uiSlice) {
  */
 export function safeLoadPersistedUI(persistenceKey) {
   try {
-    if (!(typeof window !== 'undefined' && typeof localStorage !== 'undefined')) return null;
-    if (window.location?.protocol === 'scorm-app:') return null;
+    if (typeof window === 'undefined') return null;
+
+    if (typeof localStorage === 'undefined') {
+      try {
+        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+          .then(({ rendererLogger }) => {
+            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
+          })
+          .catch(() => {});
+      } catch (_) {}
+      return null;
+    }
+
+    if (window.location?.protocol === 'scorm-app:') {
+      try {
+        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+          .then(({ rendererLogger }) => {
+            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
+          })
+          .catch(() => {});
+      } catch (_) {}
+      return null;
+    }
+
     const persisted = localStorage.getItem(persistenceKey);
     if (!persisted) return null;
     const parsed = JSON.parse(persisted);
     if (parsed && parsed.ui) return { ui: parsed.ui };
     return null;
   } catch (_e) {
+    // Swallow but log parse/load issues to renderer logger if available
+    try {
+      if (typeof window !== 'undefined') {
+        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+          .then(({ rendererLogger }) => {
+            try { rendererLogger.warn('[UIStateHelpers] safeLoadPersistedUI failed to parse persisted data', { persistenceKey }); } catch (_) {}
+          })
+          .catch(() => {});
+      }
+    } catch (_) {}
     return null;
   }
 }

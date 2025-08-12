@@ -192,10 +192,32 @@ class RecentCoursesService extends BaseService {
     try {
       const dir = path.dirname(this.recentsFilePath);
       await fs.mkdir(dir, { recursive: true });
+
       // Write atomically: write to temp file then rename
       const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}`;
       await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');
-      await fs.rename(tempPath, this.recentsFilePath);
+
+      try {
+        await fs.rename(tempPath, this.recentsFilePath);
+      } catch (renameErr) {
+        // On Windows, rename may fail with EPERM/EACCES if another process briefly
+        // holds the destination file (antivirus, indexer, etc.). Fall back to a
+        // copy-then-unlink strategy for robustness.
+        if (renameErr && (renameErr.code === 'EPERM' || renameErr.code === 'EACCES')) {
+          try {
+            await fs.copyFile(tempPath, this.recentsFilePath);
+            await fs.unlink(tempPath);
+            this.logger?.warn('RecentCoursesService: rename failed (EPERM/EACCES); used copy+unlink fallback.');
+          } catch (fallbackErr) {
+            // If fallback fails, surface the original rename error for diagnostics
+            throw renameErr;
+          }
+        } else {
+          // Non-EPERM error - rethrow for outer handler
+          throw renameErr;
+        }
+      }
+
       this.logger?.debug('RecentCoursesService: Saved recent courses to file (atomic write).');
     } catch (error) {
       this.errorHandler?.setError(

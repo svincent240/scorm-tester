@@ -1,4 +1,4 @@
-import { BaseComponent } from '../base-component.js';
+import { BaseComponent } from '../../base-component.js';
 // Dynamically import eventBus and rendererLogger within the constructor
 
 export class ApiTimelineView extends BaseComponent {
@@ -23,7 +23,7 @@ export class ApiTimelineView extends BaseComponent {
     }
 
     renderContent() {
-        rendererLogger.debug('ApiTimelineView: renderContent() called');
+        this.logger.debug('ApiTimelineView: renderContent() called');
         this.element.innerHTML = `
             <div class="api-timeline-view">
                 <h3>API Call Timeline</h3>

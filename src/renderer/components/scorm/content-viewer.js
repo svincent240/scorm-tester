@@ -237,7 +237,43 @@ class ContentViewer extends BaseComponent {
   <body>
     <iframe id="scoFrame" name="scoFrame" src="about:blank" allow="fullscreen" sandbox="${this.options.sandbox}"></iframe>
     <script>
-      // Placeholder - APIs will be injected by parent renderer synchronously after load
+      // Forward runtime errors and unhandled rejections from the host/SCO context to the parent renderer.
+      // This is a lightweight diagnostics shim only; it does not change SCO behavior.
+      (function () {
+        function safePost(payload) {
+          try {
+            // Post a structured message to the parent for logging by the renderer
+            parent.postMessage({ type: 'SCORM_RUNTIME_ERROR', payload }, '*');
+          } catch (_) { /* ignore */ }
+        }
+        // Capture synchronous runtime errors
+        window.addEventListener('error', function (e) {
+          try {
+            safePost({
+              phase: 'error',
+              message: e && (e.message || String(e)),
+              filename: e && e.filename,
+              lineno: e && e.lineno,
+              colno: e && e.colno,
+              stack: (e && e.error && e.error.stack) || null,
+              timestamp: new Date().toISOString()
+            });
+          } catch (_) {}
+        }, true);
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', function (ev) {
+          try {
+            const r = ev && ev.reason;
+            safePost({
+              phase: 'unhandledrejection',
+              message: r && (r.message || String(r)),
+              stack: r && r.stack || null,
+              reason: r,
+              timestamp: new Date().toISOString()
+            });
+          } catch (_) {}
+        }, true);
+      })();
     </script>
   </body>
 </html>`;
@@ -285,6 +321,27 @@ class ContentViewer extends BaseComponent {
         }).catch(() => {});
       } catch (_) {}
 
+      // Install a message listener (one-time) to receive forwarded runtime errors
+      // posted from the host frameset srcdoc. These messages are for diagnostics only
+      // and are forwarded into the centralized renderer logger.
+      try {
+        if (!this._hostMessageHandler) {
+          this._hostMessageHandler = (ev) => {
+            try {
+              const d = ev && ev.data;
+              if (d && d.type === 'SCORM_RUNTIME_ERROR') {
+                import('../../utils/renderer-logger.js')
+                  .then(({ rendererLogger }) => {
+                    rendererLogger.error('[ContentViewer] SCO runtime error', d.payload || d);
+                  })
+                  .catch(() => {});
+              }
+            } catch (_) { /* swallow */ }
+          };
+          window.addEventListener('message', this._hostMessageHandler);
+        }
+      } catch (_) { /* swallow */ }
+
       // If we used host frameset via srcdoc, we must await the host DOM and then:
       // - inject canonical APIs into host (self)
       // - mirror to host.parent/top/opener (within iframe context, as accessible)
@@ -298,15 +355,72 @@ class ContentViewer extends BaseComponent {
           try {
             // Inject canonical APIs into the host window and mirror to its ancestors within iframe context
             this.setupScormAPI();
-
-            // Point child frame to the actual SCO URL
+ 
+            // Point child frame to the actual SCO URL and (if accessible) inject a lightweight
+            // diagnostics shim into the SCO iframe that forwards runtime errors/unhandled
+            // rejections up to the host; the host forwarder relays them to the renderer logger.
             try {
               const scoFrame = hostDoc.getElementById('scoFrame');
               if (scoFrame && this._pendingScoUrl) {
-                scoFrame.src = this._pendingScoUrl;
+                try {
+                  // Attach one-time load listener to inject diagnostics into the child frame
+                  const injectChildDiag = () => {
+                    try {
+                      const cw = scoFrame.contentWindow;
+                      const doc = cw && cw.document;
+                      if (!doc || !doc.documentElement) return;
+ 
+                      // Create script element in child context to forward errors to parent
+                      const script = doc.createElement('script');
+                      script.type = 'text/javascript';
+                      script.text = `(function () {
+  function safePost(payload) { try { parent.postMessage({ type: 'SCORM_RUNTIME_ERROR', payload }, '*'); } catch (_) {} }
+  window.addEventListener('error', function (e) {
+    try {
+      safePost({
+        phase: 'error',
+        message: e && (e.message || String(e)),
+        filename: e && e.filename,
+        lineno: e && e.lineno,
+        colno: e && e.colno,
+        stack: (e && e.error && e.error.stack) || null,
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
+  }, true);
+  window.addEventListener('unhandledrejection', function (ev) {
+    try {
+      const r = ev && ev.reason;
+      safePost({
+        phase: 'unhandledrejection',
+        message: r && (r.message || String(r)),
+        stack: r && r.stack || null,
+        reason: r,
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
+  }, true);
+})();`;
+                      const target = doc.head || doc.documentElement;
+                      target.appendChild(script);
+                    } catch (_) { /* swallow */ }
+                  };
+ 
+                  try { scoFrame.addEventListener('load', injectChildDiag, { once: true }); } catch (_) {}
+                  // Try immediate injection if already interactive/complete and same-origin
+                  try {
+                    const alreadyCw = scoFrame.contentWindow;
+                    if (alreadyCw && alreadyCw.document && (alreadyCw.document.readyState === 'complete' || alreadyCw.document.readyState === 'interactive')) {
+                      injectChildDiag();
+                    }
+                  } catch (_) { /* cross-origin or not accessible */ }
+                } catch (_) {}
+ 
+                // Finally set the src to begin child load
+                try { scoFrame.src = this._pendingScoUrl; } catch (_) {}
               }
             } catch (_) {}
-
+ 
             // Verify presence from host window perspective
             setTimeout(() => { this.verifyScormApiPresence(); }, 0);
 
@@ -1406,6 +1520,14 @@ class ContentViewer extends BaseComponent {
 
       this._boundHandlers = null;
     }
+
+    // Remove host message handler if installed (diagnostic forwarder)
+    try {
+      if (this._hostMessageHandler) {
+        try { window.removeEventListener('message', this._hostMessageHandler); } catch (_) {}
+        this._hostMessageHandler = null;
+      }
+    } catch (_) {}
 
     this.clearContent();
     super.destroy();

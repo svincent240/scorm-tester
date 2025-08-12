@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: file: scorm-app:; script-src 'self' 'unsafe-inline' 'unsafe-eval' scorm-app: file:; style-src 'self' 'unsafe-inline' scorm-app: file:; connect-src 'self' scorm-app: data: file:; frame-src 'self' scorm-app: data: blob: file:; img-src 'self' scorm-app: data: blob: file:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob: file: scorm-app:; script-src 'self' 'unsafe-inline' scorm-app: file:; style-src 'self' 'unsafe-inline' scorm-app: file:; connect-src 'self' scorm-app: data: file:; frame-src 'self' scorm-app: data: blob: file:; img-src 'self' scorm-app: data: blob: file:;">
   <meta name="description" content="SCORM Tester - Professional SCORM 2004 4th Edition compliance testing tool">
   <meta name="author" content="SCORM Tester Team">
   <meta name="keywords" content="SCORM, e-learning, LMS, testing, compliance, SCORM 2004">
@@ -25,9 +25,20 @@
         console.log('THEME INIT: Origin:', window.location.origin);
         console.log('THEME INIT: localStorage available:', typeof localStorage !== 'undefined');
         
-        // Try to access localStorage, fallback gracefully if not available
-        savedTheme = localStorage.getItem('scorm-tester-theme');
-        console.log('THEME INIT: Successfully accessed localStorage, saved theme:', savedTheme);
+        // Only attempt localStorage when running under a storage-capable origin.
+        // Pages loaded via scorm-app:// are opaque origins and accessing localStorage
+        // can throw a SecurityError. Skip attempting access under that protocol.
+        if (window.location && window.location.protocol !== 'scorm-app:' && typeof localStorage !== 'undefined') {
+          try {
+            savedTheme = localStorage.getItem('scorm-tester-theme');
+            console.log('THEME INIT: Successfully accessed localStorage, saved theme:', savedTheme);
+          } catch (err) {
+            // localStorage access threw (e.g., storage disabled) - log safely
+            console.warn('THEME INIT: localStorage access threw:', err && err.message);
+          }
+        } else {
+          console.log('THEME INIT: Skipping localStorage access due to protocol or unavailable storage');
+        }
       } catch (error) {
         console.warn('THEME INIT: localStorage access failed:', error.message);
         console.warn('THEME INIT: Error details:', error);
