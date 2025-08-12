@@ -239,6 +239,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('select-scorm-package', this.handleSelectScormPackage.bind(this));
       this.registerHandler('select-scorm-folder', this.handleSelectScormFolder.bind(this));
       this.registerHandler('extract-scorm', this.handleExtractScorm.bind(this));
+      this.registerHandler('prepare-course-source', this.handlePrepareCourseSource.bind(this));
       this.registerHandler('save-temporary-file', this.handleSaveTemporaryFile.bind(this));
       this.registerHandler('find-scorm-entry', this.handleFindScormEntry.bind(this));
       this.registerHandler('get-course-info', this.handleGetCourseInfo.bind(this));
@@ -675,6 +676,11 @@ class IpcHandler extends BaseService {
     return await fileManager.saveTemporaryFile(fileName, base64Data);
   }
 
+  async handlePrepareCourseSource(event, source) {
+    const fileManager = this.getDependency('fileManager');
+    return await fileManager.prepareCourseSource(source);
+  }
+
   // Validation handlers
   async handleValidateScormCompliance(event, folderPath) {
     const scormService = this.getDependency('scormService');
@@ -784,15 +790,42 @@ class IpcHandler extends BaseService {
   }
  
   async handlePathUtilsToFileUrl(event, filePath) {
-    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-    return PathUtils.toScormProtocolUrl(filePath, appRoot);
+    try {
+      const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+      const tempRoot = PathUtils.normalize(require('os').tmpdir());
+      const canonicalTempRoot = PathUtils.normalize(path.join(tempRoot, 'scorm-tester'));
+      
+      const normalizedPath = PathUtils.normalize(filePath);
+      
+      // Check if path is within app root
+      if (normalizedPath.startsWith(appRoot)) {
+        const url = PathUtils.toScormProtocolUrl(filePath, appRoot);
+        return { success: true, url };
+      }
+      
+      // Check if path is within canonical temp root
+      if (normalizedPath.startsWith(canonicalTempRoot)) {
+        const url = PathUtils.toScormProtocolUrl(filePath, canonicalTempRoot);
+        return { success: true, url };
+      }
+      
+      // Path is not within allowed roots
+      return { 
+        success: false, 
+        error: `Path outside allowed roots (app: ${appRoot}, temp: ${canonicalTempRoot}): ${normalizedPath}` 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.message || String(error) 
+      };
+    }
   }
 
   // Allow optional options param to pass an allowedBase for folder-based loads
-  async handleResolveScormUrl(event, contentPath, extractionPath, options = null) {
+  async handleResolveScormUrl(event, contentPath, extractionPath) {
     const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-    const allowedBase = options && options.allowedBase ? options.allowedBase : null;
-    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot, allowedBase);
+    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
   }
 
   async handlePathNormalize(event, filePath) {

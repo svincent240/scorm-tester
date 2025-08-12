@@ -268,19 +268,38 @@ class WindowManager extends BaseService {
     }
 
     try {
-      // Register the custom protocol using consolidated PathUtils
-      // The privileged scheme registration has been moved to main.js (before app.whenReady())
-      // to ensure it's called at the correct time for Electron.
+      // Register the custom protocol using consolidated PathUtils.
+      // Note: privileged scheme registration is coordinated from main.js (before app.whenReady()).
+      // The protocol handler now enforces a simple, secure invariant:
+      //  - Only serve files under the application root (appRoot) OR the canonical temp root (os.tmpdir()/scorm-tester).
+      //  - The PathUtils.handleProtocolRequest is the single source of truth for resolution and security checks.
+      //  - This avoids fragile ad-hoc abs/path-decoding heuristics by ensuring all external course content
+      //    is prepared into the canonical temp root before being served.
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
         const appRoot = PathUtils.getAppRoot(__dirname);
-
+        const canonicalTempRoot = PathUtils.normalize(require('path').join(require('os').tmpdir(), 'scorm-tester'));
+  
         // Diagnostic — raw incoming URL from renderer / scorm content
         this.logger?.debug('WindowManager: Protocol request received', { rawUrl: request.url });
-
-        // Attempt to resolve the protocol URL to a local filesystem path
-        const result = PathUtils.handleProtocolRequest(request.url, appRoot);
-
-        // Diagnostic — structured result from PathUtils (include triedCandidates for abs/ diagnostics)
+  
+        // Attempt to resolve the protocol URL to a local filesystem path.
+        // Prefer PathUtils.handleProtocolRequest if available; fall back gracefully if not.
+        let result = null;
+        try {
+          if (PathUtils && typeof PathUtils.handleProtocolRequest === 'function') {
+            result = PathUtils.handleProtocolRequest(request.url, appRoot);
+          } else {
+            this.logger?.error('WindowManager: PathUtils.handleProtocolRequest is not available; protocol resolution cannot proceed safely.');
+            // Return a clear error result so downstream logic sends a 404 rather than throwing
+            result = { success: false, error: 'PathUtils.handleProtocolRequest not implemented', requestedPath: request.url };
+          }
+        } catch (e) {
+          // Guard against any unexpected errors from the resolver to avoid crashing the main process
+          this.logger?.error('WindowManager: PathUtils.handleProtocolRequest threw an exception', e?.message || e);
+          result = { success: false, error: `Resolver error: ${e?.message || String(e)}`, requestedPath: request.url };
+        }
+  
+        // Diagnostic — structured result from PathUtils (concise and focused)
         try {
           this.logger?.debug('WindowManager: Protocol resolution result', {
             success: !!result?.success,
@@ -289,35 +308,38 @@ class WindowManager extends BaseService {
             error: result?.error || null,
             queryString: result?.queryString || null,
             usedBase: result?.usedBase || null,
-            triedCandidates: result?.triedCandidates || null,
             isUndefinedPath: !!result?.isUndefinedPath
           });
         } catch (logErr) {
           // Guard against logger failures
           this.logger?.warn('WindowManager: Failed to log protocol resolution result', logErr?.message || logErr);
         }
-        
+  
         if (result.success) {
-          // Final check: ensure the resolvedPath is a string before handing to Electron
+          // Final check: resolvedPath must be non-empty string and reside under allowed bases
           if (typeof result.resolvedPath === 'string' && result.resolvedPath.length > 0) {
-            callback({ path: result.resolvedPath });
+            // Extra safety: ensure path starts with one of the allowed roots (double-check)
+            const normalizedResolved = PathUtils.normalize(result.resolvedPath);
+            if (normalizedResolved.startsWith(PathUtils.normalize(appRoot)) || normalizedResolved.startsWith(canonicalTempRoot)) {
+              callback({ path: normalizedResolved });
+            } else {
+              this.logger?.error('WindowManager: Resolved path is outside allowed roots', { resolvedPath: normalizedResolved, appRoot, canonicalTempRoot });
+              callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+            }
           } else {
             this.logger?.error('WindowManager: Protocol handler produced empty resolvedPath', { result });
             callback({ error: -6 }); // ERR_FILE_NOT_FOUND
           }
         } else {
-          // Handle undefined path errors more gracefully
+          // Handle undefined path errors more gracefully (indicates SCORM content using undefined JS variables)
           if (result.isUndefinedPath) {
-            this.logger?.warn('WindowManager: Undefined path blocked - SCORM content JavaScript issue');
-            this.logger?.warn('WindowManager: Requested path:', result.requestedPath);
-            // Return a 404 but don't spam the logs with errors
+            this.logger?.warn('WindowManager: Undefined path blocked - SCORM content JavaScript issue', { requestedPath: result.requestedPath });
             callback({ error: -6 }); // ERR_FILE_NOT_FOUND
           } else {
-            // Handle other types of errors normally
-            this.logger?.error('WindowManager: Protocol request failed:', result.error);
-            this.logger?.error('WindowManager: Requested path:', result.requestedPath);
+            // Handle other types of errors with clear diagnostics
+            this.logger?.error('WindowManager: Protocol request failed', { error: result.error, requestedPath: result.requestedPath });
             if (result.resolvedPath) {
-              this.logger?.error('WindowManager: Resolved path:', result.resolvedPath);
+              this.logger?.error('WindowManager: Resolved path (for diagnostics):', result.resolvedPath);
             }
             callback({ error: -6 }); // ERR_FILE_NOT_FOUND
           }

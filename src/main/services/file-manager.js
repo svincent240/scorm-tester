@@ -72,6 +72,9 @@ class FileManager extends BaseService {
     // Ensure temp directory exists
     await this.ensureTempDirectory();
     
+    // Clean up any leftover temporary files from previous sessions
+    await this.cleanupLeftoverTempFiles();
+    
     // Set up cleanup interval
     this.setupCleanupInterval();
     
@@ -97,8 +100,8 @@ class FileManager extends BaseService {
       // Add operation cancellation logic if needed
     }
     
-    // Clean up temporary files
-    await this.cleanupTempFiles();
+    // NOTE: Temporary files are no longer cleaned up at shutdown for better post-shutdown troubleshooting
+    // They will be cleaned up at next startup instead
     
     this.activeOperations.clear();
     this.tempFiles.clear();
@@ -500,6 +503,105 @@ class FileManager extends BaseService {
     }
   }
 
+/**
+   * Prepare a canonical working directory for a course source (zip or folder).
+   * Ensures the rest of the app always works against a canonical path under the
+   * app temp root (os.tmpdir()/scorm-tester/scorm_<ts>).
+   *
+   * Source descriptor:
+   *   { type: 'zip'|'folder'|'temp', path: string }
+   *
+   * Behavior:
+   *   - zip: validate zip exists and extract into canonical temp root (reuse extractScorm)
+   *   - folder: validate it contains imsmanifest.xml (findScormEntry) then copy folder into canonical temp root
+   *   - temp: treated like zip or file depending on extension (zip -> extract, folder not expected)
+   *
+   * Returns:
+   *   { success: true, type, unifiedPath, originalPath } or { success: false, error }
+   */
+  async prepareCourseSource(source) {
+    try {
+      if (!source || !source.path || !source.type) {
+        throw new Error('Invalid source descriptor. Expect { type, path }');
+      }
+
+      const srcPath = source.path;
+      const srcType = source.type;
+
+      // Sanity checks
+      if (!this.validateFilePath(srcPath) && !this.validateFolderPath(srcPath)) {
+        throw new Error('Source path does not exist or is inaccessible');
+      }
+
+      // Canonical temp root
+      const tempRoot = path.join(app.getPath('temp'), 'scorm-tester');
+      await this.ensureDirectory(tempRoot);
+
+      // For zip files (or temp files that are zip), extract and return the extracted path
+      if (srcType === 'zip' || (srcType === 'temp' && path.extname(srcPath).toLowerCase() === '.zip')) {
+        // Reuse existing extract flow which already writes into canonical temp/scorm_<ts>
+        const extractResult = await this.extractScorm(srcPath);
+        if (!extractResult.success) {
+          return { success: false, error: extractResult.error || 'Extraction failed' };
+        }
+        return { success: true, type: 'zip', unifiedPath: extractResult.path, originalPath: srcPath };
+      }
+
+      // For folder sources, validate presence of imsmanifest.xml before copying
+      if (srcType === 'folder') {
+        // Check for manifest in selected folder only (top-level acceptance)
+        const manifestCheck = await this.findScormEntry(srcPath);
+        if (!manifestCheck.success) {
+          return { success: false, error: 'Selected folder does not contain imsmanifest.xml' };
+        }
+
+        // Create canonical destination directory
+        const destPath = path.join(tempRoot, `scorm_${Date.now()}`);
+        await this.ensureDirectory(destPath);
+
+        // Perform a recursive copy from srcPath -> destPath
+        const copyRecursive = async (src, dest) => {
+          const entries = await fs.promises.readdir(src, { withFileTypes: true });
+          for (const entry of entries) {
+            const srcEntryPath = path.join(src, entry.name);
+            const destEntryPath = path.join(dest, entry.name);
+            if (entry.isDirectory()) {
+              await fs.promises.mkdir(destEntryPath, { recursive: true });
+              await copyRecursive(srcEntryPath, destEntryPath);
+            } else if (entry.isFile()) {
+              try {
+                await fs.promises.copyFile(srcEntryPath, destEntryPath);
+              } catch (e) {
+                // If copy fails for a file, log and continue (don't fail whole copy for transient IO issues)
+                this.logger?.warn(`FileManager: Failed to copy file ${srcEntryPath} -> ${destEntryPath}: ${e?.message || e}`);
+              }
+            }
+          }
+        };
+
+        await copyRecursive(srcPath, destPath);
+        this.tempFiles.add(destPath);
+
+        // Double-check manifest exists in copied destination
+        const manifestCheckCopy = this.getManifestPath(destPath);
+        if (!manifestCheckCopy.success) {
+          // Clean up and fail
+          try { fs.rmSync(destPath, { recursive: true, force: true }); } catch(_) {}
+          this.tempFiles.delete(destPath);
+          return { success: false, error: 'Manifest not found in copied folder' };
+        }
+
+        return { success: true, type: 'folder', unifiedPath: destPath, originalPath: srcPath };
+      }
+
+      // Fallback - unknown type
+      return { success: false, error: `Unsupported source type: ${srcType}` };
+
+    } catch (error) {
+      this.logger?.error('FileManager.prepareCourseSource failed:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  }
   /**
    * Extract ZIP with validation
    * @private
@@ -584,10 +686,17 @@ class FileManager extends BaseService {
           this.logger?.debug(`FileManager: Ensuring directory exists: ${destDir}`);
           await fs.promises.mkdir(destDir, { recursive: true });
 
-          // Extract this single entry to the configured extractPath (StreamZip preserves internal path)
+          // Extract this single entry preserving the directory structure
           try {
-            this.logger?.debug(`FileManager: Extracting entry: ${entryName} to ${extractPath}`);
-            await zip.extract(entryName, extractPath);
+            this.logger?.debug(`FileManager: Extracting entry: ${entryName} to ${resolvedTarget}`);
+            
+            // CRITICAL FIX: Use resolvedTarget which already includes the full directory path
+            // This preserves the ZIP's internal directory structure
+            await zip.extract(entryName, resolvedTarget);
+            
+            // Light verification - just log the extraction target for debugging
+            this.logger?.debug(`FileManager: Extracted ${entryName} -> ${resolvedTarget}`)
+            
             totalSize += entry.size || 0; // Only add size if extraction is successful
             extractedCount++;
             this.logger?.debug(`FileManager: Successfully extracted entry: ${entryName}, extractedCount: ${extractedCount}, totalSize: ${totalSize}`);
@@ -606,6 +715,9 @@ class FileManager extends BaseService {
       }
   
       this.logger?.info(`FileManager: Extracted ${extractedCount} files, skipped ${skippedCount} suspicious/failed entries (${this.formatBytes(totalSize)})`);
+      
+      // Post-extraction filesystem verification to confirm files were actually written
+      await this.verifyExtractedFiles(extractPath, extractedCount);
       
       // Return extraction statistics for callers and tests
       return { extractedCount, skippedCount, totalSize };
@@ -711,6 +823,36 @@ class FileManager extends BaseService {
   async ensureTempDirectory() {
     const tempDir = path.join(app.getPath('temp'), 'scorm-tester');
     await this.ensureDirectory(tempDir);
+    
+    // Validate temp directory permissions for Windows filesystem operations
+    try {
+      // Check read permission
+      fs.accessSync(tempDir, fs.constants.R_OK);
+      this.logger?.debug(`FileManager: Temp directory read permission confirmed: ${tempDir}`);
+      
+      // Check write permission
+      fs.accessSync(tempDir, fs.constants.W_OK);
+      this.logger?.debug(`FileManager: Temp directory write permission confirmed: ${tempDir}`);
+      
+      // Test actual file creation to ensure permissions work
+      const testFile = path.join(tempDir, `perm_test_${Date.now()}.tmp`);
+      fs.writeFileSync(testFile, 'permission test', 'utf8');
+      
+      // Verify the test file was created and is readable
+      if (fs.existsSync(testFile)) {
+        const testContent = fs.readFileSync(testFile, 'utf8');
+        this.logger?.debug(`FileManager: Temp directory write/read test successful: ${testFile}`);
+        
+        // Clean up test file
+        fs.unlinkSync(testFile);
+      } else {
+        this.logger?.error(`FileManager: Temp directory write test FAILED - file not created: ${testFile}`);
+      }
+      
+    } catch (permError) {
+      this.logger?.error(`FileManager: Temp directory permission check FAILED for ${tempDir}: ${permError.code} - ${permError.message}`);
+      throw new Error(`Insufficient permissions for temp directory: ${tempDir}`);
+    }
   }
 
   /**
@@ -768,6 +910,103 @@ class FileManager extends BaseService {
     }
     
     this.tempFiles.clear();
+  }
+
+  /**
+   * Cleanup leftover temporary files from previous sessions at startup
+   * @private
+   */
+  async cleanupLeftoverTempFiles() {
+    const tempDir = path.join(app.getPath('temp'), 'scorm-tester');
+    
+    try {
+      if (!fs.existsSync(tempDir)) {
+        this.logger?.debug('FileManager: No temp directory to clean up');
+        return;
+      }
+
+      const entries = fs.readdirSync(tempDir);
+      let cleanupCount = 0;
+
+      for (const entry of entries) {
+        const entryPath = path.join(tempDir, entry);
+        
+        try {
+          // Only clean up scorm_ prefixed directories and files
+          if (entry.startsWith('scorm_')) {
+            fs.rmSync(entryPath, { recursive: true, force: true });
+            cleanupCount++;
+            this.logger?.debug(`FileManager: Cleaned up leftover temp entry: ${entry}`);
+          }
+        } catch (error) {
+          this.logger?.error(`FileManager: Failed to cleanup leftover temp entry ${entry}:`, error);
+        }
+      }
+
+      if (cleanupCount > 0) {
+        this.logger?.info(`FileManager: Cleaned up ${cleanupCount} leftover temp entries from previous sessions`);
+      } else {
+        this.logger?.debug('FileManager: No leftover temp files to clean up');
+      }
+      
+    } catch (error) {
+      this.logger?.error('FileManager: Failed to cleanup leftover temp files:', error);
+    }
+  }
+
+  /**
+   * Verify extracted files exist on filesystem after extraction
+   * @private
+   * @param {string} extractPath - Path where files were extracted
+   * @param {number} expectedCount - Expected number of extracted files
+   */
+  async verifyExtractedFiles(extractPath, expectedCount) {
+    try {
+      this.logger?.debug(`FileManager: Verifying extraction - checking ${extractPath} for ${expectedCount} files`);
+      
+      if (!fs.existsSync(extractPath)) {
+        this.logger?.error(`FileManager: VERIFICATION FAILED - Extract path does not exist: ${extractPath}`);
+        return;
+      }
+
+      // Count actual files recursively
+      let actualCount = 0;
+      const countFiles = (dir) => {
+        try {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              countFiles(fullPath);
+            } else if (entry.isFile()) {
+              actualCount++;
+              // Also verify each file is readable
+              try {
+                fs.accessSync(fullPath, fs.constants.R_OK);
+                this.logger?.debug(`FileManager: Verified file exists and is readable: ${path.relative(extractPath, fullPath)}`);
+              } catch (accessError) {
+                this.logger?.error(`FileManager: VERIFICATION FAILED - File not readable: ${fullPath} - ${accessError.message}`);
+              }
+            }
+          }
+        } catch (error) {
+          this.logger?.error(`FileManager: Error counting files in ${dir}: ${error.message}`);
+        }
+      };
+
+      countFiles(extractPath);
+      
+      this.logger?.info(`FileManager: Post-extraction verification - Expected: ${expectedCount}, Found: ${actualCount} files`);
+      
+      if (actualCount !== expectedCount) {
+        this.logger?.warn(`FileManager: File count mismatch after extraction - expected ${expectedCount}, found ${actualCount}`);
+      } else {
+        this.logger?.debug(`FileManager: Post-extraction verification PASSED - all ${actualCount} files confirmed on filesystem`);
+      }
+
+    } catch (error) {
+      this.logger?.error(`FileManager: Post-extraction verification failed: ${error.message}`);
+    }
   }
 
   /**

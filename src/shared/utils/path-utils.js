@@ -10,6 +10,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const getLogger = require('./logger');
 
 /**
  * Path Utilities Class
@@ -17,13 +18,25 @@ const os = require('os');
  * Provides consistent, secure path operations across all processes.
  */
 class PathUtils {
+  static get logger() {
+    // Use the centralized shared logger - lazy initialization to avoid circular deps
+    if (!this._logger) {
+      try {
+        this._logger = getLogger();
+      } catch (e) {
+        // Fallback to null if logger not available
+        this._logger = null;
+      }
+    }
+    return this._logger;
+  }
   /**
    * Normalize path for cross-platform compatibility
    * @param {string} filePath - Path to normalize
    * @returns {string} Normalized path
    */
   static normalize(filePath) {
-    this.logger?.debug(`PathUtils: normalize - Input: '${filePath}'`);
+    PathUtils.logger?.debug(`PathUtils: normalize - Input: '${filePath}'`);
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path provided');
     }
@@ -38,7 +51,7 @@ class PathUtils {
     if (normalized.length > 1 && normalized.endsWith('/')) {
       normalized = normalized.slice(0, -1);
     }
-    this.logger?.debug(`PathUtils: normalize - Output: '${normalized}'`);
+    PathUtils.logger?.debug(`PathUtils: normalize - Output: '${normalized}'`);
     return normalized;
   }
 
@@ -53,11 +66,11 @@ class PathUtils {
       throw new Error('File path and app root are required');
     }
     
-    this.logger?.debug(`PathUtils: toScormProtocolUrl - Input: filePath='${filePath}', appRoot='${appRoot}'`);
+    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Input: filePath='${filePath}', appRoot='${appRoot}'`);
 
-    const normalizedPath = this.normalize(filePath);
-    const normalizedRoot = this.normalize(appRoot);
-    this.logger?.debug(`PathUtils: toScormProtocolUrl - Normalized: normalizedPath='${normalizedPath}', normalizedRoot='${normalizedRoot}'`);
+    const normalizedPath = PathUtils.normalize(filePath);
+    const normalizedRoot = PathUtils.normalize(appRoot);
+    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Normalized: normalizedPath='${normalizedPath}', normalizedRoot='${normalizedRoot}'`);
     
     // Ensure path is within app root for security
     if (!normalizedPath.startsWith(normalizedRoot)) {
@@ -71,22 +84,21 @@ class PathUtils {
     if (relativePath.startsWith('/')) {
       relativePath = relativePath.substring(1);
     }
-    this.logger?.debug(`PathUtils: toScormProtocolUrl - Relative Path: '${relativePath}'`);
+    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Relative Path: '${relativePath}'`);
     
     const protocolUrl = `scorm-app://${relativePath}`;
-    this.logger?.debug(`PathUtils: toScormProtocolUrl - Output: '${protocolUrl}'`);
+    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Output: '${protocolUrl}'`);
     return protocolUrl;
   }
 
   /**
    * Resolve SCORM content URL for iframe loading
    * @param {string} contentPath - Content path from manifest (relative or absolute)
-   * @param {string} extractionPath - SCORM package extraction directory OR user-selected folder for unzipped flow
+   * @param {string} extractionPath - SCORM package extraction directory (must be under canonical temp root)
    * @param {string} appRoot - Application root directory
-   * @param {string|null} allowedBase - Optional additional allowed base outside appRoot (e.g., selected folder path)
    * @returns {Object} Resolution result with URL and metadata
    */
-  static resolveScormContentUrl(contentPath, extractionPath, appRoot, allowedBase = null) {
+  static resolveScormContentUrl(contentPath, extractionPath, appRoot) {
     try {
       if (!contentPath || !extractionPath || !appRoot) {
         throw new Error('Content path, extraction path, and app root are required');
@@ -111,38 +123,29 @@ class PathUtils {
         resolvedPath = this.normalize(resolvedPath);
       }
 
-      // Validate the resolved path exists and is within an allowed base
+      // Validate the resolved path exists and is within allowed roots
       const normalizedAppRoot = this.normalize(appRoot);
-      const normalizedAllowedBase = allowedBase ? this.normalize(allowedBase) : null;
-      // Treat the application's canonical temp extraction directory as an additional allowed base.
+      // Treat the application's canonical temp extraction directory as the only allowed external base.
       const normalizedTempRoot = this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
  
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
-      const withinAllowedBase = normalizedAllowedBase ? resolvedPath.startsWith(normalizedAllowedBase) : false;
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
  
-      if (!withinAppRoot && !withinAllowedBase && !withinTempRoot) {
-        const bases = normalizedAllowedBase ? `${normalizedAppRoot} OR ${normalizedAllowedBase} OR ${normalizedTempRoot}` : `${normalizedAppRoot} OR ${normalizedTempRoot}`;
-        throw new Error(`Resolved path outside allowed roots (${bases}): ${resolvedPath}`);
+      if (!withinAppRoot && !withinTempRoot) {
+        throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot}): ${resolvedPath}`);
       }
 
       if (!fs.existsSync(resolvedPath)) {
         throw new Error(`File does not exist: ${resolvedPath}`);
       }
 
-      // Determine which base to use for protocol URL construction
-      const protocolBase = withinAppRoot ? appRoot : (normalizedAllowedBase || appRoot);
-
-      // Convert to protocol URL
+      // Convert to protocol URL using appropriate base
       let protocolUrl;
       if (withinAppRoot) {
         protocolUrl = this.toScormProtocolUrl(resolvedPath, appRoot);
       } else {
-        // For external allowedBase, we cannot rely on appRoot-based protocol resolution.
-        // Encode absolute path using an 'abs/' scheme that the protocol handler will decode.
-        // Example: scorm-app://abs/C|/Users/name/Folder/index.html
-        const encodedAbs = this.normalize(resolvedPath).replace(/^([A-Za-z]):/, (_m, d) => `${d}|`);
-        protocolUrl = `scorm-app://abs/${encodedAbs}`;
+        // For temp root paths, use temp root as base
+        protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedTempRoot);
       }
       
       // Add query string back if present
@@ -157,7 +160,7 @@ class PathUtils {
         originalPath: contentPath,
         hasQuery: !!queryString,
         queryString: queryString || null,
-        usedBase: withinAppRoot ? 'appRoot' : 'allowedBase'
+        usedBase: withinAppRoot ? 'appRoot' : 'tempRoot'
       };
 
     } catch (error) {
@@ -165,8 +168,7 @@ class PathUtils {
         success: false,
         error: error.message,
         originalPath: contentPath,
-        extractionPath: extractionPath,
-        allowedBase: allowedBase || null
+        extractionPath: extractionPath
       };
     }
   }
@@ -212,235 +214,137 @@ class PathUtils {
    */
   static handleProtocolRequest(protocolUrl, appRoot) {
     try {
-      this.logger?.debug(`PathUtils: handleProtocolRequest - Input: protocolUrl='${protocolUrl}'`);
-      // Extract the path from the custom protocol URL
-      let requestedPath = protocolUrl.substr(12); // Remove 'scorm-app://'
-      this.logger?.debug(`PathUtils: handleProtocolRequest - After scorm-app:// removal: requestedPath='${requestedPath}'`);
-
-      // CRITICAL FIX: Handle undefined paths from SCORM content JavaScript
-      if (requestedPath.includes('/undefined')) {
-        console.warn(`PathUtils: UNDEFINED PATH DETECTED - Blocking request: ${requestedPath}`);
-        console.warn(`PathUtils: This indicates SCORM content is using undefined JavaScript variables`);
-        return {
-          success: false,
-          error: 'Undefined path detected - SCORM content JavaScript variable is undefined',
-          requestedPath,
-          resolvedPath: null,
-          isUndefinedPath: true
-        };
+      // Defensive guard
+      if (!protocolUrl || typeof protocolUrl !== 'string') {
+        return { success: false, error: 'Invalid protocol URL', requestedPath: protocolUrl };
       }
 
-      // CRITICAL FIX: Handle double temp/ paths that SCORM content sometimes generates
+      // Strip scheme prefix 'scorm-app://'
+      const prefix = 'scorm-app://';
+      let requestedPath = protocolUrl.startsWith(prefix) ? protocolUrl.slice(prefix.length) : protocolUrl;
+
+      // Quick checks for broken content variables
+      if (requestedPath.includes('/undefined')) {
+        PathUtils.logger?.warn(`PathUtils: Undefined path blocked: ${requestedPath}`);
+        return { success: false, error: 'Undefined path detected', requestedPath, resolvedPath: null, isUndefinedPath: true };
+      }
+
+      // Normalize accidental duplicated temp segments
       if (requestedPath.includes('temp/temp/')) {
         requestedPath = requestedPath.replace(/temp\/temp\//g, 'temp/');
-        this.logger?.debug(`PathUtils: handleProtocolRequest - After temp/temp/ fix: requestedPath='${requestedPath}'`);
       }
 
-      // Remove query parameters for file resolution
-      let [filePath, queryString] = requestedPath.split('?');
-      const rawFilePath = filePath; // preserve original for 'abs/' detection
- 
-      // Normalize double abs prefixes that can occur when subresources are resolved relative to an abs URL
-      // Do the 'abs' detection before path.normalize to avoid platform path-separator issues on Windows
-      const normalizedRawForAbs = rawFilePath.replace(/\\/g, '/');
-      if (normalizedRawForAbs.startsWith('abs/abs/')) {
-        filePath = normalizedRawForAbs.replace(/^abs\/abs\//, 'abs/');
-        this.logger?.debug(`PathUtils: handleProtocolRequest - After abs/abs/ fix: filePath='${filePath}'`);
-      } else {
-        filePath = normalizedRawForAbs;
+      // Remove query part for resolution and normalize trailing slashes for file names
+      const [filePortion, queryString] = requestedPath.split('?');
+      let filePathRaw = (filePortion || '').replace(/\\/g, '/');
+      // If the path looks like a file but has a trailing slash (e.g., "index.html/"), trim it.
+      if (filePathRaw.match(/^[^\/]+\.[^\/]+\/$/)) {
+        filePathRaw = filePathRaw.replace(/\/+$/, '');
       }
- 
-      // Branch 1: Absolute-path encoded scheme for external folders
-      if (filePath.startsWith('abs/')) {
-        // Extract the encoded absolute path portion after 'abs/'
-        let encoded = filePath.substring(4);
-        this.logger?.debug(`PathUtils: handleProtocolRequest - Abs path detected, encoded='${encoded}'`);
- 
-        // Normalize separators for safer decoding attempts
-        encoded = encoded.replace(/\\/g, '/');
- 
-        // Build a robust set of candidate variants to try.
-        // We intentionally produce both forward-slash and backslash variants,
-        // percent-decoded variants, pipe-based drive encodings and direct drive encodings.
-        const variants = new Set();
- 
-        // Helper to push both slash variants and normalized forms
-        const pushVariants = (raw) => {
-          if (!raw || typeof raw !== 'string') return;
-          // Trim accidental leading slashes
-          let r = raw.replace(/^\/+/, '');
-          // Add as-is
-          variants.add(r);
-          // Add normalized forward-slash form
-          variants.add(r.replace(/\\/g, '/'));
-          // Add Windows-style backslash form
-          variants.add(r.replace(/\//g, '\\'));
-        };
- 
-        // Strategy 1: try decodeURIComponent (guarded)
-        try {
-          const dec = decodeURIComponent(encoded);
-          // convert possible 'C|/...' -> 'C:/...' form
-          pushVariants(dec.replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`));
-        } catch (e) {
-          // ignore decoding errors
-        }
- 
-        // Strategy 2: replace %7C with '|' then convert pipe -> colon
-        pushVariants(encoded.replace(/%7C/gi, '|').replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`));
- 
-        // Strategy 3: handle literal pipe used by renderer (C|/Users/...)
-        pushVariants(encoded.replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`));
- 
-        // Strategy 4: if renderer sent already-colon form (C:/...), include it
-        pushVariants(encoded.replace(/^\/+/, '').replace(/^([A-Za-z]):\//, (_m, d) => `${d}:/`));
- 
-        // Strategy 5: fallback - percent-encoded left as-is (some renderers send mixed encoding)
-        pushVariants(encoded);
- 
-        // Evaluate candidates and pick the first that exists
-        let foundPath = null;
-        const triedCandidates = [];
- 
-        for (const candidateRaw of variants) {
-          try {
-            // Normalize candidate into a platform-correct absolute path
-            // If candidate looks like 'C:/Users/...' or 'C:\Users\...', use as-is.
-            let candidate = candidateRaw;
- 
-            // If candidate uses '|' as drive separator (legacy encoding), convert to ':' form
-            candidate = candidate.replace(/^([A-Za-z])\|\//, (_m, d) => `${d}:/`);
-            candidate = candidate.replace(/^([A-Za-z])\|\\/, (_m, d) => `${d}:/`);
- 
-            // If candidate begins with a leading slash then a drive letter (e.g. '/C:/' or '/C|/'), strip leading slash
-            candidate = candidate.replace(/^\/+([A-Za-z]:|[A-Za-z]\|)/, (_m, g1) => g1);
- 
-            // Ensure we have a consistent OS-style path (path.resolve will handle absolute forms)
-            candidate = path.resolve(candidate);
-            triedCandidates.push(candidate);
- 
-            // Basic traversal guard on normalized candidate
-            if (candidate.includes('..')) {
-              this.logger?.warn(`PathUtils: handleProtocolRequest - Path traversal detected in abs candidate: ${candidate}`);
-              continue;
-            }
- 
-            // Log candidate existence attempt (use try/catch to capture permission errors)
-            let exists = false;
-            try {
-              exists = fs.existsSync(candidate);
-            } catch (statErr) {
-              this.logger?.debug(`PathUtils: handleProtocolRequest - fs.existsSync threw for candidate='${candidate}'`, statErr?.message || statErr);
-              exists = false;
-            }
- 
-            if (exists) {
-              foundPath = candidate;
-              this.logger?.debug(`PathUtils: handleProtocolRequest - Found existing abs candidate: ${candidate}`);
-              break;
-            } else {
-              this.logger?.debug(`PathUtils: handleProtocolRequest - Candidate does not exist: ${candidate}`);
-            }
-          } catch (err) {
-            // Guard against malformed candidate causing normalize/resolve to throw
-            this.logger?.debug(`PathUtils: handleProtocolRequest - Candidate processing failed: ${candidateRaw}`, err?.message || err);
-          }
-        }
- 
-        // If not found, attempt a temp-root fallback before failing.
-        // Some renderer encodings can mangle or omit the absolute drive prefix while
-        // the extraction process always writes into the known temp root
-        // (os.tmpdir()/scorm-tester). Reconstructing the tail and joining it with
-        // the canonical temp root often recovers the real path.
-        if (!foundPath) {
-          try {
-            // Attempt safe decode to make tail extraction more reliable
-            const decoded = (() => {
-              try { return decodeURIComponent(encoded); } catch (_) { return encoded; }
-            })();
- 
-            const searchNormalized = decoded.replace(/\\/g, '/');
-            const marker = 'scorm-tester/';
-            const idx = searchNormalized.toLowerCase().indexOf(marker);
- 
-            if (idx !== -1) {
-              const tail = searchNormalized.substring(idx + marker.length);
-              const tempRoot = path.join(os.tmpdir(), 'scorm-tester');
-              const tempCandidate = path.resolve(path.join(tempRoot, tail));
-              triedCandidates.push(tempCandidate);
-              this.logger?.debug(`PathUtils: handleProtocolRequest - Trying temp-root fallback candidate: ${tempCandidate}`);
-              try {
-                if (fs.existsSync(tempCandidate)) {
-                  foundPath = tempCandidate;
-                  this.logger?.debug(`PathUtils: handleProtocolRequest - Found existing temp-root fallback candidate: ${tempCandidate}`);
-                } else {
-                  this.logger?.debug(`PathUtils: handleProtocolRequest - Temp-root fallback candidate does not exist: ${tempCandidate}`);
-                }
-              } catch (statErr) {
-                this.logger?.debug(`PathUtils: handleProtocolRequest - fs.existsSync threw for tempCandidate='${tempCandidate}'`, statErr?.message || statErr);
-              }
-            }
-          } catch (fallbackErr) {
-            this.logger?.debug('PathUtils: handleProtocolRequest - temp-root fallback failed', fallbackErr?.message || fallbackErr);
-          }
-        }
- 
-        // If still not found, include a helpful diagnostic listing of tried variants
-        if (!foundPath) {
-          this.logger?.warn('PathUtils: handleProtocolRequest - No existing file found for abs path. Tried candidates:', triedCandidates);
-          return {
-            success: false,
-            error: 'Invalid or inaccessible path',
-            requestedPath,
-            resolvedPath: triedCandidates.length > 0 ? triedCandidates[0] : path.normalize(encoded),
-            triedCandidates,
-            usedBase: 'allowedBase'
-          };
-        }
- 
-        return {
-          success: true,
-          resolvedPath: foundPath,
-          requestedPath,
-          queryString: queryString || null,
-          usedBase: 'allowedBase'
-        };
-      }
- 
-      // Branch 2: Legacy appRoot-relative behavior
-      // Normalize the file path to handle '..' segments correctly for appRoot joins
-      const normalizedFilePath = path.normalize(filePath);
+
       const normalizedAppRoot = this.normalize(appRoot);
-      this.logger?.debug(`PathUtils: handleProtocolRequest - AppRoot-relative: normalizedFilePath='${normalizedFilePath}', normalizedAppRoot='${normalizedAppRoot}'`);
-      const fullPath = path.join(normalizedAppRoot, normalizedFilePath);
-      const normalizedPath = this.normalize(fullPath);
-      this.logger?.debug(`PathUtils: handleProtocolRequest - AppRoot-relative: fullPath='${fullPath}', normalizedPath='${normalizedPath}'`);
- 
-      // Validate path security and existence
-      if (!this.validatePath(normalizedPath, normalizedAppRoot)) {
-        this.logger?.warn(`PathUtils: handleProtocolRequest - Path validation failed for appRoot-relative path: ${normalizedPath}`);
-        return {
-          success: false,
-          error: 'Invalid or inaccessible path',
-          requestedPath,
-          resolvedPath: normalizedPath
-        };
+      const normalizedTempRoot = this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+
+      // Legacy abs/ encoding is no longer supported - all paths should be relative to app root or temp root
+
+      // Treat incoming path as relative first to appRoot, then to canonical temp root
+      const safeRel = path.normalize(filePathRaw);
+      const appResolved = path.resolve(normalizedAppRoot, safeRel);
+      const tempResolved = path.resolve(normalizedTempRoot, safeRel);
+
+      // Normalize resolved variants for reliable cross-platform comparisons (forward-slash normalized)
+      const appResolvedNorm = this.normalize(appResolved);
+      const tempResolvedNorm = this.normalize(tempResolved);
+      
+      // Debug path resolution process
+      PathUtils.logger?.debug('PathUtils: Path resolution process', {
+        originalUrl: protocolUrl,
+        requestedPath,
+        filePathRaw,
+        safeRel,
+        normalizedAppRoot,
+        normalizedTempRoot,
+        appResolved,
+        tempResolved,
+        appResolvedNorm,
+        tempResolvedNorm
+      });
+
+      // Prefer file under app root (compare normalized forms, but use native paths for fs operations)
+      const appExists = fs.existsSync(appResolved);
+      if (appResolvedNorm.startsWith(normalizedAppRoot) && appExists) {
+        return { success: true, resolvedPath: appResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'appRoot' };
       }
 
-      return {
-        success: true,
-        resolvedPath: normalizedPath,
-        requestedPath,
-        queryString: queryString || null,
-        usedBase: 'appRoot'
-      };
+      // Fallback to canonical temp root
+      const tempExists = fs.existsSync(tempResolved);
+      
+      // Additional filesystem debugging using native path
+      let fileStats = null;
+      try {
+        fileStats = fs.statSync(tempResolved);
+      } catch (statError) {
+        PathUtils.logger?.debug(`PathUtils: fs.statSync failed for ${tempResolved}:`, statError.message);
+      }
+      
+      // Enhanced logging for debugging file existence issues with timestamp for race condition detection
+      const checkTimestamp = new Date().toISOString();
+      PathUtils.logger?.info(`PathUtils: File existence check for ${requestedPath}`, { 
+        requestedPath, 
+        checkTimestamp,
+        appResolvedNorm,
+        appExists,
+        tempResolved,
+        tempResolvedNorm, 
+        tempExists, 
+        normalizedTempRoot, 
+        startsWithTempRoot: tempResolvedNorm.startsWith(normalizedTempRoot),
+        fileStats: fileStats ? { 
+          size: fileStats.size, 
+          isFile: fileStats.isFile(), 
+          mtime: fileStats.mtime.toISOString(),
+          birthtime: fileStats.birthtime.toISOString() 
+        } : null
+      });
+      
+      if (tempResolvedNorm.startsWith(normalizedTempRoot) && tempExists) {
+        return { success: true, resolvedPath: tempResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'tempRoot' };
+      } else {
+        // Enhanced debugging for failed validation
+        PathUtils.logger?.error('PathUtils: Temp root validation failed', {
+          tempResolvedNorm,
+          normalizedTempRoot,
+          startsWithTempRoot: tempResolvedNorm.startsWith(normalizedTempRoot),
+          tempExists,
+          tempResolvedNormLength: tempResolvedNorm.length,
+          normalizedTempRootLength: normalizedTempRoot.length,
+          tempResolvedNormChars: tempResolvedNorm.split('').slice(0, normalizedTempRoot.length + 5).join(''),
+          normalizedTempRootChars: normalizedTempRoot.split('').join('')
+        });
+      }
+
+      // If file doesn't exist, try direct read attempt to distinguish permission vs existence issues
+      if (tempResolvedNorm.startsWith(normalizedTempRoot)) {
+        try {
+          fs.readFileSync(tempResolved, { encoding: null });
+          PathUtils.logger?.error(`PathUtils: Paradox detected - fs.readFileSync succeeded but fs.existsSync failed for ${tempResolved}`);
+        } catch (readError) {
+          PathUtils.logger?.debug(`PathUtils: Direct read attempt failed for ${tempResolved}: ${readError.code} - ${readError.message}`);
+          if (readError.code === 'ENOENT') {
+            PathUtils.logger?.debug(`PathUtils: Confirmed file does not exist (ENOENT): ${tempResolved}`);
+          } else if (readError.code === 'EACCES') {
+            PathUtils.logger?.warn(`PathUtils: File exists but permission denied (EACCES): ${tempResolved}`);
+          }
+        }
+      }
+
+      // Nothing found
+      PathUtils.logger?.warn('PathUtils: handleProtocolRequest - file not found under allowed roots', { requestedPath, appResolvedNorm, tempResolvedNorm });
+      return { success: false, error: `File not found under allowed roots (${normalizedAppRoot} or ${normalizedTempRoot})`, requestedPath, resolvedPath: null };
 
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        requestedPath: protocolUrl
-      };
+      PathUtils.logger?.error('PathUtils: handleProtocolRequest unexpected error', error?.message || error);
+      return { success: false, error: error?.message || String(error), requestedPath: protocolUrl };
     }
   }
 

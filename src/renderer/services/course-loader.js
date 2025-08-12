@@ -132,20 +132,27 @@ class CourseLoader {
         throw new Error('Electron API not available');
       }
 
-      // Validate manifest presence and read it
-      const manifestContentResult = await window.electronAPI.getCourseManifest(folderPath);
+      // Prepare canonical working directory for the selected folder and operate from it
+      const prepResult = await window.electronAPI.pathUtils.prepareCourseSource({ type: 'folder', path: folderPath });
+      if (!prepResult.success) {
+        throw new Error(`Failed to prepare course source: ${prepResult.error}`);
+      }
+      const unifiedPath = prepResult.unifiedPath;
+  
+      // Validate manifest presence and read it from the unified path
+      const manifestContentResult = await window.electronAPI.getCourseManifest(unifiedPath);
       if (!manifestContentResult.success) {
         throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
       }
       const manifestContent = manifestContentResult.manifestContent;
-
-      // Process manifest via CAM in main
-      const processManifestResult = await window.electronAPI.processScormManifest(folderPath, manifestContent);
+  
+      // Process manifest via CAM in main using canonical path
+      const processManifestResult = await window.electronAPI.processScormManifest(unifiedPath, manifestContent);
       if (!processManifestResult.success) {
         throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
       }
       const { manifest, validation, analysis } = processManifestResult;
-
+  
       // Determine entry point from CAM analysis
       const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
@@ -153,8 +160,9 @@ class CourseLoader {
       if (!firstLaunchHref) {
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
       }
-      // Pass allowedBase to permit loading directly from user-selected folder
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, folderPath, { allowedBase: folderPath });
+  
+      // Resolve the launch href against the canonical unified path
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, unifiedPath);
       if (!entryResult.success) {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }
@@ -248,20 +256,15 @@ class CourseLoader {
     // console.log('CourseLoader: processCourseFile called with:', filePath); // Removed debug log
     
     try {
-      // Step 1: Extract the SCORM package
-      // console.log('CourseLoader: Step 1 - Extracting SCORM package...'); // Removed debug log
-      const extractResult = await window.electronAPI.extractScorm(filePath);
-      // console.log('CourseLoader: Extract result:', extractResult); // Removed debug log
-      
-      if (!extractResult.success) {
-        throw new Error(`Failed to extract SCORM package: ${extractResult.error}`);
+      // Step 1: Prepare canonical working directory for the SCORM source (zip/temp)
+      const prepResult = await window.electronAPI.pathUtils.prepareCourseSource({ type: 'zip', path: filePath });
+      if (!prepResult.success) {
+        throw new Error(`Failed to prepare course source: ${prepResult.error}`);
       }
-      
-      const extractedPath = extractResult.path;
-      // console.log('CourseLoader: Confirmed extractedPath:', extractedPath); // Removed debug log
-      
+      const extractedPath = prepResult.unifiedPath;
+  
       if (!extractedPath) {
-        throw new Error('Extract result did not contain a valid path property');
+        throw new Error('PrepareCourseSource did not return a valid unifiedPath');
       }
       
       // Step 2: Get manifest content (FileManager now only returns content, not parsed structure)
@@ -334,8 +337,8 @@ class CourseLoader {
       if (!firstLaunchHref) {
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
       }
-      // Robustness: pass the extraction directory as an allowedBase so resolver will accept files under temp extraction roots
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath, { allowedBase: extractedPath });
+      // Resolve the launch href against the canonical extraction path
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath);
       if (!entryResult.success) {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }
@@ -394,16 +397,17 @@ class CourseLoader {
         const { rendererLogger } = await import('../utils/renderer-logger.js');
         const itemCount = Array.isArray(courseData.structure?.items) ? courseData.structure.items.length : 0;
 
-        // Shallow diagnostics about raw structure to guide normalization (INFO-level, compact)
-        const rootKeys = rawStructure && typeof rawStructure === 'object' ? Object.keys(rawStructure).slice(0, 12) : [];
-        const orgsType = rawStructure?.organizations
-          ? (Array.isArray(rawStructure.organizations?.organizations) ? 'organizations[]'
-             : Array.isArray(rawStructure.organizations?.organization) ? 'organization[]'
-             : (rawStructure.organizations?.organization ? 'organization{}' : 'none'))
+        // Shallow diagnostics about analysis structure (INFO-level, compact)
+        const analysisStructure = analysis?.structure;
+        const rootKeys = analysisStructure && typeof analysisStructure === 'object' ? Object.keys(analysisStructure).slice(0, 12) : [];
+        const orgsType = analysisStructure?.organizations
+          ? (Array.isArray(analysisStructure.organizations?.organizations) ? 'organizations[]'
+             : Array.isArray(analysisStructure.organizations?.organization) ? 'organization[]'
+             : (analysisStructure.organizations?.organization ? 'organization{}' : 'none'))
           : 'none';
-        const childrenLen = Array.isArray(rawStructure?.children) ? rawStructure.children.length : 0;
-        const itemsLen = Array.isArray(rawStructure?.items) ? rawStructure.items.length : 0;
-        const itemLen = rawStructure?.item ? (Array.isArray(rawStructure.item) ? rawStructure.item.length : 1) : 0;
+        const childrenLen = Array.isArray(analysisStructure?.children) ? analysisStructure.children.length : 0;
+        const itemsLen = Array.isArray(analysisStructure?.items) ? analysisStructure.items.length : 0;
+        const itemLen = analysisStructure?.item ? (Array.isArray(analysisStructure.item) ? analysisStructure.item.length : 1) : 0;
 
         // Include a tiny sample of first item for confirmation without overwhelming logs
         const firstItem = (Array.isArray(courseData.structure?.items) && courseData.structure.items.length > 0)
@@ -431,7 +435,7 @@ class CourseLoader {
           itemCount,
           sample: firstItemSample
         });
-        rendererLogger.info('CourseLoader: rawStructure shallow shape', {
+        rendererLogger.info('CourseLoader: analysis structure shallow shape', {
           rootKeys,
           orgsType,
           childrenLen,

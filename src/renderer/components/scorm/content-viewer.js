@@ -217,10 +217,8 @@ class ContentViewer extends BaseComponent {
         } else if (toFileUrlResult && toFileUrlResult.success && toFileUrlResult.url) {
           processedUrl = toFileUrlResult.url;
         } else {
-          // Fallback to best-effort encoding (should be rare if preload is correct)
-          const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
-          const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
-          processedUrl = `scorm-app://abs/${encodedPath}`;
+          // If preload fails, the path cannot be processed safely
+          throw new Error('Unable to convert path to protocol URL via preload API');
         }
  
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
@@ -231,19 +229,14 @@ class ContentViewer extends BaseComponent {
           });
         }).catch(() => {});
       } catch (error) {
-        // If IPC fails, fall back to previous behavior but log the issue so we can fix preload usage.
-        try {
-          const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
-          const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
-          processedUrl = `scorm-app://abs/${encodedPath}`;
-        } catch (_) {}
- 
+        // If IPC fails, we cannot safely process the path
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.warn('[ContentViewer] Failed to convert path via preload; using local fallback', {
+          rendererLogger.error('[ContentViewer] Failed to convert path via preload API', {
             originalPath: url,
             error: error?.message || error
           });
         }).catch(() => {});
+        throw error;
       }
     }
 

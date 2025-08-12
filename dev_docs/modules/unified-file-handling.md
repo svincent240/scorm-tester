@@ -63,7 +63,21 @@ Comprehensive error handling with clear user feedback:
 
 ## Implementation Details
 
-### Path Resolution Flow
+### Path Resolution Flow (Updated)
+
+All course sources (zip files, selected folders, and drag/drop temporaries) are prepared into a canonical working directory under the application's canonical temp root: os.tmpdir()/scorm-tester/scorm_<id>. This is now the single supported external base for the renderer and protocol handler. Key points:
+
+- Zip packages are extracted into a unique directory under the canonical temp root (existing extractScorm behavior).
+- User-selected folders are validated (must contain imsmanifest.xml) and then copied into a unique directory under the canonical temp root.
+- Drag & drop files are saved as temporary files and processed the same as zip/temp sources.
+- After preparation, renderer and CAM services always operate against the canonical working directory (unifiedPath) — the app never serves files directly from arbitrary user-selected folders.
+
+Benefits:
+- Simplifies protocol handling and eliminates fragile 'abs' heuristics.
+- Removes special-case allowedBase logic in renderer code.
+- Improves security by constraining served files to app root + canonical temp root only.
+
+Updated flow:
 
 1. **SCORM Package Extraction**
    - File Manager extracts package to `temp/scorm_[timestamp]/`

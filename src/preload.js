@@ -141,8 +141,8 @@ const electronAPI = {
     toFileUrl: (filePath) => safeInvoke('path-to-file-url', filePath),
     normalize: (filePath) => safeInvoke('path-normalize', filePath),
     join: (...paths) => safeInvoke('path-join', ...paths),
-    // Accept optional options to carry allowedBase for folder-based loads
-    resolveScormUrl: (contentPath, extractionPath, options = null) => safeInvoke('resolve-scorm-url', contentPath, extractionPath, options)
+    resolveScormUrl: (contentPath, extractionPath) => safeInvoke('resolve-scorm-url', contentPath, extractionPath),
+    prepareCourseSource: (source) => safeInvoke('prepare-course-source', source)
   },
   
   // Development/Debug

@@ -88,6 +88,15 @@ module.exports = [
       validateArgs: true
     }
   },
+{
+    channel: 'prepare-course-source',
+    handlerName: 'handlePrepareCourseSource',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
   {
     channel: 'save-temporary-file',
     handlerName: 'handleSaveTemporaryFile',
