@@ -97,7 +97,7 @@ class ArchitectureValidator {
       { path: 'src/renderer/components/scorm/content-viewer.js' },
       { path: 'src/renderer/components/scorm/navigation-controls.js' },
       { path: 'src/renderer/components/scorm/progress-tracking.js' },
-      { path: 'src/renderer/components/scorm/debug-panel.js' },
+      
       { path: 'src/renderer/components/scorm/course-outline.js' },
       { path: 'src/shared/types/scorm-types.d.ts' },
       { path: 'src/renderer/types/component-types.d.ts' },
@@ -155,7 +155,7 @@ class ArchitectureValidator {
       'src/renderer/components/scorm/content-viewer.js',
       'src/renderer/components/scorm/navigation-controls.js',
       'src/renderer/components/scorm/progress-tracking.js',
-      'src/renderer/components/scorm/debug-panel.js',
+      
       'src/renderer/components/scorm/course-outline.js'
     ];
 

@@ -99,6 +99,29 @@ class EventBus {
       throw new Error('Event name must be a string');
     }
 
+    // Prevent misuse: EventBus is for UI events only. Disallow SCORM/debug/telemetry/api events here.
+    try {
+      const forbiddenPatterns = [/^scorm:/, /^debug:/, /^telemetry:/, /^api:/];
+      for (const p of forbiddenPatterns) {
+        if (p.test(event)) {
+          // Log synchronously to console/renderer logger and throw to prevent accidental usage.
+          try {
+            import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+              rendererLogger?.error(`EventBus: Forbidden event '${event}'. SCORM/debug/telemetry data must use direct IPC channels, not EventBus.`);
+            }).catch(() => {
+              console.error(`EventBus: Forbidden event '${event}'.`);
+            });
+          } catch (_) {
+            console.error(`EventBus: Forbidden event '${event}'.`);
+          }
+          throw new Error(`EventBus: Forbidden event '${event}'. SCORM/debug/telemetry data must use direct IPC channels, not EventBus.`);
+        }
+      }
+    } catch (validationErr) {
+      // Fail fast for forbidden events
+      throw validationErr;
+    }
+
     // Depth guard (per event)
     const currentDepth = (this._inFlightCounts.get(event) || 0) + 1;
     this._inFlightCounts.set(event, currentDepth);

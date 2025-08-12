@@ -229,6 +229,15 @@ class FileManager extends BaseService {
       const extractStats = await this.extractZipWithValidation(zipPath, extractPath);
       
       this.logger?.info(`FileManager: SCORM extraction completed (${operationId}): ${path.basename(extractPath)} -- extracted=${extractStats.extractedCount} skipped=${extractStats.skippedCount} size=${this.formatBytes(extractStats.totalSize)}`);
+      
+      // Copy LMS support files to extracted directory
+      try {
+        await this.copyLmsFiles(extractPath);
+        this.logger?.info(`FileManager: LMS support files copied to ${path.basename(extractPath)}`);
+      } catch (lmsError) {
+        this.logger?.warn(`FileManager: Failed to copy LMS support files: ${lmsError.message}`);
+      }
+      
       this.recordOperation('extractScorm', true);
       
       return {
@@ -262,6 +271,48 @@ class FileManager extends BaseService {
       
     } finally {
       this.activeOperations.delete(operationId);
+    }
+  }
+
+  /**
+   * Copy LMS support files to extracted SCORM directory
+   * @private
+   * @param {string} extractPath - Path to extracted SCORM directory
+   */
+  async copyLmsFiles(extractPath) {
+    try {
+      const appRoot = path.resolve(__dirname, '../../../');
+      const lmsSourcePath = path.join(appRoot, 'references', 'real_course_examples', 'SL360_LMS_SCORM_2004', 'lms');
+      const lmsDestPath = path.join(extractPath, 'lms');
+
+      // Check if source LMS directory exists
+      if (!fs.existsSync(lmsSourcePath)) {
+        this.logger?.debug(`FileManager: LMS source directory not found at ${lmsSourcePath}, skipping LMS files copy`);
+        return;
+      }
+
+      // Create destination lms directory if it doesn't exist
+      await this.ensureDirectory(lmsDestPath);
+
+      // Get list of LMS files to copy
+      const lmsFiles = fs.readdirSync(lmsSourcePath);
+      let copiedCount = 0;
+
+      for (const filename of lmsFiles) {
+        const sourcePath = path.join(lmsSourcePath, filename);
+        const destPath = path.join(lmsDestPath, filename);
+        
+        // Only copy files, skip directories
+        if (fs.statSync(sourcePath).isFile()) {
+          fs.copyFileSync(sourcePath, destPath);
+          copiedCount++;
+        }
+      }
+
+      this.logger?.debug(`FileManager: Copied ${copiedCount} LMS support files to ${path.basename(extractPath)}/lms`);
+      
+    } catch (error) {
+      throw new Error(`Failed to copy LMS support files: ${error.message}`);
     }
   }
 

@@ -148,8 +148,6 @@ const electronAPI = {
   // Development/Debug
   openDevTools: () => safeSend('open-dev-tools'),
   reloadWindow: () => safeSend('reload-window'),
-  emitDebugEvent: (eventType, data) => safeInvoke('debug-event', eventType, data),
-  openDebugWindow: () => safeInvoke('open-debug-window'),
   
   // SCORM Inspector
   openScormInspectorWindow: () => safeInvoke('open-scorm-inspector-window'),

@@ -134,7 +134,7 @@ class PathUtils {
         // For external allowedBase, we cannot rely on appRoot-based protocol resolution.
         // Encode absolute path using an 'abs/' scheme that the protocol handler will decode.
         // Example: scorm-app://abs/C|/Users/name/Folder/index.html
-        const encodedAbs = this.normalize(resolvedPath).replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
+        const encodedAbs = this.normalize(resolvedPath).replace(/^([A-Za-z]):/, (_m, d) => `${d}|`);
         protocolUrl = `scorm-app://abs/${encodedAbs}`;
       }
       

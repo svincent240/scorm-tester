@@ -120,7 +120,8 @@ class ScormClient {
     });
 
     this.logApiCall('Initialize', sessionId, 'true');
-    eventBus.emit('scorm:initialized', { sessionId });
+    // Emit UI-scoped event instead of scorm:* to keep EventBus limited to UI events.
+    eventBus.emit('ui:scorm:initialized', { sessionId });
 
     return 'true';
   }
@@ -152,7 +153,8 @@ class ScormClient {
     setTimeout(() => { this.asyncTerminate(); }, 200);
 
     this.logApiCall('Terminate', parameter, 'true');
-    eventBus.emit('scorm:terminated', { sessionId: this.sessionId });
+    // Use UI-prefixed event (allowed) instead of 'scorm:terminated'
+    eventBus.emit('ui:scorm:terminated', { sessionId: this.sessionId });
 
     return 'true';
   }
@@ -238,7 +240,8 @@ class ScormClient {
     this.asyncSetValue(element, value);
 
     this.logApiCall('SetValue', `${element} = ${value}`, 'true');
-    eventBus.emit('scorm:dataChanged', { element, value });
+    // Emit UI-scoped event to notify UI components without leaking SCORM inspection data onto EventBus
+    eventBus.emit('ui:scorm:dataChanged', { element, value });
 
     return 'true';
   }
@@ -265,7 +268,7 @@ class ScormClient {
     this.asyncCommit();
 
     this.logApiCall('Commit', parameter, 'true');
-    eventBus.emit('scorm:committed', { sessionId: this.sessionId });
+    eventBus.emit('ui:scorm:committed', { sessionId: this.sessionId });
 
     return 'true';
   }
@@ -382,7 +385,8 @@ class ScormClient {
       if (result.success) {
         this.localCache.set(element, result.value);
         this.updateUIFromElement(element, result.value);
-        eventBus.emit('scorm:dataRefreshed', { element, value: result.value });
+        // UI-scoped refresh event
+        eventBus.emit('ui:scorm:dataRefreshed', { element, value: result.value });
       }
     } catch (error) {
       try {
@@ -549,7 +553,8 @@ class ScormClient {
     }
 
     // Default behavior: emit scorm:error for all other cases
-    eventBus.emit('scorm:error', { code: String(errorCode), message: this.GetErrorString(String(errorCode)), source: 'renderer/scorm-client' });
+    // Route SCORM errors through UI-prefixed EventBus events so EventBus remains UI-focused
+    eventBus.emit('ui:scorm:error', { code: String(errorCode), message: this.GetErrorString(String(errorCode)), source: 'renderer/scorm-client' });
   }
 
   /**
@@ -578,9 +583,9 @@ class ScormClient {
 
     // Keep lightweight per-window UI state (existing code path)
     try { this.uiState.addApiCall(apiCall); } catch (_) {}
-
-    // Emit event for debug panel in same window
-    try { eventBus.emit('api:call', { data: apiCall }); } catch (_) {}
+    
+    // Emit a UI-scoped API call event (allowed). The SCORM Inspector receives data via IPC from main process.
+    try { eventBus.emit('ui:api:call', { data: apiCall }); } catch (_) {}
 
   }
 
@@ -679,7 +684,8 @@ class ScormClient {
    */
   clearCache() {
     this.localCache.clear();
-    eventBus.emit('scorm:cacheCleared');
+    // UI-scoped event for cache cleared (EventBus is reserved for UI events only)
+    eventBus.emit('ui:scorm:cacheCleared');
   }
 
   /**
@@ -697,7 +703,8 @@ class ScormClient {
    }
    
    this.clearCache();
-   eventBus.emit('scorm:destroyed');
+   // UI-scoped destroy notification
+   eventBus.emit('ui:scorm:destroyed');
  }
 
  /**

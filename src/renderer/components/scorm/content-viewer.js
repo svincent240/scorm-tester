@@ -203,7 +203,33 @@ class ContentViewer extends BaseComponent {
       return;
     }
 
-    this.currentUrl = url;
+    // Convert local file paths to scorm-app:// protocol URLs
+    let processedUrl = url;
+    if (typeof url === 'string' && (url.includes('\\') || url.startsWith('C:') || url.startsWith('/'))) {
+      // This looks like a local file path - convert to scorm-app:// protocol
+      try {
+        // Use the same normalization and encoding as PathUtils.resolveScormContentUrl
+        const normalizedPath = url.replace(/\\/g, '/').replace(/\/+/g, '/');
+        const encodedPath = normalizedPath.replace(/^([A-Za-z]):\//, (_m, d) => `${d}|/`);
+        processedUrl = `scorm-app://abs/${encodedPath}`;
+        
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.info('[ContentViewer] Converted local path to protocol URL', {
+            originalPath: url,
+            protocolUrl: processedUrl
+          });
+        }).catch(() => {});
+      } catch (error) {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.warn('[ContentViewer] Failed to convert path to protocol URL', {
+            originalPath: url,
+            error: error?.message || error
+          });
+        }).catch(() => {});
+      }
+    }
+
+    this.currentUrl = processedUrl;
     this.loadStartTime = Date.now();
     
     try {
@@ -279,8 +305,8 @@ class ContentViewer extends BaseComponent {
 </html>`;
         // srcdoc sets the host document first; on load we will inject APIs and set child frame src to url
         this.iframe.srcdoc = hostHtml;
-        // Stash target SCO URL for use when host becomes available
-        this._pendingScoUrl = url;
+        // Stash target SCO URL for use when host becomes available (use processed URL, not original)
+        this._pendingScoUrl = processedUrl;
       }
       
       this.emit('contentLoadStarted', { url, options });

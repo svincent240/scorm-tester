@@ -45,13 +45,7 @@ class IpcHandler extends BaseService {
     this.config = { ...SERVICE_DEFAULTS.IPC_HANDLER, ...options };
     // IPC refactor feature flag (Phase 0)
     this.ipcRefactorEnabled = !!(this.config && this.config.IPC_REFACTOR_ENABLED);
-    // Initialize singleflight for open-debug-window (Phase 3)
-    try {
-      const SingleflightFactory = require('../../shared/utils/singleflight');
-      this.openDebugSingleflight = (typeof SingleflightFactory === 'function') ? SingleflightFactory() : null;
-    } catch (e) {
-      this.openDebugSingleflight = null;
-    }
+    
     // Telemetry store, rate limiter, and SN snapshot service will be wired via dependencies (main)
     this.telemetryStore = null;
     this.rateLimiter = null;
@@ -67,7 +61,7 @@ class IpcHandler extends BaseService {
     // No local telemetry buffer: telemetry is delegated to ScormInspectorTelemetryStore (constructed in main)
     this.maxHistorySize = 5000;
     this.sessionId = null; // Track current session for clearing
-    this._openDebugGuards = { inFlight: false, lastAttemptTs: 0, pending: false, timer: null };
+    
 
     // SNSnapshotService is owned and managed outside this handler (wired from main); no internal SN cache here
   }
@@ -285,14 +279,8 @@ class IpcHandler extends BaseService {
       this.registerHandler('resolve-scorm-url', this.handleResolveScormUrl.bind(this));
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
-      // Migrate previously-sync channels to async handlers to unify routing (preserves channel names)
-      this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
-      
       // SCORM Inspector window management
       this.registerHandler('open-scorm-inspector-window', this.handleOpenScormInspectorWindow.bind(this));
-      
-      // Legacy debug history fetch (deprecated - use scorm-inspector-get-history instead)
-      this.registerHandler('debug-get-history', this.handleDebugGetHistory.bind(this));
       
       // SCORM Inspector history fetch - returns newest-first entries with optional filters
       this.registerHandler('scorm-inspector-get-history', this.handleScormInspectorGetHistory.bind(this));
@@ -442,34 +430,7 @@ class IpcHandler extends BaseService {
             return { success: true, rateLimited: true };
           }
 
-          if (channel === 'open-debug-window') {
-            // For debug window: schedule trailing attempt rather than silently OK
-            markSuppressed(channel);
-            this._openDebugGuards.pending = true;
-            if (this._openDebugGuards.timer) clearTimeout(this._openDebugGuards.timer);
-            this._openDebugGuards.timer = setTimeout(async () => {
-              try {
-                const wm = this.getDependency('windowManager');
-                if (wm) {
-                  const ex = wm.getWindow('debug');
-                  if (ex) {
-                    try { ex.focus(); } catch (_) {}
-                    this.recordOperation('open-debug-window:rate_limited_trailing_focus', true);
-                  } else {
-                    this.recordOperation('open-debug-window:rate_limited_trailing_create', true);
-                    await wm.createDebugWindow();
-                  }
-                }
-              } catch (_) {
-                // swallow
-              } finally {
-                this._openDebugGuards.pending = false;
-                this._openDebugGuards.timer = null;
-              }
-            }, OPEN_DEBUG_DEBOUNCE_MS);
-            this.recordOperation('open-debug-window:rate_limited_deferred', true);
-            return { success: true, rateLimited: true, deferred: true };
-          }
+          
 
           // Otherwise, enforce
           throw new Error('Rate limit exceeded');
@@ -478,11 +439,7 @@ class IpcHandler extends BaseService {
 
         this.activeRequests.set(requestId, { channel, startTime, event });
 
-        // Mark in-flight for open-debug-window to prevent bursts
-        if (channel === 'open-debug-window') {
-          this._openDebugGuards.inFlight = true;
-          this._openDebugGuards.lastAttemptTs = Date.now();
-        }
+        
 
         this.logger?.debug(`IpcHandler: Processing ${channel} request ${requestId}`);
         this.emit(SERVICE_EVENTS.IPC_MESSAGE_RECEIVED, { channel, requestId });
@@ -510,34 +467,7 @@ class IpcHandler extends BaseService {
           return { success: true, rateLimited: true };
         }
 
-        if (isRateLimit && channel === 'open-debug-window') {
-          // As a final guard: schedule trailing create/focus
-          try {
-            if (!this._openDebugGuards.timer) {
-              this._openDebugGuards.timer = setTimeout(async () => {
-                try {
-                  const wm = this.getDependency('windowManager');
-                  if (wm) {
-                    const ex = wm.getWindow('debug');
-                    if (ex) {
-                      try { ex.focus(); } catch (_) {}
-                      this.recordOperation('open-debug-window:error_trailing_focus', true);
-                    } else {
-                      this.recordOperation('open-debug-window:error_trailing_create', true);
-                      await wm.createDebugWindow();
-                    }
-                  }
-                } catch (_) {
-                } finally {
-                  this._openDebugGuards.pending = false;
-                  this._openDebugGuards.timer = null;
-                }
-              }, OPEN_DEBUG_DEBOUNCE_MS);
-            }
-          } catch (_) {}
-          this.recordOperation('open-debug-window:rate_limited_soft_ok', true);
-          return { success: true, rateLimited: true, deferred: true };
-        }
+        
 
         // Default error path
         this.recordOperation(`${channel}:error`, false);
@@ -554,10 +484,7 @@ class IpcHandler extends BaseService {
         throw error;
 
       } finally {
-        // Clear in-flight flag for open-debug-window
-        if (channel === 'open-debug-window') {
-          this._openDebugGuards.inFlight = false;
-        }
+        
         this.activeRequests.delete(requestId);
       }
     };
@@ -881,13 +808,7 @@ class IpcHandler extends BaseService {
     this.logger?.log(level, `[Renderer] ${message}`, ...args);
   }
 
-  async handleDebugGetHistory(event, { limit, offset, sinceTs, methodFilter } = {}) {
-    this.logger?.debug(`IpcHandler: handleDebugGetHistory called with limit: ${limit}, offset: ${offset}, sinceTs: ${sinceTs}, methodFilter: ${methodFilter}`);
-    if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
-      return { success: true, history: this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter }) };
-    }
-    return { success: true, history: [] };
-  }
+  
 
   async handleScormInspectorGetHistory(event, { limit, offset, sinceTs, methodFilter } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetHistory called with limit: ${limit}, offset: ${offset}, sinceTs: ${sinceTs}, methodFilter: ${methodFilter}`);
@@ -1069,71 +990,44 @@ class IpcHandler extends BaseService {
   // --- End of merged IpcHandlers methods ---
   /**
    * Broadcasts a SCORM API call logged event to all active renderer windows.
-   * @param {Object} payload - The event payload containing API call details.
-   */
-  /**
-   * Broadcasts a SCORM API call logged event to all active renderer windows.
+   * This uses the canonical SCORM Inspector IPC channel so renderer windows
+   * (including the SCORM Inspector) receive inspection data via the approved path.
    * @param {Object} payload - The event payload containing API call details.
    */
   broadcastScormApiCallLogged(payload) {
     try {
       const windowManager = this.getDependency('windowManager');
-      if (windowManager) {
-        // Iterate over all managed windows and send the event
-        for (const window of windowManager.windows.values()) {
-          if (window && !window.isDestroyed()) {
-            window.webContents.send('scorm-api-call-logged', payload);
-            this.logger?.debug(`[IPC Handler] Broadcasted scorm-api-call-logged to window ${window.id}`);
+      if (windowManager && typeof windowManager.getAllWindows === 'function') {
+        const windows = windowManager.getAllWindows();
+        let sent = 0;
+        for (const w of windows) {
+          if (w && !w.isDestroyed()) {
+            try {
+              w.webContents.send('scorm-inspector-data-updated', payload);
+              sent++;
+            } catch (err) {
+              this.logger?.warn(`[IPC Handler] Failed to send scorm-inspector-data-updated to window ${w?.id}`, err?.message || err);
+            }
           }
         }
+        this.logger?.debug(`[IPC Handler] Broadcasted scorm-inspector-data-updated to ${sent} windows`);
+      } else if (windowManager) {
+        // Fallback: iterate internal map (older WindowManager implementations)
+        for (const window of windowManager.windows.values()) {
+          if (window && !window.isDestroyed()) {
+            window.webContents.send('scorm-inspector-data-updated', payload);
+          }
+        }
+        this.logger?.debug('[IPC Handler] Broadcasted scorm-inspector-data-updated via fallback window iteration');
       } else {
-        this.logger?.warn('[IPC Handler] WindowManager not available for broadcasting scorm-api-call-logged event.');
+        this.logger?.warn('[IPC Handler] WindowManager not available for broadcasting SCORM Inspector data.');
       }
     } catch (e) {
-      this.logger?.error('[IPC Handler] Error broadcasting scorm-api-call-logged event:', e?.message || e);
+      this.logger?.error('[IPC Handler] Error broadcasting SCORM Inspector data:', e?.message || e);
     }
   }
 
-  async handleOpenDebugWindow(event) {
-    const windowManager = this.getDependency('windowManager');
-    if (!windowManager) {
-      this.logger?.warn('IpcHandler: WindowManager dependency not available for open-debug-window');
-      return { success: false, error: 'WindowManager not available' };
-    }
-
-    // Coalesce/debounce multiple rapid calls to open-debug-window
-    // This is a client-side guard; server-side rate limiting is also applied.
-    const now = Date.now();
-    if (this._openDebugGuards.inFlight || (now - this._openDebugGuards.lastAttemptTs < OPEN_DEBUG_DEBOUNCE_MS && !this._openDebugGuards.pending)) {
-      this.logger?.debug('IpcHandler: open-debug-window call coalesced/debounced');
-      this.recordOperation('open-debug-window:coalesced', true);
-      return { success: true, coalesced: true };
-    }
-
-    this._openDebugGuards.inFlight = true;
-    this._openDebugGuards.lastAttemptTs = now;
-
-    try {
-      const debugWindow = windowManager.getWindow('debug');
-      if (debugWindow && !debugWindow.isDestroyed()) {
-        debugWindow.focus();
-        this.logger?.info('IpcHandler: Focused existing debug window');
-        this.recordOperation('open-debug-window:focused', true);
-        return { success: true, focused: true };
-      } else {
-        await windowManager.createDebugWindow();
-        this.logger?.info('IpcHandler: Created new debug window');
-        this.recordOperation('open-debug-window:created', true);
-        return { success: true, created: true };
-      }
-    } catch (error) {
-      this.logger?.error('IpcHandler: Failed to open debug window:', error);
-      this.recordOperation('open-debug-window:error', false);
-      return { success: false, error: error.message };
-    } finally {
-      this._openDebugGuards.inFlight = false;
-    }
-  }
+  
 
   async handleOpenScormInspectorWindow(event) {
     const windowManager = this.getDependency('windowManager');
@@ -1151,12 +1045,8 @@ class IpcHandler extends BaseService {
         this.recordOperation('open-scorm-inspector-window:focused', true);
         return { success: true, focused: true };
       } else {
-        // Use the window manager method when it exists, fallback to createDebugWindow for now
         if (typeof windowManager.createScormInspectorWindow === 'function') {
           await windowManager.createScormInspectorWindow();
-        } else {
-          // Fallback to debug window for now - this will be updated when we implement the window manager method
-          await windowManager.createDebugWindow();
         }
         this.logger?.info('IpcHandler: Created new SCORM Inspector window');
         this.recordOperation('open-scorm-inspector-window:created', true);

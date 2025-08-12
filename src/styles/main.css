@@ -20,7 +20,7 @@
 @import url('./components/error-state.css');
 @import url('./components/content-scaling.css');
 @import url('./components/navigation-controls.css'); /* Added this line */
-@import url('./components/debug.css');
+
 
 /* Theme Styles */
 @import url('./themes/default.css');
@@ -151,8 +151,7 @@
 .navigation-controls,
 .progress-tracking,
 .content-viewer,
-.course-outline,
-.debug-panel {
+.course-outline {
   /* Ensure components don't overlap during startup */
   position: relative;
   z-index: auto;

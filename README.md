@@ -58,7 +58,7 @@ src/
 │   │       ├── content-viewer.js      # Content display
 │   │       ├── navigation-controls.js # Navigation UI
 │   │       ├── progress-tracking.js   # Progress display
-│   │       ├── debug-panel.js         # Debug interface
+
 │   │       └── course-outline.js      # Course structure
 │   └── services/                  # Renderer services
 │       ├── event-bus.js               # Event communication

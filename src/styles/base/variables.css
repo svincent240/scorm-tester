@@ -218,8 +218,7 @@
   --progress-fill-bg: linear-gradient(90deg, var(--success-color), #20c997);
   
   /* Debug Panel */
-  --debug-panel-bg: var(--bg-secondary);
-  --debug-panel-border-color: var(--border-color);
+  
   --debug-section-header-bg: var(--bg-tertiary);
   --debug-section-header-color: var(--text-secondary);
   

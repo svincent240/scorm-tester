@@ -157,8 +157,6 @@ class AppManager {
     const { CourseOutline } = await import('../components/scorm/course-outline.js');
     const { FooterProgressBar } = await import('../components/scorm/footer-progress-bar.js');
     const { FooterStatusDisplay } = await import('../components/scorm/footer-status-display.js');
-    const { DebugPanel } = await import('../components/scorm/debug-panel.js');
-
     const componentConfigs = [
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
@@ -167,7 +165,6 @@ class AppManager {
       { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'app-footer', required: true },
       { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'app-footer', required: true },
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true },
-      { name: 'debugPanel', class: DebugPanel, elementId: 'debug-panel-container', required: false, options: { hideHeader: false } } // Add DebugPanel, make non-required
     ];
 
     // DIAGNOSTIC: verify DOM mount points exist before instantiation
@@ -247,15 +244,7 @@ class AppManager {
      this.logger.error('AppManager: eventBus not found in services. Cannot set up event handlers.');
      return;
    }
-   eventBus.on('course:loaded', (courseData) => {
-     try { this.logger.debug('AppManager: eventBus course:loaded received'); } catch (_) {}
-     this.handleCourseLoaded(courseData);
-     // Delegate to debug panel
-     const debugPanel = this.components.get('debugPanel');
-     if (debugPanel && typeof debugPanel.handleCourseLoaded === 'function') {
-       debugPanel.handleCourseLoaded();
-     }
-   });
+   
 
     eventBus.on('course:loadError', (errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
@@ -287,21 +276,9 @@ class AppManager {
       } catch (_) {}
     });
 
-   // Listen for scorm-api-call-logged events from main process
-   eventBus.on('scorm-api-call-logged', (payload) => {
-     const debugPanel = this.components.get('debugPanel');
-     if (debugPanel && typeof debugPanel.addApiCall === 'function') {
-       debugPanel.addApiCall(payload);
-     }
-   });
+   
 
-   // Listen for session state changes
-   eventBus.on('session:reset', (payload) => {
-     const debugPanel = this.components.get('debugPanel');
-     if (debugPanel && typeof debugPanel.refreshSessionInfo === 'function') {
-       debugPanel.refreshSessionInfo();
-     }
-   });
+   
 
     // Debounce guard for navigation requests to avoid IPC rate limiting
     this._lastNavAt = 0;
@@ -696,13 +673,7 @@ class AppManager {
     // Render Recent Courses list if container exists
     await this.renderRecentCourses();
  
-    // Debug panel toggle
-    const debugToggleBtn = document.getElementById('debug-toggle');
-    if (debugToggleBtn) {
-      debugToggleBtn.addEventListener('click', () => {
-        this.toggleDebugPanel();
-      });
-    }
+    
 
     // SCORM Inspector toggle
     const scormInspectorToggleBtn = document.getElementById('scorm-inspector-toggle');
@@ -892,21 +863,7 @@ class AppManager {
     return this.components.get(name);
   }
 
-  /**
-   * Toggle debug panel visibility
-   */
-  toggleDebugPanel() {
-    const debugPanel = this.components.get('debugPanel');
-    if (debugPanel) {
-      if (debugPanel.isVisible()) {
-        debugPanel.hide();
-      } else {
-        debugPanel.show();
-      }
-    } else {
-      try { this.logger.warn('AppManager: DebugPanel component not available. Cannot toggle debug panel.'); } catch (_) {}
-    }
-  }
+  
 
   /**
    * Open SCORM Inspector window

@@ -37,13 +37,7 @@ class WindowManager extends BaseService {
     this.menuBuilder = new MenuBuilder(this, logger);
     this.protocolRegistered = false;
 
-    // Singleflight guard for debug window creation to avoid duplicate windows under concurrency
-    try {
-      const createSingleflight = require('../../shared/utils/singleflight');
-      this._createDebugSingleflight = (typeof createSingleflight === 'function') ? createSingleflight() : null;
-    } catch (_) {
-      this._createDebugSingleflight = null;
-    }
+    
   }
 
   /**
@@ -172,91 +166,7 @@ class WindowManager extends BaseService {
     }
   }
 
-  /**
-   * Create debug console window
-   */
-  async createDebugWindow() {
-    // Use singleflight to coalesce concurrent create requests and guarantee a single trailing execution
-    if (this._createDebugSingleflight) {
-      return this._createDebugSingleflight('createDebugWindow', async () => {
-        // Inner implementation preserved from legacy createDebugWindow
-        try {
-          const existingDebugWindow = this.windows.get(WINDOW_TYPES.DEBUG);
-          if (existingDebugWindow && !existingDebugWindow.isDestroyed()) {
-            try { existingDebugWindow.focus(); } catch (_) {}
-            return existingDebugWindow;
-          }
-     
-          this.logger?.info('WindowManager: Creating debug window');
-          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CREATING);
-          
-          const mainWindow = this.windows.get(WINDOW_TYPES.MAIN);
-          const debugWindow = new BrowserWindow({
-            ...this.config.debugWindow,
-            parent: mainWindow,
-            webPreferences: {
-              nodeIntegration: !!this.config.debugWindow.nodeIntegration,
-              contextIsolation: !!this.config.debugWindow.contextIsolation,
-              webSecurity: typeof this.config.debugWindow.webSecurity !== 'undefined' ? !!this.config.debugWindow.webSecurity : !!this.config.mainWindow.webSecurity,
-              allowRunningInsecureContent: typeof this.config.debugWindow.allowRunningInsecureContent !== 'undefined' ? !!this.config.debugWindow.allowRunningInsecureContent : !!this.config.mainWindow.allowRunningInsecureContent,
-              preload: PathUtils.getPreloadPath(__dirname)
-            },
-            title: 'SCORM Debug Console',
-            show: false
-          });
-     
-          this.windows.set(WINDOW_TYPES.DEBUG, debugWindow);
-          this.setupDebugWindowEvents(debugWindow);
-          this.setupConsoleLogging(debugWindow);
-          
-          // Use custom protocol like main window
-          await debugWindow.loadURL('scorm-app://debug.html');
-          debugWindow.show();
-          
-          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.READY);
-          this.emit(SERVICE_EVENTS.WINDOW_CREATED, {
-            windowType: WINDOW_TYPES.DEBUG,
-            windowId: debugWindow.id
-          });
-          
-          // Send any buffered API calls to the newly created debug window
-          this.sendBufferedApiCallsToDebugWindow(debugWindow);
-          
-          this.logger?.info(`WindowManager: Debug window created successfully (ID: ${debugWindow.id})`);
-          this.recordOperation('createDebugWindow', true);
-          
-          return debugWindow;
-          
-        } catch (error) {
-          this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
-          this.errorHandler?.setError(
-            MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
-            `Debug window creation failed: ${error.message}`,
-            'WindowManager.createDebugWindow'
-          );
-          
-          this.logger?.error('WindowManager: Debug window creation failed:', error);
-          this.recordOperation('createDebugWindow', false);
-          throw error;
-        }
-      });
-    }
- 
-    // Fallback when singleflight unavailable: use legacy behavior
-    try {
-      const existingDebugWindow = this.windows.get(WINDOW_TYPES.DEBUG);
-      if (existingDebugWindow && !existingDebugWindow.isDestroyed()) {
-        existingDebugWindow.focus();
-        return existingDebugWindow;
-      }
-      this.logger?.warn('WindowManager: createDebugWindow invoked without singleflight guard (fallback)');
-      // Reuse the same creation logic by recursively calling the singleflight-wrapped path when possible
-      return await this.createDebugWindow();
-    } catch (e) {
-      // If recursion above fails due to no singleflight, throw original error
-      throw e;
-    }
-  }
+  
 
   /**
    * Create SCORM Inspector window
@@ -357,21 +267,18 @@ class WindowManager extends BaseService {
     }
 
     try {
-      // If enabled, register the scheme as privileged so it behaves more like a true origin.
-      // This is gated behind an environment flag to avoid accidental security changes.
-      const useStorageCapableOrigin = process.env.USE_STORAGE_CAPABLE_ORIGIN === 'true';
-      if (useStorageCapableOrigin) {
-        try {
-          // Register as privileged so Web APIs (fetch, localStorage semantics, service workers, etc.)
-          // behave more like a normal secure origin. Must be called before windows are created in many cases,
-          // but calling here is safe for our initialization sequence.
-          protocol.registerSchemesAsPrivileged([
-            { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
-          ]);
-          this.logger?.info('WindowManager: scorm-app scheme registered as privileged (storage-capable origin enabled)');
-        } catch (e) {
-          this.logger?.warn('WindowManager: Failed to register scorm-app as privileged scheme; continuing with existing handler', e?.message || e);
-        }
+      // Register the scheme as privileged so it behaves more like a true origin.
+      // This enables localStorage access and proper CORS behavior for SCORM content.
+      try {
+        // Register as privileged so Web APIs (fetch, localStorage semantics, service workers, etc.)
+        // behave more like a normal secure origin. Must be called before windows are created in many cases,
+        // but calling here is safe for our initialization sequence.
+        protocol.registerSchemesAsPrivileged([
+          { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+        ]);
+        this.logger?.info('WindowManager: scorm-app scheme registered as privileged (storage-capable origin enabled)');
+      } catch (e) {
+        this.logger?.warn('WindowManager: Failed to register scorm-app as privileged scheme; continuing with existing handler', e?.message || e);
       }
 
       // Register the custom protocol using consolidated PathUtils
@@ -379,10 +286,37 @@ class WindowManager extends BaseService {
       // above (when enabled) will improve origin semantics for renderer pages loaded via scorm-app://
       const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
         const appRoot = PathUtils.getAppRoot(__dirname);
+
+        // Diagnostic — raw incoming URL from renderer / scorm content
+        this.logger?.debug('WindowManager: Protocol request received', { rawUrl: request.url });
+
+        // Attempt to resolve the protocol URL to a local filesystem path
         const result = PathUtils.handleProtocolRequest(request.url, appRoot);
+
+        // Diagnostic — structured result from PathUtils
+        try {
+          this.logger?.debug('WindowManager: Protocol resolution result', {
+            success: !!result?.success,
+            requestedPath: result?.requestedPath || null,
+            resolvedPath: result?.resolvedPath || null,
+            error: result?.error || null,
+            queryString: result?.queryString || null,
+            usedBase: result?.usedBase || null,
+            isUndefinedPath: !!result?.isUndefinedPath
+          });
+        } catch (logErr) {
+          // Guard against logger failures
+          this.logger?.warn('WindowManager: Failed to log protocol resolution result', logErr?.message || logErr);
+        }
         
         if (result.success) {
-          callback({ path: result.resolvedPath });
+          // Final check: ensure the resolvedPath is a string before handing to Electron
+          if (typeof result.resolvedPath === 'string' && result.resolvedPath.length > 0) {
+            callback({ path: result.resolvedPath });
+          } else {
+            this.logger?.error('WindowManager: Protocol handler produced empty resolvedPath', { result });
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+          }
         } else {
           // Handle undefined path errors more gracefully
           if (result.isUndefinedPath) {
@@ -405,9 +339,7 @@ class WindowManager extends BaseService {
       if (success) {
         this.protocolRegistered = true;
         this.logger?.info('WindowManager: Custom protocol "scorm-app://" registered successfully');
-        if (useStorageCapableOrigin) {
-          this.logger?.info('WindowManager: Storage-capable origin feature is active (USE_STORAGE_CAPABLE_ORIGIN=true)');
-        }
+        this.logger?.info('WindowManager: Storage-capable origin feature is active');
       } else {
         throw new Error('Failed to register custom protocol');
       }
@@ -423,7 +355,6 @@ class WindowManager extends BaseService {
    */
   initializeWindowStates() {
     this.windowStates.set(WINDOW_TYPES.MAIN, WINDOW_STATES.CLOSED);
-    this.windowStates.set(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
   }
 
   /**
@@ -467,16 +398,7 @@ class WindowManager extends BaseService {
     });
   }
 
-  /**
-   * Set up debug window event handlers
-   */
-  setupDebugWindowEvents(debugWindow) {
-    debugWindow.on('closed', () => {
-      this.windows.delete(WINDOW_TYPES.DEBUG);
-      this.setWindowState(WINDOW_TYPES.DEBUG, WINDOW_STATES.CLOSED);
-      this.emit(SERVICE_EVENTS.WINDOW_CLOSED, { windowType: WINDOW_TYPES.DEBUG });
-    });
-  }
+  
 
   /**
    * Set up SCORM Inspector window event handlers
@@ -591,30 +513,7 @@ class WindowManager extends BaseService {
     }
   }
 
-  /**
-   * Send buffered API calls to debug window
-   * @private
-   */
-  sendBufferedApiCallsToDebugWindow(debugWindow) {
-    try {
-      // Prefer a telemetry store if available (ScormInspectorTelemetryStore.flushTo)
-      // Use the directly set telemetryStore instance
-      if (this.telemetryStore && typeof this.telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
-        this.logger?.info('WindowManager: Flushing telemetry store to debug window');
-        try {
-          this.telemetryStore.flushTo(debugWindow.webContents);
-          return;
-        } catch (e) {
-          // Do not fall back to IpcHandler buffered calls; telemetryStore is the single source of truth now.
-          this.logger?.warn('WindowManager: telemetryStore.flushTo failed', e?.message || e);
-        }
-      }
- 
-      this.logger?.debug('WindowManager: No telemetry store available to send to debug window');
-    } catch (error) {
-      this.logger?.error('WindowManager: Failed to send buffered API calls:', error);
-    }
-  }
+  
 }
  
 /**

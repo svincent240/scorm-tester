@@ -71,11 +71,8 @@ class MenuBuilder {
               }
             ]
           },
-          {
-            label: 'Debug Console',
-            accelerator: 'F12',
-            click: () => this.windowManager.createDebugWindow()
-          }
+          // Removed legacy "Debug Console" menu item (was opening old debug window).
+          // Use "SCORM Inspector" entry under View → SCORM Inspector (Ctrl/Cmd+Shift+S) instead.
         ]
       },
       {

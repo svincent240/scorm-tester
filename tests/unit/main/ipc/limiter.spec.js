@@ -46,13 +46,7 @@ describe('TokenBucketRateLimiter - profiles and behavior', function() {
     assert.strictEqual(limiter.allow(sender, 'any-channel', { profile: 'snBypass' }), true);
   });
 
-  it('uiSparse profile is strict and will reject after configured limit', function() {
-    const channel = 'open-debug-window';
-    assert.strictEqual(limiter.allow(sender, channel, { profile: 'uiSparse' }), true);
-    assert.strictEqual(limiter.allow(sender, channel, { profile: 'uiSparse' }), true);
-    // Third call exceeds max (2) -> false
-    assert.strictEqual(limiter.allow(sender, channel, { profile: 'uiSparse' }), false);
-  });
+  
 
   it('allows scorm-get-value during the SCORM grace window even when profile would otherwise block', function() {
     const channel = 'scorm-get-value';

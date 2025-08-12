@@ -1,14 +1,5 @@
 module.exports = [
   {
-    channel: 'open-debug-window',
-    handlerName: 'handleOpenDebugWindow',
-    options: {
-      singleFlight: true,
-      debounceMs: 500,
-      rateLimitProfile: 'uiSparse'
-    }
-  },
-  {
     channel: 'open-scorm-inspector-window',
     handlerName: 'handleOpenScormInspectorWindow',
     options: {
@@ -313,13 +304,6 @@ module.exports = [
   {
     channel: 'log-message',
     handlerName: 'handleLogMessage',
-    options: {
-      rateLimitProfile: 'default'
-    }
-  },
-  {
-    channel: 'debug-event',
-    handlerName: 'handleDebugEvent',
     options: {
       rateLimitProfile: 'default'
     }

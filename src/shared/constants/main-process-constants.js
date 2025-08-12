@@ -35,7 +35,6 @@ const SERVICE_TYPES = {
  */
 const WINDOW_TYPES = {
   MAIN: 'main',
-  DEBUG: 'debug',
   SCORM_INSPECTOR: 'scorm-inspector'
 };
 
@@ -98,19 +97,22 @@ const SERVICE_DEFAULTS = {
       useContentSize: false,
       show: false // Will be shown after proper sizing
     },
-    debugWindow: {
-      width: 900,      // Increased from 800 for better debug panel layout
-      height: 700,     // Increased from 600 for more debug content
-      minWidth: 700,   // Increased from 600 for better functionality
-      minHeight: 500,  // Increased from 400 for proper debug UI
-      parent: null     // Will be set to main window
-    },
+    
     scormInspectorWindow: {
       width: 1000,     // Wider for inspection details
       height: 800,     // Taller for API timeline and error lists
       minWidth: 800,   // Minimum width for proper SCORM Inspector UI
       minHeight: 600,  // Minimum height for content visibility
-      parent: null     // Will be set to main window
+      parent: null,    // Will be set to main window
+      // Security configuration - same as main window for preload script compatibility
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      center: true,
+      maximizable: true,
+      resizable: true,
+      show: false      // Will be shown after loading content
     }
   },
   
@@ -232,8 +234,6 @@ const SECURITY_CONFIG = {
       'path-normalize',
       'path-join',
       'log-message',
-      'debug-event',
-      'debug-get-history',
       'load-module', // Added new channel
       'load-shared-logger-adapter', // Renderer logger IPC fallback
       'renderer-log-info', // Direct renderer logging channels
@@ -247,7 +247,6 @@ const SECURITY_CONFIG = {
       'sn:processNavigation',
       'sn:updateActivityProgress',
       'sn:reset',
-      'open-debug-window', // Open debug console window
       // Recent Courses channels
       'recent:get',
       'recent:addOrUpdate',

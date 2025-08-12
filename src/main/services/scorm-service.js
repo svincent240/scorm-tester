@@ -234,8 +234,7 @@ class ScormService extends BaseService {
         }
       }
       
-      // Notify debug/telemetry
-      this.notifyDebugWindow('session-initialized', session);
+      
       
       this.logger?.info(`ScormService: Session ${sessionId} initialized successfully`);
       this.recordOperation('initializeSession', true);
@@ -407,11 +406,7 @@ class ScormService extends BaseService {
         success = false;
       }
       
-      // Notify telemetry/debug via notifyDebugWindow (which delegates to telemetryStore)
-      try {
-        const payload = { sessionId, success, timestamp: Date.now() };
-        this.notifyDebugWindow('data-committed', payload);
-      } catch (_) {}
+      
       
       this.recordOperation('commit', success);
       return { success, errorCode: success ? '0' : '101' };
@@ -474,8 +469,7 @@ class ScormService extends BaseService {
       session.state = 'terminated';
       session.endTime = new Date();
  
-      // Notify telemetry/debug
-      this.notifyDebugWindow('session-terminated', { sessionId, rteSuccess });
+      
  
       // Remove session and RTE instance
       this.sessions.delete(sessionId);
@@ -688,12 +682,7 @@ class ScormService extends BaseService {
       Object.assign(session.data, dataSettings);
       session.lmsProfile = profile;
       
-      // Notify debug window
-      this.notifyDebugWindow('lms-profile-applied', {
-        sessionId,
-        profile: profile.name,
-        settings: profile.settings
-      });
+      
       
       this.logger?.info(`ScormService: Applied LMS profile ${profile.name} to session ${sessionId}`);
       this.recordOperation('applyLmsProfile', true);
@@ -757,12 +746,7 @@ class ScormService extends BaseService {
         // Log scenario
         this.logApiCall(session, 'TestScenario', scenarioType, result, '0');
         
-        // Notify debug window
-        this.notifyDebugWindow('test-scenario-completed', {
-          sessionId,
-          scenario: scenarioType,
-          result
-        });
+        
         
         this.recordOperation('runTestScenario', true);
         return { success: true, result };
@@ -964,41 +948,7 @@ class ScormService extends BaseService {
     }
   }
 
-  /**
-   * Notify debug window
-   * @private
-   * @param {string} event - Event name
-   * @param {Object} data - Event data
-   */
-  notifyDebugWindow(event, data) {
-    // Prefer publishing to telemetryStore for consistent, bounded storage and later flushTo handling.
-    try {
-      const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
-      if (telemetryStore && typeof telemetryStore.storeApiCall === 'function') {
-        telemetryStore.storeApiCall({
-          type: event,
-          payload: data,
-          timestamp: Date.now()
-        });
-        return;
-      }
-    } catch (e) {
-      this.logger?.warn('ScormService: telemetryStore.storeApiCall failed in notifyDebugWindow', e?.message || e);
-    }
-    
-    // Fallback to legacy direct debug-window send when telemetry store not available
-    try {
-      const windowManager = this.getDependency('windowManager');
-      if (windowManager) {
-        const debugWindow = windowManager.getWindow('debug');
-        if (debugWindow && !debugWindow.isDestroyed()) {
-          debugWindow.webContents.send(event, data);
-        }
-      }
-    } catch (e) {
-      this.logger?.warn('ScormService: notifyDebugWindow fallback failed', e?.message || e);
-    }
-  }
+  
 
   /**
    * Get SN service instance

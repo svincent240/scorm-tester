@@ -11,7 +11,7 @@
 import { deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState } from './ui-state.helpers.js';
 import { getInitialUIState } from './ui-state.initial.js';
 import { showNotification, removeNotification } from './ui-state.notifications.js';
-import { setupDebugMirroring } from './ui-state.debug.js';
+// setupDebugMirroring removed - SCORM Inspector architecture handles content analysis
 
 /**
  * UI State Manager Class
@@ -419,8 +419,8 @@ class UIStateManager {
       // kept for consistency
     });
  
-    // Delegate debug/event mirroring to extracted module
-    this.helpers.setupDebugMirroring(this);
+    // Debug mirroring removed - SCORM Inspector handles content analysis separately
+    // EventBus debug mode can still be toggled via devModeEnabled UI state
   }
 
   /**
@@ -569,12 +569,12 @@ class UIStateSingleton {
       const { deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState } = await import('./ui-state.helpers.js');
       const { getInitialUIState } = await import('./ui-state.initial.js');
       const { showNotification, removeNotification } = await import('./ui-state.notifications.js');
-      const { setupDebugMirroring } = await import('./ui-state.debug.js');
+      // setupDebugMirroring removed - using SCORM Inspector architecture for content analysis
 
       const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
       this.instance = new UIStateManager({
         deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState,
-        getInitialUIState, showNotification, removeNotification, setupDebugMirroring,
+        getInitialUIState, showNotification, removeNotification,
         rendererLogger // Pass rendererLogger as a helper
       });
       
@@ -584,8 +584,8 @@ class UIStateSingleton {
       this.instance.setupEventBusListeners();
       // Initialize the state after all helpers are loaded
       this.instance._initializeState();
-      // Initialize debug mirroring and helpers (extracted)
-      this.instance.helpers.setupDebugMirroring(this.instance);
+      // Debug mirroring removed - SCORM Inspector handles content analysis
+      // UI debugging still available via renderer-logger.js and app.log
       
       return this.instance;
     } catch (error) {
@@ -596,7 +596,7 @@ class UIStateSingleton {
         localRendererLogger.error('UIStateManager: Failed to initialize:', error);
       } catch (_) { /* no-op */ }
       // Return a basic instance with at least a no-op logger
-      this.instance = new UIStateManager({ rendererLogger: localRendererLogger, getInitialUIState: () => ({}), safeLoadPersistedUI: () => ({}), safePersistState: () => ({}), deepMerge: (a,b) => ({...a,...b}), getNestedValue: () => undefined, setNestedValue: () => {}, showNotification: () => {}, removeNotification: () => {}, setupDebugMirroring: () => {} });
+      this.instance = new UIStateManager({ rendererLogger: localRendererLogger, getInitialUIState: () => ({}), safeLoadPersistedUI: () => ({}), safePersistState: () => ({}), deepMerge: (a,b) => ({...a,...b}), getNestedValue: () => undefined, setNestedValue: () => {}, showNotification: () => {}, removeNotification: () => {} });
       this.instance._initializeState(); // Attempt to initialize state even with fallback helpers
       return this.instance;
     }
