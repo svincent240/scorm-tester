@@ -704,6 +704,14 @@ class AppManager {
       });
     }
 
+    // SCORM Inspector toggle
+    const scormInspectorToggleBtn = document.getElementById('scorm-inspector-toggle');
+    if (scormInspectorToggleBtn) {
+      scormInspectorToggleBtn.addEventListener('click', () => {
+        this.openScormInspector();
+      });
+    }
+
     // Theme toggle
     const themeToggleBtn = document.getElementById('theme-toggle');
     if (themeToggleBtn) {
@@ -897,6 +905,24 @@ class AppManager {
       }
     } else {
       try { this.logger.warn('AppManager: DebugPanel component not available. Cannot toggle debug panel.'); } catch (_) {}
+    }
+  }
+
+  /**
+   * Open SCORM Inspector window
+   */
+  async openScormInspector() {
+    try {
+      if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
+        const result = await window.electronAPI.openScormInspectorWindow();
+        if (!result.success) {
+          try { this.logger.error('AppManager: Failed to open SCORM Inspector:', result.error); } catch (_) {}
+        }
+      } else {
+        try { this.logger.warn('AppManager: SCORM Inspector API not available'); } catch (_) {}
+      }
+    } catch (error) {
+      try { this.logger.error('AppManager: Error opening SCORM Inspector:', error.message); } catch (_) {}
     }
   }
 

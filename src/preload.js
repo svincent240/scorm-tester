@@ -133,6 +133,8 @@ const electronAPI = {
   onCourseLoaded: (callback) => safeOn('course-loaded', callback),
   onSessionStateChanged: (callback) => safeOn('session-state-changed', callback),
   onScormApiCallLogged: (callback) => safeOn('scorm-api-call-logged', callback),
+  onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
+  onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
   
   // Utility
   pathUtils: {
@@ -148,6 +150,10 @@ const electronAPI = {
   reloadWindow: () => safeSend('reload-window'),
   emitDebugEvent: (eventType, data) => safeInvoke('debug-event', eventType, data),
   openDebugWindow: () => safeInvoke('open-debug-window'),
+  
+  // SCORM Inspector
+  openScormInspectorWindow: () => safeInvoke('open-scorm-inspector-window'),
+  getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
   
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),

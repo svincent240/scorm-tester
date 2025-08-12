@@ -291,14 +291,8 @@ class WindowManager extends BaseService {
       this.setupScormInspectorWindowEvents(inspectorWindow);
       this.setupConsoleLogging(inspectorWindow);
       
-      // Load SCORM Inspector window content
-      const inspectorUrl = url.format({
-        pathname: path.join(__dirname, '../../scorm-inspector.html'),
-        protocol: 'scorm-app:',
-        slashes: true
-      });
-
-      await inspectorWindow.loadURL(inspectorUrl);
+      // Load SCORM Inspector window content using simple protocol format
+      await inspectorWindow.loadURL('scorm-app://scorm-inspector.html');
       
       inspectorWindow.show();
       this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.READY);

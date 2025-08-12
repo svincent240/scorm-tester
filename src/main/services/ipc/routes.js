@@ -9,6 +9,23 @@ module.exports = [
     }
   },
   {
+    channel: 'open-scorm-inspector-window',
+    handlerName: 'handleOpenScormInspectorWindow',
+    options: {
+      singleFlight: true,
+      debounceMs: 500,
+      rateLimitProfile: 'uiSparse'
+    }
+  },
+  {
+    channel: 'scorm-inspector-get-history',
+    handlerName: 'handleScormInspectorGetHistory',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
     channel: 'scorm-initialize',
     handlerName: 'handleScormInitialize',
     options: {

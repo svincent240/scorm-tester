@@ -111,6 +111,11 @@ class MenuBuilder {
                 mainWindow.webContents.toggleDevTools();
               }
             }
+          },
+          {
+            label: 'SCORM Inspector',
+            accelerator: 'CmdOrCtrl+Shift+S',
+            click: () => this.windowManager.createScormInspectorWindow()
           }
         ]
       }
