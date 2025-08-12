@@ -131,7 +131,7 @@ Migration Guidance
 - Raise thresholds gradually after stabilization.
 
 Future Work
-- Debug Window testing deferred until post-refactor; see [dev_docs/debug-window-plan.md](../debug-window-plan.md:1) for intended panels and signals.
+- SCORM Inspector testing follows the single-source-of-truth pattern; see [scorm-inspector-architecture.md](scorm-inspector-architecture.md) for implementation details and testing strategy.
 - Consider adopting a lightweight DOM harness for selective renderer view-model assertions if needed, while keeping headless.
 
 Checklists

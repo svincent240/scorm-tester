@@ -15,6 +15,7 @@ const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
 const { ScormSNService } = require('./scorm/sn/index');
 const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
+const ErrorRouter = require('../../shared/utils/error-router');
 const {
   SERVICE_DEFAULTS,
   SERVICE_EVENTS
@@ -202,7 +203,8 @@ class ScormService extends BaseService {
           }
         };
         
-        const rte = new ScormApiHandler(sessionManager, this.logger, { strictMode: this.config.strictRteMode });
+        const telemetryStore = this.getDependency('telemetryStore');
+        const rte = new ScormApiHandler(sessionManager, this.logger, { strictMode: this.config.strictRteMode }, telemetryStore);
         // Initialize RTE session and then bind its internal session id to our session id for mapping
         try { rte.Initialize(''); } catch (_) {}
         // Override generated sessionId with our provided sessionId for consistency
@@ -247,7 +249,12 @@ class ScormService extends BaseService {
         'ScormService.initializeSession'
       );
       
-      this.logger?.error(`ScormService: Session ${sessionId} initialization failed:`, error);
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('initializeSession', {
+        sessionId,
+        scormApiMethod: 'Initialize'
+      }));
+      
       this.recordOperation('initializeSession', false);
       
       return { success: false, errorCode: '101', reason: error.message };
@@ -296,7 +303,13 @@ class ScormService extends BaseService {
       return { success: errorCode === '0', value, errorCode };
       
     } catch (error) {
-      this.logger?.error(`ScormService: GetValue failed for session ${sessionId}:`, error);
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('getValue', {
+        sessionId,
+        element,
+        scormApiMethod: 'GetValue'
+      }));
+      
       this.recordOperation('getValue', false);
       return { success: false, value: '', errorCode: '101' };
     }
@@ -347,7 +360,14 @@ class ScormService extends BaseService {
       return { success, errorCode: success ? '0' : '101' };
       
     } catch (error) {
-      this.logger?.error(`ScormService: SetValue failed for session ${sessionId}:`, error);
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('setValue', {
+        sessionId,
+        element,
+        value,
+        scormApiMethod: 'SetValue'
+      }));
+      
       this.recordOperation('setValue', false);
       return { success: false, errorCode: '101' };
     }
@@ -397,7 +417,12 @@ class ScormService extends BaseService {
       return { success, errorCode: success ? '0' : '101' };
       
     } catch (error) {
-      this.logger?.error(`ScormService: Commit failed for session ${sessionId}:`, error);
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('commit', {
+        sessionId,
+        scormApiMethod: 'Commit'
+      }));
+      
       this.recordOperation('commit', false);
       return { success: false, errorCode: '101' };
     }
@@ -515,7 +540,13 @@ class ScormService extends BaseService {
         `SCORM compliance validation failed: ${error.message}`,
         'ScormService.validateCompliance'
       );
-      this.logger?.error('ScormService: Compliance validation failed:', error);
+      
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('validateCompliance', {
+        manifestPath,
+        scormDataValidation: true
+      }));
+      
       this.recordOperation('validateCompliance', false);
       return { valid: false, errors: [`Validation error: ${error.message}`], warnings: [] };
     }
@@ -542,7 +573,13 @@ class ScormService extends BaseService {
         `SCORM content analysis failed: ${error.message}`,
         'ScormService.analyzeContent'
       );
-      this.logger?.error('ScormService: Content analysis failed:', error);
+      
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('analyzeContent', {
+        manifestPath,
+        manifestParsing: true
+      }));
+      
       this.recordOperation('analyzeContent', false);
       return { error: error.message };
     }
@@ -581,7 +618,13 @@ class ScormService extends BaseService {
         `SCORM manifest processing failed: ${error.message}`,
         'ScormService.processScormManifest'
       );
-      this.logger?.error('ScormService: SCORM manifest processing failed:', error);
+      
+      // Route error through ErrorRouter for proper classification
+      ErrorRouter.routeError(error, this.buildErrorContext('processScormManifest', {
+        folderPath,
+        manifestParsing: true
+      }));
+      
       this.recordOperation('processScormManifest', false);
       return { success: false, error: error.message, reason: error.message };
     }
@@ -981,6 +1024,42 @@ class ScormService extends BaseService {
         }
       }
     }, 60000); // Check every minute
+  }
+
+  /**
+   * Build context for ErrorRouter classification
+   * @private
+   * @param {string} operation - The operation that failed
+   * @param {Object} additionalContext - Additional context information
+   * @returns {Object} Context object for ErrorRouter
+   */
+  buildErrorContext(operation, additionalContext = {}) {
+    const baseContext = {
+      logger: this.logger,
+      scormInspectorStore: this.getDependency('telemetryStore'),
+      component: 'ScormService',
+      operation,
+      ...additionalContext
+    };
+
+    // Add operation-specific context clues for classification
+    if (operation.includes('ApiCall') || operation.includes('GetValue') || operation.includes('SetValue') || operation.includes('Commit')) {
+      baseContext.scormApiMethod = operation;
+    }
+
+    if (operation.includes('manifest') || operation.includes('Manifest')) {
+      baseContext.manifestParsing = true;
+    }
+
+    if (operation.includes('validation') || operation.includes('Validation')) {
+      baseContext.scormDataValidation = true;
+    }
+
+    if (operation.includes('sequencing') || operation.includes('Sequencing')) {
+      baseContext.scormSequencing = true;
+    }
+
+    return baseContext;
   }
 
   /**

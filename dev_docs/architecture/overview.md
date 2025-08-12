@@ -27,7 +27,7 @@ The SCORM Tester is an Electron-based desktop application designed to simulate v
 │  │  │ Model (CAM)             ││  │  │  │                 ││ │
 │  │  │ - Manifest Parser       ││  │  │  │ - SCO Display   ││ │
 │  │  │ - Content Validator     ││  │  │  │ - API Bridge    ││ │
-│  │  │ - Metadata Handler      ││  │  │  │ - Debug Panel   ││ │
+│  │  │ - Metadata Handler      ││  │  │  │ - SCORM Inspector││ │
 │  │  └─────────────────────────┘│  │  │  └─────────────────┘│ │
 │  │  ┌─────────────────────────┐│  │  │  ┌─────────────────┐│ │
 │  │  │ Run-Time Environment    ││  │  │  │ Navigation      ││ │
@@ -43,7 +43,7 @@ The SCORM Tester is an Electron-based desktop application designed to simulate v
 │  │  │ - Activity Tree         ││  │  │  │                 ││ │
 │  │  │ - Sequencing Engine     ││  │  │  │ - LMS Profiles  ││ │
 │  │  │ - Navigation Handler    ││  │  │  │ - Preferences   ││ │
-│  │  │ - Rollup Manager        ││  │  │  │ - Debug Tools   ││ │
+│  │  │ - Rollup Manager        ││  │  │  │ - SCORM Tools   ││ │
 │  │  └─────────────────────────┘│  │  │  └─────────────────┘│ │
 │  └─────────────────────────────┘  │  └─────────────────────┘ │
 │  ┌─────────────────────────────┐  │                          │
@@ -79,7 +79,7 @@ The renderer process provides the user interface and content display:
 
 #### Content Display
 - **Content Viewer**: Displays SCO content with proper SCORM API integration
-- **Debug Panel**: Shows SCORM API calls, data model state, and debugging information
+- **SCORM Inspector**: Single-source-of-truth SCORM package inspection interface (see [scorm-inspector-architecture.md](scorm-inspector-architecture.md) for details)
 
 #### User Interface
 - **Navigation Controls**: Provides learner navigation (Next, Previous, Menu)

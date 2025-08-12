@@ -35,10 +35,12 @@ class ScormApiHandler {
    * @param {Object} sessionManager - Session manager instance
    * @param {Object} logger - Logger instance
    * @param {Object} options - Configuration options
+   * @param {Object} telemetryStore - SCORM Inspector telemetry store instance
    */
-  constructor(sessionManager, logger, options = {}) {
+  constructor(sessionManager, logger, options = {}, telemetryStore = null) {
     this.sessionManager = sessionManager;
     this.logger = logger;
+    this.telemetryStore = telemetryStore;
     this.options = {
       strictMode: true,
       maxCommitFrequency: 10000, // Max commits per 10 seconds
@@ -660,7 +662,7 @@ class ScormApiHandler {
   }
 
   /**
-   * Emits a custom event for SCORM API calls.
+   * Emits a custom event for SCORM API calls and stores in SCORM Inspector.
    * @private
    * @param {string} method - The name of the SCORM API method called.
    * @param {Array} parameters - An array of parameters passed to the method.
@@ -680,6 +682,19 @@ class ScormApiHandler {
       sessionId: this.sessionId,
       durationMs: parseFloat(durationMs.toFixed(3)) // Round to 3 decimal places
     };
+
+    // Store in SCORM Inspector telemetry store for proper classification and broadcasting
+    if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
+      try {
+        this.telemetryStore.storeApiCall(payload);
+        this.logger?.debug(`SCORM API call stored in inspector: ${method}`);
+      } catch (error) {
+        this.logger?.warn(`Failed to store API call in telemetry: ${error.message}`);
+        // Continue with fallback event emission
+      }
+    }
+
+    // Maintain backwards compatibility with event emitter
     this.eventEmitter.emit('scorm-api-call-logged', payload);
     this.logger?.info(`SCORM API Call [Session: ${payload.sessionId}]: ${method}(${parameters.map(p => JSON.stringify(p)).join(', ')}) -> Result: ${result}, ErrorCode: ${errorCode}, ErrorMessage: "${errorMessage}" (Duration: ${durationMs}ms)`);
     this.logger?.debug(`Emitted scorm-api-call-logged event for ${method}`, payload);

@@ -111,14 +111,20 @@ class MainProcess {
     }
     this.services.set('fileManager', fileManager);
  
-    // Core shared services: telemetry store and SN snapshot service
-    const DebugTelemetryStore = require('./services/debug/debug-telemetry-store');
+    // Core shared services: SCORM Inspector telemetry store and SN snapshot service
+    const ScormInspectorTelemetryStore = require('./services/scorm-inspector/scorm-inspector-telemetry-store');
     const SNSnapshotService = require('./services/scorm/sn/snapshot-service');
  
     // Pass the main logger into shared services so logs are consistent
-    const telemetryStore = new DebugTelemetryStore({ logger: this.logger });
-    // Set the telemetry store in the window manager after it's created
-    windowManager.setTelemetryStore(telemetryStore); // NEW LINE
+    // Create SCORM Inspector store with enhanced capabilities for package analysis
+    const telemetryStore = new ScormInspectorTelemetryStore({ 
+      maxHistorySize: 2000,
+      enableBroadcast: true,
+      logger: this.logger 
+    });
+    // Wire the telemetry store and window manager together for broadcasting
+    windowManager.setTelemetryStore(telemetryStore); // For legacy compatibility
+    telemetryStore.setWindowManager(windowManager); // For new broadcasting capabilities
     // Create SNSnapshotService without scormService initially to avoid ordering issues; we'll wire scormService after it's created
     const snSnapshotService = new SNSnapshotService(null, { logger: this.logger });
  

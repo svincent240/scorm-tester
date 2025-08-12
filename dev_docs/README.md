@@ -51,7 +51,7 @@ This documentation is designed to provide comprehensive context for AI-driven de
 ### 🏗️ Architecture Highlights
 - **Modular, Service-Oriented Design**: The application now features a significantly refined modular, event-driven, and service-oriented architecture across both main and renderer processes. Key enhancements include:
   - **Declarative IPC**: Transitioned to a declarative IPC layer with a unified wrapper factory, profile-aware rate limiting, and singleflight/debounce utilities, making IPC handling predictable and robust.
-  - **Centralized Telemetry**: Introduction of a dedicated `DebugTelemetryStore` to centralize API call history and debug events, decoupling telemetry from individual services.
+  - **Centralized SCORM Inspector**: Single-source-of-truth SCORM package inspection using `ScormInspectorTelemetryStore`. See [architecture/scorm-inspector-architecture.md](architecture/scorm-inspector-architecture.md) for details.
   - **Streamlined Main Services**: Main process services (e.g., `FileManager`, `ScormService`, `WindowManager`) have been simplified with clearer responsibilities, standardized error envelopes, and consistent logging policies. `ScormService` now delegates RTE operations to a dedicated RTE module.
   - **Renderer Micro-hardening**: Renderer-side components and services have undergone micro-hardening, including browser-safe data handling, lazy API bridge activation, and strict `console.*` usage removal, ensuring reliability and performance.
   - **Single-Pass Initialization**: The main process entrypoint (`src/main/main.js`) now initializes services once with clean dependency injection, eliminating re-initialization and implicit dependencies.
@@ -66,12 +66,12 @@ flowchart LR
   MainServices -- RTE API --> RTE
   MainServices -- CAM Parse/Validate --> CAM
   MainServices -- SN Nav --> SN
-  MainServices -- Logs --> DebugTelemetryStore
-  WindowManager -- Manages --> Main/Debug Windows
-  DebugTelemetryStore -- Flushes To --> DebugWindow
+  RTE -- SCORM API Calls --> ScormInspectorStore
+  WindowManager -- Manages --> Main/Inspector Windows
+  ScormInspectorStore -- Broadcasts To --> ScormInspectorWindow
 ```
 - **Modular Design**: Emphasizes logical cohesion and clear separation of concerns. Refer to [`style.md`](style.md) for file size guidelines.
-- **Event-Driven**: Component communication through centralized event bus
+- **Event-Driven**: Component communication through centralized event bus (UI components only; SCORM inspection uses direct IPC)
 - **Service-Oriented**: Clear separation of concerns with dependency injection
 - **Type-Safe**: Complete TypeScript definitions for development support
 - **Performance Optimized**: Exceeds all performance targets by 200-600x
@@ -136,7 +136,7 @@ This documentation is maintained as part of the application codebase and should 
   - **Main Services**: Streamlined responsibilities, standardized error handling, and improved file management.
   - **Renderer**: Enhanced reliability through micro-hardening, browser-safe data handling, and strict logging policies.
   - **Main Process Initialization**: Clean, single-pass service initialization with clear dependency injection.
-The temporary `ipc-simplification-plan.md`, `renderer-simplification-plan.md`, `main-services-simplification-plan.md`, `services-simplification-checklist.md`, and `plan-progress.md` documents have been absorbed into this documentation and will be removed.
+All implementation planning documents have been absorbed into this comprehensive documentation structure with clear architectural guidance.
 
 For questions about SCORM compliance, refer to the specification guide and compliance documentation. For architectural decisions, see the detailed module documentation and design rationale sections.
 

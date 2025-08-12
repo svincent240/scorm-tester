@@ -259,11 +259,91 @@ class WindowManager extends BaseService {
   }
 
   /**
+   * Create SCORM Inspector window
+   */
+  async createScormInspectorWindow() {
+    try {
+      const existingInspectorWindow = this.windows.get(WINDOW_TYPES.SCORM_INSPECTOR);
+      if (existingInspectorWindow && !existingInspectorWindow.isDestroyed()) {
+        try { existingInspectorWindow.focus(); } catch (_) {}
+        return existingInspectorWindow;
+      }
+
+      this.logger?.info('WindowManager: Creating SCORM Inspector window');
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CREATING);
+      
+      const mainWindow = this.windows.get(WINDOW_TYPES.MAIN);
+      const inspectorWindow = new BrowserWindow({
+        ...this.config.scormInspectorWindow,
+        parent: mainWindow,
+        webPreferences: {
+          nodeIntegration: !!this.config.scormInspectorWindow.nodeIntegration,
+          contextIsolation: !!this.config.scormInspectorWindow.contextIsolation,
+          webSecurity: typeof this.config.scormInspectorWindow.webSecurity !== 'undefined' ? !!this.config.scormInspectorWindow.webSecurity : !!this.config.mainWindow.webSecurity,
+          allowRunningInsecureContent: typeof this.config.scormInspectorWindow.allowRunningInsecureContent !== 'undefined' ? !!this.config.scormInspectorWindow.allowRunningInsecureContent : !!this.config.mainWindow.allowRunningInsecureContent,
+          preload: PathUtils.getPreloadPath(__dirname)
+        },
+        title: 'SCORM Inspector',
+        show: false
+      });
+
+      this.windows.set(WINDOW_TYPES.SCORM_INSPECTOR, inspectorWindow);
+      this.setupScormInspectorWindowEvents(inspectorWindow);
+      this.setupConsoleLogging(inspectorWindow);
+      
+      // Load SCORM Inspector window content
+      const inspectorUrl = url.format({
+        pathname: path.join(__dirname, '../../scorm-inspector.html'),
+        protocol: 'scorm-app:',
+        slashes: true
+      });
+
+      await inspectorWindow.loadURL(inspectorUrl);
+      
+      inspectorWindow.show();
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.READY);
+      
+      this.logger?.info(`WindowManager: SCORM Inspector window created successfully (ID: ${inspectorWindow.id})`);
+      this.recordOperation('createScormInspectorWindow', true);
+      
+      return inspectorWindow;
+      
+    } catch (error) {
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CLOSED);
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
+        `SCORM Inspector window creation failed: ${error.message}`,
+        'WindowManager.createScormInspectorWindow'
+      );
+      
+      this.logger?.error('WindowManager: SCORM Inspector window creation failed:', error);
+      this.recordOperation('createScormInspectorWindow', false);
+      throw error;
+    }
+  }
+
+  /**
    * Get window instance by type
    */
   getWindow(windowType) {
     const window = this.windows.get(windowType);
     return (window && !window.isDestroyed()) ? window : null;
+  }
+
+  /**
+   * Get all active windows for broadcasting
+   * @returns {Array} Array of active window instances
+   */
+  getAllWindows() {
+    const activeWindows = [];
+    
+    for (const [windowType, window] of this.windows) {
+      if (window && !window.isDestroyed()) {
+        activeWindows.push(window);
+      }
+    }
+    
+    return activeWindows;
   }
 
   /**
@@ -405,6 +485,29 @@ class WindowManager extends BaseService {
   }
 
   /**
+   * Set up SCORM Inspector window event handlers
+   */
+  setupScormInspectorWindowEvents(inspectorWindow) {
+    inspectorWindow.on('closed', () => {
+      this.windows.delete(WINDOW_TYPES.SCORM_INSPECTOR);
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CLOSED);
+      this.emit(SERVICE_EVENTS.WINDOW_CLOSED, { windowType: WINDOW_TYPES.SCORM_INSPECTOR });
+    });
+
+    inspectorWindow.on('focus', () => {
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.FOCUSED);
+    });
+
+    inspectorWindow.on('minimize', () => {
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.MINIMIZED);
+    });
+
+    inspectorWindow.on('maximize', () => {
+      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.MAXIMIZED);
+    });
+  }
+
+  /**
    * Set up console logging redirection to main log file
    */
   setupConsoleLogging(window) {
@@ -500,7 +603,7 @@ class WindowManager extends BaseService {
    */
   sendBufferedApiCallsToDebugWindow(debugWindow) {
     try {
-      // Prefer a telemetry store if available (DebugTelemetryStore.flushTo)
+      // Prefer a telemetry store if available (ScormInspectorTelemetryStore.flushTo)
       // Use the directly set telemetryStore instance
       if (this.telemetryStore && typeof this.telemetryStore.flushTo === 'function' && debugWindow && !debugWindow.isDestroyed()) {
         this.logger?.info('WindowManager: Flushing telemetry store to debug window');
@@ -523,7 +626,7 @@ class WindowManager extends BaseService {
 /**
  * Set the telemetry store instance.
  * This is called after the telemetry store is initialized in the main process.
- * @param {DebugTelemetryStore} telemetryStore - The telemetry store instance.
+ * @param {ScormInspectorTelemetryStore} telemetryStore - The SCORM Inspector telemetry store instance.
  */
 WindowManager.prototype.setTelemetryStore = function(telemetryStore) {
   this.telemetryStore = telemetryStore;

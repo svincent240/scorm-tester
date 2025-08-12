@@ -1,7 +1,7 @@
 const assert = require('assert');
 const TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter');
 const createSingleflight = require('../../../../src/shared/utils/singleflight');
-const DebugTelemetryStore = require('../../../../src/main/services/debug/debug-telemetry-store');
+const ScormInspectorTelemetryStore = require('../../../../src/main/services/scorm-inspector/scorm-inspector-telemetry-store');
 
 describe('IPC - RateLimiter', function() {
   it('allows within limit and blocks when exceeded', function() {
@@ -36,16 +36,20 @@ describe('IPC - Singleflight', function() {
   });
 });
 
-describe('DebugTelemetryStore', function() {
-  it('trims history to maxSize and supports getHistory/flushTo', function() {
-    const store = new DebugTelemetryStore({ maxSize: 3, logger: null });
+describe('ScormInspectorTelemetryStore', function() {
+  it('trims history to maxHistorySize and supports getHistory/flushTo', function() {
+    const store = new ScormInspectorTelemetryStore({ 
+      maxHistorySize: 3, 
+      enableBroadcast: false,
+      logger: null 
+    });
     store.storeApiCall({ id: 1 });
     store.storeApiCall({ id: 2 });
     store.storeApiCall({ id: 3 });
     store.storeApiCall({ id: 4 });
-    const h = store.getHistory();
+    const h = store.getHistory().history;
     assert.strictEqual(h.length, 3);
-    assert.strictEqual(h[0].id, 2); // oldest (1) trimmed
+    assert.strictEqual(h[0].id, 4); // newest first, oldest (1) trimmed
     // flushTo should not throw when provided a minimal webContents-like object
     store.flushTo({ send: () => {} });
   });

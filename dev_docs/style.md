@@ -52,9 +52,13 @@ These rules enforce the centralized logging, error handling, and UI state patter
     *   On errors, log via renderer logger, set UI error, show notifications, and emit events as appropriate:
         *   See [src/renderer/app.js](src/renderer/app.js:31) and [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:349).
 *   EventBus debug mode:
-    *   Default off.
-    *   Synchronized from UIState.ui.devModeEnabled.
-    *   See [src/renderer/services/app-manager.js](src/renderer/services/app-manager.js:90), [src/renderer/services/ui-state.js](src/renderer/services/ui-state.js:240), [src/renderer/services/event-bus.js](src/renderer/services/event-bus.js:219).
+    *   Default off for UI event logging.
+    *   **SCOPE**: EventBus is for app UI events only (navigation, errors, notifications). SCORM package inspection data bypasses EventBus and uses direct IPC.
+    *   UI event debug mode synchronized from UIState.ui.devModeEnabled for app troubleshooting.
+    *   See [architecture/scorm-inspector-architecture.md](architecture/scorm-inspector-architecture.md) for SCORM data flow details.
+    *   **Examples**:
+        *   ✅ App UI: `eventBus.emit('app:error', { error })`, `eventBus.emit('navigation:request', { target })`
+        *   ❌ SCORM Data: Use direct IPC to ScormInspector, NOT EventBus
 *   Navigation state authority:
     *   UIState is the authoritative source for navigation state.
     *   Components emit intents (e.g., navigation:request) and subscribe to normalized UIState.navigationState.

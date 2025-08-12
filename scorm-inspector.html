@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCORM Inspector</title>
+    
+    <!-- Import the existing styles -->
+    <link rel="stylesheet" href="scorm-app://src/styles/main.css">
+    
+    <style>
+        /* SCORM Inspector window specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-primary, #1e1e1e);
+            color: var(--text-primary, #d4d4d4);
+        }
+
+        .scorm-inspector-window {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scorm-inspector-header {
+            background: var(--bg-secondary, #2d2d30);
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .scorm-inspector-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary, #cccccc);
+            margin: 0;
+        }
+
+        .scorm-inspector-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .scorm-inspector-btn {
+            background: var(--bg-button, #0e639c);
+            color: var(--text-button, #ffffff);
+            border: none;
+            padding: 4px 12px;
+            border-radius: 2px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .scorm-inspector-btn:hover {
+            background: var(--bg-button-hover, #1177bb);
+        }
+
+        .scorm-inspector-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .inspector-section {
+            margin-bottom: 24px;
+        }
+
+        .inspector-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary, #cccccc);
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+            padding-bottom: 4px;
+        }
+
+        .api-timeline {
+            background: var(--bg-secondary, #2d2d30);
+            border: 1px solid var(--border-color, #3e3e42);
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .api-entry {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .api-entry:last-child {
+            border-bottom: none;
+        }
+
+        .api-entry.error {
+            background: var(--error-bg, #2d1b1b);
+            border-left: 3px solid var(--error-color, #f14c4c);
+        }
+
+        .api-entry.success {
+            background: var(--success-bg, #1b2d1b);
+            border-left: 3px solid var(--success-color, #4cf14c);
+        }
+
+        .api-method {
+            color: var(--method-color, #dcdcaa);
+            font-weight: 600;
+        }
+
+        .api-params {
+            color: var(--params-color, #9cdcfe);
+        }
+
+        .api-result {
+            color: var(--result-color, #b5cea8);
+        }
+
+        .api-error {
+            color: var(--error-color, #f14c4c);
+        }
+
+        .api-timestamp {
+            color: var(--timestamp-color, #808080);
+            font-size: 10px;
+        }
+
+        .error-list {
+            background: var(--bg-secondary, #2d2d30);
+            border: 1px solid var(--border-color, #3e3e42);
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .error-entry {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color, #3e3e42);
+        }
+
+        .error-entry:last-child {
+            border-bottom: none;
+        }
+
+        .error-severity {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .error-severity.critical {
+            background: var(--critical-bg, #8b0000);
+            color: var(--critical-text, #ffffff);
+        }
+
+        .error-severity.high {
+            background: var(--high-bg, #ff4500);
+            color: var(--high-text, #ffffff);
+        }
+
+        .error-severity.medium {
+            background: var(--medium-bg, #ffa500);
+            color: var(--medium-text, #000000);
+        }
+
+        .error-severity.low {
+            background: var(--low-bg, #90ee90);
+            color: var(--low-text, #000000);
+        }
+
+        .error-message {
+            margin: 8px 0;
+            color: var(--text-primary, #d4d4d4);
+        }
+
+        .troubleshooting-steps {
+            margin-top: 8px;
+        }
+
+        .troubleshooting-steps ul {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+
+        .troubleshooting-steps li {
+            margin-bottom: 2px;
+            color: var(--text-secondary, #9ca3af);
+            font-size: 12px;
+        }
+
+        .no-data {
+            text-align: center;
+            color: var(--text-secondary, #9ca3af);
+            padding: 40px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="scorm-inspector-window">
+        <div class="scorm-inspector-header">
+            <h1 class="scorm-inspector-title">🔍 SCORM Inspector</h1>
+            <div class="scorm-inspector-controls">
+                <button class="scorm-inspector-btn" id="clear-history-btn">Clear History</button>
+                <button class="scorm-inspector-btn" id="refresh-btn">Refresh</button>
+            </div>
+        </div>
+        
+        <div class="scorm-inspector-content">
+            <div class="inspector-section">
+                <h2 class="inspector-section-title">SCORM API Timeline</h2>
+                <div id="api-timeline" class="api-timeline">
+                    <div class="no-data">No SCORM API calls recorded yet. Load a SCORM package to begin inspection.</div>
+                </div>
+            </div>
+
+            <div class="inspector-section">
+                <h2 class="inspector-section-title">SCORM Errors & Issues</h2>
+                <div id="error-list" class="error-list">
+                    <div class="no-data">No SCORM errors detected.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./scorm-inspector-window.js"></script>
+</body>
+</html>

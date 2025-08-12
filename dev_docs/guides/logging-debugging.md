@@ -2,6 +2,8 @@
 
 This document outlines the structured approach to logging and debugging within the SCORM Tester application. All debug messages and errors must be written to the application's log file (`app.log`) to ensure they are captured and not missed, especially in production or deployed environments where console access may be limited.
 
+**CRITICAL DISTINCTION**: This document covers app debugging/logging. For SCORM package inspection (end-user tool), see [architecture/scorm-inspector-architecture.md](../architecture/scorm-inspector-architecture.md).
+
 ## Renderer Logging Flow (Centralized)
 
 Renderer logs are routed through a centralized adapter so nothing writes to the browser console.
@@ -26,12 +28,14 @@ The application utilizes a singleton `Logger` utility to centralize all logging 
 - The renderer adapter constructs the shared logger and avoids console usage.
 - In development, the shared logger may still log to the console internally; production behavior writes to the file.
 
-## Event Bus Debug Mode
+## Event Bus Logging (App UI Only)
 
-Event Bus logging is routed via the renderer logger. Default debug mode is disabled:
+**IMPORTANT**: EventBus is used ONLY for app UI events. SCORM package inspection data uses direct IPC (see SCORM Inspector architecture).
 
-- See [`event-bus.js`](../../src/renderer/services/event-bus.js) where `setDebugMode(false)` is the default now.
-- Step 8 of the plan will bind this to UIState to enable/disable debug logs dynamically.
+Event Bus logging for UI events is routed via the renderer logger. Default debug mode is disabled:
+
+- See [`event-bus.js`](../../src/renderer/services/event-bus.js) where `setDebugMode(false)` is the default for UI event logging.
+- UI debug mode can be enabled/disabled dynamically for troubleshooting app UI issues.
 
 ## Rate Limiting and Suppression Policy
 

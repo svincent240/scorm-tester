@@ -64,7 +64,7 @@ class IpcHandler extends BaseService {
     // Removed this.handlerMethods = new IpcHandlers(this);
     this.rateLimitCleanupInterval = null;
  
-    // No local telemetry buffer: telemetry is delegated to DebugTelemetryStore (constructed in main)
+    // No local telemetry buffer: telemetry is delegated to ScormInspectorTelemetryStore (constructed in main)
     this.maxHistorySize = 5000;
     this.sessionId = null; // Track current session for clearing
     this._openDebugGuards = { inFlight: false, lastAttemptTs: 0, pending: false, timer: null };
@@ -212,7 +212,7 @@ class IpcHandler extends BaseService {
     // 1) Terminate SCORM sessions FIRST (best-effort, silent)
     await this.terminateScormSessionsSafely();
 
-    // 2) Clear API call history (from IpcHandlers) - now handled by DebugTelemetryStore
+    // 2) Clear API call history (from IpcHandlers) - now handled by ScormInspectorTelemetryStore
 
     // 3) Unregister handlers AFTER SCORM termination
     this.unregisterHandlers();
@@ -287,8 +287,15 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // Migrate previously-sync channels to async handlers to unify routing (preserves channel names)
       this.registerHandler('open-debug-window', this.handleOpenDebugWindow.bind(this));
-      // Debug history fetch - returns newest-first entries with optional filters { limit, offset, sinceTs, methodFilter }
+      
+      // SCORM Inspector window management
+      this.registerHandler('open-scorm-inspector-window', this.handleOpenScormInspectorWindow.bind(this));
+      
+      // Legacy debug history fetch (deprecated - use scorm-inspector-get-history instead)
       this.registerHandler('debug-get-history', this.handleDebugGetHistory.bind(this));
+      
+      // SCORM Inspector history fetch - returns newest-first entries with optional filters
+      this.registerHandler('scorm-inspector-get-history', this.handleScormInspectorGetHistory.bind(this));
 
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
@@ -882,6 +889,23 @@ class IpcHandler extends BaseService {
     return { success: true, history: [] };
   }
 
+  async handleScormInspectorGetHistory(event, { limit, offset, sinceTs, methodFilter } = {}) {
+    this.logger?.debug(`IpcHandler: handleScormInspectorGetHistory called with limit: ${limit}, offset: ${offset}, sinceTs: ${sinceTs}, methodFilter: ${methodFilter}`);
+    
+    if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
+      try {
+        const historyData = this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter });
+        return { success: true, data: historyData };
+      } catch (error) {
+        this.logger?.error(`IpcHandler: handleScormInspectorGetHistory failed: ${error.message}`);
+        return { success: false, error: error.message, data: { history: [], errors: [] } };
+      }
+    }
+    
+    // Fallback when telemetry store not available
+    return { success: true, data: { history: [], errors: [] } };
+  }
+
   /**
    * Gracefully terminate all SCORM sessions if available on scormService.
    * Used during app shutdown to avoid noisy termination errors.
@@ -1108,6 +1132,40 @@ class IpcHandler extends BaseService {
       return { success: false, error: error.message };
     } finally {
       this._openDebugGuards.inFlight = false;
+    }
+  }
+
+  async handleOpenScormInspectorWindow(event) {
+    const windowManager = this.getDependency('windowManager');
+    if (!windowManager) {
+      this.logger?.warn('IpcHandler: WindowManager dependency not available for open-scorm-inspector-window');
+      return { success: false, error: 'WindowManager not available' };
+    }
+
+    try {
+      // Check if SCORM Inspector window already exists
+      const inspectorWindow = windowManager.getWindow('scorm-inspector');
+      if (inspectorWindow && !inspectorWindow.isDestroyed()) {
+        inspectorWindow.focus();
+        this.logger?.info('IpcHandler: Focused existing SCORM Inspector window');
+        this.recordOperation('open-scorm-inspector-window:focused', true);
+        return { success: true, focused: true };
+      } else {
+        // Use the window manager method when it exists, fallback to createDebugWindow for now
+        if (typeof windowManager.createScormInspectorWindow === 'function') {
+          await windowManager.createScormInspectorWindow();
+        } else {
+          // Fallback to debug window for now - this will be updated when we implement the window manager method
+          await windowManager.createDebugWindow();
+        }
+        this.logger?.info('IpcHandler: Created new SCORM Inspector window');
+        this.recordOperation('open-scorm-inspector-window:created', true);
+        return { success: true, created: true };
+      }
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to open SCORM Inspector window:', error);
+      this.recordOperation('open-scorm-inspector-window:error', false);
+      return { success: false, error: error.message };
     }
   }
 }

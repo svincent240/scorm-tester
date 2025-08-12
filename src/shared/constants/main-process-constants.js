@@ -35,7 +35,8 @@ const SERVICE_TYPES = {
  */
 const WINDOW_TYPES = {
   MAIN: 'main',
-  DEBUG: 'debug'
+  DEBUG: 'debug',
+  SCORM_INSPECTOR: 'scorm-inspector'
 };
 
 /**
@@ -102,6 +103,13 @@ const SERVICE_DEFAULTS = {
       height: 700,     // Increased from 600 for more debug content
       minWidth: 700,   // Increased from 600 for better functionality
       minHeight: 500,  // Increased from 400 for proper debug UI
+      parent: null     // Will be set to main window
+    },
+    scormInspectorWindow: {
+      width: 1000,     // Wider for inspection details
+      height: 800,     // Taller for API timeline and error lists
+      minWidth: 800,   // Minimum width for proper SCORM Inspector UI
+      minHeight: 600,  // Minimum height for content visibility
       parent: null     // Will be set to main window
     }
   },

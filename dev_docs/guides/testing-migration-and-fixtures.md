@@ -153,8 +153,8 @@ Renderer-Specific Migration Notes
   - Renderer consumes CAM’s analysis.uiOutline directly
 - Headless: no real windows; exercise modules/services and state/intent flows only.
 
-Debug Window Testing
-- Deferred (Future Work). Do not add panel tests until refactor lands. Reference: [dev_docs/debug-window-plan.md](../debug-window-plan.md:1)
+SCORM Inspector Testing
+- Follows single-source-of-truth SCORM Inspector architecture. Reference: [architecture/scorm-inspector-architecture.md](../architecture/scorm-inspector-architecture.md) for testing patterns and API contracts.
 
 Checklist — Migration Progress
 - [x] Files relocated into unit/contract/integration/scenario/perf (initial pass)

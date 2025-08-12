@@ -201,14 +201,14 @@ Renderer Testing Requirements
 - CAM outline usage:
   - Renderer must use analysis.uiOutline as-is; do not reconstruct
 
-Debug Window Testing
-- Status: Future Work (to follow planned refactor)
-- Placeholder: Define panel-level tests after refactor lands, aligning with [dev_docs/debug-window-plan.md](../debug-window-plan.md:1)
-  - API timeline linkage to errors
-  - Attempt lifecycle guardrails
-  - Data model sandbox validation/rollback
-  - Sequencing visualizer correctness
-  - EventBus inspector filters and devMode gating
+SCORM Inspector Testing
+- Status: Follows single-source-of-truth architecture pattern
+- Reference: [architecture/scorm-inspector-architecture.md](../architecture/scorm-inspector-architecture.md) for complete testing strategy
+- Test Categories:
+  - Single data path validation (api-handler → telemetry-store → UI)
+  - IPC channel message handling and history loading
+  - UI component pure consumer pattern verification
+  - Real-time update performance with high API call frequency
 
 Execution and Scripts
 Suggested npm scripts (to be aligned in package.json):
@@ -248,7 +248,7 @@ Acceptance Criteria for This Refresh
 - Performance tests produce trend artifacts with warnings only
 - Canonical fixtures in place with documentation
 - Renderer tests validate enablement, intent wiring, and logging policies
-- Debug Window testing tagged as Future Work pending refactor
+- SCORM Inspector testing follows established architecture (see [architecture/scorm-inspector-architecture.md](../architecture/scorm-inspector-architecture.md))
 
 Changelog
 - 2025-08: Strategy fully refreshed; layered model, thresholds, fixtures governance, performance policies established.
