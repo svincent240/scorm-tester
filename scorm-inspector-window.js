@@ -5,6 +5,8 @@
 
 class ScormInspectorWindow {
     constructor() {
+        console.log('SCORM Inspector: Initializing window...');
+        
         this.apiHistory = [];
         this.scormErrors = [];
         this.isLoading = false;
@@ -13,6 +15,14 @@ class ScormInspectorWindow {
         this.errorListElement = document.getElementById('error-list');
         this.clearHistoryBtn = document.getElementById('clear-history-btn');
         this.refreshBtn = document.getElementById('refresh-btn');
+        
+        console.log('SCORM Inspector: Elements found:', {
+            apiTimelineElement: !!this.apiTimelineElement,
+            errorListElement: !!this.errorListElement,
+            clearHistoryBtn: !!this.clearHistoryBtn,
+            refreshBtn: !!this.refreshBtn,
+            electronAPI: !!window.electronAPI
+        });
         
         this.setupEventListeners();
         this.loadInitialHistory();
@@ -23,17 +33,34 @@ class ScormInspectorWindow {
         this.clearHistoryBtn?.addEventListener('click', () => this.clearHistory());
         this.refreshBtn?.addEventListener('click', () => this.refreshData());
 
-        // Listen for real-time updates from main process
-        if (window.electronAPI) {
-            // Listen for SCORM Inspector data updates
-            window.electronAPI.ipcRenderer?.on('scorm-inspector-data-updated', (event, data) => {
-                this.addApiCall(data);
-            });
+        // Set up IPC event listeners after electronAPI is available
+        this.setupIpcEventListeners();
+    }
+
+    async setupIpcEventListeners() {
+        try {
+            // Wait for electronAPI to be available
+            await this.waitForElectronAPI();
+
+            // Listen for real-time updates from main process
+            if (window.electronAPI.onScormInspectorDataUpdated) {
+                window.electronAPI.onScormInspectorDataUpdated((event, data) => {
+                    console.log('SCORM Inspector: Received API call update', data);
+                    this.addApiCall(data);
+                });
+                console.log('SCORM Inspector: Data update listener registered');
+            }
 
             // Listen for SCORM Inspector error updates
-            window.electronAPI.ipcRenderer?.on('scorm-inspector-error-updated', (event, errorData) => {
-                this.addError(errorData);
-            });
+            if (window.electronAPI.onScormInspectorErrorUpdated) {
+                window.electronAPI.onScormInspectorErrorUpdated((event, errorData) => {
+                    console.log('SCORM Inspector: Received error update', errorData);
+                    this.addError(errorData);
+                });
+                console.log('SCORM Inspector: Error update listener registered');
+            }
+        } catch (error) {
+            console.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
         }
     }
 
@@ -41,15 +68,16 @@ class ScormInspectorWindow {
         try {
             this.setLoading(true);
             
-            if (!window.electronAPI?.ipcRenderer) {
-                console.warn('SCORM Inspector: ElectronAPI not available');
+            // Wait for electronAPI to be available
+            await this.waitForElectronAPI();
+            
+            if (!window.electronAPI?.getScormInspectorHistory) {
+                console.error('SCORM Inspector: getScormInspectorHistory method not available');
                 return;
             }
 
             // Request history from SCORM Inspector telemetry store
-            const response = await window.electronAPI.ipcRenderer.invoke('scorm-inspector-get-history', {
-                limit: 1000
-            });
+            const response = await window.electronAPI.getScormInspectorHistory();
 
             if (response.success && response.data) {
                 const { history = [], errors = [] } = response.data;
@@ -71,6 +99,19 @@ class ScormInspectorWindow {
         } finally {
             this.setLoading(false);
         }
+    }
+
+    async waitForElectronAPI(timeout = 5000) {
+        const startTime = Date.now();
+        
+        while (!window.electronAPI) {
+            if (Date.now() - startTime > timeout) {
+                throw new Error('Timeout waiting for electronAPI to be available');
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        console.log('SCORM Inspector: electronAPI is now available');
     }
 
     addApiCall(data) {

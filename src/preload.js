@@ -153,6 +153,10 @@ const electronAPI = {
   openScormInspectorWindow: () => safeInvoke('open-scorm-inspector-window'),
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
   
+  // SCORM Inspector Event Listeners
+  onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
+  onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
+  
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),
   getAppPath: () => safeInvoke('get-app-path'),

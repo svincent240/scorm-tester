@@ -871,15 +871,25 @@ class AppManager {
   async openScormInspector() {
     try {
       if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
+        try { this.logger.debug('AppManager: Requesting SCORM Inspector window...'); } catch (_) {}
         const result = await window.electronAPI.openScormInspectorWindow();
-        if (!result.success) {
-          try { this.logger.error('AppManager: Failed to open SCORM Inspector:', result.error); } catch (_) {}
+        
+        if (result && result.success) {
+          try { this.logger.info('AppManager: SCORM Inspector opened successfully'); } catch (_) {}
+          return;
+        }
+        
+        // Handle failure cases
+        if (!result) {
+          try { this.logger.error('AppManager: Failed to open SCORM Inspector: No response from main process'); } catch (_) {}
+        } else if (!result.success) {
+          try { this.logger.error('AppManager: Failed to open SCORM Inspector:', result.error || 'Unknown error'); } catch (_) {}
         }
       } else {
         try { this.logger.warn('AppManager: SCORM Inspector API not available'); } catch (_) {}
       }
     } catch (error) {
-      try { this.logger.error('AppManager: Error opening SCORM Inspector:', error.message); } catch (_) {}
+      try { this.logger.error('AppManager: Error opening SCORM Inspector:', error.message || error); } catch (_) {}
     }
   }
 
