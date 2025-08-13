@@ -44,6 +44,19 @@
   background: var(--bg-color);
   color: var(--text-color);
   overflow: hidden;  /* Prevent document-level scrolling */
+  /* Force immediate layout calculation */
+  will-change: transform;
+}
+
+/* Ensure proper initialization when app becomes ready */
+.app-layout:not(.initialized) {
+  /* While initializing, use a temporary min-height to prevent layout collapse */
+  min-height: 100vh;
+}
+
+.app-layout.initialized {
+  /* Once initialized, rely on flexbox for proper sizing */
+  will-change: auto;
 }
 
 .app-header {

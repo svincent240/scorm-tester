@@ -325,7 +325,15 @@ class ContentViewer extends BaseComponent {
         this.applyContentScaling();
         // Begin observing size changes to keep fit without inner scrollbars
         this.startResizeObserver();
+        // Force layout refresh to ensure content utilizes full available space
+        this.refreshLayout();
       }, 100);
+      
+      // Fix nested iframe sizing issues with additional delay for SCORM courses
+      // that create nested iframes after initial load
+      setTimeout(() => {
+        this.fixNestedIframeSizing();
+      }, 500);
       
       this.emit('contentLoaded', {
         url: this.currentUrl,
@@ -1055,6 +1063,106 @@ class ContentViewer extends BaseComponent {
       }
     } catch (_) {
       // ignore
+    }
+  }
+
+  /**
+   * Force layout refresh to ensure proper space utilization
+   */
+  refreshLayout() {
+    try {
+      // Force a reflow by reading layout properties and triggering resize
+      if (this.element) {
+        // Force reflow by accessing layout-triggering properties
+        const height = this.element.offsetHeight;
+        const width = this.element.offsetWidth;
+        
+        // Dispatch a resize event to trigger layout recalculation
+        if (window.ResizeObserver) {
+          // If ResizeObserver is available, manually trigger observers
+          this.element.style.width = width + 'px';
+          this.element.style.height = height + 'px';
+          // Remove explicit sizing to let flex handle it
+          setTimeout(() => {
+            this.element.style.width = '';
+            this.element.style.height = '';
+          }, 10);
+        } else {
+          // Fallback: dispatch window resize event
+          window.dispatchEvent(new Event('resize'));
+        }
+      }
+      
+      // Fix nested iframe sizing issues in SCORM content
+      this.fixNestedIframeSizing();
+      
+    } catch (error) {
+      // Silent fail - layout refresh is best effort
+    }
+  }
+
+  /**
+   * Fix nested iframe sizing issues in SCORM content that uses fixed dimensions
+   */
+  fixNestedIframeSizing() {
+    try {
+      if (!this.contentWindow || !this.contentWindow.document) {
+        return;
+      }
+
+      const contentDoc = this.contentWindow.document;
+      
+      // Get our content viewer's available height
+      const availableHeight = this.iframe ? this.iframe.clientHeight : 600;
+      
+      // Look for common iframe IDs/classes used in SCORM courses
+      const nestedIframes = contentDoc.querySelectorAll('iframe#contentFrame, iframe[id*="content"], iframe[id*="Content"]');
+      
+      nestedIframes.forEach(nestedIframe => {
+        if (nestedIframe) {
+          // Calculate proper height accounting for navigation elements
+          const navDiv = contentDoc.getElementById('navDiv');
+          const navHeight = navDiv ? navDiv.offsetHeight + 10 : 50; // Add some padding
+          const calculatedHeight = availableHeight - navHeight;
+          
+          // Override the fixed sizing with calculated dimensions
+          nestedIframe.style.width = '100%';
+          nestedIframe.style.height = `${Math.max(calculatedHeight, 400)}px`; // Ensure minimum height
+          nestedIframe.style.border = 'none';
+          nestedIframe.style.marginTop = '0';
+          nestedIframe.style.overflow = 'hidden'; // Prevent scrollbars on the iframe itself
+          
+          // Fix the parent body to not create additional scrollbars while preserving expected margins
+          const iframeDoc = nestedIframe.contentDocument || nestedIframe.contentWindow?.document;
+          if (iframeDoc) {
+            iframeDoc.documentElement.style.height = '100%';
+            iframeDoc.documentElement.style.overflow = 'hidden';
+            iframeDoc.body.style.height = '100%';
+            // Preserve the original left margin (20px) from the course's CSS but remove others
+            const computedStyle = iframeDoc.defaultView?.getComputedStyle(iframeDoc.body);
+            const originalMarginLeft = computedStyle?.marginLeft || '20px';
+            iframeDoc.body.style.margin = `0 0 0 ${originalMarginLeft}`;
+            iframeDoc.body.style.padding = '0';
+            iframeDoc.body.style.overflow = 'auto'; // Allow scrolling only in the inner content if needed
+          }
+        }
+      });
+
+      // Fix the main content document to eliminate outer scrollbars
+      if (contentDoc.body) {
+        contentDoc.body.style.height = `${availableHeight}px`;
+        contentDoc.body.style.margin = '0';
+        contentDoc.body.style.padding = '0';
+        contentDoc.body.style.overflow = 'hidden'; // Prevent outer scrollbars
+      }
+      
+      if (contentDoc.documentElement) {
+        contentDoc.documentElement.style.height = '100%';
+        contentDoc.documentElement.style.overflow = 'hidden';
+      }
+      
+    } catch (error) {
+      // Silent fail - nested iframe fixes are best effort
     }
   }
 
