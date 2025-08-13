@@ -117,13 +117,38 @@ Inline HTML error injections in the renderer entry were replaced with centralize
 - Graceful shutdown:
   - [`ipc-handler.js`](../../src/main/services/ipc-handler.js) attempts to terminate SCORM sessions first (best-effort, soft-ok) before unregistering IPC handlers and closing windows. Benign "already terminated" or late-shutdown cases must not escalate to ERROR logs.
 
+## Log Level Guidelines
+
+### Error Level (`error`)
+- **Always preserved**: System failures, IPC handler registration failures, security violations
+- **Required for**: Any condition that prevents normal operation or indicates a bug
+- **Examples**: Missing required dependencies, handler registration failures, file access errors
+
+### Warning Level (`warn`) 
+- **Always preserved**: Potential issues that don't prevent operation but indicate problems
+- **Required for**: Degraded functionality, fallback behavior activation, deprecated usage
+- **Examples**: Missing optional services, configuration issues, compatibility warnings
+
+### Info Level (`info`)
+- **Selective use**: Important application state changes and significant events
+- **Avoid for**: Routine successful operations, repetitive confirmations
+- **Keep for**: Service initialization completion, major workflow transitions, user-initiated actions
+- **Remove**: Handler registration confirmations, routine event subscriptions
+
+### Debug Level (`debug`)
+- **Controlled by LOG_LEVEL**: Only logged when `LOG_LEVEL=debug` 
+- **Avoid excessive**: Routine method entry/exit, repetitive status checks
+- **Keep for**: Complex troubleshooting scenarios, rare code paths, detailed error context
+
 ## Best Practices for Logging
 
 1.  Always use the renderer adapter in the renderer; avoid `console.*`.
-2.  Choose appropriate log levels (`info`, `warn`, `error`, `debug`).
+2.  Choose appropriate log levels following the guidelines above.
 3.  Provide context safely; avoid sensitive data.
 4.  Keep messages actionable; include identifiers, event names, and state context where possible.
 5.  Do not log repeated rate-limit warnings; rely on one-time main-side INFO engagement logs.
+6.  Avoid logging successful routine operations (handler registrations, event subscriptions).
+7.  Focus logging on failures, warnings, and significant state transitions.
 
 ## Debugging Steps
 

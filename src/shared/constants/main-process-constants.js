@@ -215,6 +215,7 @@ const SECURITY_CONFIG = {
       'select-scorm-package',
       'select-scorm-folder',
       'extract-scorm',
+      'prepare-course-source',
       'save-temporary-file',
       'find-scorm-entry',
       'get-course-info',
@@ -251,7 +252,10 @@ const SECURITY_CONFIG = {
       'recent:get',
       'recent:addOrUpdate',
       'recent:remove',
-      'recent:clear'
+      'recent:clear',
+      // SCORM Inspector channels
+      'open-scorm-inspector-window',
+      'scorm-inspector-get-history'
     ]
   },
   

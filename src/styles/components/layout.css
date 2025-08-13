@@ -586,7 +586,7 @@
  }
   
   .header__nav {
-    display: none;
+    display: flex; /* Show header nav on desktop - this is an Electron desktop app */
   }
   
   .app-content {

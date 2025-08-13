@@ -96,7 +96,6 @@ class IpcHandler extends BaseService {
    * Initialize IPC handler service
    */
   async doInitialize() {
-    this.logger?.debug('IpcHandler: Starting initialization');
 
     // Wire optional dependencies provided by main (telemetryStore, snSnapshotService)
     try {
@@ -104,29 +103,19 @@ class IpcHandler extends BaseService {
       if (telemetry) {
         this.telemetryStore = telemetry;
         // Ensure clean telemetry state on startup when telemetryStore is provided
-        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); this.logger?.info('[DEBUG EVENT] telemetryStore cleared on startup'); } } catch (_) {}
+        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (_) {}
       }
     } catch (_) {}
     
-    // Diagnostic: log telemetry store wiring state for debug-event plumbing validation
-    try {
-      this.logger?.info(`[DEBUG EVENT] telemetryStore present: ${!!this.telemetryStore}, hasFlushTo: ${typeof this.telemetryStore?.flushTo === 'function'}`);
-    } catch (_) {}
     
     // Subscribe to scorm-api-call-logged events from ScormService
     try {
       const scormService = this.getDependency('scormService');
-      this.logger?.debug(`[IPC Handler] scormService in doInitialize: ${!!scormService}`);
-      this.logger?.debug(`[IPC Handler] typeof scormService.onScormApiCallLogged: ${typeof scormService?.onScormApiCallLogged}`);
-      this.logger?.debug(`[IPC Handler] typeof scormService.eventEmitter: ${typeof scormService?.eventEmitter}`);
-      this.logger?.debug(`[IPC Handler] typeof scormService.eventEmitter.on: ${typeof scormService?.eventEmitter?.on}`);
 
       if (scormService && typeof scormService.onScormApiCallLogged === 'function') {
         scormService.onScormApiCallLogged((payload) => {
-          this.logger?.debug('[IPC Handler] Received scorm-api-call-logged event from ScormService', payload);
           this.broadcastScormApiCallLogged(payload);
         });
-        this.logger?.info('[IPC Handler] Subscribed to scorm-api-call-logged events from ScormService');
       } else {
         this.logger?.warn('[IPC Handler] ScormService or onScormApiCallLogged not available; cannot subscribe to API call events.');
       }
@@ -134,18 +123,15 @@ class IpcHandler extends BaseService {
       // Subscribe to course:loaded and session:reset events from ScormService
       if (scormService && typeof scormService.eventEmitter === 'object' && typeof scormService.eventEmitter.on === 'function') {
         scormService.eventEmitter.on('course:loaded', (payload) => {
-          this.logger?.info('[IPC Handler] Received course:loaded event from ScormService. Clearing telemetry store.');
           if (this.telemetryStore) {
             this.telemetryStore.clear();
           }
         });
         scormService.eventEmitter.on('session:reset', (payload) => {
-          this.logger?.info('[IPC Handler] Received session:reset event from ScormService. Clearing telemetry store.');
           if (this.telemetryStore) {
             this.telemetryStore.clear();
           }
         });
-        this.logger?.info('[IPC Handler] Subscribed to course:loaded and session:reset events from ScormService');
       } else {
         this.logger?.warn('[IPC Handler] ScormService eventEmitter not available; cannot subscribe to course load/reset events.');
       }
@@ -168,31 +154,21 @@ class IpcHandler extends BaseService {
       }
     }
 
-    this.logger?.debug(`IpcHandler: handleDebugGetHistory is ${typeof this.handleDebugGetHistory}`);
     this.registerHandlers();
     this.setupRateLimitCleanup();
 
     // SNSnapshotService is preferred and owned by main; fetch SN status on-demand when not present.
     if (this.snSnapshotService && typeof this.snSnapshotService.startPolling === 'function') {
-      this.logger?.info('IpcHandler: SNSnapshotService detected; delegating SN polling to it');
     } else {
       this.logger?.warn('IpcHandler: SNSnapshotService not present; SN status will be fetched on-demand (no internal poller)');
     }
 
-    if (IPC_ROUTES && IPC_ROUTES.length) {
-      this.logger?.info(`IpcHandler: declarative routes loaded: ${IPC_ROUTES.length}`);
-    } else {
-      this.logger?.info('IpcHandler: no declarative routes loaded');
-    }
-
-    this.logger?.debug('IpcHandler: Initialization completed');
   }
 
   /**
    * Shutdown IPC handler service
    */
   async doShutdown() {
-    this.logger?.debug('IpcHandler: Starting shutdown');
 
     // Stop SN poller (delegate to SNSnapshotService when available)
     try {
@@ -219,13 +195,44 @@ class IpcHandler extends BaseService {
       this.rateLimitCleanupInterval = null;
     }
 
-    this.logger?.debug('IpcHandler: Shutdown completed');
+  }
+
+  /**
+   * Register critical IPC handlers that must always be available
+   */
+  _registerCriticalHandlers() {
+    const { ipcMain } = require('electron');
+    
+    // Register logging handlers directly to bypass any potential issues
+    try {
+      ipcMain.handle('renderer-log-info', async (_event, ...args) => { 
+        try { this.logger?.info(...args); } catch (e) {} 
+        return { success: true }; 
+      });
+      ipcMain.handle('renderer-log-warn', async (_event, ...args) => { 
+        try { this.logger?.warn(...args); } catch (e) {} 
+        return { success: true }; 
+      });
+      ipcMain.handle('renderer-log-error', async (_event, ...args) => { 
+        try { this.logger?.error(...args); } catch (e) {} 
+        return { success: true }; 
+      });
+      ipcMain.handle('renderer-log-debug', async (_event, ...args) => { 
+        try { this.logger?.debug(...args); } catch (e) {} 
+        return { success: true }; 
+      });
+    } catch (e) {
+      // Even if this fails, continue with other handlers
+    }
   }
 
   /**
    * Register all IPC channel handlers
    */
   registerHandlers() {
+    // Register critical logging handlers first to ensure they're always available
+    this._registerCriticalHandlers();
+    
     const declarativeChannelSet = new Set((IPC_ROUTES || []).map(r => r.channel));
     try {
       // SCORM API handlers
@@ -289,13 +296,8 @@ class IpcHandler extends BaseService {
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
 
-      // Direct renderer logging channels (avoid cloning function objects over IPC)
-      this.registerHandler('renderer-log-info', async (_event, ...args) => { try { this.logger?.info(...args); } catch (e) {} return { success: true }; });
-      this.registerHandler('renderer-log-warn', async (_event, ...args) => { try { this.logger?.warn(...args); } catch (e) {} return { success: true }; });
-      this.registerHandler('renderer-log-error', async (_event, ...args) => { try { this.logger?.error(...args); } catch (e) {} return { success: true }; });
-      this.registerHandler('renderer-log-debug', async (_event, ...args) => { try { this.logger?.debug(...args); } catch (e) {} return { success: true }; });
+      // Direct renderer logging channels already registered in _registerCriticalHandlers()
       
-      this.logger?.info(`IpcHandler: Registered ${this.handlers.size} IPC handlers`);
       this.recordOperation('registerHandlers', true);
       
     } catch (error) {
@@ -323,22 +325,26 @@ class IpcHandler extends BaseService {
         const wrapped = require('./ipc/wrapper-factory').createWrappedHandler(route, this);
         ipcMain.handle(channel, wrapped);
         this.handlers.set(channel, wrapped);
-        this.logger?.debug(`IpcHandler: Registered declarative route for channel: ${channel}`);
         return;
       }
     } catch (e) {
+      this.logger?.error(`IpcHandler: Declarative route registration failed for ${channel}:`, e);
       // Fall back to legacy routing on error
     }
     
-    if (!this.securityConfig.allowedChannels.includes(channel)) {
+    if (!this.securityConfig?.allowedChannels?.includes(channel)) {
+      this.logger?.error(`IpcHandler: Channel ${channel} not in allowed channels list`);
       throw new Error(`Channel ${channel} not in allowed channels list`);
     }
     
-    const wrappedHandler = this.wrapHandler(channel, handler);
-    ipcMain.handle(channel, wrappedHandler);
-    this.handlers.set(channel, wrappedHandler);
-    
-    this.logger?.debug(`IpcHandler: Registered handler for channel: ${channel}`);
+    try {
+      const wrappedHandler = this.wrapHandler(channel, handler);
+      ipcMain.handle(channel, wrappedHandler);
+      this.handlers.set(channel, wrappedHandler);
+    } catch (error) {
+      this.logger?.error(`IpcHandler: Failed to register handler for ${channel}:`, error);
+      throw error;
+    }
   }
 
   /**

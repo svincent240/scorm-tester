@@ -31,15 +31,22 @@ class AppManager {
     };
 
     // Initialize logger asynchronously but safely
-    import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
-      .then(({ rendererLogger }) => {
-        if (rendererLogger) {
-          this.logger = rendererLogger;
-        }
-      })
-      .catch(() => {
-        // keep no-op fallback
-      });
+    try {
+      const baseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
+        ? window.electronAPI.rendererBaseUrl
+        : 'scorm-app://src/renderer/';
+      import(`${baseUrl}utils/renderer-logger.js`)
+        .then(({ rendererLogger }) => {
+          if (rendererLogger) {
+            this.logger = rendererLogger;
+          }
+        })
+        .catch(() => {
+          // keep no-op fallback
+        });
+    } catch (_) {
+      // If any unexpected error occurs while resolving rendererBaseUrl, keep no-op logger
+    }
 
     this.setupErrorHandlers();
   }
@@ -1114,9 +1121,57 @@ class AppManager {
     }
     return null;
   }
+
+  /**
+   * Test helper method to load a course programmatically
+   * This is exposed for testing purposes only
+   * @param {string} coursePath - Path to course ZIP file or directory
+   * @returns {Promise<Object>} Load result
+   */
+  async testLoadCourse(coursePath) {
+    if (!this.initialized) {
+      return { success: false, error: 'AppManager not initialized' };
+    }
+
+    try {
+      const courseLoader = this.services.get('courseLoader');
+      if (!courseLoader) {
+        return { success: false, error: 'Course loader service not available' };
+      }
+
+      // Call the course loader directly
+      await courseLoader.loadCourseFromPath(coursePath);
+      return { success: true, message: 'Course loading initiated' };
+    } catch (error) {
+      return { success: false, error: error.message || String(error) };
+    }
+  }
 }
 
 // Create and export singleton instance
 const appManager = new AppManager();
+
+// Make test helper available globally for e2e tests and console debugging
+if (typeof window !== 'undefined') {
+  window.appManager = appManager;
+  
+  // Add global test helper function
+  window.testLoadCourse = async (coursePath) => {
+    const result = await appManager.testLoadCourse(coursePath);
+    console.log('testLoadCourse result:', result);
+    return result;
+  };
+
+  // Add helper to load the sample course for quick testing
+  window.loadSampleCourse = async () => {
+    const samplePath = 'references/real_course_examples/SL360_LMS_SCORM_2004.zip';
+    console.log('Loading sample course from:', samplePath);
+    return await window.testLoadCourse(samplePath);
+  };
+
+  console.log('Test helpers available:');
+  console.log('  window.testLoadCourse(path) - Load course from path');
+  console.log('  window.loadSampleCourse() - Load the sample SL360 course');
+}
 
 export { AppManager, appManager };
