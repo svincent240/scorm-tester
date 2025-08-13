@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Windows desktop application built with Electron for testing and previewing SCORM (Sharable Content Object Reference Model) courses with full LMS simulation capabilities. The application provides offline SCORM testing, real-time debugging, and compliance validation for multiple LMS environments including Litmos, Moodle, SCORM Cloud, and Generic LMS.
+This is a desktop application built with Electron for testing and previewing SCORM (Sharable Content Object Reference Model) courses with full LMS simulation capabilities. The application provides offline SCORM testing, real-time debugging, and compliance validation for multiple LMS environments including Litmos, Moodle, SCORM Cloud, and Generic LMS.
 
 **Status**: ✅ **PRODUCTION READY** - Complete SCORM 2004 4th Edition implementation with 100% compliance achieved.
 
@@ -13,6 +13,7 @@ This is a Windows desktop application built with Electron for testing and previe
 ### Development
 - `npm run dev` - Start application in development mode
 - `npm run dev-debug` - Start with NODE_ENV=development for enhanced debugging
+- `npm run dev:remote-debug` - Start with remote debugging enabled for Playwright MCP interaction
 - `npm start` - Start application in production mode
 
 ### Testing and Quality
@@ -174,6 +175,120 @@ All file operations include path validation and security checks to prevent direc
 - Keep TypeScript definitions synchronized with implementation
 - Update test documentation for new test scenarios
 
+## Interactive Testing with Playwright MCP
+
+### Remote Debugging Setup
+The application supports remote debugging for AI-powered testing and interaction through Playwright MCP:
+
+**1. Launch Application with Remote Debugging:**
+```bash
+npm run dev:remote-debug
+```
+This command starts the Electron app with:
+- `--remote-debugging-port=9222` - Enables Chrome DevTools Protocol on port 9222
+- `--remote-allow-origins=*` - Allows connections from any origin
+
+**2. Connect via Playwright MCP:**
+- Navigate to `http://localhost:9222` to see available debugging targets
+- Click on "SCORM Tester" to access the application through DevTools
+- Use Playwright MCP browser tools to interact with the running application
+
+**3. Available Interactions:**
+- **UI Testing**: Click buttons, fill forms, navigate through the application
+- **Screenshot Capture**: Take screenshots of the current application state
+- **DOM Inspection**: Examine and interact with UI elements
+- **JavaScript Evaluation**: Execute custom scripts within the application context
+- **Event Simulation**: Simulate user interactions for testing workflows
+
+**4. Common Use Cases:**
+- **Automated Testing**: Test SCORM package loading and validation workflows
+- **UI Validation**: Verify interface elements and user experience
+- **Debugging**: Inspect application state during SCORM course execution
+- **Documentation**: Capture screenshots for documentation purposes
+- **Quality Assurance**: Validate application behavior with real user interactions
+
+**Note**: The remote debugging session remains active until the application is closed. Multiple debugging connections can be established simultaneously.
+
+### Playwright MCP Best Practices - Token-Efficient Debugging
+
+Based on extensive debugging experience, follow these guidelines to avoid token limit issues and maximize debugging efficiency:
+
+#### **🚫 Avoid These Token-Heavy Operations:**
+
+1. **Never use `browser_snapshot` on complex UIs**
+   - DevTools, admin interfaces, or rich applications generate 25k+ token responses
+   - Use only for simple pages or specific testing scenarios
+
+2. **Avoid element-based interactions requiring refs**
+   - `browser_click` with `ref` parameters requires snapshots first
+   - Snapshots of complex apps exceed token limits
+   - Use direct JavaScript evaluation instead
+
+3. **Don't use `browser_evaluate` in DevTools context**
+   - Even minimal JavaScript returns massive responses when connected to DevTools
+   - DevTools DOM context is enormous and will hit token limits
+
+4. **Avoid iterative DOM exploration**
+   - Don't try to "browse" through complex UIs step by step
+   - Plan specific targeted interactions instead of exploratory debugging
+
+#### **✅ Efficient Token-Saving Strategies:**
+
+1. **Use Screenshots Strategically**
+   - **Good**: Single verification screenshots (`browser_take_screenshot`)
+   - **Bad**: Screenshots for interaction or detailed inspection
+   - **Best**: Before/after comparison shots to verify changes
+
+2. **Direct Navigation Over Interaction**
+   - Use `browser_navigate` to specific URLs when possible
+   - Avoid clicking through complex navigation paths
+
+3. **Minimal JavaScript Evaluation**
+   - Return only essential data (booleans, strings, small objects)
+   - Avoid returning DOM elements or large data structures
+   - Filter and summarize results before returning
+
+4. **Console Monitoring for Events**
+   - Use `browser_console_messages` for lightweight debugging
+   - Add targeted logging to application code instead of DOM inspection
+   - Monitor specific event patterns rather than full console output
+
+5. **Network Requests for State Verification**
+   - Use `browser_network_requests` to understand application behavior
+   - Often more informative than DOM inspection for state changes
+
+#### **🎯 Recommended Debugging Workflow:**
+
+1. **Analyze code statically first** (using Read/Grep tools)
+2. **Make targeted fixes based on code analysis**
+3. **Use single screenshot for visual verification**
+4. **Use console/network monitoring for behavior verification**
+5. **Avoid interactive debugging through MCP for complex applications**
+
+#### **📋 Application-Specific Considerations:**
+
+- **Electron Apps**: Custom protocols (`scorm-app://`) aren't directly accessible via browser navigation
+- **DevTools Connection**: Connecting to DevTools creates massive DOM contexts that exceed token limits
+- **Complex SPAs**: Better to test via API endpoints, logs, or unit tests than DOM manipulation
+- **Real-time Applications**: Use event monitoring rather than polling for state changes
+
+#### **🔧 When MCP Isn't the Right Tool:**
+
+- **Complex UI testing**: Use traditional testing frameworks (Jest, Cypress) instead
+- **Interactive debugging**: Use browser DevTools directly for detailed inspection
+- **Performance testing**: Use dedicated performance tools and profilers
+- **Deep DOM inspection**: Use browser inspector manually for complex element analysis
+
+#### **💡 Token-Efficient Alternatives:**
+
+- **Code Analysis**: Use file reading and grep tools to understand logic
+- **Static Testing**: Write unit tests for component behavior
+- **Log-Based Debugging**: Add console.log statements and monitor output
+- **API Testing**: Test backend endpoints directly rather than UI interactions
+- **Screenshot Verification**: Use visual confirmation rather than programmatic inspection
+
+This approach prioritizes **efficiency over comprehensive interaction** - use MCP for verification and targeted testing, not as a replacement for traditional debugging tools.
+
 ## AI Development Context
 
 ### Key Files to Reference
@@ -188,6 +303,7 @@ All file operations include path validation and security checks to prevent direc
 - Use the comprehensive test suites defined in the testing strategy
 - Validate performance requirements and memory management
 - Test error handling and recovery scenarios
+- Utilize Playwright MCP for interactive testing and UI validation
 
 ### Current Status
 The application is **production-ready** with complete SCORM 2004 4th Edition compliance. All major refactoring phases have been completed:

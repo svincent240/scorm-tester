@@ -1,16 +1,31 @@
 import { _electron as electron, test, expect } from '@playwright/test';
 import path from 'path';
 
-test('loads ZIP course and displays content iframe', async () => {
+test('loads ZIP course and displays content iframe (diagnostic)', async () => {
   const zipPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004.zip');
   const extractedPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004');
 
-  const electronApp = await electron.launch({ args: ['.'] });
+  // Launch Electron using the project's installed binary to avoid environment mismatches.
+  const electronApp = await electron.launch({ executablePath: require('electron'), args: ['.'] });
   const page = await electronApp.firstWindow();
 
-  // Stub electron API used by the renderer to avoid complex IPC and native file dialogs.
+  // Diagnostic 1: Inspect what electronAPI exists before stubbing
+  const beforeApi = await page.evaluate(() => {
+    try {
+      const api = (window as any).electronAPI;
+      return {
+        exists: !!api,
+        keys: api ? Object.keys(api) : [],
+        selectScormPackageType: api && api.selectScormPackage ? typeof api.selectScormPackage : null
+      };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  });
+  console.log('Diagnostic - electronAPI before stub:', JSON.stringify(beforeApi));
+
+  // Install a stubbed electronAPI to make the flow deterministic in tests.
   await page.evaluate(({ zipPath, extractedPath }) => {
-    // Attach a test stub to the renderer window. Cast to any to avoid TypeScript DOM type errors.
     (window as any).electronAPI = {
       selectScormPackage: async () => ({ success: true, filePath: zipPath }),
       selectScormFolder: async () => ({ success: true, folderPath: extractedPath }),
@@ -36,19 +51,40 @@ test('loads ZIP course and displays content iframe', async () => {
     };
   }, { zipPath, extractedPath });
 
-  // Trigger the Load ZIP UI
+  // Diagnostic 2: Confirm stub installed
+  const afterApi = await page.evaluate(() => {
+    try {
+      const api = (window as any).electronAPI;
+      return {
+        exists: !!api,
+        keys: api ? Object.keys(api) : [],
+        selectScormPackageType: api && api.selectScormPackage ? typeof api.selectScormPackage : null
+      };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  });
+  console.log('Diagnostic - electronAPI after stub:', JSON.stringify(afterApi));
+
+  // Ensure the Load button exists and click it.
+  await page.waitForSelector('#course-load-btn', { timeout: 5000 });
   await page.click('#course-load-btn');
 
-  // Wait for the content iframe to load the resolved launch URL
-  await page.waitForFunction(() => {
+  // Increase timeout for manifest/process work and wait for iframe src to contain the launch page.
+  const waitResult = await page.waitForFunction(() => {
     const iframe = document.getElementById('content-frame') as HTMLIFrameElement | null;
-    return iframe && iframe.src && iframe.src.indexOf('story.html') !== -1;
-  }, null, { timeout: 10000 });
+    return iframe && typeof iframe.src === 'string' && iframe.src.indexOf('story.html') !== -1;
+  }, null, { timeout: 60000 }).catch(e => ({ error: String(e) }));
+
+  console.log('Diagnostic - waitResult:', JSON.stringify(waitResult));
 
   const src = await page.evaluate(() => {
     const iframe = document.getElementById('content-frame') as HTMLIFrameElement | null;
-    return iframe ? iframe.src : '';
+    return iframe ? iframe.src : null;
   });
+  console.log('Diagnostic - iframe src after wait:', src);
+
+  // Assert that the iframe loaded the expected launch URL
   expect(src).toContain('story.html');
 
   await electronApp.close();

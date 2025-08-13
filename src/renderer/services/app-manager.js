@@ -944,7 +944,7 @@ class AppManager {
     const isVisible = data.visible;
     
     if (sidebar) {
-      sidebar.classList.toggle('sidebar--hidden', !isVisible);
+      sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
       
       // Also update main content area
       const appContent = document.querySelector('.app-content');
@@ -971,7 +971,7 @@ class AppManager {
     const isVisible = data.visible;
     
     if (sidebar) {
-      sidebar.classList.toggle('sidebar--hidden', !isVisible);
+      sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
       
       // Also update main content area
       const appContent = document.querySelector('.app-content');

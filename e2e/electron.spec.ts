@@ -1,7 +1,8 @@
 import { _electron as electron, test, expect } from '@playwright/test';
-
+ 
 test('renders the first page', async () => {
-  const electronApp = await electron.launch({ args: ['.'] });
+  // Ensure Playwright launches the same Electron binary used by the project.
+  const electronApp = await electron.launch({ executablePath: require('electron'), args: ['.'] });
   const window = await electronApp.firstWindow();
   
   await test.step('Verify window title', async () => {
