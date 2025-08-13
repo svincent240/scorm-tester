@@ -20,9 +20,10 @@ The unified file handling system provides consistent, secure, and robust file op
    - Comprehensive error handling
 
 3. **Updated File Manager** (`src/main/services/file-manager.js`)
-   - Integrated path utilities for SCORM entry resolution
-   - Consistent URL generation for content
-   - Enhanced manifest parsing with proper path handling
+   - Integrated PathUtils for all path operations using `getTempRoot()` and `normalize()`
+   - Consolidated manifest handling with single `getManifestInfo()` method
+   - Modular ZIP extraction with focused security validation methods
+   - Removed redundant LMS files copying (SCORM API provided by application)
 
 4. **Simplified Renderer Logic** (`src/renderer/app.js`)
    - Clean content loading implementation
@@ -38,6 +39,12 @@ All path operations use the centralized `PathUtils` class:
 ```javascript
 // Normalize paths across platforms
 const normalizedPath = PathUtils.normalize(filePath);
+
+// Get consistent temp root directory
+const tempRoot = PathUtils.getTempRoot();
+
+// Validate path within allowed root
+const isValid = PathUtils.isValidPath(resolvedPath, allowedRoot, nativePath);
 
 // Resolve SCORM content URLs
 const urlResult = PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
@@ -239,7 +246,11 @@ Checks if file exists at specified path.
 
 ### Main Process
 
-1. **File Manager** uses PathUtils for entry point resolution
+1. **File Manager** uses PathUtils extensively:
+   - `getTempRoot()` for consistent temp directory handling
+   - `normalize()` for cross-platform path compatibility
+   - `isValidPath()` for security validation
+   - Modular ZIP extraction with focused validation methods
 2. **Window Manager** uses PathUtils in custom protocol handler
 3. **IPC Handlers** expose path utilities to renderer process
 
