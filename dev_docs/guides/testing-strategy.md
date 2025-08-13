@@ -283,10 +283,11 @@ While the primary testing strategy focuses on unit, contract, and integration te
 All E2E tests include comprehensive error monitoring through the `ConsoleMonitor` helper class:
 
 **Features**:
-- **Console message capture**: All browser console messages (log, error, warning)
-- **Application log monitoring**: Real-time monitoring of `app.log` for `[ERROR]` entries
-- **Critical error detection**: Filters out known safe errors (favicon 404s, expected CSP violations)
-- **Baseline establishment**: Tracks log file size to detect new errors during test execution
+- **Console message capture**: All browser console messages (log, error, warning) with location tracking
+- **Application log monitoring**: Real-time monitoring of `app.log` for `[ERROR]` entries using incremental file reading
+- **Critical error detection**: Filters out known safe errors (favicon 404s, expected CSP violations, test messages)
+- **Baseline establishment**: Records initial log file size to detect only new errors during test execution
+- **Detailed reporting**: Provides message counts by type and comprehensive error summaries
 
 **Usage Pattern**:
 ```typescript
@@ -332,6 +333,10 @@ test('course loading test example', async () => {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000); // Allow app to fully initialize
   
+  // MANDATORY: Check for errors after app initialization
+  consoleMonitor.printSummary('after app initialization');
+  consoleMonitor.assertNoCriticalErrors('after app initialization');
+  
   // 4. Verify AppManager Ready State
   const isInitialized = await page.evaluate(() => {
     return !!(window as any).appManager && (window as any).appManager.initialized;
@@ -341,6 +346,10 @@ test('course loading test example', async () => {
     console.log('Waiting for AppManager to initialize...');
     await page.waitForTimeout(3000);
   }
+  
+  // MANDATORY: Check for errors after AppManager verification
+  consoleMonitor.printSummary('after AppManager verification');
+  consoleMonitor.assertNoCriticalErrors('after AppManager verification');
   
   // 5. Course Loading via Test Helper
   const zipPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004.zip');
@@ -352,6 +361,9 @@ test('course loading test example', async () => {
   
   if (!hasHelper) {
     console.log('Test helper not available, skipping programmatic test');
+    // MANDATORY: Check for errors even when skipping
+    consoleMonitor.printSummary('test helper check');
+    consoleMonitor.assertNoCriticalErrors('test helper check');
     return;
   }
   
@@ -364,6 +376,10 @@ test('course loading test example', async () => {
     }
   }, { zipPath });
   
+  // MANDATORY: Check for errors immediately after course loading
+  consoleMonitor.printSummary('after course loading execution');
+  consoleMonitor.assertNoCriticalErrors('after course loading execution');
+  
   // 7. Validate Loading Results
   console.log('Course loading result:', loadResult);
   expect(loadResult).toBeDefined();
@@ -375,20 +391,28 @@ test('course loading test example', async () => {
     // Wait for UI updates
     await page.waitForTimeout(2000);
     
+    // MANDATORY: Check for errors after UI wait
+    consoleMonitor.printSummary('after UI update wait');
+    consoleMonitor.assertNoCriticalErrors('after UI update wait');
+    
     // Verify DOM changes (iframe presence, etc.)
     const iframe = page.locator('#content-frame');
     const iframeExists = await iframe.count() > 0;
     expect(iframeExists).toBe(true);
     
     console.log('✓ Iframe exists in DOM');
+    
+    // MANDATORY: Check for errors after DOM verification
+    consoleMonitor.printSummary('after DOM verification');
+    consoleMonitor.assertNoCriticalErrors('after DOM verification');
   } else {
     console.log('Course loading failed:', loadResult.error);
     // Test can still be successful if the mechanism works
+    
+    // MANDATORY: Check for errors even when loading fails
+    consoleMonitor.printSummary('after failed loading validation');
+    consoleMonitor.assertNoCriticalErrors('after failed loading validation');
   }
-  
-  // 8. Error Verification
-  consoleMonitor.printSummary('test name');
-  consoleMonitor.assertNoCriticalErrors('test name');
   
   await electronApp.close();
 });
@@ -397,11 +421,36 @@ test('course loading test example', async () => {
 #### Key Template Components
 
 1. **Standardized Setup**: Consistent Electron launch configuration with appropriate timeouts
-2. **Error Monitoring**: Automatic console and log file error detection
-3. **Initialization Verification**: Ensures AppManager is ready before proceeding
-4. **Test Helper Pattern**: Uses `window.testLoadCourse()` for programmatic course loading
-5. **Result Validation**: Comprehensive checking of loading success and UI state
-6. **Error Reporting**: Detailed logging for debugging and CI visibility
+2. **Error Monitoring**: Automatic console and log file error detection with ConsoleMonitor
+3. **Individual Error Checking**: **MANDATORY** error verification after EVERY single operation with descriptive names
+4. **Initialization Verification**: Ensures AppManager is ready before proceeding (with error check after)
+5. **Test Helper Pattern**: Uses `window.testLoadCourse()` for programmatic ZIP course loading (with error check after)
+6. **Result Validation**: Comprehensive checking of loading success and UI state (with error checks after each validation)
+7. **Granular Error Reporting**: Detailed logging with operation-specific context for immediate debugging
+
+#### Course Loading Variations
+
+**For ZIP Files** (Default Template):
+```typescript
+// Use the standard template above
+const loadResult = await page.evaluate(async ({ zipPath }) => {
+  return await (window as any).testLoadCourse(zipPath); // defaults to 'zip' type
+}, { zipPath });
+```
+
+**For Folder Loading**:
+```typescript
+// Specify 'folder' type for directory-based courses
+const loadResult = await page.evaluate(async ({ folderPath }) => {
+  return await (window as any).testLoadCourse(folderPath, 'folder');
+}, { folderPath });
+
+// MANDATORY: Check for errors immediately after folder loading
+consoleMonitor.printSummary('after folder loading execution');
+consoleMonitor.assertNoCriticalErrors('after folder loading execution');
+```
+
+**Note**: The standard template uses ZIP loading as it's the most common scenario. Create separate tests for folder loading when needed, using the same error checking pattern.
 
 ### E2E Test Categories
 
@@ -449,20 +498,69 @@ Tests automatically detect and fail on:
 - Use reasonable timeouts (2-3 seconds for UI updates)
 
 #### Error Handling
-- Always use `ConsoleMonitor` for error detection
-- Call `consoleMonitor.assertNoCriticalErrors()` before test completion
-- Include descriptive test names in error reporting
+- **CRITICAL**: Always use `ConsoleMonitor` for error detection in every E2E test
+- **MANDATORY**: Check for errors immediately after each significant operation within the test, not just at the end
+- **REQUIRED**: Call `consoleMonitor.assertNoCriticalErrors()` after each test operation to catch and associate errors quickly
+- Include descriptive test names in error reporting for precise debugging
+- **Best Practice**: Individual error checks enable faster debugging and clearer failure attribution
 
 #### Course Loading Tests
 - Always verify `testLoadCourse` helper availability before use
 - Use absolute paths for course packages
 - Validate both loading mechanism and resulting UI state
 - Include helpful console logging for debugging
+- **MANDATORY**: Check for errors immediately after course loading operations
+- Use descriptive error check names like `'after ZIP load'` or `'after folder load'`
 
 #### Debugging Support
 - Include descriptive console.log statements for test progress
 - Use `consoleMonitor.printSummary()` for detailed error reporting
 - Preserve error context in test failure messages
+
+#### Required Error Checking Pattern
+
+**EVERY E2E test must include error checking after each significant operation**:
+```typescript
+test('example operation test', async () => {
+  // ... setup code ...
+  
+  // Perform operation
+  await someOperation();
+  
+  // MANDATORY: Check for errors immediately
+  consoleMonitor.printSummary('after operation');
+  consoleMonitor.assertNoCriticalErrors('after operation');
+  
+  // Continue with test...
+});
+```
+
+#### Advanced ConsoleMonitor Patterns
+
+**Multiple Operations**: For tests that perform multiple course loads or operations:
+```typescript
+// Check errors after first operation
+consoleMonitor.printSummary('after ZIP load');
+consoleMonitor.assertNoCriticalErrors('after ZIP load');
+
+// Clear console messages (keeps log file baseline)
+consoleMonitor.clear();
+
+// Create fresh monitor for second operation
+const secondMonitor = new ConsoleMonitor(page);
+
+// Perform second operation...
+
+// Check errors after second operation
+secondMonitor.printSummary('after folder load');
+secondMonitor.assertNoCriticalErrors('after folder load');
+```
+
+**Error Isolation**: Use `consoleMonitor.clear()` to reset console message buffer while preserving log file baseline, enabling fine-grained error detection between operations.
+
+**Descriptive Test Names**: Always use descriptive names in error reporting methods to make CI debugging easier:
+- `consoleMonitor.printSummary('after ZIP load')` instead of generic names
+- `folderMonitor.assertNoCriticalErrors('after folder load')` for operation-specific context
 
 ### Integration with CI/CD
 

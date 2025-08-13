@@ -35,13 +35,7 @@ test.describe('Course Loading Tests', () => {
   });
 
   test.afterEach(async ({}, testInfo) => {
-    // Check for console errors before closing
-    if (consoleMonitor) {
-      const testName = testInfo.title;
-      consoleMonitor.printSummary(testName);
-      consoleMonitor.assertNoCriticalErrors(testName);
-    }
-    
+    // Note: Error checking is done within each test for immediate feedback
     await electronApp.close();
   });
 
@@ -67,6 +61,10 @@ test.describe('Course Loading Tests', () => {
     
     // Give the app time to handle the click
     await page.waitForTimeout(500);
+    
+    // Check for errors after button interaction
+    consoleMonitor.printSummary('load course button test');
+    consoleMonitor.assertNoCriticalErrors('load course button test');
   });
 
   test('loads ZIP course programmatically', async () => {
@@ -113,6 +111,63 @@ test.describe('Course Loading Tests', () => {
       console.log('Course loading failed:', loadResult.error);
       // Still consider test successful if the mechanism works
     }
+    
+    // Check for errors after ZIP course loading
+    consoleMonitor.printSummary('ZIP course loading test');
+    consoleMonitor.assertNoCriticalErrors('ZIP course loading test');
+  });
+
+  test('loads folder course programmatically', async () => {
+    const folderPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004');
+    
+    // Check that test helper is available
+    const hasHelper = await page.evaluate(() => {
+      return typeof (window as any).testLoadCourse === 'function';
+    });
+    
+    if (!hasHelper) {
+      console.log('testLoadCourse helper not available, skipping programmatic test');
+      return;
+    }
+    
+    // Use the test helper to load the course from folder with correct type
+    const loadResult = await page.evaluate(async ({ folderPath }) => {
+      try {
+        if (typeof (window as any).testLoadCourse === 'function') {
+          // Pass 'folder' as the second parameter to specify type
+          return await (window as any).testLoadCourse(folderPath, 'folder');
+        }
+        return { success: false, error: 'testLoadCourse helper not available' };
+      } catch (error) {
+        return { success: false, error: String(error) };
+      }
+    }, { folderPath });
+    
+    console.log('Folder course loading result:', loadResult);
+    
+    // The test passes if we can call the function without crashing
+    expect(loadResult).toBeDefined();
+    expect(typeof loadResult.success).toBe('boolean');
+    
+    if (loadResult.success) {
+      console.log('✓ Folder course loading initiated successfully');
+      
+      // Wait a bit and check if UI updated
+      await page.waitForTimeout(2000);
+      
+      const iframe = page.locator('#content-frame');
+      const iframeExists = await iframe.count() > 0;
+      expect(iframeExists).toBe(true);
+      
+      console.log('✓ Iframe exists in DOM after folder load');
+    } else {
+      console.log('Folder course loading failed:', loadResult.error);
+      // Still consider test successful if the mechanism works
+    }
+    
+    // Check for errors after folder course loading
+    consoleMonitor.printSummary('folder course loading test');
+    consoleMonitor.assertNoCriticalErrors('folder course loading test');
   });
 
   test('folder loading button exists and is functional', async () => {
@@ -135,5 +190,9 @@ test.describe('Course Loading Tests', () => {
     console.log('✓ Load folder button can be clicked');
     
     await page.waitForTimeout(500);
+    
+    // Check for errors after folder button interaction
+    consoleMonitor.printSummary('folder loading button test');
+    consoleMonitor.assertNoCriticalErrors('folder loading button test');
   });
 });

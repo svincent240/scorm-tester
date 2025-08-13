@@ -1128,7 +1128,7 @@ class AppManager {
    * @param {string} coursePath - Path to course ZIP file or directory
    * @returns {Promise<Object>} Load result
    */
-  async testLoadCourse(coursePath) {
+  async testLoadCourse(coursePath, type = 'zip') {
     if (!this.initialized) {
       return { success: false, error: 'AppManager not initialized' };
     }
@@ -1139,8 +1139,14 @@ class AppManager {
         return { success: false, error: 'Course loader service not available' };
       }
 
-      // Call the course loader directly
-      await courseLoader.loadCourseFromPath(coursePath);
+      if (type === 'folder') {
+        // Load from folder
+        await courseLoader.loadCourseFromFolder(coursePath);
+      } else {
+        // Load from file (ZIP)
+        await courseLoader.loadCourseFromPath(coursePath);
+      }
+      
       return { success: true, message: 'Course loading initiated' };
     } catch (error) {
       return { success: false, error: error.message || String(error) };
@@ -1156,8 +1162,8 @@ if (typeof window !== 'undefined') {
   window.appManager = appManager;
   
   // Add global test helper function
-  window.testLoadCourse = async (coursePath) => {
-    const result = await appManager.testLoadCourse(coursePath);
+  window.testLoadCourse = async (coursePath, type = 'zip') => {
+    const result = await appManager.testLoadCourse(coursePath, type);
     console.log('testLoadCourse result:', result);
     return result;
   };

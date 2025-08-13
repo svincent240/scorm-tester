@@ -323,12 +323,16 @@ class IpcHandler extends BaseService {
       const route = routes.find(r => r.channel === channel);
       if (route) {
         const wrapped = require('./ipc/wrapper-factory').createWrappedHandler(route, this);
+        if (!wrapped) {
+          this.logger?.error(`IpcHandler: Failed to create wrapped handler for ${channel}, falling back to legacy`);
+          throw new Error(`Failed to create wrapped handler for ${channel}`);
+        }
         ipcMain.handle(channel, wrapped);
         this.handlers.set(channel, wrapped);
         return;
       }
     } catch (e) {
-      this.logger?.error(`IpcHandler: Declarative route registration failed for ${channel}:`, e);
+      this.logger?.error(`IpcHandler: Declarative route registration failed for ${channel}:`, e?.message || e);
       // Fall back to legacy routing on error
     }
     

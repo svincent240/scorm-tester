@@ -34,14 +34,23 @@ module.exports = {
 
     const channel = route.channel;
     const handlerName = route.handlerName;
+    
     // Resolve the actual per-channel handler on the context
-    const actualHandler = typeof ctx[handlerName] === 'function'
+    // Check both own properties and prototype chain
+    const actualHandler = (typeof ctx[handlerName] === 'function')
       ? ctx[handlerName].bind(ctx)
       : null;
 
     if (!actualHandler) {
-      ctx?.logger?.error(`wrapper-factory: handler not found: ${handlerName} for channel ${channel}`);
-      return async (event, ...args) => IPC_RESULT.failure('handler_not_found', `Handler ${handlerName} not found for channel ${channel}`);
+      // Log available methods for debugging
+      const availableMethods = [];
+      for (const name in ctx) {
+        if (typeof ctx[name] === 'function') {
+          availableMethods.push(name);
+        }
+      }
+      ctx?.logger?.error(`wrapper-factory: handler not found: ${handlerName} for channel ${channel}. Available: ${availableMethods.slice(0, 10).join(', ')}`);
+      return null; // Return null to signal failure to caller
     }
 
     // Prepare a lightweight singleflight wrapper if requested
