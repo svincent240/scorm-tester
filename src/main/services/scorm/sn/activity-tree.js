@@ -97,8 +97,6 @@ class ActivityTreeManager {
     this.currentActivity = null;
     this.globalObjectives = new Map();
 
-    // Internal marker to distinguish duplicate-id non-fatal skips
-    this._lastDuplicateId = null;
     
     this.logger?.debug('ActivityTreeManager initialized');
   }
@@ -144,33 +142,26 @@ class ActivityTreeManager {
         if (resource && resource.identifier) resourceMap.set(resource.identifier, resource);
       });
  
-      // Prepare cycle detection structures
-      const visiting = new Set(); // recursion stack
-      const seen = new Set();     // track created node ids to prevent re-attachment
+      const visiting = new Set();
 
       // Build root
-      // Ensure consistent visiting lifecycle: mark root during subtree processing
-      this.root = this.buildActivityNode(organization, resourceMap, null, visiting, seen);
+      this.root = this.buildActivityNode(organization, resourceMap, null, visiting);
       if (!this.root) {
-        // Fail-fast per unit test expectations
         return false;
       }
-      // Mark root as visiting until its subtree is processed
+      
       visiting.add(this.root.identifier);
 
-      // Recurse children from organization
+      // Process children
       const topItems = organization.items || organization.children || [];
       if (Array.isArray(topItems)) {
         for (const item of topItems) {
-          if (!this.addChildSubtree(item, this.root, resourceMap, visiting, seen)) {
-            // On failure, ensure root visiting is cleared before exit
-            visiting.delete(this.root.identifier);
+          if (!this.addChildSubtree(item, this.root, resourceMap, visiting)) {
             return false;
           }
         }
       }
 
-      // Pop root from recursion stack after processing entire tree
       visiting.delete(this.root.identifier);
 
       this.logger?.info(`Activity tree built with ${this.activities.size} activities`);
@@ -190,10 +181,7 @@ class ActivityTreeManager {
   /**
    * Build a node with cycle detection (DFS)
    */
-  buildActivityNode(item, resourceMap, parent = null, visiting = new Set(), seen = new Set()) {
-    // Clear duplicate marker by default
-    this._lastDuplicateId = null;
-
+  buildActivityNode(item, resourceMap, parent = null, visiting = new Set()) {
     // Validate identifier
     if (!item || !item.identifier) {
       this.errorHandler?.setError(
@@ -204,42 +192,37 @@ class ActivityTreeManager {
       return null;
     }
 
-    // Depth check with safe fallback and diagnostic logging
-    const depth = parent ? parent.getDepth() + 1 : 0;
-    const maxDepthConfigured = Number(SN_DEFAULTS?.MAX_ACTIVITY_DEPTH);
-    const MAX_ALLOWED_DEPTH = Number.isFinite(maxDepthConfigured) && maxDepthConfigured > 0 ? maxDepthConfigured : 1024;
-    if (depth > MAX_ALLOWED_DEPTH) {
-      try { this.logger?.warn?.(`ActivityTreeManager: depth limit exceeded at ${depth} (max=${MAX_ALLOWED_DEPTH}) for item ${item?.identifier}`); } catch (_) {}
+    const id = item.identifier;
+    
+    // Check for circular reference (currently in recursion stack)
+    if (visiting.has(id)) {
       this.errorHandler?.setError(
-        SN_ERROR_CODES.MAX_DEPTH_EXCEEDED,
-        `Maximum activity depth exceeded: ${depth} (max=${MAX_ALLOWED_DEPTH})`,
+        SN_ERROR_CODES.CIRCULAR_ACTIVITY_REFERENCE,
+        `Circular reference detected: ${id}`,
         'buildActivityNode'
       );
+      return null;
+    }
+    
+    // Check for duplicate (already processed)
+    if (this.activities.has(id)) {
+      this.logger?.warn(`Duplicate identifier skipped: ${id}`);
       return null;
     }
 
-    // True cycle detection: only detect if currently in recursion stack
-    const id = item.identifier;
-    if (visiting.has(id)) {
-      const msg = `Circular reference detected: ${id}`;
-      try { this.logger?.error?.(msg); } catch (_) {}
+    // Depth check
+    const depth = parent ? parent.getDepth() + 1 : 0;
+    const MAX_DEPTH = SN_DEFAULTS?.MAX_ACTIVITY_DEPTH || 1024;
+    if (depth > MAX_DEPTH) {
       this.errorHandler?.setError(
-        SN_ERROR_CODES.CIRCULAR_ACTIVITY_REFERENCE,
-        msg,
+        SN_ERROR_CODES.MAX_DEPTH_EXCEEDED,
+        `Maximum activity depth exceeded: ${depth}`,
         'buildActivityNode'
       );
-      return null;
-    }
-    if (seen.has(id)) {
-      // Duplicate identifier encountered again outside current recursion stack.
-      // Treat as non-fatal: register first-occurrence only, skip re-attachment.
-      this._lastDuplicateId = id;
-      try { this.logger?.warn?.(`ActivityTreeManager: duplicate identifier encountered, skipping re-attachment: ${id}`); } catch (_) {}
       return null;
     }
 
     visiting.add(id);
-    seen.add(id);
 
     // Resolve resource
     let resource = null;
@@ -249,43 +232,33 @@ class ActivityTreeManager {
 
     const node = new ActivityNode(item, resource, parent);
     this.initializeObjectives(node);
-    // Only register the first occurrence; keep existing if present
-    if (!this.activities.has(id)) {
-      this.activities.set(id, node);
-    }
+    this.activities.set(id, node);
 
-    // Keep id in 'visiting' until its subtree is fully processed in addChildSubtree
     return node;
   }
  
   /**
    * Recursively add child subtree with proper cycle handling
    */
-  addChildSubtree(item, parentNode, resourceMap, visiting, seen) {
-    const node = this.buildActivityNode(item, resourceMap, parentNode, visiting, seen);
+  addChildSubtree(item, parentNode, resourceMap, visiting) {
+    const node = this.buildActivityNode(item, resourceMap, parentNode, visiting);
     if (!node) {
-      // Distinguish duplicate-id non-fatal skip vs actual error
-      if (this._lastDuplicateId && this._lastDuplicateId === (item && item.identifier)) {
-        // Clear marker and skip attaching this subtree
-        this._lastDuplicateId = null;
-        return true;
-      }
-      // Fail-fast on invalid node, cycle, depth, or invalid id
-      return false;
+      // Skip duplicates silently, fail on errors
+      return !this.activities.has(item?.identifier);
     }
 
     parentNode.addChild(node);
+    
     const children = item.children || item.items || [];
     if (Array.isArray(children)) {
       for (const child of children) {
-        if (!this.addChildSubtree(child, node, resourceMap, visiting, seen)) {
+        if (!this.addChildSubtree(child, node, resourceMap, visiting)) {
           return false;
         }
       }
     }
-    // Pop current node from recursion stack after processing its entire subtree
+    
     visiting.delete(node.identifier);
-    // IMPORTANT: Do NOT remove from 'seen' here. 'seen' tracks globally created nodes.
     return true;
   }
  

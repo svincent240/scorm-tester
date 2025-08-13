@@ -110,8 +110,10 @@ Where:
 
 ### PathUtils Class
 
+#### Core Methods
+
 #### `normalize(filePath)`
-Normalizes file paths for cross-platform compatibility.
+Normalizes file paths for cross-platform compatibility. Converts backslashes to forward slashes, removes duplicate slashes, and removes trailing slashes (except root).
 
 **Parameters:**
 - `filePath` (string) - Path to normalize
@@ -119,29 +121,85 @@ Normalizes file paths for cross-platform compatibility.
 **Returns:** 
 - (string) Normalized path
 
-#### `resolveScormContentUrl(contentPath, extractionPath, appRoot)`
-Resolves SCORM content paths to loadable URLs.
+#### `getTempRoot()`
+Gets the normalized canonical temp root directory for SCORM extractions.
+
+**Returns:**
+- (string) Normalized temp root path (`os.tmpdir()/scorm-tester`)
+
+#### `isValidPath(resolvedPath, allowedRoot, nativePath)`
+Checks if a resolved path is within allowed root boundaries and exists on filesystem.
 
 **Parameters:**
-- `contentPath` (string) - Content path from manifest
-- `extractionPath` (string) - SCORM extraction directory
+- `resolvedPath` (string) - The normalized resolved path  
+- `allowedRoot` (string) - The allowed root directory
+- `nativePath` (string) - The native file path for existence check
+
+**Returns:**
+- (boolean) True if path is valid and exists
+
+#### Content Resolution Methods
+
+#### `resolveScormContentUrl(contentPath, extractionPath, appRoot)`
+Resolves SCORM content paths to loadable URLs with comprehensive validation.
+
+**Parameters:**
+- `contentPath` (string) - Content path from manifest (may include query parameters)
+- `extractionPath` (string) - SCORM extraction directory (must be under canonical temp root)
 - `appRoot` (string) - Application root directory
 
 **Returns:**
-- (Object) Resolution result with URL and metadata
+- (Object) Resolution result with URL and metadata:
+  ```javascript
+  {
+    success: boolean,
+    url?: string,           // Protocol URL if successful
+    resolvedPath?: string,  // Final resolved file path
+    originalPath: string,   // Input content path
+    hasQuery?: boolean,     // Whether query parameters were present
+    queryString?: string,   // Query parameters if present
+    usedBase?: string,      // 'appRoot' or 'tempRoot'
+    error?: string         // Error message if failed
+  }
+  ```
 
 #### `toScormProtocolUrl(filePath, appRoot)`
-Converts file system paths to `scorm-app://` protocol URLs.
+Converts file system paths to `scorm-app://` protocol URLs with intelligent same-origin handling for SCORM content.
 
 **Parameters:**
 - `filePath` (string) - Absolute file system path
 - `appRoot` (string) - Application root directory
 
 **Returns:**
-- (string) Protocol URL
+- (string) Protocol URL (uses `scorm-app://index.html/` prefix for SCORM content under temp root)
+
+#### Protocol Handling
+
+#### `handleProtocolRequest(protocolUrl, appRoot)`
+Handles custom protocol requests with comprehensive path processing and validation.
+
+**Parameters:**
+- `protocolUrl` (string) - Full protocol URL (e.g., 'scorm-app://temp/file.html')
+- `appRoot` (string) - Application root directory
+
+**Returns:**
+- (Object) Processing result:
+  ```javascript
+  {
+    success: boolean,
+    resolvedPath?: string,    // Final resolved path if successful
+    requestedPath: string,    // Requested path portion
+    queryString?: string,     // Query parameters if present
+    usedBase?: string,       // 'appRoot' or 'tempRoot'
+    error?: string,          // Error message if failed
+    isUndefinedPath?: boolean // Special flag for undefined path detection
+  }
+  ```
+
+#### Utility Methods
 
 #### `validatePath(filePath, allowedRoot)`
-Validates paths for security and existence.
+Validates paths for security and existence with path traversal protection.
 
 **Parameters:**
 - `filePath` (string) - Path to validate
@@ -149,6 +207,33 @@ Validates paths for security and existence.
 
 **Returns:**
 - (boolean) True if path is valid and safe
+
+#### `getAppRoot(currentDir)`
+Gets normalized application root directory by navigating up from current directory.
+
+**Parameters:**
+- `currentDir` (string) - Current directory (usually `__dirname`)
+
+**Returns:**
+- (string) Normalized application root path
+
+#### `getPreloadPath(currentDir)`
+Resolves preload script path relative to current directory.
+
+**Parameters:**
+- `currentDir` (string) - Current directory (usually `__dirname`)
+
+**Returns:**
+- (string) Resolved preload script path
+
+#### `fileExists(filePath)`
+Checks if file exists at specified path.
+
+**Parameters:**
+- `filePath` (string) - Path to check
+
+**Returns:**
+- (boolean) True if file exists
 
 ## Integration Points
 

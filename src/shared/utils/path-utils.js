@@ -19,39 +19,52 @@ const getLogger = require('./logger');
  */
 class PathUtils {
   static get logger() {
-    // Use the centralized shared logger - lazy initialization to avoid circular deps
     if (!this._logger) {
       try {
         this._logger = getLogger();
       } catch (e) {
-        // Fallback to null if logger not available
         this._logger = null;
       }
     }
     return this._logger;
   }
+
+  /**
+   * Get normalized temp root directory
+   * @returns {string} Normalized temp root path
+   */
+  static getTempRoot() {
+    return this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+  }
+
+  /**
+   * Check if path is within allowed root and exists
+   * @param {string} resolvedPath - The resolved file path
+   * @param {string} allowedRoot - The allowed root directory
+   * @param {string} nativePath - The native file path for existence check
+   * @returns {boolean} True if path is valid and exists
+   */
+  static isValidPath(resolvedPath, allowedRoot, nativePath) {
+    return resolvedPath.startsWith(allowedRoot) && fs.existsSync(nativePath);
+  }
+
   /**
    * Normalize path for cross-platform compatibility
    * @param {string} filePath - Path to normalize
    * @returns {string} Normalized path
    */
   static normalize(filePath) {
-    PathUtils.logger?.debug(`PathUtils: normalize - Input: '${filePath}'`);
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path provided');
     }
     
-    // Convert backslashes to forward slashes for consistency
-    let normalized = filePath.replace(/\\/g, '/');
-    
-    // Remove duplicate slashes
-    normalized = normalized.replace(/\/+/g, '/');
+    // Convert backslashes to forward slashes and remove duplicate slashes
+    let normalized = filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
     
     // Remove trailing slash unless it's root
     if (normalized.length > 1 && normalized.endsWith('/')) {
       normalized = normalized.slice(0, -1);
     }
-    PathUtils.logger?.debug(`PathUtils: normalize - Output: '${normalized}'`);
     return normalized;
   }
 
@@ -66,11 +79,8 @@ class PathUtils {
       throw new Error('File path and app root are required');
     }
     
-    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Input: filePath='${filePath}', appRoot='${appRoot}'`);
-
-    const normalizedPath = PathUtils.normalize(filePath);
-    const normalizedRoot = PathUtils.normalize(appRoot);
-    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Normalized: normalizedPath='${normalizedPath}', normalizedRoot='${normalizedRoot}'`);
+    const normalizedPath = this.normalize(filePath);
+    const normalizedRoot = this.normalize(appRoot);
     
     // Ensure path is within app root for security
     if (!normalizedPath.startsWith(normalizedRoot)) {
@@ -84,17 +94,15 @@ class PathUtils {
     if (relativePath.startsWith('/')) {
       relativePath = relativePath.substring(1);
     }
-    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Relative Path: '${relativePath}'`);
     
     // Only use same-origin prefix for SCORM content (files under temp directory)
     // Main app files (index.html, scorm-inspector.html, etc.) should load directly
-    const normalizedTempRoot = this.normalize(require('path').join(require('os').tmpdir(), 'scorm-tester'));
+    const normalizedTempRoot = this.getTempRoot();
     const isScormContent = this.normalize(appRoot).startsWith(normalizedTempRoot);
     
     const protocolUrl = isScormContent 
       ? `scorm-app://index.html/${relativePath}`
       : `scorm-app://${relativePath}`;
-    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Output: '${protocolUrl}' (isScormContent: ${isScormContent})`);
     return protocolUrl;
   }
 
@@ -133,7 +141,7 @@ class PathUtils {
       // Validate the resolved path exists and is within allowed roots
       const normalizedAppRoot = this.normalize(appRoot);
       // Treat the application's canonical temp extraction directory as the only allowed external base.
-      const normalizedTempRoot = this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+      const normalizedTempRoot = this.getTempRoot();
  
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
@@ -233,17 +241,14 @@ class PathUtils {
       // Handle case where main app requests 'index.html/' (with trailing slash)
       if (requestedPath === 'index.html/') {
         requestedPath = 'index.html';
-        PathUtils.logger?.debug(`PathUtils: Converted index.html/ to index.html`);
       }
       // Handle same-origin paths that start with 'index.html/' - strip this prefix
       else if (requestedPath.startsWith('index.html/')) {
         requestedPath = requestedPath.slice('index.html/'.length);
-        PathUtils.logger?.debug(`PathUtils: Stripped index.html/ prefix, new path: ${requestedPath}`);
       }
 
       // Quick checks for broken content variables
       if (requestedPath.includes('/undefined')) {
-        PathUtils.logger?.warn(`PathUtils: Undefined path blocked: ${requestedPath}`);
         return { success: false, error: 'Undefined path detected', requestedPath, resolvedPath: null, isUndefinedPath: true };
       }
 
@@ -261,7 +266,7 @@ class PathUtils {
       }
 
       const normalizedAppRoot = this.normalize(appRoot);
-      const normalizedTempRoot = this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+      const normalizedTempRoot = this.getTempRoot();
 
       // Legacy abs/ encoding is no longer supported - all paths should be relative to app root or temp root
 
@@ -273,87 +278,14 @@ class PathUtils {
       // Normalize resolved variants for reliable cross-platform comparisons (forward-slash normalized)
       const appResolvedNorm = this.normalize(appResolved);
       const tempResolvedNorm = this.normalize(tempResolved);
-      
-      // Debug path resolution process
-      PathUtils.logger?.debug('PathUtils: Path resolution process', {
-        originalUrl: protocolUrl,
-        requestedPath,
-        filePathRaw,
-        safeRel,
-        normalizedAppRoot,
-        normalizedTempRoot,
-        appResolved,
-        tempResolved,
-        appResolvedNorm,
-        tempResolvedNorm
-      });
 
-      // Prefer file under app root (compare normalized forms, but use native paths for fs operations)
-      const appExists = fs.existsSync(appResolved);
-      if (appResolvedNorm.startsWith(normalizedAppRoot) && appExists) {
+      // Check file existence and validate against allowed roots
+      if (this.isValidPath(appResolvedNorm, normalizedAppRoot, appResolved)) {
         return { success: true, resolvedPath: appResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'appRoot' };
       }
-
-      // Fallback to canonical temp root
-      const tempExists = fs.existsSync(tempResolved);
       
-      // Additional filesystem debugging using native path
-      let fileStats = null;
-      try {
-        fileStats = fs.statSync(tempResolved);
-      } catch (statError) {
-        PathUtils.logger?.debug(`PathUtils: fs.statSync failed for ${tempResolved}:`, statError.message);
-      }
-      
-      // Enhanced logging for debugging file existence issues with timestamp for race condition detection
-      const checkTimestamp = new Date().toISOString();
-      PathUtils.logger?.info(`PathUtils: File existence check for ${requestedPath}`, { 
-        requestedPath, 
-        checkTimestamp,
-        appResolvedNorm,
-        appExists,
-        tempResolved,
-        tempResolvedNorm, 
-        tempExists, 
-        normalizedTempRoot, 
-        startsWithTempRoot: tempResolvedNorm.startsWith(normalizedTempRoot),
-        fileStats: fileStats ? { 
-          size: fileStats.size, 
-          isFile: fileStats.isFile(), 
-          mtime: fileStats.mtime.toISOString(),
-          birthtime: fileStats.birthtime.toISOString() 
-        } : null
-      });
-      
-      if (tempResolvedNorm.startsWith(normalizedTempRoot) && tempExists) {
+      if (this.isValidPath(tempResolvedNorm, normalizedTempRoot, tempResolved)) {
         return { success: true, resolvedPath: tempResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'tempRoot' };
-      } else {
-        // Enhanced debugging for failed validation
-        PathUtils.logger?.error('PathUtils: Temp root validation failed', {
-          tempResolvedNorm,
-          normalizedTempRoot,
-          startsWithTempRoot: tempResolvedNorm.startsWith(normalizedTempRoot),
-          tempExists,
-          tempResolvedNormLength: tempResolvedNorm.length,
-          normalizedTempRootLength: normalizedTempRoot.length,
-          tempResolvedNormChars: tempResolvedNorm.split('').slice(0, normalizedTempRoot.length + 5).join(''),
-          normalizedTempRootChars: normalizedTempRoot.split('').join('')
-        });
-      }
-
-      // If file doesn't exist, try direct read attempt to distinguish permission vs existence issues
-      if (tempResolvedNorm.startsWith(normalizedTempRoot)) {
-        try {
-          fs.readFileSync(tempResolved, { encoding: null });
-          PathUtils.logger?.error(`PathUtils: Paradox detected - fs.readFileSync succeeded but fs.existsSync failed for ${tempResolved}`);
-        } catch (readError) {
-          PathUtils.logger?.debug(`PathUtils: Direct read attempt failed for ${tempResolved}: ${readError.code} - ${readError.message}`);
-          if (readError.code === 'ENOENT') {
-            PathUtils.logger?.debug(`PathUtils: Confirmed file does not exist (ENOENT): ${tempResolved}`);
-          } else if (readError.code === 'EACCES') {
-            PathUtils.logger?.warn(`PathUtils: File exists but permission denied (EACCES): ${tempResolved}`);
-          }
-        }
       }
 
       // Nothing found
@@ -393,11 +325,7 @@ class PathUtils {
    * @returns {boolean} True if file exists
    */
   static fileExists(filePath) {
-    try {
-      return fs.existsSync(filePath);
-    } catch (error) {
-      return false;
-    }
+    return fs.existsSync(filePath);
   }
 }
 
