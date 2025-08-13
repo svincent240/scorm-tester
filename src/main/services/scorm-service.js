@@ -15,7 +15,7 @@ const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
 const { ScormSNService } = require('./scorm/sn/index');
 const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
-const ErrorRouter = require('../../shared/utils/error-router');
+const ErrorHandler = require('../../shared/utils/error-handler');
 const {
   SERVICE_DEFAULTS,
   SERVICE_EVENTS
@@ -249,7 +249,7 @@ class ScormService extends BaseService {
       );
       
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('initializeSession', {
+      ErrorHandler.handleError(error, this.buildErrorContext('initializeSession', {
         sessionId,
         scormApiMethod: 'Initialize'
       }));
@@ -303,7 +303,7 @@ class ScormService extends BaseService {
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('getValue', {
+      ErrorHandler.handleError(error, this.buildErrorContext('getValue', {
         sessionId,
         element,
         scormApiMethod: 'GetValue'
@@ -360,7 +360,7 @@ class ScormService extends BaseService {
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('setValue', {
+      ErrorHandler.handleError(error, this.buildErrorContext('setValue', {
         sessionId,
         element,
         value,
@@ -413,7 +413,7 @@ class ScormService extends BaseService {
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('commit', {
+      ErrorHandler.handleError(error, this.buildErrorContext('commit', {
         sessionId,
         scormApiMethod: 'Commit'
       }));
@@ -536,7 +536,7 @@ class ScormService extends BaseService {
       );
       
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('validateCompliance', {
+      ErrorHandler.handleError(error, this.buildErrorContext('validateCompliance', {
         manifestPath,
         scormDataValidation: true
       }));
@@ -569,7 +569,7 @@ class ScormService extends BaseService {
       );
       
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('analyzeContent', {
+      ErrorHandler.handleError(error, this.buildErrorContext('analyzeContent', {
         manifestPath,
         manifestParsing: true
       }));
@@ -614,7 +614,7 @@ class ScormService extends BaseService {
       );
       
       // Route error through ErrorRouter for proper classification
-      ErrorRouter.routeError(error, this.buildErrorContext('processScormManifest', {
+      ErrorHandler.handleError(error, this.buildErrorContext('processScormManifest', {
         folderPath,
         manifestParsing: true
       }));

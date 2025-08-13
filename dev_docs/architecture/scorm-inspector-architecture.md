@@ -336,8 +336,8 @@ const ERROR_CATEGORY = {
 #### **2. Dual-Channel Error Routing**
 
 ```javascript
-class ErrorRouter {
-  static routeError(error, context = {}) {
+class ErrorHandler {
+  static handleError(error, context = {}) {
     const classification = this.classifyError(error, context);
     
     // Always log to app.log for developers
@@ -380,7 +380,7 @@ class ErrorRouter {
 try {
   scormApi.SetValue('cmi.completion_status', 'invalid_value');
 } catch (error) {
-  ErrorRouter.routeError(error, { 
+  ErrorHandler.handleError(error, { 
     source: ERROR_SOURCE.SCORM,
     category: ERROR_CATEGORY.API,
     scormApiMethod: 'SetValue',
@@ -392,7 +392,7 @@ try {
 try {
   parseManifest(xmlContent);
 } catch (error) {
-  ErrorRouter.routeError(error, {
+  ErrorHandler.handleError(error, {
     source: ERROR_SOURCE.SCORM,
     category: ERROR_CATEGORY.CONTENT,
     manifestParsing: true,
@@ -407,7 +407,7 @@ try {
 try {
   fs.readFile(configPath);
 } catch (error) {
-  ErrorRouter.routeError(error, {
+  ErrorHandler.handleError(error, {
     source: ERROR_SOURCE.APP,
     category: ERROR_CATEGORY.SYSTEM,
     fileSystem: true,
@@ -419,7 +419,7 @@ try {
 try {
   component.render();
 } catch (error) {
-  ErrorRouter.routeError(error, {
+  ErrorHandler.handleError(error, {
     source: ERROR_SOURCE.APP,
     category: ERROR_CATEGORY.UI,
     component: component.name
@@ -433,7 +433,7 @@ try {
 try {
   loadScormContent(contentUrl);
 } catch (error) {
-  ErrorRouter.routeError(error, {
+  ErrorHandler.handleError(error, {
     source: ERROR_SOURCE.AMBIGUOUS,
     category: ERROR_CATEGORY.RUNTIME,
     contentLoading: true,
@@ -532,7 +532,7 @@ class ScormApiHandler {
     
     // Add error classification if error occurred
     if (errorCode !== '0') {
-      payload.error = ErrorRouter.classifyScormError(
+      payload.error = ErrorHandler.classifyScormError(
         { code: errorCode, method, params },
         { scormApiMethod: method, scormElement: params[0] }
       );
@@ -549,7 +549,7 @@ class ManifestParser {
       return this.parseXML(xmlContent);
     } catch (error) {
       // Route manifest parsing errors to SCORM Inspector
-      ErrorRouter.routeError(error, {
+      ErrorHandler.handleError(error, {
         source: ERROR_SOURCE.SCORM,
         category: ERROR_CATEGORY.CONTENT,
         manifestParsing: true,
@@ -570,7 +570,7 @@ class ManifestParser {
 // In app-manager.js (UI errors)
 class AppManager {
   handleRenderError(error, componentName) {
-    ErrorRouter.routeError(error, {
+    ErrorHandler.handleError(error, {
       source: ERROR_SOURCE.APP,
       category: ERROR_CATEGORY.UI,
       component: componentName,
@@ -648,7 +648,7 @@ class ScormInspectorErrorsView {
 ```javascript
 // User loads broken SCORM package
 SetValue('cmi.completion_status', 'finished') // Invalid value
-→ ErrorRouter classifies as: { source: 'scorm', category: 'scorm-api' }
+→ ErrorHandler classifies as: { source: 'scorm', category: 'scorm-api' }
 → Shows in SCORM Inspector with troubleshooting steps
 → Also logged to app.log for development analysis
 ```
@@ -657,7 +657,7 @@ SetValue('cmi.completion_status', 'finished') // Invalid value
 ```javascript  
 // App fails to read configuration
 fs.readFile('/invalid/path/config.json')
-→ ErrorRouter classifies as: { source: 'app', category: 'system' }
+→ ErrorHandler classifies as: { source: 'app', category: 'system' }
 → Shows app error notification to user
 → Logged to app.log with full stack trace
 → NOT shown in SCORM Inspector
@@ -667,7 +667,7 @@ fs.readFile('/invalid/path/config.json')
 ```javascript
 // Content fails to load - could be network, app bug, or bad content URL
 fetch('http://invalid-scorm-content.com/course.html')
-→ ErrorRouter classifies as: { source: 'ambiguous', category: 'runtime' }
+→ ErrorHandler classifies as: { source: 'ambiguous', category: 'runtime' }
 → Shows in BOTH SCORM Inspector AND app notifications
 → Provides investigation guidance to user
 → Full technical details in app.log

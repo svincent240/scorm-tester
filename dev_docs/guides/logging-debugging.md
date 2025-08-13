@@ -27,6 +27,7 @@ The application utilizes a singleton `Logger` utility to centralize all logging 
 - The file is located at [`logger.js`](../../src/shared/utils/logger.js).
 - The renderer adapter constructs the shared logger and avoids console usage.
 - In development, the shared logger may still log to the console internally; production behavior writes to the file.
+- **Debug level filtering**: Logger now respects `LOG_LEVEL` environment variable - debug messages only logged when `LOG_LEVEL=debug`.
 
 ## Event Bus Logging (App UI Only)
 
@@ -60,6 +61,49 @@ To prevent log spam and IPC overload, the application enforces coordinated rate 
 
 This policy ensures only one informative line per engaged channel per session while maintaining functional correctness.
 
+## Error Handling System
+
+The application uses a centralized error handling system that separates classification from routing for maintainability:
+
+### Error Handler Architecture
+- [`error-handler.js`](../../src/shared/utils/error-handler.js) - Main error routing logic with loose UI coupling
+- [`error-classifier.js`](../../src/shared/utils/error-classifier.js) - Error classification and utilities
+- [`error-context.js`](../../src/shared/types/error-context.js) - Standardized context structure
+
+### Error Flow
+```
+Error → ErrorHandler.handleError() → ErrorClassifier.classifyError() → Event emission → UI handles
+```
+
+### Error Types and Routing
+- **SCORM errors**: Routed to SCORM Inspector via `scorm:error` events
+- **App errors**: Routed to UI notifications via `app:error` events  
+- **Ambiguous errors**: Sent to both systems for investigation
+
+### Using Error Handling
+```js
+const ErrorHandler = require('../../shared/utils/error-handler');
+const { ErrorContexts } = require('../../shared/types/error-context');
+
+// For SCORM API errors
+const context = ErrorContexts.scormApi('GetValue', 'cmi.core.student_name', sessionId);
+ErrorHandler.handleError(error, context);
+
+// For manifest parsing errors
+const context = ErrorContexts.manifestParsing(packagePath, manifestId);
+ErrorHandler.handleError(error, context);
+```
+
+### ParserError Integration
+```js
+const parserError = new ParserError({
+  code: 'PARSE_VALIDATION_ERROR',
+  message: 'Invalid manifest structure'
+});
+// Use new handle() method instead of deprecated log()
+parserError.handle(context, handlers);
+```
+
 ## Error, Initialization, and Shutdown Handling
 
 Inline HTML error injections in the renderer entry were replaced with centralized logging and UIState notifications.
@@ -71,7 +115,7 @@ Inline HTML error injections in the renderer entry were replaced with centralize
   - `eventBus.emit('app:error', { error })`
 
 - Graceful shutdown:
-  - [`ipc-handler.js`](../../src/main/services/ipc-handler.js) attempts to terminate SCORM sessions first (best-effort, soft-ok) before unregistering IPC handlers and closing windows. Benign “already terminated” or late-shutdown cases must not escalate to ERROR logs.
+  - [`ipc-handler.js`](../../src/main/services/ipc-handler.js) attempts to terminate SCORM sessions first (best-effort, soft-ok) before unregistering IPC handlers and closing windows. Benign "already terminated" or late-shutdown cases must not escalate to ERROR logs.
 
 ## Best Practices for Logging
 

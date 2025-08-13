@@ -223,7 +223,7 @@ class PackageAnalyzer {
       this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: manifest is null/undefined:', manifest == null);
 
       if (!manifest) {
-        console.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');
+        this.contentValidator.logger?.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');
         return {
           hasRequiredElements: false,
           validScormTypes: false,
@@ -259,7 +259,7 @@ class PackageAnalyzer {
       this.contentValidator.logger?.debug && this.contentValidator.logger.debug('PackageAnalyzer: Synchronous compliance check completed:', result);
       return result;
     } catch (error) {
-      console.error('PackageAnalyzer: Synchronous compliance check failed:', error);
+      this.contentValidator.logger?.error('PackageAnalyzer: Synchronous compliance check failed:', error);
       this.errorHandler?.setError('301', `Synchronous compliance check failed: ${error.message}`, 'checkComplianceSync');
       return {
         hasRequiredElements: false,

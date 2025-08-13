@@ -401,7 +401,7 @@ logScormApiCall(method, params, result, errorCode, sessionId) {
 
 ### 1.3 ✅ COMPLETED: Error Classification System
 
-#### ✅ COMPLETED: New File: `src/shared/utils/error-router.js`
+#### ✅ COMPLETED: New File: `src/shared/utils/error-handler.js`
 
 **Key Features Implemented**:
 - ✅ **Error Source Classification**: APP, SCORM, AMBIGUOUS
@@ -440,7 +440,7 @@ const ERROR_CATEGORY = {
   INTEGRATION: 'integration' // App-content integration issues
 };
 
-class ErrorRouter {
+class ErrorHandler {
   /**
    * Route error to appropriate system based on classification
    * @param {Error} error - The error object
@@ -534,7 +534,7 @@ class ErrorRouter {
     };
     
     // Always log to app debugging system
-    logger.error('[ErrorRouter] Error classified and logged', logData);
+    logger.error('[ErrorHandler] Error classified and logged', logData);
   }
   
   /**
@@ -687,10 +687,10 @@ class ErrorRouter {
 }
 
 // Export constants for use in other modules
-ErrorRouter.ERROR_SOURCE = ERROR_SOURCE;
-ErrorRouter.ERROR_CATEGORY = ERROR_CATEGORY;
+ErrorHandler.ERROR_SOURCE = ERROR_SOURCE;
+ErrorHandler.ERROR_CATEGORY = ERROR_CATEGORY;
 
-module.exports = ErrorRouter;
+module.exports = ErrorHandler;
 ```
 
 ## Phase 2: UI Component Implementation
@@ -1687,7 +1687,7 @@ async handleOpenScormInspectorWindow(event) {
 ```javascript
 // Import new services
 const ScormInspectorTelemetryStore = require('./services/scorm-inspector/scorm-inspector-telemetry-store');
-const ErrorRouter = require('../shared/utils/error-router');
+const ErrorHandler = require('../shared/utils/error-handler');
 
 // In service initialization section:
 async function initializeServices() {
@@ -2187,7 +2187,7 @@ class ScormInspectorTelemetryStore {
 ### Week 1: Core Architecture - ✅ **COMPLETED**
 - [x] Day 1-2: ✅ **COMPLETED** - Enhanced ScormInspectorTelemetryStore (renamed and improved existing store)
 - [x] Day 3: ✅ **COMPLETED** - Updated api-handler integration  
-- [x] Day 4: ✅ **COMPLETED** - Created ErrorRouter with comprehensive classification system
+- [x] Day 4: ✅ **COMPLETED** - Created ErrorHandler with comprehensive classification system
 - [x] Day 5: ✅ **COMPLETED** - Updated service initialization and dependency wiring
 
 **Progress Update**: **4/4 core architecture tasks completed**. Foundation fully implemented with proper SCORM Inspector store and error routing.

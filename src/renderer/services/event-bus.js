@@ -106,13 +106,13 @@ class EventBus {
         if (p.test(event)) {
           // Log synchronously to console/renderer logger and throw to prevent accidental usage.
           try {
-            import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+            import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ default: rendererLogger }) => {
               rendererLogger?.error(`EventBus: Forbidden event '${event}'. SCORM/debug/telemetry data must use direct IPC channels, not EventBus.`);
             }).catch(() => {
-              console.error(`EventBus: Forbidden event '${event}'.`);
+              // Fallback only - should not reach here in normal operation
             });
           } catch (_) {
-            console.error(`EventBus: Forbidden event '${event}'.`);
+            // Silent fallback - renderer logger should handle all cases
           }
           throw new Error(`EventBus: Forbidden event '${event}'. SCORM/debug/telemetry data must use direct IPC channels, not EventBus.`);
         }

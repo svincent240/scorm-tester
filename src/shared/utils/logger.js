@@ -112,8 +112,17 @@ class Logger {
     }
 
     debug(message, ...args) {
-        // Temporarily force debug logs for troubleshooting
-        this.log('debug', message, ...args);
+        // Only log debug messages if log level allows it
+        if (this.shouldLog('debug')) {
+            this.log('debug', message, ...args);
+        }
+    }
+    
+    shouldLog(level) {
+        const levels = { debug: 0, info: 1, warn: 2, error: 3 };
+        const currentLevel = levels[this.logLevel] || levels.info;
+        const messageLevel = levels[level] || levels.info;
+        return messageLevel >= currentLevel;
     }
 }
 

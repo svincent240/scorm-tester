@@ -17,7 +17,6 @@
  */
 
 const path = require('path');
-const logger = require('../utils/logger');
 
 const ParserErrorCode = Object.freeze({
   PARSE_VALIDATION_ERROR: 'PARSE_VALIDATION_ERROR',
@@ -38,7 +37,7 @@ class ParserError extends Error {
    * @param {{ orgCount?: number, topCount?: number }} [args.stats] - Quick snapshot metrics
    * @param {string} [args.packagePath] - Absolute or workspace-relative path to package
    * @param {"error"|"warn"|"info"|"debug"} [args.severity="error"]
-   * @param {boolean} [args.autoLog=true] - Whether to auto-log on construction
+   * @param {boolean} [args.autoLog=false] - Whether to auto-log on construction (deprecated - use ErrorRouter)
    */
   constructor({
     code,
@@ -50,7 +49,7 @@ class ParserError extends Error {
     stats,
     packagePath,
     severity = 'error',
-    autoLog = true
+    autoLog = false
   }) {
     super(message);
     this.name = 'ParserError';
@@ -69,7 +68,8 @@ class ParserError extends Error {
     }
 
     if (autoLog) {
-      this.log();
+      // Use the new handle() method instead of deprecated log()
+      this.handle();
     }
   }
 
@@ -87,31 +87,58 @@ class ParserError extends Error {
     };
   }
 
+  /**
+   * Handle error through ErrorHandler system
+   * @param {Object} context - Additional context for error routing
+   * @param {Object} handlers - Optional custom handlers
+   */
+  handle(context = {}, handlers = {}) {
+    const ErrorHandler = require('../utils/error-handler');
+    
+    // Merge ParserError data into context
+    const enrichedContext = {
+      ...context,
+      manifestParsing: true,
+      phase: this.phase,
+      manifestId: this.manifestId,
+      defaultOrgId: this.defaultOrgId,
+      stats: this.stats,
+      packagePath: this.packagePath,
+      severity: this.severity
+    };
+    
+    ErrorHandler.handleError(this, enrichedContext, handlers);
+  }
+  
+  /**
+   * @deprecated Use handle() method instead for proper routing
+   * Legacy method for direct logging - only use when ErrorHandler unavailable
+   */
   log() {
+    // This method is deprecated - errors should go through ErrorHandler
+    // Kept for backward compatibility only
+    const getLogger = require('../utils/logger');
+    const logger = getLogger();
     const payload = this.toJSON();
+    
     try {
       switch (this.severity) {
         case 'debug':
-          logger.debug('ParserError', payload);
+          logger.debug('ParserError (legacy)', payload);
           break;
         case 'info':
-          logger.info('ParserError', payload);
+          logger.info('ParserError (legacy)', payload);
           break;
         case 'warn':
-          logger.warn('ParserError', payload);
+          logger.warn('ParserError (legacy)', payload);
           break;
         case 'error':
         default:
-          logger.error('ParserError', payload);
+          logger.error('ParserError (legacy)', payload);
           break;
       }
     } catch {
-      // As a last resort, attempt to avoid complete silence if logger fails
-      try {
-        // The project rules require writing to app log, not console;
-        // we still avoid console usage here.
-        // If the logger utility throws, we do nothing further.
-      } catch (_) {}
+      // Silently fail to avoid infinite error loops
     }
   }
 }
