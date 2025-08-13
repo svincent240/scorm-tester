@@ -15,7 +15,16 @@ Test Framework and Runners
 - Global setup: [tests/setup.js](../../tests/setup.js:1)
 - Configuration: [package.json](../../package.json:1) jest section
 - Parallelism: Use Jest projects to shard by test layer to reduce wall time
-- Electron rendering: Avoid headful E2E; renderer “integration” targets state/intent wiring and logging guarantees via Node/JSDOM-compatible harnesses
+- Electron rendering: Avoid headful E2E; renderer "integration" targets state/intent wiring and logging guarantees via Node/JSDOM-compatible harnesses
+
+## Architecture Boundaries and Public Entry Points
+Tests must import only through public module entry points to avoid test-only coupling:
+
+- CAM: [src/main/services/scorm/cam/index.js](../../src/main/services/scorm/cam/index.js:1)
+- RTE: [src/main/services/scorm/rte/api-handler.js](../../src/main/services/scorm/rte/api-handler.js:1)
+- SN:  [src/main/services/scorm/sn/index.js](../../src/main/services/scorm/sn/index.js:1)
+- Shared: [src/shared/constants/*](../../src/shared/constants/error-codes.js:1), [src/shared/utils/*](../../src/shared/utils/logger.js:1)
+- Renderer services: [src/renderer/services/*](../../src/renderer/services/app-manager.js:1) (import only via service entry files)
 
 Layered Test Model
 Tests are organized into layers, each with clear responsibilities and boundaries. Import only through public module entry points to avoid test-only coupling.

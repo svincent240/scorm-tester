@@ -23,12 +23,13 @@ This documentation is designed to provide comprehensive context for AI-driven de
 
 ### Core Architecture
 - [`architecture/overview.md`](architecture/overview.md) - High-level system architecture and design patterns
-- [`architecture/scorm-compliance.md`](architecture/scorm-compliance.md) - SCORM 2004 4th Edition implementation details (updated with strict CAM parsing, namespace-first selection, and ParserError modeling)
+- [`architecture/scorm-compliance.md`](architecture/scorm-compliance.md) - SCORM 2004 4th Edition implementation details
+- [`architecture/scorm-inspector-architecture.md`](architecture/scorm-inspector-architecture.md) - SCORM Inspector implementation details
 
 ### Module Documentation
 - [`modules/scorm-engine.md`](modules/scorm-engine.md) - Complete SCORM implementation (RTE, CAM, SN)
-- [`modules/cam-module.md`](modules/cam-module.md) - Content Aggregation Model implementation (updated for strict parser behavior, error codes, and logging contract)
-- [`modules/sn-module.md`](modules/sn-module.md) - Sequencing and Navigation engine
+- [`modules/scorm-engine.testing-contracts.md`](modules/scorm-engine.testing-contracts.md) - Testing contracts for SCORM modules
+- [`modules/unified-file-handling.md`](modules/unified-file-handling.md) - File handling patterns across modules
 
 ### API Reference
 - [`api/scorm-api.md`](api/scorm-api.md) - SCORM API implementation reference and usage
@@ -57,30 +58,10 @@ This documentation is designed to provide comprehensive context for AI-driven de
   - **Single-Pass Initialization**: The main process entrypoint (`src/main/main.js`) now initializes services once with clean dependency injection, eliminating re-initialization and implicit dependencies.
   - **Consistent Error Handling**: A standardized error envelope with SCORM-specific codes and references ensures clear, actionable messages for all course-related issues.
 
-### 📊 System Overview
-```mermaid
-flowchart LR
-  Renderer -- IPC Calls --> IpcHandler
-  IpcHandler -- Routes/Wrapper --> MainServices
-  MainServices -- File Ops --> FileManager
-  MainServices -- RTE API --> RTE
-  MainServices -- CAM Parse/Validate --> CAM
-  MainServices -- SN Nav --> SN
-  RTE -- SCORM API Calls --> ScormInspectorStore
-  WindowManager -- Manages --> Main/Inspector Windows
-  ScormInspectorStore -- Broadcasts To --> ScormInspectorWindow
-```
-- **Modular Design**: Emphasizes logical cohesion and clear separation of concerns. Refer to [`style.md`](style.md) for file size guidelines.
-- **Event-Driven**: Component communication through centralized event bus (UI components only; SCORM inspection uses direct IPC)
-- **Service-Oriented**: Clear separation of concerns with dependency injection
-- **Type-Safe**: Complete TypeScript definitions for development support
-- **Performance Optimized**: Exceeds all performance targets by 200-600x
-
 ### 📊 Quality Metrics
 - **Test Coverage**: 37/37 tests passing (100% success rate)
 - **SCORM Compliance**: 100% compliance with SCORM 2004 4th Edition
 - **Performance**: Sub-millisecond API response times
-- **Memory Management**: Optimized with proper cleanup and leak prevention
 - **Code Quality**: Comprehensive error handling and logging
 
 ### 🚀 Production Status
@@ -124,10 +105,8 @@ The SCORM Tester is now in production-ready state with all major architectural c
 
 This documentation is maintained as part of the application codebase and should be updated whenever architectural changes are made. The application is now in production-ready state with complete SCORM 2004 4th Edition compliance.
 
-### Implementation Archives
-Completed implementation plans are preserved for historical reference:
-- [`navigation-controls-enhancement-plan.md`](navigation-controls-enhancement-plan.md) - Navigation enhancement implementation (archived)
-- [`scorm-inspector-implementation-plan.md`](scorm-inspector-implementation-plan.md) - SCORM Inspector implementation (archived)
+### Historical Reference
+- Past implementation plans have been archived to maintain clean documentation
 
 ### Development Status
 - ✅ **Complete Implementation**: All SCORM 2004 4th Edition features implemented

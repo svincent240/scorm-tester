@@ -103,41 +103,7 @@ interface Item {
 
 ### ContentValidator (`src/main/services/scorm/cam/content-validator.js`)
 
-**Purpose**: Validate SCORM packages for compliance and integrity
-
-#### Key Responsibilities
-- Package structure validation
-- File integrity checking
-- SCORM application profile compliance
-- Metadata validation
-- Sequencing rule validation
-
-#### API Interface
-```javascript
-class ContentValidator {
-  /**
-   * Validate complete SCORM package
-   * @param {string} packagePath - Path to extracted package
-   * @returns {Promise<ValidationReport>} Comprehensive validation report
-   */
-  async validatePackage(packagePath)
-  
-  /**
-   * Validate manifest structure and content
-   * @param {ScormManifest} manifest - Parsed manifest
-   * @returns {ValidationResult[]} Array of validation results
-   */
-  validateManifest(manifest)
-  
-  /**
-   * Check file integrity and references
-   * @param {Resource[]} resources - Resource definitions
-   * @param {string} packagePath - Package directory path
-   * @returns {IntegrityResult} File integrity results
-   */
-  validateResources(resources, packagePath)
-}
-```
+**Purpose**: Validate SCORM packages for compliance and integrity with comprehensive validation including file existence verification, resource dependency validation, SCORM type validation, manifest structure validation, and detailed compliance reporting.
 
 ## Run-Time Environment (RTE)
 
@@ -273,82 +239,15 @@ const SESSION_STATES = {
 
 ### ActivityTree (`src/main/services/scorm/sn/activity-tree.js`)
 
-**Purpose**: Manage the runtime activity tree structure
+**Purpose**: Manage the runtime activity tree structure with activity tree construction, state tracking, parent-child relationships, and global objective mapping.
 
-#### Key Responsibilities
-- Activity tree construction from organization
-- Activity state tracking
-- Parent-child relationship management
-- Global objective mapping
+### SequencingEngine (`src/main/services/scorm/sn/sequencing-engine.js`)  
 
-#### API Interface
-```javascript
-class ActivityTree {
-  /**
-   * Build activity tree from organization
-   * @param {Organization} organization - Course organization
-   * @returns {Activity} Root activity
-   */
-  buildTree(organization)
-  
-  /**
-   * Find activity by identifier
-   * @param {string} identifier - Activity identifier
-   * @returns {Activity|null} Found activity or null
-   */
-  findActivity(identifier)
-  
-  /**
-   * Update activity tracking status
-   * @param {string} activityId - Activity identifier
-   * @param {ActivityStatus} status - New status
-   */
-  updateActivityStatus(activityId, status)
-  
-  /**
-   * Get available activities for navigation
-   * @returns {Activity[]} Array of available activities
-   */
-  getAvailableActivities()
-}
-```
+**Purpose**: Process sequencing rules and navigation requests with comprehensive rule evaluation, limit condition checking, and rollup processing coordination.
 
-### SequencingEngine (`src/main/services/scorm/sn/sequencing-engine.js`)
+### SnapshotService (`src/main/services/scorm/sn/snapshot-service.js`)
 
-**Purpose**: Process sequencing rules and navigation requests
-
-#### Key Responsibilities
-- Navigation request processing
-- Sequencing rule evaluation
-- Limit condition checking
-- Rollup processing coordination
-
-#### API Interface
-```javascript
-class SequencingEngine {
-  /**
-   * Process navigation request
-   * @param {NavigationRequest} request - Navigation request
-   * @returns {SequencingResult} Processing result
-   */
-  processNavigationRequest(request)
-  
-  /**
-   * Evaluate sequencing rules for activity
-   * @param {Activity} activity - Target activity
-   * @param {RuleType} ruleType - Type of rules to evaluate
-   * @returns {RuleResult[]} Rule evaluation results
-   */
-  evaluateSequencingRules(activity, ruleType)
-  
-  /**
-   * Check limit conditions for activity
-   * @param {Activity} activity - Activity to check
-   * @returns {boolean} True if limits allow access
-   */
-  checkLimitConditions(activity)
-}
-```
+**Purpose**: Manage sequencing and navigation state snapshots for session persistence and recovery.
 
 ## Integration Patterns
 
