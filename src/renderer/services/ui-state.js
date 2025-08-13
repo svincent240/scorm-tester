@@ -297,7 +297,7 @@ class UIStateManager {
 
     this.setState({ apiCallHistory: history });
     // Emit normalized payload to EventBus for subscribers
-    this.eventBus?.emit('api:call', { data: normalized });
+    this.eventBus?.emit('ui:api:call', { data: normalized });
   }
 
   /**

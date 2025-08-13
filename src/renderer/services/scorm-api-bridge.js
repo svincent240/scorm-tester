@@ -18,6 +18,15 @@ class ScormAPIBridge {
     // Lazy activation flag — message handler is installed only when enable() is called.
     this.isEnabled = false;
     this._boundMessageHandler = null;
+    this._scormClient = null;
+  }
+
+  /**
+   * Set the SCORM client reference for synchronous API calls
+   * @param {Object} scormClient - The SCORM client instance
+   */
+  setScormClient(scormClient) {
+    this._scormClient = scormClient;
   }
 
   /**
@@ -97,57 +106,69 @@ class ScormAPIBridge {
   }
 
   /**
-   * Execute SCORM method and return result
+   * Execute SCORM method and return result synchronously
    */
-  async executeScormMethod(method, params) {
-    const { scormClient } = await import('./scorm-client.js');
-    
-    // Debug log to see what method is being called
-    console.log('[ScormAPIBridge] Executing method:', method, 'with params:', params);
-    
-    let result;
-    switch (method) {
-      case 'Initialize':
-      case 'LMSInitialize':
-        // Generate session ID if not already set
-        if (!this.sessionId) {
-          this.sessionId = 'session_' + Date.now();
-        }
-        result = scormClient.Initialize(this.sessionId);
-        break;
-      case 'Terminate':
-      case 'LMSFinish':
-        result = scormClient.Terminate(params[0] || '');
-        break;
-      case 'GetValue':
-      case 'LMSGetValue':
-        result = scormClient.GetValue(params[0]);
-        break;
-      case 'SetValue':
-      case 'LMSSetValue':
-        result = scormClient.SetValue(params[0], params[1]);
-        break;
-      case 'Commit':
-      case 'LMSCommit':
-        result = scormClient.Commit(params[0] || '');
-        break;
-      case 'GetLastError':
-      case 'LMSGetLastError':
-        result = scormClient.GetLastError();
-        break;
-      case 'GetErrorString':
-      case 'LMSGetErrorString':
-        result = scormClient.GetErrorString(params[0]);
-        break;
-      case 'GetDiagnostic':
-      case 'LMSGetDiagnostic':
-        result = scormClient.GetDiagnostic(params[0]);
-        break;
-      default:
-        result = 'false'; // Return 'false' for unknown methods, not '0'
+  executeScormMethod(method, params) {
+    // Import synchronously using cached module reference
+    let scormClient;
+    try {
+      // Use the imported scormClient from module scope
+      scormClient = this._scormClient;
+      if (!scormClient) {
+        // Fallback: return error code if client not available
+        return '101'; // General error code
+      }
+    } catch (e) {
+      return '101';
     }
     
-    console.log('[ScormAPIBridge] Method result:', method, '->', result);
+    let result;
+    try {
+      switch (method) {
+        case 'Initialize':
+        case 'LMSInitialize':
+          // Generate session ID if not already set
+          if (!this.sessionId) {
+            this.sessionId = 'session_' + Date.now();
+          }
+          result = scormClient.Initialize(this.sessionId);
+          break;
+        case 'Terminate':
+        case 'LMSFinish':
+          result = scormClient.Terminate(params[0] || '');
+          break;
+        case 'GetValue':
+        case 'LMSGetValue':
+          result = scormClient.GetValue(params[0]);
+          break;
+        case 'SetValue':
+        case 'LMSSetValue':
+          result = scormClient.SetValue(params[0], params[1]);
+          break;
+        case 'Commit':
+        case 'LMSCommit':
+          result = scormClient.Commit(params[0] || '');
+          break;
+        case 'GetLastError':
+        case 'LMSGetLastError':
+          result = scormClient.GetLastError();
+          break;
+        case 'GetErrorString':
+        case 'LMSGetErrorString':
+          result = scormClient.GetErrorString(params[0]);
+          break;
+        case 'GetDiagnostic':
+        case 'LMSGetDiagnostic':
+          result = scormClient.GetDiagnostic(params[0]);
+          break;
+        default:
+          result = 'false'; // Return 'false' for unknown methods, not '0'
+      }
+    } catch (error) {
+      // If any SCORM method throws, return error code instead of crashing
+      result = '101';
+    }
+    
     return result;
   }
 }

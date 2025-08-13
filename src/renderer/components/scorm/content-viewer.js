@@ -197,7 +197,7 @@ class ContentViewer extends BaseComponent {
    * @param {string} url - Content URL
    * @param {Object} options - Loading options
    */
-  async loadContent(url, options = {}) {
+  loadContent(url, options = {}) {
     if (!url) {
       this.showError('Invalid content URL', 'A valid content URL must be provided.');
       return;
@@ -250,6 +250,10 @@ class ContentViewer extends BaseComponent {
       this.loadingTimeout = setTimeout(() => {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
+      
+      // PRE-INJECT APIs into parent window contexts BEFORE loading iframe
+      // This ensures APIs are already present when SCORM content starts searching
+      this.preInjectAPIs();
       
       // Load content directly in iframe (no host frameset)
       if (this.iframe) {
@@ -309,44 +313,12 @@ class ContentViewer extends BaseComponent {
       this.setupScormAPI();
       const apiSetupCompleteTime = Date.now();
       
-      // Add Rustici detection monitoring after API setup
-      const monitoringSetupStartTime = Date.now();
-      this.setupRusticiDetectionMonitoring();
-      const monitoringSetupCompleteTime = Date.now();
+      // Simplified API verification - no complex monitoring needed
       
-      // Log timing relationship between iframe load and API injection
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] API injection timing relative to iframe load', {
-            url: this.currentUrl,
-            timingSequence: {
-              iframeLoadToApiStart: apiSetupStartTime - iframeLoadTime,
-              apiSetupDuration: apiSetupCompleteTime - apiSetupStartTime,
-              monitoringSetupDuration: monitoringSetupCompleteTime - monitoringSetupStartTime,
-              totalPostLoadDuration: monitoringSetupCompleteTime - iframeLoadTime
-            },
-            documentState: {
-              readyState: this.contentWindow?.document?.readyState || 'unknown',
-              hasBody: !!(this.contentWindow?.document?.body),
-              hasHead: !!(this.contentWindow?.document?.head)
-            }
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
+      // Verify API presence after a brief delay to ensure injection is complete
       setTimeout(() => { 
-        const verificationStartTime = Date.now();
         this.verifyScormApiPresence();
-        
-        try {
-          import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.info('[ContentViewer] API verification timing', {
-              verificationDelayFromLoad: verificationStartTime - iframeLoadTime,
-              verificationDelayFromApiSetup: verificationStartTime - apiSetupCompleteTime
-            });
-          }).catch(() => {});
-        } catch (_) {}
-      }, 0);
+      }, 100);
       
       // Apply scaling after content loads
       setTimeout(() => {
@@ -379,805 +351,142 @@ class ContentViewer extends BaseComponent {
     this.emit('contentLoadError', { url: this.currentUrl });
   }
 
-  /**
-   * Inject API script directly into content document head for immediate availability
-   */
-  injectAPIScript() {
-    if (!this.contentWindow || !this.contentWindow.document) return;
-    
-    try {
-      const doc = this.contentWindow.document;
-      const script = doc.createElement('script');
-      
-      // Create the API objects as a script that executes immediately
-      script.textContent = `
-        (function() {
-          // Create API proxy functions that communicate via postMessage
-          function createAPIMethod(method) {
-            return function() {
-              const args = Array.from(arguments);
-              const callId = 'call_' + Date.now() + '_' + Math.random();
-              let result = '0';
-              let responseReceived = false;
-              
-              const listener = function(event) {
-                if (event.data && event.data.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
-                  window.removeEventListener('message', listener);
-                  responseReceived = true;
-                  result = event.data.result || '0';
-                }
-              };
-              window.addEventListener('message', listener);
-              
-              try {
-                window.parent.postMessage({
-                  type: 'SCORM_API_CALL',
-                  method: method,
-                  params: args,
-                  callId: callId
-                }, '*');
-              } catch (e) {
-                window.removeEventListener('message', listener);
-                return '0';
-              }
-              
-              // Synchronous wait
-              const startTime = Date.now();
-              while (!responseReceived && (Date.now() - startTime) < 5000) {
-                const now = Date.now();
-                while (Date.now() - now < 1) {}
-              }
-              
-              if (!responseReceived) {
-                window.removeEventListener('message', listener);
-              }
-              
-              return result;
-            };
-          }
-          
-          // SCORM 1.2 API
-          window.API = {
-            LMSInitialize: createAPIMethod('Initialize'),
-            LMSFinish: createAPIMethod('Terminate'),
-            LMSGetValue: createAPIMethod('GetValue'),
-            LMSSetValue: createAPIMethod('SetValue'),
-            LMSCommit: createAPIMethod('Commit'),
-            LMSGetLastError: createAPIMethod('GetLastError'),
-            LMSGetErrorString: createAPIMethod('GetErrorString'),
-            LMSGetDiagnostic: createAPIMethod('GetDiagnostic')
-          };
-          
-          // SCORM 2004 API
-          window.API_1484_11 = {
-            Initialize: createAPIMethod('Initialize'),
-            Terminate: createAPIMethod('Terminate'),
-            GetValue: createAPIMethod('GetValue'),
-            SetValue: createAPIMethod('SetValue'),
-            Commit: createAPIMethod('Commit'),
-            GetLastError: createAPIMethod('GetLastError'),
-            GetErrorString: createAPIMethod('GetErrorString'),
-            GetDiagnostic: createAPIMethod('GetDiagnostic')
-          };
-          
-          // Add compatibility methods to SCORM 1.2 API
-          window.API.Initialize = window.API.LMSInitialize;
-          window.API.Terminate = window.API.LMSFinish;
-          window.API.GetValue = window.API.LMSGetValue;
-          window.API.SetValue = window.API.LMSSetValue;
-          window.API.Commit = window.API.LMSCommit;
-          window.API.GetLastError = window.API.LMSGetLastError;
-          window.API.GetErrorString = window.API.LMSGetErrorString;
-          window.API.GetDiagnostic = window.API.LMSGetDiagnostic;
-        })();
-      `;
-      
-      // Insert at the beginning of head to ensure early availability
-      if (doc.head) {
-        doc.head.insertBefore(script, doc.head.firstChild);
-      } else {
-        // If no head yet, add to document
-        doc.appendChild(script);
-      }
-      
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] API script injected into document head', {
-            url: this.currentUrl,
-            hasAPI: !!(this.contentWindow.API),
-            hasAPI_1484_11: !!(this.contentWindow.API_1484_11),
-            windowLocation: this.contentWindow.location.href,
-            documentState: this.contentWindow.document.readyState
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
-    } catch (error) {
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('[ContentViewer] Failed to inject API script', error?.message || String(error));
-        }).catch(() => {});
-      } catch (_) {}
-    }
-  }
+
+
+
 
   /**
-   * Inject APIs into the main renderer window for Rustici Software algorithm
+   * Pre-inject APIs into parent window contexts BEFORE iframe loads
+   * This ensures APIs are present when Rustici algorithm searches
    */
-  injectAPIIntoRendererWindow() {
-    // Create API methods that communicate directly with the SCORM bridge
-    const createRendererAPIMethod = (method) => {
-      return (...args) => {
-        const callId = 'renderer_' + Date.now() + '_' + Math.random();
-        let result = '0';
-        let responseReceived = false;
-        
-        const listener = (event) => {
-          if (event.data?.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
-            window.removeEventListener('message', listener);
-            responseReceived = true;
-            result = event.data.result || '0';
-          }
-        };
-        window.addEventListener('message', listener);
-        
-        // Send to the bridge (which is listening on this same window)
-        try {
-          window.postMessage({
-            type: 'SCORM_API_CALL',
-            method,
-            params: args,
-            callId
-          }, '*');
-        } catch (e) {
-          window.removeEventListener('message', listener);
-          return '0';
-        }
-        
-        // Synchronous wait for response
-        const startTime = Date.now();
-        while (!responseReceived && (Date.now() - startTime) < 5000) {
-          const now = Date.now();
-          while (Date.now() - now < 1) {}
-        }
-        
-        if (!responseReceived) {
-          window.removeEventListener('message', listener);
-        }
-        
-        return result;
-      };
-    };
-    
-    // Create API objects with proper structure for Rustici detection
-    const mainAPI12 = {
-      LMSInitialize: createRendererAPIMethod('Initialize'),
-      LMSFinish: createRendererAPIMethod('Terminate'),
-      LMSGetValue: createRendererAPIMethod('GetValue'),
-      LMSSetValue: createRendererAPIMethod('SetValue'),
-      LMSCommit: createRendererAPIMethod('Commit'),
-      LMSGetLastError: createRendererAPIMethod('GetLastError'),
-      LMSGetErrorString: createRendererAPIMethod('GetErrorString'),
-      LMSGetDiagnostic: createRendererAPIMethod('GetDiagnostic'),
-      // Add direct methods for compatibility
-      Initialize: createRendererAPIMethod('Initialize'),
-      Terminate: createRendererAPIMethod('Terminate'),
-      GetValue: createRendererAPIMethod('GetValue'),
-      SetValue: createRendererAPIMethod('SetValue'),
-      Commit: createRendererAPIMethod('Commit'),
-      GetLastError: createRendererAPIMethod('GetLastError'),
-      GetErrorString: createRendererAPIMethod('GetErrorString'),
-      GetDiagnostic: createRendererAPIMethod('GetDiagnostic')
-    };
-    
-    const mainAPI2004 = {
-      Initialize: createRendererAPIMethod('Initialize'),
-      Terminate: createRendererAPIMethod('Terminate'),
-      GetValue: createRendererAPIMethod('GetValue'),
-      SetValue: createRendererAPIMethod('SetValue'),
-      Commit: createRendererAPIMethod('Commit'),
-      GetLastError: createRendererAPIMethod('GetLastError'),
-      GetErrorString: createRendererAPIMethod('GetErrorString'),
-      GetDiagnostic: createRendererAPIMethod('GetDiagnostic')
-    };
-    
-    // Inject SCORM APIs into main renderer window with property descriptors
-    window.API = mainAPI12;
-    window.API_1484_11 = mainAPI2004;
-    
-    // Ensure they're properly defined as enumerable properties
+  preInjectAPIs() {
     try {
-      Object.defineProperty(window, 'API', {
-        value: mainAPI12,
-        writable: true,
-        enumerable: true,
-        configurable: true
-      });
-      Object.defineProperty(window, 'API_1484_11', {
-        value: mainAPI2004,
-        writable: true,
-        enumerable: true,
-        configurable: true
-      });
-    } catch (e) {
-      // Property descriptors might fail in some contexts
-    }
-    
-    try {
-      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.info('[ContentViewer] APIs injected into main renderer window', {
-          hasAPI: !!(window.API),
-          hasAPI_1484_11: !!(window.API_1484_11)
-        });
-      }).catch(() => {});
-    } catch (_) {}
-  }
-
-  /**
-   * Inject API script into a specific window (for child frames)
-   */
-  injectAPIScriptIntoWindow(targetWindow) {
-    if (!targetWindow || !targetWindow.document) return;
-    
-    try {
-      const doc = targetWindow.document;
-      const script = doc.createElement('script');
+      // Set the SCORM client for synchronous bridge calls (already imported)
+      scormAPIBridge.setScormClient(scormClient);
       
-      // Use the same API creation script as injectAPIScript
-      script.textContent = `
-        (function() {
-          // Create API proxy functions that communicate via postMessage
-          function createAPIMethod(method) {
-            return function() {
-              const args = Array.from(arguments);
-              const callId = 'call_' + Date.now() + '_' + Math.random();
-              let result = '0';
-              let responseReceived = false;
-              
-              const listener = function(event) {
-                if (event.data && event.data.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
-                  window.removeEventListener('message', listener);
-                  responseReceived = true;
-                  result = event.data.result || '0';
-                }
-              };
-              window.addEventListener('message', listener);
-              
-              try {
-                window.parent.postMessage({
-                  type: 'SCORM_API_CALL',
-                  method: method,
-                  params: args,
-                  callId: callId
-                }, '*');
-              } catch (e) {
-                window.removeEventListener('message', listener);
-                return '0';
-              }
-              
-              // Synchronous wait
-              const startTime = Date.now();
-              while (!responseReceived && (Date.now() - startTime) < 5000) {
-                const now = Date.now();
-                while (Date.now() - now < 1) {}
-              }
-              
-              if (!responseReceived) {
-                window.removeEventListener('message', listener);
-              }
-              
-              return result;
-            };
-          }
-          
-          // SCORM 1.2 API
-          window.API = {
-            LMSInitialize: createAPIMethod('Initialize'),
-            LMSFinish: createAPIMethod('Terminate'),
-            LMSGetValue: createAPIMethod('GetValue'),
-            LMSSetValue: createAPIMethod('SetValue'),
-            LMSCommit: createAPIMethod('Commit'),
-            LMSGetLastError: createAPIMethod('GetLastError'),
-            LMSGetErrorString: createAPIMethod('GetErrorString'),
-            LMSGetDiagnostic: createAPIMethod('GetDiagnostic')
-          };
-          
-          // SCORM 2004 API
-          window.API_1484_11 = {
-            Initialize: createAPIMethod('Initialize'),
-            Terminate: createAPIMethod('Terminate'),
-            GetValue: createAPIMethod('GetValue'),
-            SetValue: createAPIMethod('SetValue'),
-            Commit: createAPIMethod('Commit'),
-            GetLastError: createAPIMethod('GetLastError'),
-            GetErrorString: createAPIMethod('GetErrorString'),
-            GetDiagnostic: createAPIMethod('GetDiagnostic')
-          };
-          
-          // Add compatibility methods to SCORM 1.2 API
-          window.API.Initialize = window.API.LMSInitialize;
-          window.API.Terminate = window.API.LMSFinish;
-          window.API.GetValue = window.API.LMSGetValue;
-          window.API.SetValue = window.API.LMSSetValue;
-          window.API.Commit = window.API.LMSCommit;
-          window.API.GetLastError = window.API.LMSGetLastError;
-          window.API.GetErrorString = window.API.LMSGetErrorString;
-          window.API.GetDiagnostic = window.API.LMSGetDiagnostic;
-        })();
-      `;
-      
-      // Insert script
-      if (doc.head) {
-        doc.head.insertBefore(script, doc.head.firstChild);
-      } else if (doc.body) {
-        doc.body.appendChild(script);
-      } else {
-        doc.appendChild(script);
-      }
-      
-    } catch (error) {
-      // Silent failure - cross-origin restrictions expected
-    }
-  }
-
-  /**
-   * Ensure API availability by monitoring document state and re-injecting if needed
-   */
-  ensureAPIAvailability() {
-    if (!this.contentWindow || !this.contentWindow.document) return;
-    
-    const doc = this.contentWindow.document;
-    const win = this.contentWindow;
-    
-    // Check if APIs are already present
-    const checkAndInject = () => {
-      if (!win.API || !win.API_1484_11) {
-        try {
-          import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.info('[ContentViewer] Re-injecting SCORM APIs', {
-              hasAPI: !!win.API,
-              hasAPI_1484_11: !!win.API_1484_11
-            });
-          }).catch(() => {});
-        } catch (_) {}
-        
-        this.setupScormAPI();
-        this.injectAPIScript();
-      }
-    };
-    
-    // Monitor document ready state changes
-    if (doc.readyState === 'loading') {
-      const readyHandler = () => {
-        checkAndInject();
-        doc.removeEventListener('DOMContentLoaded', readyHandler);
-      };
-      doc.addEventListener('DOMContentLoaded', readyHandler);
-    }
-    
-    // Also monitor for any DOM mutations that might clear our APIs
-    if (typeof MutationObserver === 'function') {
-      const observer = new MutationObserver(() => {
-        // Throttle API checks
-        if (!this._apiCheckTimeout) {
-          this._apiCheckTimeout = setTimeout(() => {
-            checkAndInject();
-            this._apiCheckTimeout = null;
-          }, 100);
-        }
-      });
-      
-      observer.observe(doc, { childList: true, subtree: true });
-      
-      // Clean up observer when content is cleared
-      this._mutationObserver = observer;
-    }
-  }
-
-  /**
-   * Setup SCORM API in content window using postMessage bridge
-   */
-  setupScormAPI() {
-    const setupStartTime = Date.now();
-    
-    try {
-      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.info('[ContentViewer] setupScormAPI START - timing diagnostic', {
-          timestamp: setupStartTime,
-          url: this.currentUrl,
-          documentReadyState: this.contentWindow?.document?.readyState || 'unknown',
-          windowContexts: {
-            hasContentWindow: !!this.contentWindow,
-            hasParent: !!(window.parent),
-            hasTop: !!(window.top),
-            isSameOrigin: this.contentWindow && window.location.origin === this.contentWindow.location.origin
-          }
-        });
-      }).catch(() => {});
-    } catch (_) {}
-    
-    if (!this.contentWindow) {
-      this.showError('Content Setup Error', 'Content window not available for SCORM API setup');
-      return;
-    }
-    
-    try {
-      // Enable the postMessage bridge to handle SCORM API calls
+      // Enable the bridge for communication
       scormAPIBridge.enable();
       
-      const bridgeEnableTime = Date.now();
-      
-      // CRITICAL: Inject APIs into the main renderer window FIRST
-      // This ensures the Rustici Software frame traversal algorithm finds them
-      this.injectAPIIntoRendererWindow();
-      
-      const rendererInjectionTime = Date.now();
-      
-      // Debug: Verify APIs are present in main window
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] Main window API injection complete - timing diagnostic', {
-            bridgeEnableMs: bridgeEnableTime - setupStartTime,
-            rendererInjectionMs: rendererInjectionTime - bridgeEnableTime,
-            totalElapsedMs: rendererInjectionTime - setupStartTime,
-            mainWindowAPIs: {
-              hasAPI: !!(window.API),
-              hasAPI_1484_11: !!(window.API_1484_11),
-              apiInitialize: typeof window.API?.Initialize,
-              api1484Initialize: typeof window.API_1484_11?.Initialize
-            }
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
-      const win = this.contentWindow;
-      
-      // Create proxy API objects that use postMessage to communicate with the bridge
-      const createProxyAPI = (version) => {
+      // Create direct API methods that call the bridge synchronously
+      const createDirectAPI = (version) => {
         const methods = version === '2004' 
           ? ['Initialize', 'Terminate', 'GetValue', 'SetValue', 'Commit', 'GetLastError', 'GetErrorString', 'GetDiagnostic']
           : ['LMSInitialize', 'LMSFinish', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSGetLastError', 'LMSGetErrorString', 'LMSGetDiagnostic'];
           
-        const proxy = {};
+        const api = {};
         
         methods.forEach(method => {
-          proxy[method] = (...args) => {
-            const callId = 'call_' + Date.now() + '_' + Math.random();
-            let result = '0';
-            let responseReceived = false;
-            
-            // Set up response listener
-            const listener = (event) => {
-              if (event.data?.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
-                window.removeEventListener('message', listener);
-                responseReceived = true;
-                result = event.data.result || '0';
-              }
-            };
-            window.addEventListener('message', listener);
-            
-            // Send request to parent window (where bridge is listening)
+          api[method] = (...args) => {
             try {
-              window.parent.postMessage({
-                type: 'SCORM_API_CALL',
-                method,
-                params: args,
-                callId
-              }, '*');
-            } catch (e) {
-              window.removeEventListener('message', listener);
+              // Direct synchronous call to the bridge's executeScormMethod
+              return scormAPIBridge.executeScormMethod(method, args);
+            } catch (error) {
               return '0';
             }
-            
-            // Synchronous wait for response (required by SCORM spec)
-            // Use a tight polling loop with yielding to prevent blocking
-            const startTime = Date.now();
-            const timeout = 5000; // 5 second timeout
-            
-            while (!responseReceived && (Date.now() - startTime) < timeout) {
-              // Yield control to allow message processing
-              // This creates a synchronous wait without blocking the event loop completely
-              const now = Date.now();
-              while (Date.now() - now < 1) {
-                // Busy wait for 1ms, then yield
-              }
-            }
-            
-            // Clean up listener if timeout occurred
-            if (!responseReceived) {
-              window.removeEventListener('message', listener);
-              result = '0';
-            }
-            
-            return result;
           };
         });
         
         // Add SCORM 1.2 compatibility methods
         if (version === '1.2') {
-          proxy.Initialize = proxy.LMSInitialize;
-          proxy.Terminate = proxy.LMSFinish;
-          proxy.GetValue = proxy.LMSGetValue;
-          proxy.SetValue = proxy.LMSSetValue;
-          proxy.Commit = proxy.LMSCommit;
-          proxy.GetLastError = proxy.LMSGetLastError;
-          proxy.GetErrorString = proxy.LMSGetErrorString;
-          proxy.GetDiagnostic = proxy.LMSGetDiagnostic;
+          api.Initialize = api.LMSInitialize;
+          api.Terminate = api.LMSFinish;
+          api.GetValue = api.LMSGetValue;
+          api.SetValue = api.LMSSetValue;
+          api.Commit = api.LMSCommit;
+          api.GetLastError = api.LMSGetLastError;
+          api.GetErrorString = api.LMSGetErrorString;
+          api.GetDiagnostic = api.LMSGetDiagnostic;
         }
         
-        return proxy;
+        return api;
       };
       
-      // Inject proxy API objects into the content window
-      const contentInjectionStart = Date.now();
+      // Create the API objects
+      const api12 = createDirectAPI('1.2');
+      const api2004 = createDirectAPI('2004');
       
-      // CRITICAL: Ensure APIs are directly accessible as window properties
-      // Rustici's algorithm checks window.API_1484_11 directly
-      const api12 = createProxyAPI('1.2');
-      const api2004 = createProxyAPI('2004');
+      // CRITICAL: Inject APIs into current window (which will be parent of iframe)
+      window.API = api12;
+      window.API_1484_11 = api2004;
       
-      // Direct assignment to ensure Rustici detection works
-      win.API = api12;
-      win.API_1484_11 = api2004;
-      
-      // Also ensure they're accessible via property descriptors  
+      // Ensure APIs are enumerable properties (Rustici checks this)
       try {
-        Object.defineProperty(win, 'API', {
+        Object.defineProperty(window, 'API', {
           value: api12,
           writable: true,
           enumerable: true,
           configurable: true
         });
-        Object.defineProperty(win, 'API_1484_11', {
+        Object.defineProperty(window, 'API_1484_11', {
           value: api2004,
           writable: true,
           enumerable: true,
           configurable: true
         });
       } catch (e) {
-        // Fallback to direct assignment if defineProperty fails
+        // Direct assignment should work as fallback
       }
       
-      // CRITICAL DEBUG: Intercept Rustici's API detection to see what it's actually checking
+      // Also inject into parent/top windows if they exist and are different
       try {
-        // Override the SCORM2004_APIFound function if it exists
-        if (typeof win.SCORM2004_APIFound === 'function') {
-          const originalAPIFound = win.SCORM2004_APIFound;
-          win.SCORM2004_APIFound = function(obj) {
-            try {
-              import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-                rendererLogger.info('[ContentViewer] SCORM2004_APIFound intercepted', {
-                  obj: obj,
-                  objType: typeof obj,
-                  objNull: obj === null,
-                  objUndefined: obj === undefined,
-                  objStringified: obj ? obj.toString() : 'null/undefined',
-                  hasInitialize: !!(obj?.Initialize),
-                  objectKeys: obj ? Object.keys(obj) : [],
-                  windowAPI: win.API_1484_11,
-                  windowAPIType: typeof win.API_1484_11
-                });
-              }).catch(() => {});
-            } catch (_) {}
-            
-            const result = originalAPIFound.call(this, obj);
-            
-            try {
-              import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-                rendererLogger.info('[ContentViewer] SCORM2004_APIFound result', {
-                  result,
-                  objWasNull: obj === null || obj === undefined,
-                  comparison: `obj=${obj}, result=${result}`
-                });
-              }).catch(() => {});
-            } catch (_) {}
-            
-            return result;
-          };
+        if (window.parent && window.parent !== window) {
+          window.parent.API = api12;
+          window.parent.API_1484_11 = api2004;
         }
       } catch (e) {
-        // Function override might fail
+        // Cross-origin access may fail - ignore
       }
       
-      const contentInjectionTime = Date.now();
-      
-      // IMMEDIATE DEBUG: Check what's actually in the window after injection
       try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] POST-INJECTION DEBUG - What Rustici will see', {
-            currentWindowAPI: !!win.API_1484_11,
-            currentWindowLocation: win.location.href,
-            parentHasAPI: !!(window.parent?.API_1484_11),
-            topHasAPI: !!(window.top?.API_1484_11)
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
-      // TEST: Add a simple test function to the content window to verify injection worked
-      try {
-        win.testAPIInjection = function() {
-          return {
-            hasAPI: !!win.API,
-            hasAPI_1484_11: !!win.API_1484_11,
-            apiType: typeof win.API,
-            api1484Type: typeof win.API_1484_11,
-            directAccess: win.API_1484_11,
-            manualCheck: win.API_1484_11 === null || typeof win.API_1484_11 === 'undefined'
-          };
-        };
-        
-        // Simple access logging without complex property descriptors
-        console.log('[ContentViewer] API injection completed for window:', win.location.href);
-      } catch (_) {}
-      
-      // Also inject into the main renderer window (parent context) for Rustici discovery
-      const parentInjectionStart = Date.now();
-      try {
-        if (window.parent && window.parent !== win) {
-          const parentAPI12 = createProxyAPI('1.2');
-          const parentAPI2004 = createProxyAPI('2004');
-          
-          window.parent.API = parentAPI12;
-          window.parent.API_1484_11 = parentAPI2004;
-          
-          // Ensure proper property definitions
-          try {
-            Object.defineProperty(window.parent, 'API', {
-              value: parentAPI12,
-              writable: true,
-              enumerable: true,
-              configurable: true
-            });
-            Object.defineProperty(window.parent, 'API_1484_11', {
-              value: parentAPI2004,
-              writable: true,
-              enumerable: true,
-              configurable: true
-            });
-          } catch (_) {}
-        }
-        if (window.top && window.top !== win && window.top !== window.parent) {
-          const topAPI12 = createProxyAPI('1.2');
-          const topAPI2004 = createProxyAPI('2004');
-          
-          window.top.API = topAPI12;
-          window.top.API_1484_11 = topAPI2004;
-          
-          // Ensure proper property definitions
-          try {
-            Object.defineProperty(window.top, 'API', {
-              value: topAPI12,
-              writable: true,
-              enumerable: true,
-              configurable: true
-            });
-            Object.defineProperty(window.top, 'API_1484_11', {
-              value: topAPI2004,
-              writable: true,
-              enumerable: true,
-              configurable: true
-            });
-          } catch (_) {}
+        if (window.top && window.top !== window && window.top !== window.parent) {
+          window.top.API = api12;
+          window.top.API_1484_11 = api2004;
         }
       } catch (e) {
-        // Cross-origin restrictions - expected in some cases
-        try {
-          import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.debug('[ContentViewer] Could not inject into parent/top windows', e.message);
-          }).catch(() => {});
-        } catch (_) {}
+        // Cross-origin access may fail - ignore
       }
-      const parentInjectionTime = Date.now();
-      
-      // Also inject into child iframes that may contain the actual SCORM content
-      try {
-        // Look for common SCORM iframe IDs/names
-        const potentialFrames = [
-          win.document?.getElementById('scoFrame'),
-          win.document?.getElementById('scorm_object'),
-          win.document?.querySelector('iframe[name="scoFrame"]'),
-          win.document?.querySelector('iframe[name="scorm_object"]'),
-          win.document?.querySelector('iframe')  // fallback to first iframe
-        ].filter(Boolean);
-        
-        potentialFrames.forEach(frame => {
-          const injectIntoFrame = () => {
-            try {
-              const frameWin = frame.contentWindow;
-              if (frameWin && frameWin !== win) {
-                const frameAPI12 = createProxyAPI('1.2');
-                const frameAPI2004 = createProxyAPI('2004');
-                
-                frameWin.API = frameAPI12;
-                frameWin.API_1484_11 = frameAPI2004;
-                
-                // Ensure proper property definitions for child frames too
-                try {
-                  Object.defineProperty(frameWin, 'API', {
-                    value: frameAPI12,
-                    writable: true,
-                    enumerable: true,
-                    configurable: true
-                  });
-                  Object.defineProperty(frameWin, 'API_1484_11', {
-                    value: frameAPI2004,
-                    writable: true,
-                    enumerable: true,
-                    configurable: true
-                  });
-                } catch (_) {}
-                
-                // Also inject script into the frame document
-                this.injectAPIScriptIntoWindow(frameWin);
-                
-                try {
-                  import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-                    rendererLogger.info('[ContentViewer] Injected APIs into child frame', {
-                      frameId: frame.id || 'unnamed',
-                      frameSrc: frame.src || 'no-src'
-                    });
-                  }).catch(() => {});
-                } catch (_) {}
-              }
-            } catch (e) {
-              // Cross-origin or not accessible - this is expected for some frames
-              try {
-                import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-                  rendererLogger.debug('[ContentViewer] Could not access child frame', {
-                    frameId: frame.id || 'unnamed',
-                    error: e.message
-                  });
-                }).catch(() => {});
-              } catch (_) {}
-            }
-          };
-          
-          // Try immediate injection if frame is ready
-          if (frame.contentWindow && frame.contentWindow.document) {
-            injectIntoFrame();
-          }
-          
-          // Also listen for frame load
-          frame.addEventListener('load', injectIntoFrame, { once: true });
-        });
-      } catch (_) {}
-      
-      const setupCompleteTime = Date.now();
-      
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] setupScormAPI COMPLETE - final timing diagnostic', {
-            url: this.currentUrl,
-            timingBreakdown: {
-              contentInjectionMs: contentInjectionTime - contentInjectionStart,
-              parentInjectionMs: parentInjectionTime - parentInjectionStart,
-              totalSetupMs: setupCompleteTime - setupStartTime
-            },
-            apiAvailability: {
-              contentWindow: {
-                hasAPI: !!(win.API),
-                hasAPI_1484_11: !!(win.API_1484_11)
-              },
-              mainWindow: {
-                hasAPI: !!(window.API),
-                hasAPI_1484_11: !!(window.API_1484_11)
-              },
-              parentWindow: {
-                hasAPI: !!(window.parent?.API),
-                hasAPI_1484_11: !!(window.parent?.API_1484_11)
-              }
-            },
-            bridgeEnabled: scormAPIBridge.isEnabled
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
-      this.emit('scormApiInjected', { contentWindow: win, mode: 'postMessage' });
       
     } catch (error) {
       try {
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('[ContentViewer] postMessage API injection error', error?.message || String(error));
+          rendererLogger.error('[ContentViewer] Pre-injection API error', error?.message || String(error));
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Setup SCORM API in content window - APIs are now pre-injected in parent
+   */
+  setupScormAPI() {
+    if (!this.contentWindow) {
+      this.showError('Content Setup Error', 'Content window not available for SCORM API setup');
+      return;
+    }
+    
+    try {
+      const win = this.contentWindow;
+      
+      // APIs are already pre-injected in parent window, just add verification function
+      win.testAPIInjection = function() {
+        return {
+          hasAPI: !!win.API,
+          hasAPI_1484_11: !!win.API_1484_11,
+          parentHasAPI: !!(window.parent?.API),
+          parentHasAPI_1484_11: !!(window.parent?.API_1484_11),
+          topHasAPI: !!(window.top?.API),
+          topHasAPI_1484_11: !!(window.top?.API_1484_11),
+          apiInitialize: typeof window.parent?.API?.Initialize,
+          api1484Initialize: typeof window.parent?.API_1484_11?.Initialize
+        };
+      };
+      
+      this.emit('scormApiInjected', { contentWindow: win, mode: 'pre-injected' });
+      
+    } catch (error) {
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error('[ContentViewer] API setup error', error?.message || String(error));
         }).catch(() => {});
       } catch (_) {}
     }
@@ -1749,107 +1058,9 @@ class ContentViewer extends BaseComponent {
     }
   }
 
-  /**
-   * Setup monitoring for Rustici Software SCORM detection algorithm
-   * Intercepts common detection patterns to understand timing
-   */
-  setupRusticiDetectionMonitoring() {
-    if (!this.contentWindow) return;
-    
-    try {
-      const win = this.contentWindow;
-      const startTime = Date.now();
-      
-      // Hook into common Rustici detection function calls
-      const originalSetTimeout = win.setTimeout;
-      const originalSetInterval = win.setInterval;
-      
-      // Monitor setTimeout calls that might be part of detection algorithm
-      win.setTimeout = function(callback, delay, ...args) {
-        const callbackStr = callback.toString();
-        if (callbackStr.includes('API') || callbackStr.includes('SCORM') || callbackStr.includes('SearchFor')) {
-          try {
-            import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-              rendererLogger.info('[ContentViewer] Rustici detection setTimeout intercepted', {
-                delay,
-                timestamp: Date.now(),
-                elapsedSinceSetup: Date.now() - startTime,
-                callbackPreview: callbackStr.substring(0, 100) + '...'
-              });
-            }).catch(() => {});
-          } catch (_) {}
-        }
-        return originalSetTimeout.call(this, callback, delay, ...args);
-      };
-      
-      // Monitor function calls that look like Rustici API detection
-      const monitorAPIAccess = (windowObj, windowName) => {
-        if (!windowObj) return;
-        
-        try {
-          const apiAccessHandler = {
-            get(target, prop) {
-              if (prop === 'API' || prop === 'API_1484_11') {
-                try {
-                  import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-                    rendererLogger.info('[ContentViewer] Rustici API access detected', {
-                      windowContext: windowName,
-                      apiProperty: prop,
-                      timestamp: Date.now(),
-                      elapsedSinceSetup: Date.now() - startTime,
-                      hasAPI: !!(target[prop]),
-                      callStack: new Error().stack?.split('\n').slice(1, 4) || []
-                    });
-                  }).catch(() => {});
-                } catch (_) {}
-              }
-              return target[prop];
-            }
-          };
-          
-          // Only wrap if not already wrapped
-          if (!windowObj._rusticiMonitorInstalled) {
-            const proxy = new Proxy(windowObj, apiAccessHandler);
-            windowObj._rusticiMonitorInstalled = true;
-          }
-        } catch (e) {
-          // Cross-origin or other restrictions
-        }
-      };
-      
-      // Monitor main window contexts
-      monitorAPIAccess(win, 'contentWindow');
-      monitorAPIAccess(window, 'mainWindow');
-      if (window.parent !== window) {
-        monitorAPIAccess(window.parent, 'parentWindow');
-      }
-      if (window.top !== window && window.top !== window.parent) {
-        monitorAPIAccess(window.top, 'topWindow');
-      }
-      
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] Rustici detection monitoring setup complete', {
-            timestamp: startTime,
-            monitoredWindows: ['contentWindow', 'mainWindow', 'parentWindow', 'topWindow']
-          });
-        }).catch(() => {});
-      } catch (_) {}
-      
-    } catch (error) {
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.debug('[ContentViewer] Rustici monitoring setup failed', error?.message || String(error));
-        }).catch(() => {});
-      } catch (_) {}
-    }
-  }
 
   /**
-   * Verify SCORM API presence and establish fallback if needed
-   * - Prefer direct API injection (API_1484_11 or API with Initialize())
-   * - If unavailable, attempt bridge-based postMessage path
-   * - If both unavailable, notify user with persistent error
+   * Verify SCORM API presence - simplified version
    */
   verifyScormApiPresence() {
     try {
@@ -1865,105 +1076,19 @@ class ContentViewer extends BaseComponent {
       const has2004 = api2004 && typeof api2004.Initialize === 'function';
       const has12 = api12 && (typeof api12.Initialize === 'function' || typeof api12.LMSInitialize === 'function');
 
-      // Comprehensive API presence verification across all window contexts
-      const verifyWindowContext = (windowObj, contextName) => {
-        try {
-          return {
-            contextName,
-            accessible: !!windowObj,
-            hasAPI: !!(windowObj?.API),
-            hasAPI_1484_11: !!(windowObj?.API_1484_11),
-            apiInitialize: typeof windowObj?.API?.Initialize,
-            apiLMSInitialize: typeof windowObj?.API?.LMSInitialize,
-            api1484Initialize: typeof windowObj?.API_1484_11?.Initialize,
-            origin: windowObj?.location?.origin || 'unknown',
-            href: windowObj?.location?.href || 'unknown'
-          };
-        } catch (e) {
-          return {
-            contextName,
-            accessible: false,
-            error: e.message
-          };
-        }
-      };
-
-      const windowContexts = [
-        verifyWindowContext(win, 'contentWindow'),
-        verifyWindowContext(window, 'mainWindow'),
-        verifyWindowContext(window.parent, 'parentWindow'),
-        verifyWindowContext(window.top, 'topWindow')
-      ];
-
-      // Diagnostic snapshot with comprehensive window context analysis
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] verifyScormApiPresence - comprehensive window analysis', {
-            url: this.currentUrl,
-            contentWindowAPIs: { has12, has2004 },
-            allWindowContexts: windowContexts,
-            frameHierarchy: {
-              selfIsParent: window === window.parent,
-              selfIsTop: window === window.top,
-              parentIsTop: window.parent === window.top,
-              contentIsMain: win === window,
-              contentIsParent: win === window.parent
-            }
-          });
-        }).catch(() => {});
-      } catch (_) {}
-
       if (has2004 || has12) {
-        // API present; nothing further required
+        // API present - success!
         this.emit('scormApiVerified', { mode: 'direct', has2004, has12 });
         return;
       }
 
-      // Fallback: attempt postMessage bridge discovery by sending a ping
-      const callId = 'probe_' + Date.now();
-      let responded = false;
-      const listener = (event) => {
-        if (event.data && event.data.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
-          responded = true;
-          window.removeEventListener('message', listener);
-          this.emit('scormApiVerified', { mode: 'bridge' });
-        }
-      };
-      window.addEventListener('message', listener);
-
-      // Enable the SCORM API bridge before sending the probe
-      scormAPIBridge.enable();
-
-      // Post a harmless probe request expected by bridge (Initialize with empty)
-      try {
-        win.postMessage({
-          type: 'SCORM_API_CALL',
-          method: 'GetLastError',
-          params: [],
-          callId
-        }, '*');
-      } catch (_) {
-        // ignore
-      }
-
-      // Give the bridge a short time to respond
-      setTimeout(() => {
-        if (!responded) {
-          window.removeEventListener('message', listener);
-          // Neither direct API nor bridge responded; standardize via showError
-          try {
-            import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-              rendererLogger.error('[ContentViewer] SCORM API missing after probe', { url: this.currentUrl });
-            }).catch(() => {});
-          } catch (_) {}
-
-          this.showError(
-            'SCORM API not found',
-            'The SCO did not expose API_1484_11 or API, and no postMessage bridge responded. The course may not be SCORM-enabled or is loading in a context that cannot access the API.'
-          );
-          this.emit('scormApiMissing', { url: this.currentUrl });
-        }
-      }, 600);
+      // If APIs are missing, show error
+      this.showError(
+        'SCORM API not found',
+        'The SCORM course content does not have the required API objects. Please ensure this is a valid SCORM package.'
+      );
+      this.emit('scormApiMissing', { url: this.currentUrl });
+      
     } catch (err) {
       this.showError('SCORM API verification error', err?.message || String(err));
     }
