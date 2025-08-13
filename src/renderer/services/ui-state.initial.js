@@ -41,11 +41,24 @@ export function getInitialUIState() {
     ui: {
       theme: 'default',
       sidebarCollapsed: false,
+      sidebarVisible: true,
       courseOutlineVisible: false,
       devModeEnabled: false,
       loading: false,
       error: null,
       notifications: []
+    },
+
+    // Testing mode state
+    testingMode: {
+      enabled: false,
+      overrides: {
+        bypassSequencing: false,
+        forceNavigation: false,
+        ignorePrerequisites: false,
+        unlimitedAttempts: false
+      },
+      testStates: new Map()
     },
 
     // LMS simulation state

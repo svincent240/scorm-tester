@@ -317,6 +317,9 @@
   --text-muted: var(--text-secondary);
   --border-radius: var(--border-radius-base);
   --primary-color-alpha: rgba(0, 123, 255, 0.25);
+  --success-color-alpha: rgba(40, 167, 69, 0.25);
+  --warning-color-alpha: rgba(255, 193, 7, 0.25);
+  --danger-color-alpha: rgba(220, 53, 69, 0.25);
 
   /* Screen-adaptive spacing */
   --content-padding: var(--spacing-md);

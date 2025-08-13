@@ -352,17 +352,20 @@ class SequencingEngine {
 
 ## Integration Patterns
 
-### IPC Communication
-The SCORM Engine communicates with the renderer process through Electron's IPC system:
+### Direct API Communication
+The SCORM Engine provides direct, synchronous API access through the renderer bridge:
 
 ```javascript
-// Main Process (SCORM Engine)
-ipcMain.handle('scorm:initialize', async (event, parameter) => {
-  return scormApiHandler.Initialize(parameter);
-});
+// Renderer Process - Direct API calls (no async IPC)
+window.API_1484_11 = {
+  Initialize: (param) => scormAPIBridge.executeScormMethod('Initialize', [param]),
+  GetValue: (element) => scormAPIBridge.executeScormMethod('GetValue', [element]),
+  SetValue: (element, value) => scormAPIBridge.executeScormMethod('SetValue', [element, value])
+  // ... other methods
+};
 
-// Renderer Process (Content Viewer)
-const result = await ipcRenderer.invoke('scorm:initialize', '');
+// SCORM Content calls API synchronously
+const result = window.API_1484_11.Initialize('');  // Returns immediately
 ```
 
 ### IPC Rate Limiting and Soft-OK Semantics

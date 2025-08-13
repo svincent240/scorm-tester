@@ -121,6 +121,165 @@
   font-size: var(--font-size-md);
 }
 
+/* Navigation Context Display */
+.navigation-controls__context {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  z-index: var(--z-content-header);
+}
+
+.nav-context {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.nav-context__position {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.nav-context__title {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  flex: 1;
+}
+
+.nav-context__type {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+}
+
+/* Navigation State Indicators */
+.navigation-controls__btn.nav-available {
+  border-color: var(--success-color);
+  color: var(--success-color);
+}
+
+.navigation-controls__btn.nav-available:hover {
+  background: var(--success-color-alpha);
+}
+
+.navigation-controls__btn.nav-locked {
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+}
+
+.navigation-controls__btn.nav-forced {
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+  background: var(--warning-color-alpha);
+}
+
+.navigation-controls__btn.nav-processing {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Mode Toggle Styles */
+.mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 2px;
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: calc(var(--border-radius) - 2px);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+  color: var(--text-secondary);
+}
+
+.mode-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background: var(--primary-color);
+  color: var(--primary-text);
+}
+
+.mode-btn--learner.active {
+  background: var(--success-color);
+  color: white;
+}
+
+.mode-btn--testing.active {
+  background: var(--warning-color);
+  color: var(--warning-dark);
+}
+
+/* Testing Mode Styles */
+.navigation-controls--testing {
+  border-color: var(--warning-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--warning-color-alpha) 100%);
+}
+
+.navigation-controls--testing .navigation-controls__title {
+  color: var(--warning-dark);
+}
+
+.testing-mode-indicator {
+  background: var(--warning-color);
+  color: var(--warning-dark);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  margin-top: var(--spacing-xs);
+  text-align: center;
+  border: 1px solid var(--warning-dark);
+}
+
+.navigation-controls__btn.nav-testing-mode {
+  border-color: var(--warning-color);
+  background: var(--warning-color-alpha);
+  color: var(--warning-dark);
+}
+
+.navigation-controls__btn.nav-testing-mode:hover {
+  background: var(--warning-color);
+  color: var(--warning-dark);
+}
+
+/* Learner Mode Styles */
+.navigation-controls--learner {
+  border-color: var(--success-color);
+}
+
+.navigation-controls--learner .navigation-controls__title {
+  color: var(--success-dark);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .navigation-controls {
@@ -148,5 +307,15 @@
   .navigation-controls__btn {
     flex: 1 1 auto;
     min-width: 0;
+  }
+  
+  .mode-toggle {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .mode-btn {
+    flex: 1;
   }
 }

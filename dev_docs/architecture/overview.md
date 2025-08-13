@@ -185,48 +185,38 @@ flowchart TD
 5. Rollup processing updates parent activity statuses
 6. UI updates to reflect new current activity and available navigation
 
-## Renderer Content Embedding and SCORM API Exposure
+## SCORM API Integration
 
-To ensure strict SCORM compliance without modifying course code, the Content Viewer uses a host-frameset embedding model and strict API exposure:
+The Content Viewer uses a simplified, direct API injection approach for SCORM compliance:
 
-- Host frameset embedding:
-  - The main viewer iframe is first loaded with a minimal same-origin host document via srcdoc that contains a child iframe id="scoFrame".
-  - On host DOM ready, canonical APIs are injected into the host window and then scoFrame.src is set to the SCO launch URL.
-  - This mirrors LMS frameset behavior so ADL discovery in the SCO finds the API at window.parent/top/opener.
+### Direct API Injection
+- **Simple iframe loading**: Content loads directly in iframe without complex host frameset structure
+- **Pre-load API setup**: SCORM APIs are injected into `window` before iframe content loads
+- **Synchronous bridge**: Direct method calls through `scormAPIBridge` to `scormClient` services
 
-- Strict API exposure:
-  - Provide canonical API objects only:
-    - SCORM 2004: window.API_1484_11 with Initialize/Terminate/GetValue/SetValue/Commit/GetLastError/GetErrorString/GetDiagnostic
-    - SCORM 1.2: window.API with LMS* aliases mapping to 2004 methods for compatibility
-  - Do not override SCO discovery routines (FindAPI/GetAPI) or wrap course functions.
-  - Mirror API references onto parent/top/opener where accessible, without altering behavior.
+### API Objects
+- **SCORM 2004**: `window.API_1484_11` with all 8 required methods
+- **SCORM 1.2**: `window.API` with LMS* methods plus 2004-style aliases for compatibility
+- **Direct execution**: Each API method calls `scormAPIBridge.executeScormMethod()` synchronously
 
-- Defensive propagation (same-origin only):
-  - Recursively seed canonical APIs into same-origin descendant iframes and observe for dynamically added iframes.
-  - Minimal discovery helpers may be defined only in those same-origin descendants to assist deep nesting while keeping the host strict.
+### Implementation Flow
+1. Content Viewer calls `setupScormAPIs()` before iframe loads
+2. Bridge gets reference to `scormClient` for direct method execution  
+3. API objects created with methods that call bridge synchronously
+4. Iframe loads and discovers APIs in parent window per SCORM standard
+5. All API calls execute immediately without async IPC overhead
 
-- Popup handling:
-  - Intercept window.open to set canonical API objects on new windows without modifying their discovery functions.
+### Key Implementation Files
+- **Content Viewer**: [`src/renderer/components/scorm/content-viewer.js:320`](../../src/renderer/components/scorm/content-viewer.js) - `setupScormAPIs()` method
+- **API Bridge**: [`src/renderer/services/scorm-api-bridge.js`](../../src/renderer/services/scorm-api-bridge.js) - Synchronous method execution
+- **SCORM Client**: [`src/renderer/services/scorm-client.js`](../../src/renderer/services/scorm-client.js) - Main process communication
 
-Implementation references:
-- Content Viewer host flow and injection: [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:200)
-- API wrapper and strict exposure: [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:569)
-- Defensive propagation and observers: [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:1218)
-- Popup interception: [src/renderer/components/scorm/content-viewer.js](src/renderer/components/scorm/content-viewer.js:500)
-
-Diagnostics (written to app.log):
-- “[ContentViewer] iframe load: contentWindow acquired”
-- “[ContentViewer] SCORM API injected”
-- “[ContentViewer] parent/top mirror diagnostics”
-- “[ContentViewer] immediate frame enumeration”
-- “[ContentViewer] propagateApiToFrames completed”
-- “[ContentViewer] observeAndPropagateToNewIframes attached”
-- “[ContentViewer] host frameset initialized”
-- “[ContentViewer] verifyScormApiPresence snapshot”
-- SCORM API calls via “[DEBUG EVENT] api:call … Initialize/GetValue/SetValue/Commit/Terminate … result:true”
-
-Compliance note:
-- This approach preserves course code intact and places canonical APIs at the parent frame per ADL expectations. It has been validated with the SequencingSimpleRemediation SCORM 2004 sample.
+### SCORM Compliance
+- Maintains full SCORM 2004 4th Edition compliance with simplified architecture
+- Content discovers APIs using standard ADL methods in parent window
+- No modification of course code required
+- Supports both SCORM 1.2 and 2004 content seamlessly
+- Validated with real SCORM content including complex sequencing scenarios
 
 ## Technology Stack
 

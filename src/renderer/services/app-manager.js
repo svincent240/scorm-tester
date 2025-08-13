@@ -412,6 +412,10 @@ class AppManager {
       } catch (_) {}
     });
  
+    // Menu button toggle event handlers
+    eventBus.on('menuToggled', this.handleMenuToggle.bind(this));
+    eventBus.on('menuVisibilityChanged', this.handleMenuVisibilityChanged.bind(this));
+
     // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
 
@@ -930,6 +934,55 @@ class AppManager {
       newOverlay.addEventListener('click', () => this.toggleSidebar());
       document.body.appendChild(newOverlay);
     }
+  }
+
+  /**
+   * Handle menu toggle event from navigation controls
+   */
+  handleMenuToggle(data) {
+    const sidebar = document.getElementById('app-sidebar');
+    const isVisible = data.visible;
+    
+    if (sidebar) {
+      sidebar.classList.toggle('sidebar--hidden', !isVisible);
+      
+      // Also update main content area
+      const appContent = document.querySelector('.app-content');
+      if (appContent) {
+        appContent.classList.toggle('app-content--full-width', !isVisible);
+      }
+      
+      // Update UI state
+      if (this.uiState) {
+        this.uiState.setState('ui.sidebarVisible', isVisible, true); // silent update to avoid loops
+      }
+    }
+    
+    try {
+      this.logger.debug('AppManager: Menu toggled', { visible: isVisible });
+    } catch (_) {}
+  }
+
+  /**
+   * Handle menu visibility change event from navigation controls
+   */
+  handleMenuVisibilityChanged(data) {
+    const sidebar = document.getElementById('app-sidebar');
+    const isVisible = data.visible;
+    
+    if (sidebar) {
+      sidebar.classList.toggle('sidebar--hidden', !isVisible);
+      
+      // Also update main content area
+      const appContent = document.querySelector('.app-content');
+      if (appContent) {
+        appContent.classList.toggle('app-content--full-width', !isVisible);
+      }
+    }
+    
+    try {
+      this.logger.info('AppManager: Menu visibility changed', { visible: isVisible });
+    } catch (_) {}
   }
 
   /**

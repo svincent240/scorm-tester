@@ -22,6 +22,7 @@
     "test:phase-integration": "jest tests/integration/phase-integration.test.js",
     "test:renderer": "jest tests/integration/renderer-integration.test.js",
     "test:all": "jest tests/unit tests/contract tests/integration tests/perf --forceExit --detectOpenHandles --maxWorkers=1",
+    "test:e2e": "playwright test",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
     "validate:architecture": "node scripts/validate-architecture.js",
@@ -49,6 +50,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@babel/preset-env": "^7.25.0",
+    "@playwright/test": "^1.54.2",
     "@testing-library/jest-dom": "^6.6.4",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.0",

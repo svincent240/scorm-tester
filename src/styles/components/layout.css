@@ -106,6 +106,18 @@
   width: var(--sidebar-width-collapsed);
 }
 
+.app-sidebar--hidden {
+  transform: translateX(-100%);
+  width: 0;
+  min-width: 0;
+  border-right: none;
+}
+
+.app-content--full-width {
+  /* Expand content area when sidebar hidden */
+  margin-left: 0;
+}
+
 .app-content {
   flex: 1;
   display: flex;

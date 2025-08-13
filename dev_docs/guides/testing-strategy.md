@@ -212,7 +212,8 @@ SCORM Inspector Testing
 
 Execution and Scripts
 Suggested npm scripts (to be aligned in package.json):
-- test: run all Jest projects
+- test:e2e: run Playwright end-to-end tests
+- test:all: run all Jest projects
 - test:coverage: run all with coverage and upload LCOV
 - test:unit, test:contract, test:integration, test:scenario, test:perf: run corresponding projects
 - test:watch: developer watch on unit + contract
@@ -252,3 +253,12 @@ Acceptance Criteria for This Refresh
 
 Changelog
 - 2025-08: Strategy fully refreshed; layered model, thresholds, fixtures governance, performance policies established.
+
+End-to-End (E2E) Testing
+While the primary testing strategy focuses on unit, contract, and integration tests to avoid flaky headful tests, a minimal E2E suite using Playwright is included to validate the packaged Electron application.
+
+- Scope: Basic application launch and window verification.
+- Purpose: Sanity check to ensure the application starts correctly after being packaged. This is not for detailed feature testing.
+- Location: e2e/*.spec.ts
+- Runner: Playwright (using only the Chromium project, as Electron is based on Chromium).
+- Execution: npm run test:e2e

@@ -367,6 +367,7 @@ class UIStateManager {
     initialState.ui.theme = this.state.ui.theme;
     initialState.ui.debugPanelVisible = this.state.ui.debugPanelVisible;
     initialState.ui.sidebarCollapsed = this.state.ui.sidebarCollapsed;
+    initialState.ui.sidebarVisible = this.state.ui.sidebarVisible;
     
     this.state = initialState;
     this.notifyStateChange({}, this.state);
@@ -516,6 +517,7 @@ class UIStateManager {
         theme: this.state.ui.theme,
         debugPanelVisible: this.state.ui.debugPanelVisible,
         sidebarCollapsed: this.state.ui.sidebarCollapsed,
+        sidebarVisible: this.state.ui.sidebarVisible,
         devModeEnabled: this.state.ui.devModeEnabled
       };
       this.helpers.safePersistState(this.persistenceKey, uiSlice);

@@ -55,8 +55,8 @@ class SNSnapshotService {
 
   async _pollOnce() {
     const result = await this._fetchStatus();
-    if (result) {
-      this.logger?.debug && this.logger.debug('[SNSnapshotService] Polled SN status', { initialized: result.initialized, timestamp: Date.now() });
+    if (!result) {
+      this.logger?.warn && this.logger.warn('[SNSnapshotService] Poll returned no result');
     }
   }
 

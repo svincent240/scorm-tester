@@ -35,7 +35,7 @@ This documentation is designed to provide comprehensive context for AI-driven de
 
 ### Development Guides
 - [`guides/development-setup.md`](guides/development-setup.md) - Development environment setup
-- [`guides/testing-strategy.md`](guides/testing-strategy.md) - Testing approach and compliance validation
+- [`guides/testing-strategy.md`](guides/testing-strategy.md) - Complete testing approach and compliance validation
 - [`guides/renderer-imports.md`](guides/renderer-imports.md) - Electron Renderer Module Strategy for Imports
 - [`guides/logging-debugging.md`](guides/logging-debugging.md) - Logging and debugging guidelines
 
@@ -83,14 +83,12 @@ flowchart LR
 - **Memory Management**: Optimized with proper cleanup and leak prevention
 - **Code Quality**: Comprehensive error handling and logging
 
-### 🚀 Rollout and Observability
-- **Feature Flag**: `IPC_REFACTOR_ENABLED` controls the new IPC/main services. Default `false` for initial release.
-- **Staged Rollout**: Enable in development builds and manual QA first.
-- **Key Metrics to Observe**:
-  - `ipc.rate_limited`: Monitor for channels hitting rate limits.
-  - `ipc.error`: Track errors in IPC communication.
-  - `ipc.success`: Monitor successful IPC operations and their `durationMs`.
-- **Rollback Guidance**: If regressions are observed, disable `IPC_REFACTOR_ENABLED` via environment toggle to revert to legacy paths. No UI changes are expected.
+### 🚀 Production Status
+The SCORM Tester is now in production-ready state with all major architectural components complete:
+- **IPC Architecture**: Fully declarative routing with robust rate limiting and centralized telemetry
+- **Main Services**: Streamlined responsibilities with standardized error handling and file management
+- **Renderer Components**: Enhanced reliability through micro-hardening and strict logging policies
+- **SCORM Inspector**: Complete separation between app debugging and SCORM package inspection
 
 ## 🎯 AI Tool Guidelines
 
@@ -126,17 +124,22 @@ flowchart LR
 
 This documentation is maintained as part of the application codebase and should be updated whenever architectural changes are made. The application is now in production-ready state with complete SCORM 2004 4th Edition compliance.
 
+### Implementation Archives
+Completed implementation plans are preserved for historical reference:
+- [`navigation-controls-enhancement-plan.md`](navigation-controls-enhancement-plan.md) - Navigation enhancement implementation (archived)
+- [`scorm-inspector-implementation-plan.md`](scorm-inspector-implementation-plan.md) - SCORM Inspector implementation (archived)
+
 ### Development Status
 - ✅ **Complete Implementation**: All SCORM 2004 4th Edition features implemented
 - ✅ **Production Ready**: Comprehensive testing and validation completed
 - ✅ **Maintenance Mode**: Focus on bug fixes, performance optimization, and feature enhancements
 - ✅ **Full Documentation**: Complete API reference and development guides available
-- ✅ **Core Refactoring Complete**: Major simplification efforts across IPC, Main Services, and Renderer are now complete. This includes:
-  - **IPC Layer**: Fully declarative routing, robust rate limiting, and centralized telemetry.
-  - **Main Services**: Streamlined responsibilities, standardized error handling, and improved file management.
-  - **Renderer**: Enhanced reliability through micro-hardening, browser-safe data handling, and strict logging policies.
-  - **Main Process Initialization**: Clean, single-pass service initialization with clear dependency injection.
-All implementation planning documents have been absorbed into this comprehensive documentation structure with clear architectural guidance.
+- ✅ **Production Architecture**: Complete modular architecture with clear separation of concerns:
+  - **IPC Layer**: Fully declarative routing with robust rate limiting and centralized telemetry
+  - **Main Services**: Streamlined responsibilities with standardized error handling and file management  
+  - **Renderer**: Enhanced reliability through micro-hardening and strict logging policies
+  - **SCORM Inspector**: Professional SCORM package analysis tool separate from app debugging
+  - **Testing Framework**: Comprehensive test coverage with layered testing strategy
 
 For questions about SCORM compliance, refer to the specification guide and compliance documentation. For architectural decisions, see the detailed module documentation and design rationale sections.
 

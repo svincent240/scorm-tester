@@ -132,22 +132,30 @@ class NavigationControls extends BaseComponent {
         </div>
         
         <div class="navigation-controls__right">
+          <!-- Mode Toggle -->
+          <div class="mode-toggle" id="${this.elementId}-mode-toggle">
+            <button class="mode-btn mode-btn--learner active" id="${this.elementId}-learner-mode">🎓 Learner Mode</button>  
+            <button class="mode-btn mode-btn--testing" id="${this.elementId}-testing-mode">🔧 Testing Mode</button>
+          </div>
+          
           <button 
             class="navigation-controls__btn navigation-controls__btn--previous" 
             id="${this.elementId}-previous"
             disabled
-            title="Previous"
+            title="Previous Activity (respects course sequencing)"
+            aria-describedby="${this.elementId}-prev-status"
           >
-            ← Previous
+            ← Previous Activity
           </button>
           
           <button 
             class="navigation-controls__btn navigation-controls__btn--next" 
             id="${this.elementId}-next"
             disabled
-            title="Next"
+            title="Next Activity (respects course sequencing)"
+            aria-describedby="${this.elementId}-next-status"
           >
-            Next →
+            Next Activity →
           </button>
           
           <button 
@@ -155,8 +163,22 @@ class NavigationControls extends BaseComponent {
             id="${this.elementId}-menu"
             title="Toggle Course Menu"
           >
-            ☰ Menu
+            📚 Course Menu
           </button>
+        </div>
+        
+        <div class="navigation-controls__context" id="${this.elementId}-context" style="display: none;">
+          <div class="nav-context">
+            <span class="nav-context__position" id="${this.elementId}-position">Activity 1 of 1</span>
+            <span class="nav-context__title" id="${this.elementId}-title-display">No activity selected</span>
+            <span class="nav-context__type" id="${this.elementId}-type">SCO</span>
+          </div>
+          <div id="${this.elementId}-prev-status" class="sr-only">
+            Navigation to previous activity respects course sequencing rules
+          </div>
+          <div id="${this.elementId}-next-status" class="sr-only">
+            Navigation to next activity respects course sequencing rules
+          </div>
         </div>
       </div>
     `;
@@ -170,6 +192,17 @@ class NavigationControls extends BaseComponent {
     this.previousBtn = this.find('.navigation-controls__btn--previous');
     this.nextBtn = this.find('.navigation-controls__btn--next');
     this.menuBtn = this.find('.navigation-controls__btn--menu');
+    
+    // Mode toggle elements
+    this.modeToggle = this.find('.mode-toggle');
+    this.learnerModeBtn = this.find('.mode-btn--learner');
+    this.testingModeBtn = this.find('.mode-btn--testing');
+    
+    // Navigation context elements
+    this.contextElement = this.find('.navigation-controls__context');
+    this.positionElement = this.find('.nav-context__position');
+    this.titleDisplayElement = this.find('.nav-context__title');
+    this.typeElement = this.find('.nav-context__type');
   }
 
   /**
@@ -207,6 +240,8 @@ class NavigationControls extends BaseComponent {
         handlePreviousClick: this.handlePreviousClick.bind(this),
         handleNextClick: this.handleNextClick.bind(this),
         handleMenuClick: this.handleMenuClick.bind(this),
+        handleLearnerModeClick: this.handleLearnerModeClick.bind(this),
+        handleTestingModeClick: this.handleTestingModeClick.bind(this),
         handleKeyDown: this.handleKeyDown.bind(this)
       };
     }
@@ -222,6 +257,15 @@ class NavigationControls extends BaseComponent {
     
     if (this.menuBtn && this._boundHandlers.handleMenuClick) {
       this.menuBtn.addEventListener('click', this._boundHandlers.handleMenuClick);
+    }
+    
+    // Mode toggle button event listeners
+    if (this.learnerModeBtn && this._boundHandlers.handleLearnerModeClick) {
+      this.learnerModeBtn.addEventListener('click', this._boundHandlers.handleLearnerModeClick);
+    }
+    
+    if (this.testingModeBtn && this._boundHandlers.handleTestingModeClick) {
+      this.testingModeBtn.addEventListener('click', this._boundHandlers.handleTestingModeClick);
     }
     
     // Keyboard navigation with guard against missing binding
@@ -269,10 +313,32 @@ class NavigationControls extends BaseComponent {
   /**
    * Handle menu button click
    */
-  handleMenuClick() {
+  async handleMenuClick() {
     const newState = !this.navigationState.menuVisible;
     this.setMenuVisible(newState);
     this.emit('menuToggled', { visible: newState });
+    
+    // Also emit to global eventBus for app-manager
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('menuToggled', { visible: newState });
+    } catch (_) {
+      // Fallback - continue with component-level event
+    }
+  }
+
+  /**
+   * Handle learner mode button click
+   */
+  async handleLearnerModeClick() {
+    await this.setTestingMode(false);
+  }
+
+  /**
+   * Handle testing mode button click
+   */
+  async handleTestingModeClick() {
+    await this.setTestingMode(true);
   }
 
   /**
@@ -586,16 +652,19 @@ class NavigationControls extends BaseComponent {
     if (this.previousBtn) {
       this.previousBtn.disabled = !canNavigatePrevious;
       this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
-      this.previousBtn.title = canNavigatePrevious ? 'Previous' : 'Previous navigation not available';
+      this.previousBtn.title = canNavigatePrevious ? 'Previous Activity (respects course sequencing)' : 'Previous navigation not available';
       this.previousBtn.setAttribute('aria-disabled', String(!canNavigatePrevious));
     }
     
     if (this.nextBtn) {
       this.nextBtn.disabled = !canNavigateNext;
       this.nextBtn.classList.toggle('disabled', !canNavigateNext);
-      this.nextBtn.title = canNavigateNext ? 'Next' : 'Next navigation not available';
+      this.nextBtn.title = canNavigateNext ? 'Next Activity (respects course sequencing)' : 'Next navigation not available';
       this.nextBtn.setAttribute('aria-disabled', String(!canNavigateNext));
     }
+    
+    // Add navigation state indicators
+    this.addNavigationStateIndicators();
   }
 
   /**
@@ -603,17 +672,187 @@ class NavigationControls extends BaseComponent {
    */
   updateMenuButton() {
     if (this.menuBtn) {
-      this.menuBtn.textContent = this.navigationState.menuVisible ? '✕ Close' : '☰ Menu';
+      this.menuBtn.textContent = this.navigationState.menuVisible ? '✕ Hide Menu' : '📚 Course Menu';
       this.menuBtn.classList.toggle('active', this.navigationState.menuVisible);
+    }
+  }
+
+  /**
+   * Update navigation context display
+   */
+  updateNavigationContext(activityInfo = {}) {
+    if (!this.contextElement) return;
+    
+    // Show context if we have activity information
+    const hasActivity = activityInfo && (activityInfo.title || activityInfo.identifier);
+    
+    if (hasActivity) {
+      this.contextElement.style.display = 'block';
+      
+      // Update position (if available)
+      if (this.positionElement && activityInfo.position) {
+        this.positionElement.textContent = `Activity ${activityInfo.position.current} of ${activityInfo.position.total}`;
+      }
+      
+      // Update title
+      if (this.titleDisplayElement && activityInfo.title) {
+        this.titleDisplayElement.textContent = activityInfo.title;
+      }
+      
+      // Update type
+      if (this.typeElement && activityInfo.type) {
+        this.typeElement.textContent = activityInfo.type.toUpperCase();
+      }
+    } else {
+      this.contextElement.style.display = 'none';
+    }
+  }
+
+  /**
+   * Add navigation state indicators
+   */
+  addNavigationStateIndicators() {
+    // Add visual indicators for navigation state
+    const indicators = {
+      locked: '🔒',
+      forced: '⚠️',  
+      available: '✅',
+      processing: '🔄'
+    };
+    
+    // Update button states with indicators
+    if (this.previousBtn && this.navigationState.canNavigatePrevious) {
+      this.previousBtn.classList.add('nav-available');
+    }
+    
+    if (this.nextBtn && this.navigationState.canNavigateNext) {
+      this.nextBtn.classList.add('nav-available');
+    }
+  }
+
+  /**
+   * Set testing mode
+   */
+  async setTestingMode(enabled) {
+    try {
+      // Update UI state
+      if (this.uiState) {
+        const currentTestingMode = this.uiState.getState('testingMode') || {};
+        const newTestingMode = {
+          ...currentTestingMode,
+          enabled: enabled
+        };
+        this.uiState.setState('testingMode', newTestingMode);
+      }
+      
+      // Update mode toggle buttons
+      this.updateModeToggle(enabled);
+      
+      // Update navigation controls display based on mode
+      this.updateNavigationForTestingMode(enabled);
+      
+      // Emit mode change event
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('testingMode:changed', { enabled });
+      
+      this.logger?.info('NavigationControls: Testing mode changed', { enabled });
+      
+    } catch (error) {
+      this.logger?.error('NavigationControls: Failed to set testing mode', error);
+    }
+  }
+
+  /**
+   * Update mode toggle button states
+   */
+  updateModeToggle(testingModeEnabled) {
+    if (this.learnerModeBtn && this.testingModeBtn) {
+      this.learnerModeBtn.classList.toggle('active', !testingModeEnabled);
+      this.testingModeBtn.classList.toggle('active', testingModeEnabled);
+    }
+  }
+
+  /**
+   * Update navigation controls for testing mode
+   */
+  updateNavigationForTestingMode(testingModeEnabled) {
+    // Update navigation controls container to show testing mode
+    if (this.element) {
+      this.element.classList.toggle('navigation-controls--testing', testingModeEnabled);
+      this.element.classList.toggle('navigation-controls--learner', !testingModeEnabled);
+    }
+    
+    // Update button labels and behavior for testing mode
+    if (testingModeEnabled) {
+      if (this.previousBtn) {
+        this.previousBtn.title = 'Previous Activity (TESTING MODE - Can override sequencing)';
+        this.previousBtn.classList.add('nav-testing-mode');
+      }
+      if (this.nextBtn) {
+        this.nextBtn.title = 'Next Activity (TESTING MODE - Can override sequencing)';
+        this.nextBtn.classList.add('nav-testing-mode');
+      }
+      
+      // Show testing mode indicator
+      this.showTestingModeIndicator();
+    } else {
+      if (this.previousBtn) {
+        this.previousBtn.title = 'Previous Activity (respects course sequencing)';
+        this.previousBtn.classList.remove('nav-testing-mode');
+      }
+      if (this.nextBtn) {
+        this.nextBtn.title = 'Next Activity (respects course sequencing)';
+        this.nextBtn.classList.remove('nav-testing-mode');
+      }
+      
+      // Hide testing mode indicator
+      this.hideTestingModeIndicator();
+    }
+  }
+
+  /**
+   * Show testing mode indicator
+   */
+  showTestingModeIndicator() {
+    if (this.statusElement && !this.testingModeIndicator) {
+      this.testingModeIndicator = document.createElement('div');
+      this.testingModeIndicator.className = 'testing-mode-indicator';
+      this.testingModeIndicator.innerHTML = '🔧 TESTING MODE - Sequencing Rules Can Be Overridden';
+      
+      // Insert after status element
+      if (this.statusElement.parentNode) {
+        this.statusElement.parentNode.insertBefore(this.testingModeIndicator, this.statusElement.nextSibling);
+      }
+    }
+    
+    if (this.testingModeIndicator) {
+      this.testingModeIndicator.style.display = 'block';
+    }
+  }
+
+  /**
+   * Hide testing mode indicator
+   */
+  hideTestingModeIndicator() {
+    if (this.testingModeIndicator) {
+      this.testingModeIndicator.style.display = 'none';
     }
   }
 
   /**
    * Set menu visibility
    */
-  setMenuVisible(visible) {
+  async setMenuVisible(visible) {
     this.updateNavigationState({ menuVisible: visible });
     this.emit('menuVisibilityChanged', { visible });
+    
+    // Also emit to global eventBus for app-manager
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('menuVisibilityChanged', { visible });
+    } catch (_) {
+      // Fallback - continue with component-level event
+    }
   }
 
   /**
@@ -886,6 +1125,12 @@ class NavigationControls extends BaseComponent {
     }
     if (this.menuBtn && this._boundHandlers && this._boundHandlers.handleMenuClick) {
       this.menuBtn.removeEventListener('click', this._boundHandlers.handleMenuClick);
+    }
+    if (this.learnerModeBtn && this._boundHandlers && this._boundHandlers.handleLearnerModeClick) {
+      this.learnerModeBtn.removeEventListener('click', this._boundHandlers.handleLearnerModeClick);
+    }
+    if (this.testingModeBtn && this._boundHandlers && this._boundHandlers.handleTestingModeClick) {
+      this.testingModeBtn.removeEventListener('click', this._boundHandlers.handleTestingModeClick);
     }
     super.destroy();
   }
