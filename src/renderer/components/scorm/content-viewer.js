@@ -1060,32 +1060,26 @@ class ContentViewer extends BaseComponent {
 
 
   /**
-   * Verify SCORM API presence - simplified version
+   * Verify SCORM API presence - check parent window where APIs are pre-injected
    */
   verifyScormApiPresence() {
     try {
-      const win = this.contentWindow;
-      if (!win) {
-        this.showError('SCORM API Verification Failed', 'Content window not available to verify SCORM API.');
+      // APIs are pre-injected in parent window, not content window
+      const parentApi2004 = window.API_1484_11;
+      const parentApi12 = window.API;
+      const hasParent2004 = parentApi2004 && typeof parentApi2004.Initialize === 'function';
+      const hasParent12 = parentApi12 && (typeof parentApi12.Initialize === 'function' || typeof parentApi12.LMSInitialize === 'function');
+
+      if (hasParent2004 || hasParent12) {
+        // API present in parent window - success!
+        this.emit('scormApiVerified', { mode: 'pre-injected', hasParent2004, hasParent12 });
         return;
       }
 
-      // Check SCORM APIs in content window
-      const api2004 = win.API_1484_11;
-      const api12 = win.API;
-      const has2004 = api2004 && typeof api2004.Initialize === 'function';
-      const has12 = api12 && (typeof api12.Initialize === 'function' || typeof api12.LMSInitialize === 'function');
-
-      if (has2004 || has12) {
-        // API present - success!
-        this.emit('scormApiVerified', { mode: 'direct', has2004, has12 });
-        return;
-      }
-
-      // If APIs are missing, show error
+      // If APIs are missing from parent window, show error
       this.showError(
         'SCORM API not found',
-        'The SCORM course content does not have the required API objects. Please ensure this is a valid SCORM package.'
+        'SCORM APIs were not properly pre-injected into parent window. API bridge may not be functioning correctly.'
       );
       this.emit('scormApiMissing', { url: this.currentUrl });
       

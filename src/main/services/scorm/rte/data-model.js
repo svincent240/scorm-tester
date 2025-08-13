@@ -248,6 +248,7 @@ class ScormDataModel {
     this.data.set('cmi.score.raw', '');
     this.data.set('cmi.score.max', '');
     this.data.set('cmi.score.min', '');
+    this.data.set('cmi.progress_measure', '');
     this.data.set('cmi.location', '');
     this.data.set('cmi.suspend_data', '');
     this.data.set('cmi.entry', 'ab-initio');
