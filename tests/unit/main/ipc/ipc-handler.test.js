@@ -129,7 +129,7 @@ describe('IpcHandler Event Broadcasting', () => {
 
     // Expect the broadcastScormApiCallLogged method to have been called
     expect(mockWebContents.send).toHaveBeenCalledTimes(1);
-    expect(mockWebContents.send).toHaveBeenCalledWith('scorm-api-call-logged', apiCallPayload);
+    expect(mockWebContents.send).toHaveBeenCalledWith('scorm-inspector-data-updated', apiCallPayload);
   });
 
   it('should broadcast scorm-api-call-logged to multiple open windows', () => {
@@ -146,9 +146,9 @@ describe('IpcHandler Event Broadcasting', () => {
     apiCallLoggedCallback(apiCallPayload);
 
     expect(mockWebContents1.send).toHaveBeenCalledTimes(1);
-    expect(mockWebContents1.send).toHaveBeenCalledWith('scorm-api-call-logged', apiCallPayload);
+    expect(mockWebContents1.send).toHaveBeenCalledWith('scorm-inspector-data-updated', apiCallPayload);
     expect(mockWebContents2.send).toHaveBeenCalledTimes(1);
-    expect(mockWebContents2.send).toHaveBeenCalledWith('scorm-api-call-logged', apiCallPayload);
+    expect(mockWebContents2.send).toHaveBeenCalledWith('scorm-inspector-data-updated', apiCallPayload);
   });
 
   it('should not broadcast to destroyed windows', () => {
@@ -165,7 +165,7 @@ describe('IpcHandler Event Broadcasting', () => {
     apiCallLoggedCallback(apiCallPayload);
 
     expect(mockWebContents1.send).toHaveBeenCalledTimes(1);
-    expect(mockWebContents1.send).toHaveBeenCalledWith('scorm-api-call-logged', apiCallPayload);
+    expect(mockWebContents1.send).toHaveBeenCalledWith('scorm-inspector-data-updated', apiCallPayload);
     expect(mockWebContents2.send).not.toHaveBeenCalled(); // Should not send to destroyed window
   });
 

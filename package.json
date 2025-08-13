@@ -22,7 +22,7 @@
     "test:error-handling": "jest tests/integration/error-handling.test.js",
     "test:phase-integration": "jest tests/integration/phase-integration.test.js",
     "test:renderer": "jest tests/integration/renderer-integration.test.js",
-    "test:all": "jest tests/unit tests/contract tests/integration tests/perf --forceExit --detectOpenHandles --maxWorkers=1",
+    "test:all": "jest && playwright test",
     "test:e2e": "playwright test",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",

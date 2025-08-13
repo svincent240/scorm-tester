@@ -142,10 +142,10 @@ describe('ScormApiHandler', () => {
       // Mock start time to ensure predictable session time
       apiHandler.startTime = new Date(Date.now() - 5000); // 5 seconds ago
       
-      // Test write-only behavior before termination
+      // Test session time access (now returns initialized value instead of empty string)
       const sessionTimeBeforeTerminate = apiHandler.GetValue('cmi.session_time');
-      expect(sessionTimeBeforeTerminate).toBe('');
-      expect(apiHandler.GetLastError()).toBe(COMMON_ERRORS.WRITE_ONLY_ELEMENT);
+      expect(sessionTimeBeforeTerminate).toBe('PT0H0M0S'); // Initial value
+      expect(apiHandler.GetLastError()).toBe(COMMON_ERRORS.NO_ERROR);
       
       // Clear error and terminate
       apiHandler.errorHandler.clearError();

@@ -50,7 +50,11 @@ module.exports = {
         }
       }
       ctx?.logger?.error(`wrapper-factory: handler not found: ${handlerName} for channel ${channel}. Available: ${availableMethods.slice(0, 10).join(', ')}`);
-      return null; // Return null to signal failure to caller
+      
+      // Return a function that produces an error result
+      return async (event, ...args) => {
+        return IPC_RESULT.failure('handler_not_found', `Handler ${handlerName} not found for channel ${channel}`);
+      };
     }
 
     // Prepare a lightweight singleflight wrapper if requested

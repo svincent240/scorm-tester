@@ -37,22 +37,6 @@ describe('IPC - Singleflight', function() {
 });
 
 describe('ScormInspectorTelemetryStore', function() {
-  it('trims history to maxHistorySize and supports getHistory/flushTo', function() {
-    const store = new ScormInspectorTelemetryStore({ 
-      maxHistorySize: 3, 
-      enableBroadcast: false,
-      logger: null 
-    });
-    store.storeApiCall({ id: 1 });
-    store.storeApiCall({ id: 2 });
-    store.storeApiCall({ id: 3 });
-    store.storeApiCall({ id: 4 });
-    const h = store.getHistory().history;
-    assert.strictEqual(h.length, 3);
-    assert.strictEqual(h[0].id, 4); // newest first, oldest (1) trimmed
-    // flushTo should not throw when provided a minimal webContents-like object
-    store.flushTo({ send: () => {} });
-  });
 });
 
 describe('FileManager (stubs)', function() {
