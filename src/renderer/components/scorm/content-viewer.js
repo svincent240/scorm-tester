@@ -251,10 +251,10 @@ class ContentViewer extends BaseComponent {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
       
-      // Ensure SCORM APIs are available for content discovery
-      this.ensureScormAPIsAvailable();
+      // Setup SCORM APIs BEFORE iframe loads
+      this.setupScormAPIs();
       
-      // Load content directly in iframe (no host frameset)
+      // Load content directly in iframe
       if (this.iframe) {
         this.iframe.src = processedUrl;
       }
@@ -271,72 +271,24 @@ class ContentViewer extends BaseComponent {
    * Handle iframe load event
    */
   handleIframeLoad() {
-    const iframeLoadTime = Date.now();
-    
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
       this.loadingTimeout = null;
     }
     
-    const loadTime = iframeLoadTime - this.loadStartTime;
-    
     try {
       this.contentWindow = this.iframe.contentWindow;
-      const contentWindowAcquiredTime = Date.now();
-      
       this.hideLoading();
       this.showContent();
-
-      try {
-        // Diagnostics: log initial content document state and timing
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          const docReady = (() => {
-            try { return this.contentWindow?.document?.readyState || 'unknown'; } catch (_) { return 'err'; }
-          })();
-          rendererLogger.info('[ContentViewer] iframe load event - timing analysis', {
-            url: this.currentUrl,
-            loadTimeMs: loadTime,
-            contentWindowAcquiredMs: contentWindowAcquiredTime - iframeLoadTime,
-            docReadyState: docReady,
-            timestampBreakdown: {
-              iframeLoadEvent: iframeLoadTime,
-              contentWindowAcquired: contentWindowAcquiredTime,
-              startTime: this.loadStartTime
-            }
-          });
-        }).catch(() => {});
-      } catch (_) {}
-
-      // Direct content loading - inject API directly into SCORM content window
-      const apiSetupStartTime = Date.now();
-      this.setupScormAPI();
-      const apiSetupCompleteTime = Date.now();
-      
-      // Simplified API verification - no complex monitoring needed
-      
-      // Verify API presence after a brief delay to ensure injection is complete
-      setTimeout(() => { 
-        this.verifyScormApiPresence();
-      }, 100);
       
       // Respect content design after content loads
-      setTimeout(() => {
-        this.respectContentDesign();
-        // Begin observing size changes for container adjustments only
-        this.startResizeObserver();
-        // Force layout refresh to ensure content utilizes full available space
-        this.refreshLayout();
-      }, 100);
-      
-      // Fix nested iframe sizing issues with additional delay for SCORM courses
-      // that create nested iframes after initial load
-      setTimeout(() => {
-        this.fixNestedIframeSizing();
-      }, 500);
+      this.respectContentDesign();
+      this.startResizeObserver();
+      this.refreshLayout();
+      this.fixNestedIframeSizing();
       
       this.emit('contentLoaded', {
         url: this.currentUrl,
-        loadTime,
         contentWindow: this.contentWindow
       });
       
@@ -363,16 +315,12 @@ class ContentViewer extends BaseComponent {
 
 
   /**
-   * Pre-inject APIs into parent window contexts BEFORE iframe loads
-   * This ensures APIs are present when Rustici algorithm searches
+   * Setup SCORM APIs - single method called before iframe loads
    */
-  preInjectAPIs() {
+  setupScormAPIs() {
     try {
-      // Set the SCORM client for synchronous bridge calls (already imported)
+      // Set the SCORM client for the bridge
       scormAPIBridge.setScormClient(scormClient);
-      
-      // Enable the bridge for communication
-      scormAPIBridge.enable();
       
       // Create direct API methods that call the bridge synchronously
       const createDirectAPI = (version) => {
@@ -385,7 +333,6 @@ class ContentViewer extends BaseComponent {
         methods.forEach(method => {
           api[method] = (...args) => {
             try {
-              // Direct synchronous call to the bridge's executeScormMethod
               return scormAPIBridge.executeScormMethod(method, args);
             } catch (error) {
               return '0';
@@ -408,113 +355,9 @@ class ContentViewer extends BaseComponent {
         return api;
       };
       
-      // Create the API objects
-      const api12 = createDirectAPI('1.2');
-      const api2004 = createDirectAPI('2004');
-      
-      // CRITICAL: Inject APIs into current window (which will be parent of iframe)
-      window.API = api12;
-      window.API_1484_11 = api2004;
-      
-      // Ensure APIs are enumerable properties (Rustici checks this)
-      try {
-        Object.defineProperty(window, 'API', {
-          value: api12,
-          writable: true,
-          enumerable: true,
-          configurable: true
-        });
-        Object.defineProperty(window, 'API_1484_11', {
-          value: api2004,
-          writable: true,
-          enumerable: true,
-          configurable: true
-        });
-      } catch (e) {
-        // Direct assignment should work as fallback
-      }
-      
-      // Also inject into parent/top windows if they exist and are different
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.API = api12;
-          window.parent.API_1484_11 = api2004;
-        }
-      } catch (e) {
-        // Cross-origin access may fail - ignore
-      }
-      
-      try {
-        if (window.top && window.top !== window && window.top !== window.parent) {
-          window.top.API = api12;
-          window.top.API_1484_11 = api2004;
-        }
-      } catch (e) {
-        // Cross-origin access may fail - ignore
-      }
-      
-    } catch (error) {
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('[ContentViewer] Pre-injection API error', error?.message || String(error));
-        }).catch(() => {});
-      } catch (_) {}
-    }
-  }
-
-  /**
-   * Ensure SCORM APIs are available in the parent window for content discovery
-   * SCORM-compliant: APIs available in parent window, no content modification
-   */
-  ensureScormAPIsAvailable() {
-    try {
-      // Set the SCORM client for synchronous bridge calls
-      scormAPIBridge.setScormClient(scormClient);
-      
-      // Enable the bridge for communication
-      scormAPIBridge.enable();
-      
-      // Create SCORM APIs in the current window (parent of content iframe)
-      // This follows SCORM standard - APIs discoverable in parent window hierarchy
-      const createDirectAPI = (version) => {
-        const methods = version === '2004' 
-          ? ['Initialize', 'Terminate', 'GetValue', 'SetValue', 'Commit', 'GetLastError', 'GetErrorString', 'GetDiagnostic']
-          : ['LMSInitialize', 'LMSFinish', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSGetLastError', 'LMSGetErrorString', 'LMSGetDiagnostic'];
-          
-        const api = {};
-        
-        methods.forEach(method => {
-          api[method] = (...args) => {
-            try {
-              return scormAPIBridge.executeScormMethod(method, args);
-            } catch (error) {
-              return '0';
-            }
-          };
-        });
-        
-        // Add SCORM 1.2 compatibility methods
-        if (version === '1.2') {
-          api.Initialize = api.LMSInitialize;
-          api.Terminate = api.LMSFinish;
-          api.GetValue = api.LMSGetValue;
-          api.SetValue = api.LMSSetValue;
-          api.Commit = api.LMSCommit;
-          api.GetLastError = api.LMSGetLastError;
-          api.GetErrorString = api.LMSGetErrorString;
-          api.GetDiagnostic = api.LMSGetDiagnostic;
-        }
-        
-        return api;
-      };
-      
-      // Make APIs available in current window for SCORM content discovery
-      if (!window.API) {
-        window.API = createDirectAPI('1.2');
-      }
-      if (!window.API_1484_11) {
-        window.API_1484_11 = createDirectAPI('2004');
-      }
+      // Create API objects and inject into window
+      window.API = createDirectAPI('1.2');
+      window.API_1484_11 = createDirectAPI('2004');
       
     } catch (error) {
       try {
@@ -523,91 +366,6 @@ class ContentViewer extends BaseComponent {
         }).catch(() => {});
       } catch (_) {}
     }
-  }
-
-  /**
-   * Setup SCORM API verification in content window
-   */
-  setupScormAPI() {
-    if (!this.contentWindow) {
-      this.showError('Content Setup Error', 'Content window not available for SCORM API setup');
-      return;
-    }
-    
-    try {
-      const win = this.contentWindow;
-      
-      // Only add diagnostic function, don't modify content APIs
-      win.testAPIInjection = function() {
-        return {
-          hasAPI: !!win.API,
-          hasAPI_1484_11: !!win.API_1484_11,
-          parentHasAPI: !!(window.parent?.API),
-          parentHasAPI_1484_11: !!(window.parent?.API_1484_11),
-          topHasAPI: !!(window.top?.API),
-          topHasAPI_1484_11: !!(window.top?.API_1484_11),
-          apiInitialize: typeof window.parent?.API?.Initialize,
-          api1484Initialize: typeof window.parent?.API_1484_11?.Initialize
-        };
-      };
-      
-      this.emit('scormApiInjected', { contentWindow: win, mode: 'available-in-parent' });
-      
-    } catch (error) {
-      try {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('[ContentViewer] API setup error', error?.message || String(error));
-        }).catch(() => {});
-      } catch (_) {}
-    }
-  }
-
-  /**
-   * Create optimized SCORM API wrapper
-   * @private
-   */
-  createOptimizedAPIWrapper() {
-    const sessionId = scormClient.getSessionId() || 'default';
-    
-    // Common API methods with optimized logging
-    const createAPIMethod = (methodName, clientMethod) => {
-      return (...args) => {
-        const result = clientMethod.apply(scormClient, args);
-        return result;
-      };
-    };
-    
-    // SCORM 2004 API methods
-    const scorm2004Methods = {
-      Initialize: createAPIMethod('Initialize', () => scormClient.Initialize(sessionId)),
-      Terminate: createAPIMethod('Terminate', scormClient.Terminate),
-      GetValue: createAPIMethod('GetValue', scormClient.GetValue),
-      SetValue: createAPIMethod('SetValue', scormClient.SetValue),
-      Commit: createAPIMethod('Commit', scormClient.Commit),
-      GetLastError: createAPIMethod('GetLastError', scormClient.GetLastError),
-      GetErrorString: createAPIMethod('GetErrorString', scormClient.GetErrorString),
-      GetDiagnostic: createAPIMethod('GetDiagnostic', scormClient.GetDiagnostic)
-    };
-    
-    // SCORM 1.2 API methods (with LMS prefix)
-    const scorm12Methods = {
-      ...scorm2004Methods, // Include direct methods for compatibility
-      LMSInitialize: scorm2004Methods.Initialize,
-      LMSFinish: scorm2004Methods.Terminate,
-      LMSGetValue: scorm2004Methods.GetValue,
-      LMSSetValue: scorm2004Methods.SetValue,
-      LMSCommit: scorm2004Methods.Commit,
-      LMSGetLastError: scorm2004Methods.GetLastError,
-      LMSGetErrorString: scorm2004Methods.GetErrorString,
-      LMSGetDiagnostic: scorm2004Methods.GetDiagnostic,
-      // Add legacy aliases
-      Finish: scorm2004Methods.Terminate
-    };
-    
-    return {
-      scorm12: scorm12Methods,
-      scorm2004: scorm2004Methods
-    };
   }
 
 
@@ -1149,34 +907,6 @@ class ContentViewer extends BaseComponent {
   }
 
 
-  /**
-   * Verify SCORM API presence - check parent window where APIs are pre-injected
-   */
-  verifyScormApiPresence() {
-    try {
-      // APIs are pre-injected in parent window, not content window
-      const parentApi2004 = window.API_1484_11;
-      const parentApi12 = window.API;
-      const hasParent2004 = parentApi2004 && typeof parentApi2004.Initialize === 'function';
-      const hasParent12 = parentApi12 && (typeof parentApi12.Initialize === 'function' || typeof parentApi12.LMSInitialize === 'function');
-
-      if (hasParent2004 || hasParent12) {
-        // API present in parent window - success!
-        this.emit('scormApiVerified', { mode: 'pre-injected', hasParent2004, hasParent12 });
-        return;
-      }
-
-      // If APIs are missing from parent window, show error
-      this.showError(
-        'SCORM API not found',
-        'SCORM APIs were not properly pre-injected into parent window. API bridge may not be functioning correctly.'
-      );
-      this.emit('scormApiMissing', { url: this.currentUrl });
-      
-    } catch (err) {
-      this.showError('SCORM API verification error', err?.message || String(err));
-    }
-  }
 
 
   /**
@@ -1265,10 +995,6 @@ class ContentViewer extends BaseComponent {
       }
     } catch (_) {}
 
-    // Disable the SCORM API bridge
-    try {
-      scormAPIBridge.disable();
-    } catch (_) {}
 
     this.clearContent();
     super.destroy();
