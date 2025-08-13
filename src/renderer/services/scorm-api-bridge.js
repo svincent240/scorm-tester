@@ -101,30 +101,54 @@ class ScormAPIBridge {
    */
   async executeScormMethod(method, params) {
     const { scormClient } = await import('./scorm-client.js');
+    
+    // Debug log to see what method is being called
+    console.log('[ScormAPIBridge] Executing method:', method, 'with params:', params);
+    
+    let result;
     switch (method) {
       case 'Initialize':
+      case 'LMSInitialize':
         // Generate session ID if not already set
         if (!this.sessionId) {
           this.sessionId = 'session_' + Date.now();
         }
-        return scormClient.Initialize(this.sessionId);
+        result = scormClient.Initialize(this.sessionId);
+        break;
       case 'Terminate':
-        return scormClient.Terminate(params[0] || '');
+      case 'LMSFinish':
+        result = scormClient.Terminate(params[0] || '');
+        break;
       case 'GetValue':
-        return scormClient.GetValue(params[0]);
+      case 'LMSGetValue':
+        result = scormClient.GetValue(params[0]);
+        break;
       case 'SetValue':
-        return scormClient.SetValue(params[0], params[1]);
+      case 'LMSSetValue':
+        result = scormClient.SetValue(params[0], params[1]);
+        break;
       case 'Commit':
-        return scormClient.Commit(params[0] || '');
+      case 'LMSCommit':
+        result = scormClient.Commit(params[0] || '');
+        break;
       case 'GetLastError':
-        return scormClient.GetLastError();
+      case 'LMSGetLastError':
+        result = scormClient.GetLastError();
+        break;
       case 'GetErrorString':
-        return scormClient.GetErrorString(params[0]);
+      case 'LMSGetErrorString':
+        result = scormClient.GetErrorString(params[0]);
+        break;
       case 'GetDiagnostic':
-        return scormClient.GetDiagnostic(params[0]);
+      case 'LMSGetDiagnostic':
+        result = scormClient.GetDiagnostic(params[0]);
+        break;
       default:
-        return '0';
+        result = 'false'; // Return 'false' for unknown methods, not '0'
     }
+    
+    console.log('[ScormAPIBridge] Method result:', method, '->', result);
+    return result;
   }
 }
 

@@ -523,6 +523,174 @@ class WindowManager extends BaseService {
     }
   }
 
+  /**
+   * Inject SCORM API script into HTML content before serving
+   * @private
+   */
+  injectScormAPIIntoHTML(filePath, callback) {
+    const fs = require('fs');
+    
+    try {
+      // Read the HTML file
+      fs.readFile(filePath, 'utf8', (err, html) => {
+        if (err) {
+          this.logger?.error('WindowManager: Failed to read HTML file for SCORM API injection', { filePath, error: err.message });
+          callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+          return;
+        }
+        
+        // SCORM API injection script - creates API objects that communicate via postMessage
+        const scormAPIScript = `
+<script>
+(function() {
+  // SCORM API Bridge for cross-origin communication
+  function createAPIMethod(method) {
+    return function() {
+      const args = Array.from(arguments);
+      const callId = 'scorm_' + Date.now() + '_' + Math.random();
+      let result = '0';
+      let responseReceived = false;
+      
+      // Listen for response from the renderer bridge
+      const listener = function(event) {
+        if (event.data && event.data.type === 'SCORM_API_RESPONSE' && event.data.callId === callId) {
+          window.removeEventListener('message', listener);
+          responseReceived = true;
+          result = event.data.result || '0';
+        }
+      };
+      window.addEventListener('message', listener);
+      
+      // Send API call to parent window
+      try {
+        window.parent.postMessage({
+          type: 'SCORM_API_CALL',
+          method: method,
+          params: args,
+          callId: callId
+        }, '*');
+      } catch (e) {
+        window.removeEventListener('message', listener);
+        return '0';
+      }
+      
+      // Synchronous wait for response (required by SCORM spec)
+      const startTime = Date.now();
+      const timeout = 5000;
+      while (!responseReceived && (Date.now() - startTime) < timeout) {
+        // Yield control briefly to allow message processing
+        const now = Date.now();
+        while (Date.now() - now < 1) {
+          // Busy wait for 1ms
+        }
+      }
+      
+      if (!responseReceived) {
+        window.removeEventListener('message', listener);
+      }
+      
+      return result;
+    };
+  }
+  
+  // SCORM 1.2 API
+  window.API = {
+    LMSInitialize: createAPIMethod('Initialize'),
+    LMSFinish: createAPIMethod('Terminate'),
+    LMSGetValue: createAPIMethod('GetValue'),
+    LMSSetValue: createAPIMethod('SetValue'),
+    LMSCommit: createAPIMethod('Commit'),
+    LMSGetLastError: createAPIMethod('GetLastError'),
+    LMSGetErrorString: createAPIMethod('GetErrorString'),
+    LMSGetDiagnostic: createAPIMethod('GetDiagnostic')
+  };
+  
+  // SCORM 2004 API
+  window.API_1484_11 = {
+    Initialize: createAPIMethod('Initialize'),
+    Terminate: createAPIMethod('Terminate'),
+    GetValue: createAPIMethod('GetValue'),
+    SetValue: createAPIMethod('SetValue'),
+    Commit: createAPIMethod('Commit'),
+    GetLastError: createAPIMethod('GetLastError'),
+    GetErrorString: createAPIMethod('GetErrorString'),
+    GetDiagnostic: createAPIMethod('GetDiagnostic')
+  };
+  
+  // Add compatibility methods to SCORM 1.2 API
+  window.API.Initialize = window.API.LMSInitialize;
+  window.API.Terminate = window.API.LMSFinish;
+  window.API.GetValue = window.API.LMSGetValue;
+  window.API.SetValue = window.API.LMSSetValue;
+  window.API.Commit = window.API.LMSCommit;
+  window.API.GetLastError = window.API.LMSGetLastError;
+  window.API.GetErrorString = window.API.LMSGetErrorString;
+  window.API.GetDiagnostic = window.API.LMSGetDiagnostic;
+  
+  // Debug logging
+  console.log('SCORM APIs injected directly into content window:', {
+    hasAPI: !!window.API,
+    hasAPI_1484_11: !!window.API_1484_11,
+    location: window.location.href
+  });
+})();
+</script>`;
+        
+        // Inject script at the beginning of <head> or before first <script> tag
+        let modifiedHTML = html;
+        
+        // Try to inject into <head> first
+        if (html.includes('<head>')) {
+          modifiedHTML = html.replace('<head>', '<head>' + scormAPIScript);
+        } else if (html.includes('<HEAD>')) {
+          modifiedHTML = html.replace('<HEAD>', '<HEAD>' + scormAPIScript);
+        } else if (html.includes('<script')) {
+          // If no head, inject before first script
+          modifiedHTML = html.replace('<script', scormAPIScript + '<script');
+        } else if (html.includes('<SCRIPT')) {
+          modifiedHTML = html.replace('<SCRIPT', scormAPIScript + '<SCRIPT');
+        } else if (html.includes('<html>')) {
+          // If no head or scripts, inject after <html>
+          modifiedHTML = html.replace('<html>', '<html>' + scormAPIScript);
+        } else if (html.includes('<HTML>')) {
+          modifiedHTML = html.replace('<HTML>', '<HTML>' + scormAPIScript);
+        } else {
+          // Fallback: inject at the very beginning
+          modifiedHTML = scormAPIScript + html;
+        }
+        
+        // Write modified HTML to a temporary file and serve that
+        const path = require('path');
+        const os = require('os');
+        const tempFilePath = path.join(os.tmpdir(), `scorm-api-injected-${Date.now()}.html`);
+        
+        fs.writeFile(tempFilePath, modifiedHTML, 'utf8', (writeErr) => {
+          if (writeErr) {
+            this.logger?.error('WindowManager: Failed to write modified HTML to temp file', { tempFilePath, error: writeErr.message });
+            callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+            return;
+          }
+          
+          // Return the temporary file path
+          callback({ path: tempFilePath });
+          
+          // Clean up the temp file after a delay
+          setTimeout(() => {
+            fs.unlink(tempFilePath, () => {
+              // Ignore errors - temp file cleanup is best effort
+            });
+          }, 30000); // 30 seconds should be enough for content to load
+        });
+        
+        this.logger?.debug('WindowManager: SCORM API script injected into HTML', { filePath });
+      });
+      
+    } catch (error) {
+      this.logger?.error('WindowManager: Error during SCORM API injection', { filePath, error: error.message });
+      callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+    }
+  }
+
   
 }
  

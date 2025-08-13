@@ -306,7 +306,7 @@ class MainProcess {
 // This enables localStorage access and proper CORS behavior for SCORM content.
 // Must be called before app is ready.
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+  { scheme: 'scorm-app', privileges: { secure: true, standard: true, supportFetchAPI: true } }
 ]);
 
 // Global main process instance

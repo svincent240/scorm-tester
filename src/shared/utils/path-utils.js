@@ -86,8 +86,15 @@ class PathUtils {
     }
     PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Relative Path: '${relativePath}'`);
     
-    const protocolUrl = `scorm-app://${relativePath}`;
-    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Output: '${protocolUrl}'`);
+    // Only use same-origin prefix for SCORM content (files under temp directory)
+    // Main app files (index.html, scorm-inspector.html, etc.) should load directly
+    const normalizedTempRoot = this.normalize(require('path').join(require('os').tmpdir(), 'scorm-tester'));
+    const isScormContent = this.normalize(appRoot).startsWith(normalizedTempRoot);
+    
+    const protocolUrl = isScormContent 
+      ? `scorm-app://index.html/${relativePath}`
+      : `scorm-app://${relativePath}`;
+    PathUtils.logger?.debug(`PathUtils: toScormProtocolUrl - Output: '${protocolUrl}' (isScormContent: ${isScormContent})`);
     return protocolUrl;
   }
 
@@ -222,6 +229,17 @@ class PathUtils {
       // Strip scheme prefix 'scorm-app://'
       const prefix = 'scorm-app://';
       let requestedPath = protocolUrl.startsWith(prefix) ? protocolUrl.slice(prefix.length) : protocolUrl;
+
+      // Handle case where main app requests 'index.html/' (with trailing slash)
+      if (requestedPath === 'index.html/') {
+        requestedPath = 'index.html';
+        PathUtils.logger?.debug(`PathUtils: Converted index.html/ to index.html`);
+      }
+      // Handle same-origin paths that start with 'index.html/' - strip this prefix
+      else if (requestedPath.startsWith('index.html/')) {
+        requestedPath = requestedPath.slice('index.html/'.length);
+        PathUtils.logger?.debug(`PathUtils: Stripped index.html/ prefix, new path: ${requestedPath}`);
+      }
 
       // Quick checks for broken content variables
       if (requestedPath.includes('/undefined')) {
