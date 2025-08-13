@@ -62,23 +62,27 @@
 .app-header {
   flex-shrink: 0;
   height: var(--header-height);
-  background: var(--bg-secondary);
+  background: var(--bg-gradient-surface);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-elevated);
   z-index: var(--z-header);
   position: relative;  /* Create stacking context */
   width: 100%;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .app-footer {
   flex-shrink: 0;
   height: var(--footer-height);
-  background: var(--bg-secondary);
+  background: var(--bg-gradient-surface);
   border-top: 1px solid var(--border-color);
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.1);
   z-index: var(--z-header);
   position: relative;
   width: 100%;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .app-main {
@@ -93,13 +97,14 @@
   flex-shrink: 0;
   width: var(--sidebar-width);
   min-width: 280px;  /* Ensure minimum width for content */
-  background: var(--bg-secondary);
+  background: var(--bg-gradient-subtle);
   border-right: 1px solid var(--border-color);
   overflow-y: auto;
   transition: width var(--transition-normal) ease;
   z-index: var(--z-sidebar);
   position: relative;  /* Create stacking context */
   height: 100%;  /* Full height of parent */
+  box-shadow: var(--shadow-lg);
 }
 
 .app-sidebar--collapsed {

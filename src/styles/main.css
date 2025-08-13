@@ -199,41 +199,131 @@ body.dev-mode .dev-mode-toggle {
   .hide-desktop { display: none !important; }
 }
 
-/* Animation Utilities */
+/* Enhanced Animation Utilities */
 .fade-in {
-  animation: fadeIn var(--transition-base) ease-in-out;
+  animation: fadeIn var(--transition-base) ease-out;
 }
 
 .fade-out {
-  animation: fadeOut var(--transition-base) ease-in-out;
+  animation: fadeOut var(--transition-base) ease-in;
 }
 
 .slide-in-right {
-  animation: slideInRight var(--transition-base) ease-out;
+  animation: slideInRight var(--transition-base) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .slide-out-right {
-  animation: slideOutRight var(--transition-base) ease-in;
+  animation: slideOutRight var(--transition-base) cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+.slide-in-up {
+  animation: slideInUp var(--transition-base) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scale-in {
+  animation: scaleIn var(--transition-base) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+.bounce-in {
+  animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { 
+    opacity: 0; 
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from { 
+    opacity: 1; 
+    transform: translateY(0);
+  }
+  to { 
+    opacity: 0; 
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { 
+    transform: translateX(100%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateX(0); 
+    opacity: 1; 
+  }
 }
 
 @keyframes slideOutRight {
-  from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(100%); opacity: 0; }
+  from { 
+    transform: translateX(0); 
+    opacity: 1; 
+  }
+  to { 
+    transform: translateX(100%); 
+    opacity: 0; 
+  }
+}
+
+@keyframes slideInUp {
+  from { 
+    transform: translateY(100%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    transform: scale(0.9); 
+    opacity: 0; 
+  }
+  to { 
+    transform: scale(1); 
+    opacity: 1; 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Focus Management */
