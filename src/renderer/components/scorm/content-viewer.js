@@ -45,7 +45,7 @@ class ContentViewer extends BaseComponent {
       loadingTimeout: 30000,
       showLoadingIndicator: true,
       enableFullscreen: true,
-      enableContentScaling: true, // Enable to make SCORM content responsive
+      respectContentDesign: true, // SCORM compliance: respect content author's design
       sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
       attributes: {
         'data-component': 'content-viewer'
@@ -251,9 +251,8 @@ class ContentViewer extends BaseComponent {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
       
-      // PRE-INJECT APIs into parent window contexts BEFORE loading iframe
-      // This ensures APIs are already present when SCORM content starts searching
-      this.preInjectAPIs();
+      // Ensure SCORM APIs are available for content discovery
+      this.ensureScormAPIsAvailable();
       
       // Load content directly in iframe (no host frameset)
       if (this.iframe) {
@@ -320,10 +319,10 @@ class ContentViewer extends BaseComponent {
         this.verifyScormApiPresence();
       }, 100);
       
-      // Apply scaling after content loads
+      // Respect content design after content loads
       setTimeout(() => {
-        this.applyContentScaling();
-        // Begin observing size changes to keep fit without inner scrollbars
+        this.respectContentDesign();
+        // Begin observing size changes for container adjustments only
         this.startResizeObserver();
         // Force layout refresh to ensure content utilizes full available space
         this.refreshLayout();
@@ -464,7 +463,70 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Setup SCORM API in content window - APIs are now pre-injected in parent
+   * Ensure SCORM APIs are available in the parent window for content discovery
+   * SCORM-compliant: APIs available in parent window, no content modification
+   */
+  ensureScormAPIsAvailable() {
+    try {
+      // Set the SCORM client for synchronous bridge calls
+      scormAPIBridge.setScormClient(scormClient);
+      
+      // Enable the bridge for communication
+      scormAPIBridge.enable();
+      
+      // Create SCORM APIs in the current window (parent of content iframe)
+      // This follows SCORM standard - APIs discoverable in parent window hierarchy
+      const createDirectAPI = (version) => {
+        const methods = version === '2004' 
+          ? ['Initialize', 'Terminate', 'GetValue', 'SetValue', 'Commit', 'GetLastError', 'GetErrorString', 'GetDiagnostic']
+          : ['LMSInitialize', 'LMSFinish', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSGetLastError', 'LMSGetErrorString', 'LMSGetDiagnostic'];
+          
+        const api = {};
+        
+        methods.forEach(method => {
+          api[method] = (...args) => {
+            try {
+              return scormAPIBridge.executeScormMethod(method, args);
+            } catch (error) {
+              return '0';
+            }
+          };
+        });
+        
+        // Add SCORM 1.2 compatibility methods
+        if (version === '1.2') {
+          api.Initialize = api.LMSInitialize;
+          api.Terminate = api.LMSFinish;
+          api.GetValue = api.LMSGetValue;
+          api.SetValue = api.LMSSetValue;
+          api.Commit = api.LMSCommit;
+          api.GetLastError = api.LMSGetLastError;
+          api.GetErrorString = api.LMSGetErrorString;
+          api.GetDiagnostic = api.LMSGetDiagnostic;
+        }
+        
+        return api;
+      };
+      
+      // Make APIs available in current window for SCORM content discovery
+      if (!window.API) {
+        window.API = createDirectAPI('1.2');
+      }
+      if (!window.API_1484_11) {
+        window.API_1484_11 = createDirectAPI('2004');
+      }
+      
+    } catch (error) {
+      try {
+        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+          rendererLogger.error('[ContentViewer] API setup error', error?.message || String(error));
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Setup SCORM API verification in content window
    */
   setupScormAPI() {
     if (!this.contentWindow) {
@@ -475,7 +537,7 @@ class ContentViewer extends BaseComponent {
     try {
       const win = this.contentWindow;
       
-      // APIs are already pre-injected in parent window, just add verification function
+      // Only add diagnostic function, don't modify content APIs
       win.testAPIInjection = function() {
         return {
           hasAPI: !!win.API,
@@ -489,7 +551,7 @@ class ContentViewer extends BaseComponent {
         };
       };
       
-      this.emit('scormApiInjected', { contentWindow: win, mode: 'pre-injected' });
+      this.emit('scormApiInjected', { contentWindow: win, mode: 'available-in-parent' });
       
     } catch (error) {
       try {
@@ -601,72 +663,28 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Apply content scaling to fit iframe content properly (optimized)
+   * Respect content author's design - no scaling modifications
+   * SCORM content should display as intended by the content author
    */
-  applyContentScaling() {
-    // Skip scaling if disabled or content window not available
-    if (!this.options.enableContentScaling || !this.iframe || !this.contentWindow) {
-      return;
-    }
-
+  respectContentDesign() {
+    // SCORM standard compliance: Do not modify content presentation
+    // Content authors design their content for specific dimensions and layouts
+    // The LMS should not alter the visual presentation
+    
     try {
-      const contentDoc = this.contentWindow.document;
-      if (!contentDoc || !contentDoc.body || contentDoc.readyState !== 'complete') {
-        // Retry after content is fully loaded
-        setTimeout(() => this.applyContentScaling(), 500);
-        return;
+      // Only ensure the iframe is properly sized to contain the content
+      // without modifying the content itself
+      if (this.iframe) {
+        // Let the content determine its own scrolling behavior
+        this.iframe.style.overflow = 'auto';
       }
-
-      // Get dimensions to check if scaling is needed
-      const iframeRect = this.iframe.getBoundingClientRect();
-      const contentBody = contentDoc.body;
-      
-      // Check actual content dimensions vs iframe size
-      const contentWidth = Math.max(contentBody.scrollWidth, contentBody.offsetWidth);
-      const contentHeight = Math.max(contentBody.scrollHeight, contentBody.offsetHeight);
-      
-      // Calculate scaling ratios
-      const scaleX = iframeRect.width / contentWidth;
-      const scaleY = iframeRect.height / contentHeight;
-      const scale = Math.min(scaleX, scaleY, 1);
-      
-      // If content fits, skip scaling
-      if (scale >= 1.0) {
-        return;
-      }
-
-      // Apply scaling for content that needs it
-      contentBody.style.setProperty('--scorm-scale', scale);
-      contentBody.style.setProperty('--scorm-inverse-scale-width', `${100 / scale}%`);
-      contentBody.style.setProperty('--scorm-inverse-scale-height', `${100 / scale}%`);
-      contentBody.classList.add('scaled-content');
-      
-      // Store scaling info for cleanup
-      this.appliedScaling = { scale };
-
     } catch (error) {
-      // Silent failure per plan; content remains viewable
+      // Silent failure - respect for content design is best effort
     }
   }
 
-  /**
-   * Remove applied content scaling
-   */
-  removeContentScaling() {
-    if (this.appliedScaling && this.contentWindow && this.contentWindow.document && this.contentWindow.document.body) {
-      try {
-        const contentBody = this.contentWindow.document.body;
-        contentBody.classList.remove('scaled-content');
-        contentBody.style.removeProperty('--scorm-scale');
-        contentBody.style.removeProperty('--scorm-inverse-scale-width');
-        contentBody.style.removeProperty('--scorm-inverse-scale-height');
-        this.appliedScaling = null;
-        rendererLogger.info('ContentViewer: Content scaling removed');
-      } catch (error) {
-        rendererLogger.warn('ContentViewer: Failed to remove scaling:', error?.message || error);
-      }
-    }
-  }
+  // Content scaling methods removed - respecting SCORM standard compliance
+  // SCORM content should not be visually modified by the LMS
 
   /**
    * Hide content
@@ -996,8 +1014,7 @@ class ContentViewer extends BaseComponent {
    * Clear content
    */
   clearContent() {
-    // Clean up any applied scaling
-    this.removeContentScaling();
+    // No scaling cleanup needed - we respect content as-is
     
     this.currentUrl = null;
     this.contentWindow = null;
@@ -1034,13 +1051,13 @@ class ContentViewer extends BaseComponent {
       // Prefer native ResizeObserver if available
       if (typeof ResizeObserver === 'function') {
         this.resizeObserver = new ResizeObserver(() => {
-          // Re-apply scaling when container size changes
-          this.applyContentScaling();
+          // Only adjust container sizing, respect content design
+          this.respectContentDesign();
         });
         this.resizeObserver.observe(this.element);
       } else {
         // Fallback: listen to window resize
-        this._resizeHandler = () => this.applyContentScaling();
+        this._resizeHandler = () => this.respectContentDesign();
         window.addEventListener('resize', this._resizeHandler);
       }
     } catch (_) {
