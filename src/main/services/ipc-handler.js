@@ -1158,12 +1158,12 @@ class IpcHandler extends BaseService {
 
       // Get SN service which manages activity trees
       const snService = scormService.snService;
-      if (!snService || !snService.activityTree) {
+      if (!snService || !snService.activityTreeManager || !snService.activityTreeManager.root) {
         return { success: true, data: {} }; // No activity tree loaded yet
       }
 
       // Convert activity tree to serializable format for inspector
-      const activityTreeData = this.serializeActivityTree(snService.activityTree);
+      const activityTreeData = this.serializeActivityTree(snService.activityTreeManager);
       
       return { success: true, data: activityTreeData };
     } catch (error) {
