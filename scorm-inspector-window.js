@@ -73,6 +73,9 @@ class ScormInspectorWindow {
         
         this.setupEventListeners();
         this.loadInitialHistory();
+
+        // Load enhanced inspector data on initialization
+        this.loadEnhancedInspectorData();
     }
 
     setupEventListeners() {
@@ -252,6 +255,24 @@ class ScormInspectorWindow {
             rendererLogger.error('SCORM Inspector: Error loading initial history', error);
         } finally {
             this.setLoading(false);
+        }
+    }
+
+    async loadEnhancedInspectorData() {
+        try {
+            // Wait for electronAPI to be available
+            await this.waitForElectronAPI();
+
+            // Load activity tree data
+            this.refreshActivityTree();
+
+            // Load other enhanced inspector data
+            this.refreshNavigation();
+            this.refreshObjectives();
+            this.refreshSSP();
+
+        } catch (error) {
+            rendererLogger.error('SCORM Inspector: Error loading enhanced inspector data', error);
         }
     }
  
