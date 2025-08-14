@@ -331,6 +331,8 @@ class ScormApiHandler {
         result = "true";
         errorCode = "0"; // No error
         errorMessage = "";
+        // Broadcast data model update for successful SetValue
+        this._broadcastDataModelUpdate();
       } else {
         errorCode = this.errorHandler.getLastError();
         errorMessage = this.errorHandler.getErrorString(errorCode);
@@ -397,6 +399,8 @@ class ScormApiHandler {
         result = "true";
         errorCode = "0"; // No error
         errorMessage = "";
+        // Broadcast data model update for successful Commit
+        this._broadcastDataModelUpdate();
       } else {
         errorCode = this.errorHandler.getLastError();
         errorMessage = this.errorHandler.getErrorString(errorCode);
@@ -698,6 +702,23 @@ class ScormApiHandler {
     this.eventEmitter.emit('scorm-api-call-logged', payload);
     this.logger?.info(`SCORM API Call [Session: ${payload.sessionId}]: ${method}(${parameters.map(p => JSON.stringify(p)).join(', ')}) -> Result: ${result}, ErrorCode: ${errorCode}, ErrorMessage: "${errorMessage}" (Duration: ${durationMs}ms)`);
     this.logger?.debug(`Emitted scorm-api-call-logged event for ${method}`, payload);
+  }
+
+  /**
+   * Broadcast data model changes to inspector windows
+   * @private
+   */
+  _broadcastDataModelUpdate() {
+    try {
+      if (this.telemetryStore && this.telemetryStore.windowManager && 
+          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
+        const dataModel = this.dataModel.getAllData();
+        this.telemetryStore.windowManager.broadcastToAllWindows('scorm-data-model-updated', dataModel);
+        this.logger?.debug('Broadcasted data model update to inspector windows');
+      }
+    } catch (error) {
+      this.logger?.warn('Failed to broadcast data model update:', error.message);
+    }
   }
 }
 

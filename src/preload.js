@@ -153,9 +153,16 @@ const electronAPI = {
   openScormInspectorWindow: () => safeInvoke('open-scorm-inspector-window'),
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
   
+  // Enhanced SCORM Inspector data retrieval
+  getActivityTree: () => safeInvoke('scorm-inspector-get-activity-tree'),
+  getNavigationRequests: () => safeInvoke('scorm-inspector-get-navigation-requests'),
+  getGlobalObjectives: () => safeInvoke('scorm-inspector-get-global-objectives'),
+  getSSPBuckets: () => safeInvoke('scorm-inspector-get-ssp-buckets'),
+  
   // SCORM Inspector Event Listeners
   onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
   onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
+  onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
   
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),

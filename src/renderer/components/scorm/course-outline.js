@@ -267,26 +267,30 @@ class CourseOutline extends BaseComponent {
 
   getItemIcon(item, progress) {
     if (item.type === 'sco') {
-      switch (progress.completionStatus) {
-        case 'completed': return '✅';
-        case 'incomplete': return '🔄';
-        case 'not attempted': return '⭕';
-        default: return '📄';
-      }
+      return '📄'; // Simple document icon for all SCOs
     }
     return item.type === 'asset' ? '📎' : '📁';
   }
 
   getProgressIndicator(progress) {
-    if (!progress.completionStatus) return '';
+    if (!progress.completionStatus && !progress.successStatus) return '';
     
+    // Check for passed/failed status first
+    if (progress.successStatus === 'passed') {
+      return '<span class="progress-indicator progress-indicator--passed">✓</span>';
+    }
+    if (progress.successStatus === 'failed') {
+      return '<span class="progress-indicator progress-indicator--failed">✗</span>';
+    }
+    
+    // Fall back to completion status
     const statusMap = {
       'completed': '<span class="progress-indicator progress-indicator--completed">✓</span>',
       'incomplete': '<span class="progress-indicator progress-indicator--incomplete">○</span>',
       'not attempted': '<span class="progress-indicator progress-indicator--not-attempted">○</span>'
     };
     
-    return statusMap[progress.completionStatus] || '';
+    return statusMap[progress.completionStatus] || '<span class="progress-indicator progress-indicator--not-attempted">○</span>';
   }
 
   bindItemEvents() {
@@ -493,8 +497,21 @@ class CourseOutline extends BaseComponent {
   handleScormDataChanged(data) {
     const { element, value } = data.data || data;
     
-    if (element === 'cmi.completion_status' && this.currentItem) {
-      this.updateItemProgress(this.currentItem, { completionStatus: value });
+    if (!this.currentItem) return;
+    
+    // Update progress based on SCORM data changes
+    if (element === 'cmi.completion_status') {
+      const currentProgress = this.progressData.get(this.currentItem) || {};
+      this.updateItemProgress(this.currentItem, { 
+        ...currentProgress, 
+        completionStatus: value 
+      });
+    } else if (element === 'cmi.success_status') {
+      const currentProgress = this.progressData.get(this.currentItem) || {};
+      this.updateItemProgress(this.currentItem, { 
+        ...currentProgress, 
+        successStatus: value 
+      });
     }
   }
 

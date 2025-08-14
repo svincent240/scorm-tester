@@ -247,6 +247,31 @@ class WindowManager extends BaseService {
   }
 
   /**
+   * Broadcast message to all active windows
+   * @param {string} channel - IPC channel to send message on
+   * @param {any} data - Data to send
+   * @returns {number} Number of windows the message was sent to
+   */
+  broadcastToAllWindows(channel, data) {
+    const activeWindows = this.getAllWindows();
+    let successCount = 0;
+
+    for (const window of activeWindows) {
+      try {
+        if (window && window.webContents && !window.webContents.isDestroyed()) {
+          window.webContents.send(channel, data);
+          successCount++;
+        }
+      } catch (error) {
+        this.logger?.warn(`Failed to send message to window on channel '${channel}':`, error.message);
+      }
+    }
+
+    this.logger?.debug(`Broadcasted message on channel '${channel}' to ${successCount} windows`);
+    return successCount;
+  }
+
+  /**
    * Register custom protocol for app resources
    * @private
    */

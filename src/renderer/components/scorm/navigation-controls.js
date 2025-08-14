@@ -239,7 +239,6 @@ class NavigationControls extends BaseComponent {
       this._boundHandlers = {
         handlePreviousClick: this.handlePreviousClick.bind(this),
         handleNextClick: this.handleNextClick.bind(this),
-        handleMenuClick: this.handleMenuClick.bind(this),
         handleLearnerModeClick: this.handleLearnerModeClick.bind(this),
         handleTestingModeClick: this.handleTestingModeClick.bind(this),
         handleKeyDown: this.handleKeyDown.bind(this)
@@ -255,8 +254,11 @@ class NavigationControls extends BaseComponent {
       this.nextBtn.addEventListener('click', this._boundHandlers.handleNextClick);
     }
     
-    if (this.menuBtn && this._boundHandlers.handleMenuClick) {
-      this.menuBtn.addEventListener('click', this._boundHandlers.handleMenuClick);
+    // Simple direct menu button handler - no complex binding
+    if (this.menuBtn) {
+      this.menuBtn.addEventListener('click', () => {
+        this.toggleMenu();
+      });
     }
     
     // Mode toggle button event listeners
@@ -311,19 +313,40 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Handle menu button click
+   * Simple menu toggle - just works
    */
-  async handleMenuClick() {
-    const newState = !this.navigationState.menuVisible;
-    this.setMenuVisible(newState);
-    this.emit('menuToggled', { visible: newState });
-    
-    // Also emit to global eventBus for app-manager
+  toggleMenu() {
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) {
+      // Error logging for missing sidebar - indicates serious DOM issue
+      import('../../utils/renderer-logger.js').then(({ default: logger }) => {
+        logger.error('NavigationControls: Sidebar element not found during menu toggle');
+      });
+      return;
+    }
+
     try {
-      const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('menuToggled', { visible: newState });
-    } catch (_) {
-      // Fallback - continue with component-level event
+      // Simple toggle logic
+      const isHidden = sidebar.classList.contains('app-sidebar--hidden');
+
+      if (isHidden) {
+        // Show sidebar
+        sidebar.classList.remove('app-sidebar--hidden');
+        if (this.menuBtn) {
+          this.menuBtn.textContent = '✕ Hide Menu';
+        }
+      } else {
+        // Hide sidebar
+        sidebar.classList.add('app-sidebar--hidden');
+        if (this.menuBtn) {
+          this.menuBtn.textContent = '📚 Course Menu';
+        }
+      }
+    } catch (error) {
+      // Error logging for unexpected failures
+      import('../../utils/renderer-logger.js').then(({ default: logger }) => {
+        logger.error('NavigationControls: Menu toggle failed', error?.message || error);
+      });
     }
   }
 
@@ -715,18 +738,24 @@ class NavigationControls extends BaseComponent {
     // Add visual indicators for navigation state
     const indicators = {
       locked: '🔒',
-      forced: '⚠️',  
+      forced: '⚠️',
       available: '✅',
       processing: '🔄'
     };
     
     // Update button states with indicators
-    if (this.previousBtn && this.navigationState.canNavigatePrevious) {
-      this.previousBtn.classList.add('nav-available');
+    if (this.previousBtn) {
+      const currentTitle = this.previousBtn.title;
+      const indicator = this.navigationState.canNavigatePrevious ? indicators.available : indicators.locked;
+      this.previousBtn.title = `${currentTitle} ${indicator}`;
+      this.previousBtn.classList.toggle('nav-available', this.navigationState.canNavigatePrevious);
     }
     
-    if (this.nextBtn && this.navigationState.canNavigateNext) {
-      this.nextBtn.classList.add('nav-available');
+    if (this.nextBtn) {
+      const currentTitle = this.nextBtn.title;
+      const indicator = this.navigationState.canNavigateNext ? indicators.available : indicators.locked;
+      this.nextBtn.title = `${currentTitle} ${indicator}`;
+      this.nextBtn.classList.toggle('nav-available', this.navigationState.canNavigateNext);
     }
   }
 
@@ -1079,7 +1108,7 @@ class NavigationControls extends BaseComponent {
   /**
    * Handle SCORM initialized event
    */
-  handleScormInitialized(data) {
+  handleScormInitialized(_data) {
     this.updateTitleAndStatus(null, 'SCORM session active');
   }
 
@@ -1110,7 +1139,7 @@ class NavigationControls extends BaseComponent {
    */
   destroy() {
     if (typeof this._unsubscribeNav === 'function') {
-      try { this._unsubscribeNav(); } catch (_) {}
+      try { this._unsubscribeNav(); } catch (e) { this.logger?.warn('NavigationControls: Error unsubscribing from UIState', e?.message || e); }
       this._unsubscribeNav = null;
     }
     // Remove listeners with the same bound references to avoid leaks
@@ -1123,9 +1152,7 @@ class NavigationControls extends BaseComponent {
     if (this.nextBtn && this._boundHandlers && this._boundHandlers.handleNextClick) {
       this.nextBtn.removeEventListener('click', this._boundHandlers.handleNextClick);
     }
-    if (this.menuBtn && this._boundHandlers && this._boundHandlers.handleMenuClick) {
-      this.menuBtn.removeEventListener('click', this._boundHandlers.handleMenuClick);
-    }
+    // Menu button uses direct arrow function, no cleanup needed
     if (this.learnerModeBtn && this._boundHandlers && this._boundHandlers.handleLearnerModeClick) {
       this.learnerModeBtn.removeEventListener('click', this._boundHandlers.handleLearnerModeClick);
     }

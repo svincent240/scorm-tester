@@ -317,4 +317,37 @@ module.exports = [
       rateLimitProfile: 'default'
     }
   },
+  // Enhanced SCORM Inspector routes
+  {
+    channel: 'scorm-inspector-get-activity-tree',
+    handlerName: 'handleScormInspectorGetActivityTree',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'scorm-inspector-get-navigation-requests',
+    handlerName: 'handleScormInspectorGetNavigationRequests',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'scorm-inspector-get-global-objectives',
+    handlerName: 'handleScormInspectorGetGlobalObjectives',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'scorm-inspector-get-ssp-buckets',
+    handlerName: 'handleScormInspectorGetSSPBuckets',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
 ];

@@ -1019,6 +1019,49 @@ class ScormService extends BaseService {
   onScormApiCallLogged(callback) {
     this.eventEmitter.on('scorm-api-call-logged', callback);
   }
+
+  /**
+   * Get current data model from the active session
+   * @returns {Object} Current data model or empty object if no active session
+   */
+  getCurrentDataModel() {
+    try {
+      // Get the most recent/active session
+      const sessions = this.getAllSessions();
+      this.logger?.debug(`getCurrentDataModel: Found ${sessions ? sessions.length : 0} sessions`);
+      
+      if (!sessions || sessions.length === 0) {
+        this.logger?.debug('getCurrentDataModel: No sessions available, returning empty object');
+        return {};
+      }
+      
+      // Find the most recently used session
+      const mostRecentSession = sessions.reduce((latest, current) => {
+        const latestTime = latest.lastAccessTime || 0;
+        const currentTime = current.lastAccessTime || 0;
+        return currentTime > latestTime ? current : latest;
+      });
+      
+      this.logger?.debug(`getCurrentDataModel: Most recent session ID: ${mostRecentSession?.sessionId || 'unknown'}`);
+      
+      // Get data model from the session's API handler
+      if (mostRecentSession && mostRecentSession.apiHandler && 
+          mostRecentSession.apiHandler.dataModel && 
+          typeof mostRecentSession.apiHandler.dataModel.getAllData === 'function') {
+        
+        const dataModel = mostRecentSession.apiHandler.dataModel.getAllData();
+        this.logger?.debug(`getCurrentDataModel: Retrieved data model with ${Object.keys(dataModel.coreData || {}).length} core data items`);
+        return dataModel;
+      } else {
+        this.logger?.debug('getCurrentDataModel: Session has no valid API handler or data model');
+      }
+      
+      return {};
+    } catch (error) {
+      this.logger?.error('Error getting current data model:', error);
+      return {};
+    }
+  }
 }
 
 module.exports = ScormService;

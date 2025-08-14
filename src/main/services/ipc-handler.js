@@ -126,10 +126,22 @@ class IpcHandler extends BaseService {
           if (this.telemetryStore) {
             this.telemetryStore.clear();
           }
+          // Broadcast course loaded event to all windows (including inspector)
+          const windowManager = this.getDependency('windowManager');
+          if (windowManager && typeof windowManager.broadcastToAllWindows === 'function') {
+            windowManager.broadcastToAllWindows('course-loaded', payload);
+            this.logger?.debug('Broadcasted course-loaded event to all windows');
+          }
         });
         scormService.eventEmitter.on('session:reset', (payload) => {
           if (this.telemetryStore) {
             this.telemetryStore.clear();
+          }
+          // Broadcast session state changed event to all windows (including inspector)
+          const windowManager = this.getDependency('windowManager');
+          if (windowManager && typeof windowManager.broadcastToAllWindows === 'function') {
+            windowManager.broadcastToAllWindows('session-state-changed', payload);
+            this.logger?.debug('Broadcasted session-state-changed event to all windows');
           }
         });
       } else {
@@ -292,6 +304,12 @@ class IpcHandler extends BaseService {
       
       // SCORM Inspector history fetch - returns newest-first entries with optional filters
       this.registerHandler('scorm-inspector-get-history', this.handleScormInspectorGetHistory.bind(this));
+      
+      // Enhanced SCORM Inspector data retrieval handlers
+      this.registerHandler('scorm-inspector-get-activity-tree', this.handleScormInspectorGetActivityTree.bind(this));
+      this.registerHandler('scorm-inspector-get-navigation-requests', this.handleScormInspectorGetNavigationRequests.bind(this));
+      this.registerHandler('scorm-inspector-get-global-objectives', this.handleScormInspectorGetGlobalObjectives.bind(this));
+      this.registerHandler('scorm-inspector-get-ssp-buckets', this.handleScormInspectorGetSSPBuckets.bind(this));
 
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
@@ -858,16 +876,38 @@ class IpcHandler extends BaseService {
     
     if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
       try {
-        const historyData = this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter });
-        return { success: true, data: historyData };
+        const historyResponse = this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter });
+        const errorsResponse = this.telemetryStore.getErrors ? this.telemetryStore.getErrors() : { errors: [] };
+        
+        // Get current data model from active SCORM session
+        let dataModel = {};
+        const scormService = this.getDependency('scormService');
+        if (scormService && typeof scormService.getCurrentDataModel === 'function') {
+          try {
+            dataModel = scormService.getCurrentDataModel() || {};
+            this.logger?.debug(`IpcHandler: getCurrentDataModel returned object with keys: ${Object.keys(dataModel)}`);
+          } catch (e) {
+            this.logger?.warn('Failed to get current data model:', e.message);
+          }
+        } else {
+          this.logger?.warn('IpcHandler: SCORM service or getCurrentDataModel method not available');
+        }
+        
+        const responseData = {
+          history: historyResponse.history || [],
+          errors: errorsResponse.errors || [],
+          dataModel: dataModel
+        };
+        
+        return { success: true, data: responseData };
       } catch (error) {
         this.logger?.error(`IpcHandler: handleScormInspectorGetHistory failed: ${error.message}`);
-        return { success: false, error: error.message, data: { history: [], errors: [] } };
+        return { success: false, error: error.message, data: { history: [], errors: [], dataModel: {} } };
       }
     }
     
     // Fallback when telemetry store not available
-    return { success: true, data: { history: [], errors: [] } };
+    return { success: true, data: { history: [], errors: [], dataModel: {} } };
   }
 
   /**
@@ -1100,6 +1140,278 @@ class IpcHandler extends BaseService {
       this.recordOperation('open-scorm-inspector-window:error', false);
       return { success: false, error: error.message };
     }
+  }
+
+  // Enhanced SCORM Inspector data retrieval methods
+
+  /**
+   * Get activity tree structure for SCORM Inspector
+   */
+  async handleScormInspectorGetActivityTree(event, { sessionId } = {}) {
+    this.logger?.debug(`IpcHandler: handleScormInspectorGetActivityTree called with sessionId: ${sessionId}`);
+    
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', data: {} };
+      }
+
+      // Get SN service which manages activity trees
+      const snService = scormService.snService;
+      if (!snService || !snService.activityTree) {
+        return { success: true, data: {} }; // No activity tree loaded yet
+      }
+
+      // Convert activity tree to serializable format for inspector
+      const activityTreeData = this.serializeActivityTree(snService.activityTree);
+      
+      return { success: true, data: activityTreeData };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetActivityTree failed: ${error.message}`);
+      return { success: false, error: error.message, data: {} };
+    }
+  }
+
+  /**
+   * Get navigation requests analysis for SCORM Inspector
+   */
+  async handleScormInspectorGetNavigationRequests(event, { sessionId } = {}) {
+    this.logger?.debug(`IpcHandler: handleScormInspectorGetNavigationRequests called with sessionId: ${sessionId}`);
+    
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', data: [] };
+      }
+
+      // Get navigation analysis from SN service
+      const snService = scormService.snService;
+      if (!snService || !snService.navigationHandler) {
+        return { success: true, data: [] }; // No navigation data yet
+      }
+
+      // Get navigation request analysis
+      const navigationData = this.extractNavigationRequests(snService.navigationHandler);
+      
+      return { success: true, data: navigationData };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetNavigationRequests failed: ${error.message}`);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  /**
+   * Get global objectives for SCORM Inspector
+   */
+  async handleScormInspectorGetGlobalObjectives(event, { sessionId } = {}) {
+    this.logger?.debug(`IpcHandler: handleScormInspectorGetGlobalObjectives called with sessionId: ${sessionId}`);
+    
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', data: [] };
+      }
+
+      // Get global objectives from activity tree
+      const snService = scormService.snService;
+      if (!snService || !snService.activityTree) {
+        return { success: true, data: [] }; // No objectives yet
+      }
+
+      // Extract global objectives
+      const objectivesData = this.extractGlobalObjectives(snService.activityTree);
+      
+      return { success: true, data: objectivesData };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetGlobalObjectives failed: ${error.message}`);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  /**
+   * Get SSP buckets for SCORM Inspector
+   */
+  async handleScormInspectorGetSSPBuckets(event, { sessionId } = {}) {
+    this.logger?.debug(`IpcHandler: handleScormInspectorGetSSPBuckets called with sessionId: ${sessionId}`);
+    
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', data: [] };
+      }
+
+      // Get SSP data from RTE service
+      const rteInstances = scormService.rteInstances;
+      if (!rteInstances || rteInstances.size === 0) {
+        return { success: true, data: [] }; // No SSP data yet
+      }
+
+      // Extract SSP buckets from all active sessions
+      const sspData = this.extractSSPBuckets(rteInstances);
+      
+      return { success: true, data: sspData };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetSSPBuckets failed: ${error.message}`);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
+
+  // Helper methods for data extraction and serialization
+
+  /**
+   * Serialize activity tree for inspector display
+   */
+  serializeActivityTree(activityTree) {
+    if (!activityTree || !activityTree.root) {
+      return {};
+    }
+
+    const serializeNode = (node) => {
+      const serialized = {
+        id: node.identifier,
+        title: node.title,
+        type: node.resource?.scormType || (node.children.length > 0 ? 'cluster' : 'activity'),
+        status: this.getActivityCompletionStatus(node),
+        children: []
+      };
+
+      // Add detailed information for inspector
+      if (node.activityState || node.attemptState || node.attemptCount > 0) {
+        serialized.details = {
+          completionStatus: this.mapActivityState(node.activityState),
+          successStatus: this.mapAttemptState(node.attemptState),
+          progressMeasure: node.progressMeasure || 0,
+          attempted: node.attemptCount > 0,
+          attemptCount: node.attemptCount,
+          suspended: node.suspended,
+          objectives: Array.from(node.objectives?.values() || []).map(obj => ({
+            id: obj.id,
+            status: obj.satisfiedStatus ? 'satisfied' : 'not satisfied',
+            score: obj.normalizedMeasure
+          })),
+          sequencingDefinition: {
+            choice: node.sequencing?.choice !== false,
+            flow: node.sequencing?.flow !== false,
+            forwardOnly: node.sequencing?.forwardOnly === true
+          }
+        };
+      }
+
+      // Recursively serialize children
+      if (node.children && node.children.length > 0) {
+        serialized.children = node.children.map(child => serializeNode(child));
+      }
+
+      return serialized;
+    };
+
+    return serializeNode(activityTree.root);
+  }
+
+  /**
+   * Extract navigation requests for analysis
+   */
+  extractNavigationRequests(navigationHandler) {
+    if (!navigationHandler) return [];
+
+    // Get available navigation requests
+    const navRequests = [
+      { type: 'Start', disabled: false, willAlwaysSucceed: true, willNeverSucceed: false, hidden: false },
+      { type: 'Resume All', disabled: false, willAlwaysSucceed: false, willNeverSucceed: false, hidden: false },
+      { type: 'Exit', disabled: false, willAlwaysSucceed: true, willNeverSucceed: false, hidden: false },
+      { type: 'Exit All', disabled: false, willAlwaysSucceed: true, willNeverSucceed: false, hidden: false },
+      { type: 'Suspend All', disabled: false, willAlwaysSucceed: true, willNeverSucceed: false, hidden: false },
+      { type: 'Previous', disabled: true, willAlwaysSucceed: false, willNeverSucceed: true, hidden: false },
+      { type: 'Continue', disabled: false, willAlwaysSucceed: false, willNeverSucceed: false, hidden: false }
+    ];
+
+    // Add activity-specific navigation requests if available
+    if (navigationHandler.currentActivity) {
+      navRequests.push({
+        type: 'Choice',
+        targetActivityId: navigationHandler.currentActivity.identifier,
+        disabled: false,
+        willAlwaysSucceed: false,
+        willNeverSucceed: false,
+        hidden: false
+      });
+    }
+
+    return navRequests;
+  }
+
+  /**
+   * Extract global objectives from activity tree
+   */
+  extractGlobalObjectives(activityTree) {
+    if (!activityTree || !activityTree.globalObjectives) {
+      return [];
+    }
+
+    const objectives = [];
+    for (const [id, objective] of activityTree.globalObjectives.entries()) {
+      objectives.push({
+        id: id,
+        status: objective.satisfiedStatus ? 'satisfied' : 'not satisfied',
+        score: objective.normalizedMeasure || 0,
+        progressMeasure: objective.progressMeasure || 0
+      });
+    }
+
+    return objectives;
+  }
+
+  /**
+   * Extract SSP buckets from RTE instances
+   */
+  extractSSPBuckets(rteInstances) {
+    const sspBuckets = [];
+
+    for (const [sessionId, rteInstance] of rteInstances.entries()) {
+      if (rteInstance && rteInstance.dataModel) {
+        const suspendData = rteInstance.dataModel.getValue('cmi.suspend_data');
+        if (suspendData && suspendData.value) {
+          sspBuckets.push({
+            id: `session-${sessionId}`,
+            size: new Blob([suspendData.value]).size,
+            persistence: 'session',
+            data: suspendData.value
+          });
+        }
+      }
+    }
+
+    return sspBuckets;
+  }
+
+  // Utility methods for status mapping
+
+  mapActivityState(state) {
+    const stateMap = {
+      'active': 'incomplete',
+      'inactive': 'not attempted',
+      'suspended': 'incomplete',
+      'completed': 'completed'
+    };
+    return stateMap[state] || 'unknown';
+  }
+
+  mapAttemptState(state) {
+    const stateMap = {
+      'not_attempted': 'not attempted',
+      'incomplete': 'incomplete',
+      'completed': 'completed',
+      'passed': 'passed',
+      'failed': 'failed'
+    };
+    return stateMap[state] || 'unknown';
+  }
+
+  getActivityCompletionStatus(node) {
+    if (node.attemptCount === 0) return 'not attempted';
+    if (node.activityState === 'completed') return 'completed';
+    if (node.suspended || node.activityState === 'active') return 'incomplete';
+    return 'not attempted';
   }
 }
 

@@ -112,10 +112,10 @@
 }
 
 .app-sidebar--hidden {
-  transform: translateX(-100%);
-  width: 0;
-  min-width: 0;
-  border-right: none;
+  transform: translateX(-100%) !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  border-right: none !important;
 }
 
 .app-content--full-width {
