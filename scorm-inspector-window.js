@@ -3,9 +3,11 @@
 // SCORM Inspector Window JavaScript
 // Handles the display and management of SCORM package inspection data
 
+import rendererLogger from '../../src/renderer/utils/renderer-logger.js';
+
 class ScormInspectorWindow {
     constructor() {
-        console.log('SCORM Inspector: Initializing window...');
+        // Removed: console.log('SCORM Inspector: Initializing window...');
         
         this.apiHistory = [];
         this.scormErrors = [];
@@ -13,6 +15,11 @@ class ScormInspectorWindow {
         this.dataModelHistory = new Map();
         this.isLoading = false;
         this.filterText = '';
+
+        // Debouncing for data model updates to prevent race conditions
+        this.dataModelUpdateTimeout = null;
+        this.lastDataModelUpdate = 0;
+        this.isUpdatingDataModel = false;
         
         this.apiTimelineElement = document.getElementById('api-timeline');
         this.errorListElement = document.getElementById('error-list');
@@ -62,15 +69,7 @@ class ScormInspectorWindow {
         this.sspBuckets = [];
         this.enhancedLogEntries = [];
         
-        console.log('SCORM Inspector: Elements found:', {
-            apiTimelineElement: !!this.apiTimelineElement,
-            errorListElement: !!this.errorListElement,
-            dataModelElement: !!this.dataModelElement,
-            clearHistoryBtn: !!this.clearHistoryBtn,
-            refreshBtn: !!this.refreshBtn,
-            dataFilterInput: !!this.dataFilterInput,
-            electronAPI: !!window.electronAPI
-        });
+        // Removed: console.log('SCORM Inspector: Elements found:', { ... });
         
         this.setupEventListeners();
         this.loadInitialHistory();
@@ -123,39 +122,35 @@ class ScormInspectorWindow {
 
             // Listen for real-time updates from main process
             if (window.electronAPI.onScormInspectorDataUpdated) {
-                window.electronAPI.onScormInspectorDataUpdated((event, data) => {
-                    console.log('SCORM Inspector: Received API call update', data);
+                window.electronAPI.onScormInspectorDataUpdated((data) => {
+                    // Removed: console.log('SCORM Inspector: Received API call update', data);
                     this.addApiCall(data);
-                    
-                    // Refresh data model when API calls are made (indicates active session)
-                    if (data && data.method && (data.method === 'Initialize' || data.method === 'SetValue' || data.method === 'Commit')) {
-                        setTimeout(() => {
-                            this.refreshData();
-                        }, 100);
-                    }
+ 
+                    // Note: Data model updates are handled by onScormDataModelUpdated listener
+                    // to avoid race conditions. We don't need to refresh here.
                 });
-                console.log('SCORM Inspector: Data update listener registered');
+                // Removed: console.log('SCORM Inspector: Data update listener registered');
             }
-
+ 
             // Listen for SCORM Inspector error updates
             if (window.electronAPI.onScormInspectorErrorUpdated) {
-                window.electronAPI.onScormInspectorErrorUpdated((event, errorData) => {
-                    console.log('SCORM Inspector: Received error update', errorData);
+                window.electronAPI.onScormInspectorErrorUpdated((errorData) => {
+                    // Removed: console.log('SCORM Inspector: Received error update', errorData);
                     this.addError(errorData);
                 });
-                console.log('SCORM Inspector: Error update listener registered');
+                // Removed: console.log('SCORM Inspector: Error update listener registered');
             }
-
+ 
             // Listen for SCORM Data Model updates
             if (window.electronAPI.onScormDataModelUpdated) {
-                window.electronAPI.onScormDataModelUpdated((event, dataModel) => {
-                    console.log('SCORM Inspector: Received data model update', dataModel);
+                window.electronAPI.onScormDataModelUpdated((dataModel) => {
+                    // Removed: console.log('SCORM Inspector: Received data model update', dataModel);
                     this.updateDataModel(dataModel);
                 });
-                console.log('SCORM Inspector: Data model update listener registered');
+                // Removed: console.log('SCORM Inspector: Data model update listener registered');
             }
         } catch (error) {
-            console.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
+            rendererLogger.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
         }
     }
 
@@ -167,7 +162,7 @@ class ScormInspectorWindow {
             // Listen for course loaded events
             if (window.electronAPI.onCourseLoaded) {
                 window.electronAPI.onCourseLoaded(() => {
-                    console.log('SCORM Inspector: Course loaded, refreshing data');
+                    // Removed: console.log('SCORM Inspector: Course loaded, refreshing data');
                     // Refresh all inspector data when a new course is loaded
                     setTimeout(() => {
                         this.refreshData();
@@ -177,22 +172,22 @@ class ScormInspectorWindow {
                         this.refreshSSP();
                     }, 500); // Small delay to allow session creation
                 });
-                console.log('SCORM Inspector: Course loaded listener registered');
+                // Removed: console.log('SCORM Inspector: Course loaded listener registered');
             }
-
+ 
             // Listen for session state changes
             if (window.electronAPI.onSessionStateChanged) {
                 window.electronAPI.onSessionStateChanged(() => {
-                    console.log('SCORM Inspector: Session state changed, refreshing data');
+                    // Removed: console.log('SCORM Inspector: Session state changed, refreshing data');
                     // Refresh inspector data when session state changes
                     setTimeout(() => {
                         this.refreshData();
                     }, 100);
                 });
-                console.log('SCORM Inspector: Session state change listener registered');
+                // Removed: console.log('SCORM Inspector: Session state change listener registered');
             }
         } catch (error) {
-            console.error('SCORM Inspector: Failed to setup course event listeners:', error);
+            rendererLogger.error('SCORM Inspector: Failed to setup course event listeners:', error);
         }
     }
 
@@ -204,39 +199,62 @@ class ScormInspectorWindow {
             await this.waitForElectronAPI();
             
             if (!window.electronAPI?.getScormInspectorHistory) {
-                console.error('SCORM Inspector: getScormInspectorHistory method not available');
+                rendererLogger.error('SCORM Inspector: getScormInspectorHistory method not available');
                 return;
             }
-
+ 
             // Request history from SCORM Inspector telemetry store
-            const response = await window.electronAPI.getScormInspectorHistory();
-
+            // Removed: console.log('SCORM Inspector: Calling getScormInspectorHistory...');
+            let response;
+            try {
+                response = await window.electronAPI.getScormInspectorHistory();
+                // Removed: console.log('SCORM Inspector: getScormInspectorHistory response:', JSON.stringify(response, null, 2));
+            } catch (error) {
+                rendererLogger.error('SCORM Inspector: getScormInspectorHistory failed:', error);
+                this.setLoading(false);
+                return;
+            }
+ 
             if (response.success && response.data) {
                 const { history = [], errors = [], dataModel = {} } = response.data;
-                
+                // Removed: console.log('SCORM Inspector: Response data breakdown:', JSON.stringify({ ... }, null, 2));
+ 
                 // Load API call history
                 this.apiHistory = history;
                 this.renderApiTimeline();
-
+ 
                 // Load error history
                 this.scormErrors = errors;
                 this.renderErrorList();
-
-                // Load data model
-                this.dataModel = dataModel;
-                this.renderDataModel();
-
-                console.log(`SCORM Inspector: Loaded ${history.length} API calls, ${errors.length} errors, and ${Object.keys(dataModel).length} data model elements`);
+ 
+                // Load data model (only if it contains actual data)
+                const hasDataModelData = dataModel && Object.keys(dataModel).length > 0 &&
+                    (dataModel.coreData || dataModel.interactions ||
+                     dataModel.objectives || dataModel.commentsFromLearner ||
+                     dataModel.commentsFromLms);
+ 
+                if (hasDataModelData) {
+                    this.dataModel = dataModel;
+                    this.renderDataModel();
+                } else {
+                    // Removed: console.log('SCORM Inspector: Skipping empty data model from initial load');
+                    // Only render if we don't have existing data
+                    if (!this.dataModel || Object.keys(this.dataModel).length === 0) {
+                        this.renderDataModel();
+                    }
+                }
+ 
+                // Removed: console.log(`SCORM Inspector: Loaded ${history.length} API calls, ${errors.length} errors, and ${Object.keys(dataModel).length} data model elements`);
             } else {
-                console.warn('SCORM Inspector: Failed to load history', response.error);
+                // Removed: console.warn('SCORM Inspector: Failed to load history', response.error);
             }
         } catch (error) {
-            console.error('SCORM Inspector: Error loading initial history', error);
+            rendererLogger.error('SCORM Inspector: Error loading initial history', error);
         } finally {
             this.setLoading(false);
         }
     }
-
+ 
     async waitForElectronAPI(timeout = 5000) {
         const startTime = Date.now();
         
@@ -247,9 +265,9 @@ class ScormInspectorWindow {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         
-        console.log('SCORM Inspector: electronAPI is now available');
+        // Removed: console.log('SCORM Inspector: electronAPI is now available');
     }
-
+ 
     addApiCall(data) {
         if (!data) return;
 
@@ -377,14 +395,14 @@ class ScormInspectorWindow {
         this.renderApiTimeline();
         this.renderErrorList();
         this.renderDataModel();
-        console.log('SCORM Inspector: History cleared');
+        // Removed: console.log('SCORM Inspector: History cleared');
     }
-
+ 
     async refreshData() {
         await this.loadInitialHistory();
-        console.log('SCORM Inspector: Data refreshed');
+        // Removed: console.log('SCORM Inspector: Data refreshed');
     }
-
+ 
     setLoading(loading) {
         this.isLoading = loading;
         if (this.refreshBtn) {
@@ -404,17 +422,46 @@ class ScormInspectorWindow {
     updateDataModel(newDataModel) {
         if (!newDataModel) return;
 
+        // Prevent race conditions by debouncing rapid updates
+        const now = Date.now();
+        if (this.isUpdatingDataModel || (now - this.lastDataModelUpdate) < 50) {
+            // Clear any pending update and schedule a new one
+            if (this.dataModelUpdateTimeout) {
+                clearTimeout(this.dataModelUpdateTimeout);
+            }
+            this.dataModelUpdateTimeout = setTimeout(() => {
+                this.updateDataModel(newDataModel);
+            }, 100);
+            return;
+        }
+
+        this.isUpdatingDataModel = true;
+        this.lastDataModelUpdate = now;
+
+        // Validate that we're not overwriting good data with empty data
+        const hasExistingData = this.dataModel && Object.keys(this.dataModel).length > 0;
+        const isNewDataEmpty = !newDataModel || Object.keys(newDataModel).length === 0 ||
+            (!newDataModel.coreData && !newDataModel.interactions &&
+             !newDataModel.objectives && !newDataModel.commentsFromLearner &&
+             !newDataModel.commentsFromLms);
+ 
+        if (hasExistingData && isNewDataEmpty) {
+            rendererLogger.warn('SCORM Inspector: Ignoring empty data model update to prevent overwriting existing data');
+            this.isUpdatingDataModel = false;
+            return;
+        }
+ 
         // Track changes for highlighting (simplified for structured data)
         const changedKeys = new Set();
-        
+
         // For structured data, we'll do a simple deep comparison
         const oldDataStr = JSON.stringify(this.dataModel);
         const newDataStr = JSON.stringify(newDataModel);
-        
+
         if (oldDataStr !== newDataStr) {
             // Mark as changed - we could implement more granular change tracking later
             changedKeys.add('__data_changed__');
-            
+
             // Store change history for the entire data model
             this.dataModelHistory.set('dataModel', {
                 previousValue: this.dataModel,
@@ -425,6 +472,7 @@ class ScormInspectorWindow {
 
         this.dataModel = newDataModel;
         this.renderDataModel(changedKeys);
+        this.isUpdatingDataModel = false;
     }
 
     renderDataModel(changedKeys = new Set()) {
@@ -729,12 +777,22 @@ class ScormInspectorWindow {
 
     filterDataModel(filterText) {
         this.filterText = filterText.trim();
+
+        // Temporarily block data model updates to prevent race conditions during filtering
+        const wasUpdating = this.isUpdatingDataModel;
+        this.isUpdatingDataModel = true;
+
         this.renderDataModel();
-        
+
         // Update clear button visibility
         if (this.clearFilterBtn) {
             this.clearFilterBtn.style.display = this.filterText ? 'flex' : 'none';
         }
+
+        // Restore update state after a brief delay
+        setTimeout(() => {
+            this.isUpdatingDataModel = wasUpdating;
+        }, 100);
     }
 
     clearFilter() {
@@ -742,11 +800,21 @@ class ScormInspectorWindow {
         if (this.dataFilterInput) {
             this.dataFilterInput.value = '';
         }
+
+        // Temporarily block data model updates to prevent race conditions
+        const wasUpdating = this.isUpdatingDataModel;
+        this.isUpdatingDataModel = true;
+
         this.renderDataModel();
-        
+
         if (this.clearFilterBtn) {
             this.clearFilterBtn.style.display = 'none';
         }
+
+        // Restore update state after a brief delay
+        setTimeout(() => {
+            this.isUpdatingDataModel = wasUpdating;
+        }, 200);
     }
 
     expandAllCategories() {
@@ -795,12 +863,12 @@ class ScormInspectorWindow {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-
-        console.log('SCORM Inspector: Data model exported');
+ 
+        // Removed: console.log('SCORM Inspector: Data model exported');
     }
-
+ 
     // ==================== ENHANCED INSPECTOR FUNCTIONALITY ====================
-
+ 
     // Activity Tree Methods
     refreshActivityTree() {
         // Request activity tree from main process
@@ -811,11 +879,11 @@ class ScormInspectorWindow {
                     this.renderActivityTree();
                 }
             }).catch(error => {
-                console.error('Failed to refresh activity tree:', error);
+                rendererLogger.error('Failed to refresh activity tree:', error);
             });
         }
     }
-
+ 
     renderActivityTree() {
         if (!this.activityTreeElement) return;
 
@@ -995,11 +1063,11 @@ class ScormInspectorWindow {
                     this.renderNavigationAnalysis();
                 }
             }).catch(error => {
-                console.error('Failed to refresh navigation requests:', error);
+                rendererLogger.error('Failed to refresh navigation requests:', error);
             });
         }
     }
-
+ 
     renderNavigationAnalysis() {
         if (!this.navigationAnalysisElement) return;
 
@@ -1116,11 +1184,11 @@ class ScormInspectorWindow {
                     this.renderGlobalObjectives();
                 }
             }).catch(error => {
-                console.error('Failed to refresh global objectives:', error);
+                rendererLogger.error('Failed to refresh global objectives:', error);
             });
         }
     }
-
+ 
     renderGlobalObjectives() {
         if (!this.globalObjectivesElement) return;
 
@@ -1193,11 +1261,11 @@ class ScormInspectorWindow {
                     this.renderSSPBuckets();
                 }
             }).catch(error => {
-                console.error('Failed to refresh SSP buckets:', error);
+                rendererLogger.error('Failed to refresh SSP buckets:', error);
             });
         }
     }
-
+ 
     renderSSPBuckets() {
         if (!this.sspBucketsElement) return;
 
@@ -1363,9 +1431,9 @@ class ScormInspectorWindow {
     clearEnhancedLog() {
         this.enhancedLogEntries = [];
         this.renderEnhancedLog();
-        console.log('SCORM Inspector: Enhanced log cleared');
+        // Removed: console.log('SCORM Inspector: Enhanced log cleared');
     }
-
+ 
     exportEnhancedLog() {
         if (!this.enhancedLogEntries || this.enhancedLogEntries.length === 0) {
             alert('No log entries to export.');

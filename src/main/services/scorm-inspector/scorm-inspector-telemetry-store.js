@@ -72,6 +72,8 @@ class ScormInspectorTelemetryStore {
       }
       
       // Immediately broadcast to all windows
+      // Debug: Log entry type and method
+      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Broadcasting entry type: ${typeof entry}, method: ${entry?.method}, id: ${entry?.id}`);
       this.broadcastToAllWindows('scorm-inspector-data-updated', entry);
       
       // Update performance stats
