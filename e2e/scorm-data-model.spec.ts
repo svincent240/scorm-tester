@@ -225,22 +225,35 @@ test.describe('SCORM Data Model Inspector Tests', () => {
     // Additional check: Wait for inspector to actually receive data
     let dataReceived = false;
     for (let i = 0; i < 10; i++) {
-      const checkData = await inspectorWindow.evaluate(() => {
-        const inspector = (window as any).scormInspector;
-        return {
-          hasData: inspector?.dataModel && Object.keys(inspector.dataModel).length > 0,
-          apiHistoryLength: inspector?.apiHistory?.length || 0
-        };
-      });
+      try {
+        // Check if inspector window is still open
+        if (inspectorWindow.isClosed()) {
+          console.log('❌ Inspector window was closed unexpectedly');
+          break;
+        }
 
-      if (checkData.hasData || checkData.apiHistoryLength > 0) {
-        dataReceived = true;
-        console.log(`✓ Inspector received data: ${checkData.apiHistoryLength} API calls, data model has ${checkData.hasData ? 'data' : 'no data'}`);
+        const checkData = await inspectorWindow.evaluate(() => {
+          const inspector = (window as any).scormInspector;
+          return {
+            hasData: inspector?.dataModel && Object.keys(inspector.dataModel).length > 0,
+            apiHistoryLength: inspector?.apiHistory?.length || 0,
+            hasInspector: !!inspector,
+            dataModelKeys: inspector?.dataModel ? Object.keys(inspector.dataModel) : []
+          };
+        });
+
+        if (checkData.hasData || checkData.apiHistoryLength > 0) {
+          dataReceived = true;
+          console.log(`✓ Inspector received data: ${checkData.apiHistoryLength} API calls, data model has ${checkData.hasData ? 'data' : 'no data'}`);
+          break;
+        }
+
+        console.log(`Waiting for inspector data... attempt ${i + 1}/10 (API calls: ${checkData.apiHistoryLength}, has inspector: ${checkData.hasInspector})`);
+        await inspectorWindow.waitForTimeout(1000);
+      } catch (error) {
+        console.log(`❌ Error checking inspector data on attempt ${i + 1}: ${error.message}`);
         break;
       }
-
-      console.log(`Waiting for inspector data... attempt ${i + 1}/10`);
-      await inspectorWindow.waitForTimeout(1000);
     }
 
     if (!dataReceived) {

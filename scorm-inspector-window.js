@@ -3,7 +3,7 @@
 // SCORM Inspector Window JavaScript
 // Handles the display and management of SCORM package inspection data
 
-import rendererLogger from '../../src/renderer/utils/renderer-logger.js';
+// Note: Using console.error instead of rendererLogger to avoid import issues in browser context
 
 class ScormInspectorWindow {
     constructor() {
@@ -150,7 +150,7 @@ class ScormInspectorWindow {
                 // Removed: console.log('SCORM Inspector: Data model update listener registered');
             }
         } catch (error) {
-            rendererLogger.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
+            console.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
         }
     }
 
