@@ -30,9 +30,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">71.22% </span>
+                <span class="strong">70.27% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>151/212</span>
+                <span class='fraction'>156/222</span>
             </div>
         
             
@@ -828,9 +828,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -840,8 +840,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">48x</span>
-<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">39x</span>
+<span class="cline-any cline-yes">39x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1555,7 +1555,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span></td><td class="text"><pre class="prettyprint lang-js">/**
+<span class="cline-any cline-yes">7x</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * SCORM 2004 4th Edition Package Analyzer
  * 
  * Analyzes SCORM package structure and content according to:
@@ -1774,13 +1774,13 @@ class PackageAnalyzer {
    */
   checkComplianceSync(packagePath, manifest) {
     try {
-      console.log('PackageAnalyzer: Starting synchronous compliance check');
-      console.log('PackageAnalyzer: packagePath:', packagePath);
-      console.log('PackageAnalyzer: manifest type:', typeof manifest);
-      console.log('PackageAnalyzer: manifest is null/undefined:', manifest == null);
+      this.contentValidator.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.contentValidator.logger.debug('PackageAnalyzer: Starting synchronous compliance check');</span>
+      this.contentValidator.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.contentValidator.logger.debug('PackageAnalyzer: packagePath:', packagePath);</span>
+      this.contentValidator.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.contentValidator.logger.debug('PackageAnalyzer: manifest type:', typeof manifest);</span>
+      this.contentValidator.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.contentValidator.logger.debug('PackageAnalyzer: manifest is null/undefined:', manifest == null);</span>
 &nbsp;
       <span class="missing-if-branch" title="if path not taken" >I</span>if (!manifest) {
-<span class="cstat-no" title="statement not covered" >        console.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');</span>
+<span class="cstat-no" title="statement not covered" >        this.contentValidator.logger?.error('PackageAnalyzer: Manifest is null or undefined in checkComplianceSync');</span>
 <span class="cstat-no" title="statement not covered" >        return {</span>
           hasRequiredElements: false,
           validScormTypes: false,
@@ -1813,10 +1813,10 @@ class PackageAnalyzer {
         warnings: []
       };
 &nbsp;
-      console.log('PackageAnalyzer: Synchronous compliance check completed:', result);
+      this.contentValidator.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.contentValidator.logger.debug('PackageAnalyzer: Synchronous compliance check completed:', result);</span>
       return result;
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('PackageAnalyzer: Synchronous compliance check failed:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.contentValidator.logger?.error('PackageAnalyzer: Synchronous compliance check failed:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.errorHandler?.setError('301', `Synchronous compliance check failed: ${error.message}`, 'checkComplianceSync');</span>
 <span class="cstat-no" title="statement not covered" >      return {</span>
         hasRequiredElements: false,
@@ -2308,7 +2308,7 @@ module.exports = PackageAnalyzer;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-07T15:39:05.530Z
+                at 2025-08-14T21:33:24.528Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

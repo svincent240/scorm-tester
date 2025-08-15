@@ -1,6 +1,6 @@
 ---
 type: "agent_requested"
-description: "Example description"
+description: "General Rules"
 ---
 # Development Rules and Guidelines
 
@@ -52,12 +52,13 @@ Keep responsibilities distinct:
 - Avoid placing unrelated code in the same file
 
 ### Respect the architecture
-The architecture described in `dev_docs/README.md` and supporting docs must be followed.  
+The architecture described in `dev_docs/README.md` and ALL supporting docs in the dev_docs directort must be followed.  
 Do not bypass or work around the intended design.
 
 ### No temporary or hardcoded fixes
 - Avoid shortcuts such as “just make it work” hacks
 - Fix the root cause or document a limitation and open an issue if necessary
+- NEVER cheat on tests
 
 ### File size and complexity
 - Break up files that grow too large
@@ -76,6 +77,7 @@ If a well-supported package or library solves a problem:
 ### Testing
 - Every new feature or bug fix must include tests
 - Tests should verify both expected success and failure cases
+- Never force tests to pass in ways that would mask underlying problems
 
 ---
 

@@ -30,9 +30,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">67.79% </span>
+                <span class="strong">55.42% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>80/118</span>
+                <span class='fraction'>92/166</span>
             </div>
         
             
@@ -591,9 +591,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -603,15 +603,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
-<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1081,7 +1081,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span></td><td class="text"><pre class="prettyprint lang-js">/**
+<span class="cline-any cline-yes">7x</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * SCORM 2004 4th Edition Content Validator
  * 
  * Validates SCORM packages according to:
@@ -1160,13 +1160,13 @@ class ContentValidator {
    * @param {Object} manifest - Parsed manifest object
    */
   async validateManifestStructure(manifest) {
-    console.log('ContentValidator: Starting manifest structure validation');
-    console.log('ContentValidator: manifest type:', typeof manifest);
-    console.log('ContentValidator: manifest is null/undefined:', manifest == null);
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Starting manifest structure validation');</span>
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: manifest type:', typeof manifest);</span>
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: manifest is null/undefined:', manifest == null);</span>
     
     // Critical check: ensure manifest is not null/undefined
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!manifest) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Manifest is null or undefined!');</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Manifest is null or undefined!');</span>
 <span class="cstat-no" title="statement not covered" >      this.addError('Manifest object is null or undefined');</span>
 <span class="cstat-no" title="statement not covered" >      this.hasRequiredElements = false;</span>
 <span class="cstat-no" title="statement not covered" >      this.metadataCompliance = false;</span>
@@ -1174,14 +1174,14 @@ class ContentValidator {
     }
 &nbsp;
     <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof manifest !== 'object') {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Manifest is not an object, got:', typeof manifest);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Manifest is not an object, got:', typeof manifest);</span>
 <span class="cstat-no" title="statement not covered" >      this.addError(`Manifest must be an object, got: ${typeof manifest}`);</span>
 <span class="cstat-no" title="statement not covered" >      this.hasRequiredElements = false;</span>
 <span class="cstat-no" title="statement not covered" >      this.metadataCompliance = false;</span>
 <span class="cstat-no" title="statement not covered" >      return;</span>
     }
 &nbsp;
-    console.log('ContentValidator: Manifest structure:', {
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Manifest structure:', {</span>
       hasIdentifier: 'identifier' in manifest,
       identifierValue: manifest.identifier,
       hasOrganizations: 'organizations' in manifest,
@@ -1194,63 +1194,63 @@ class ContentValidator {
     
     try {
       <span class="missing-if-branch" title="if path not taken" >I</span>if (!manifest.identifier) {
-<span class="cstat-no" title="statement not covered" >        console.log('ContentValidator: Missing identifier attribute');</span>
+<span class="cstat-no" title="statement not covered" >        this.logger?.debug &amp;&amp; this.logger.debug('ContentValidator: Missing identifier attribute');</span>
 <span class="cstat-no" title="statement not covered" >        this.addError('Manifest missing required identifier attribute');</span>
 <span class="cstat-no" title="statement not covered" >        missingRequired = true;</span>
       } else {
-        console.log('ContentValidator: Identifier found:', manifest.identifier);
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Identifier found:', manifest.identifier);</span>
       }
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Error checking identifier:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Error checking identifier:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.addError('Error accessing manifest identifier');</span>
 <span class="cstat-no" title="statement not covered" >      missingRequired = true;</span>
     }
 &nbsp;
     try {
       <span class="missing-if-branch" title="if path not taken" >I</span>if (!manifest.organizations) {
-<span class="cstat-no" title="statement not covered" >        console.log('ContentValidator: Missing organizations element');</span>
+<span class="cstat-no" title="statement not covered" >        this.logger?.debug &amp;&amp; this.logger.debug('ContentValidator: Missing organizations element');</span>
 <span class="cstat-no" title="statement not covered" >        this.addError('Manifest missing required organizations element');</span>
 <span class="cstat-no" title="statement not covered" >        missingRequired = true;</span>
       } else {
-        console.log('ContentValidator: Organizations found');
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Organizations found');</span>
       }
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Error checking organizations:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Error checking organizations:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.addError('Error accessing manifest organizations');</span>
 <span class="cstat-no" title="statement not covered" >      missingRequired = true;</span>
     }
 &nbsp;
     try {
       <span class="missing-if-branch" title="if path not taken" >I</span>if (!manifest.resources) {
-<span class="cstat-no" title="statement not covered" >        console.log('ContentValidator: Missing resources element');</span>
+<span class="cstat-no" title="statement not covered" >        this.logger?.debug &amp;&amp; this.logger.debug('ContentValidator: Missing resources element');</span>
 <span class="cstat-no" title="statement not covered" >        this.addError('Manifest missing required resources element');</span>
 <span class="cstat-no" title="statement not covered" >        missingRequired = true;</span>
       } else {
-        console.log('ContentValidator: Resources found, count:', manifest.resources?.length || 0);
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Resources found, count:', manifest.resources?.length || 0);</span>
       }
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Error checking resources:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Error checking resources:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.addError('Error accessing manifest resources');</span>
 <span class="cstat-no" title="statement not covered" >      missingRequired = true;</span>
     }
 &nbsp;
     this.hasRequiredElements = !missingRequired;
-    console.log('ContentValidator: Required elements check completed, hasRequiredElements:', this.hasRequiredElements);
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Required elements check completed, hasRequiredElements:', this.hasRequiredElements);</span>
 &nbsp;
     // Metadata validation
     try {
       if (manifest.metadata) {
-        console.log('ContentValidator: Validating metadata structure');
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Validating metadata structure');</span>
         this.validateMetadataStructure(manifest.metadata);
         this.metadataCompliance = true; // Assuming valid if present and structure is validated
-        console.log('ContentValidator: Metadata validation completed');
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Metadata validation completed');</span>
       } else {
-        console.log('ContentValidator: No metadata found');
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: No metadata found');</span>
         this.addWarning('Package missing recommended metadata section');
         this.metadataCompliance = false;
       }
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Error validating metadata:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Error validating metadata:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.addError('Error validating manifest metadata');</span>
 <span class="cstat-no" title="statement not covered" >      this.metadataCompliance = false;</span>
     }
@@ -1258,17 +1258,17 @@ class ContentValidator {
     // Version validation
     try {
       if (manifest.version &amp;&amp; !this.isValidVersion(manifest.version)) {
-        console.log('ContentValidator: Invalid version format:', manifest.version);
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Invalid version format:', manifest.version);</span>
         this.addWarning(`Invalid manifest version: ${manifest.version}`);
       } else <span class="missing-if-branch" title="else path not taken" >E</span>if (manifest.version) {
-        console.log('ContentValidator: Valid version found:', manifest.version);
+        this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Valid version found:', manifest.version);</span>
       }
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      console.error('ContentValidator: Error checking version:', error);</span>
+<span class="cstat-no" title="statement not covered" >      this.logger?.error &amp;&amp; this.logger.error('ContentValidator: Error checking version:', error);</span>
 <span class="cstat-no" title="statement not covered" >      this.addWarning('Error validating manifest version');</span>
     }
 &nbsp;
-    console.log('ContentValidator: Manifest structure validation completed');
+    this.logger?.debug &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >this.logger.debug('ContentValidator: Manifest structure validation completed');</span>
   }
 &nbsp;
   /**
@@ -1597,7 +1597,7 @@ module.exports = ContentValidator;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-07T15:39:05.317Z
+                at 2025-08-14T21:33:24.292Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>
