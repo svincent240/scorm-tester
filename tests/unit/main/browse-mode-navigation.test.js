@@ -314,7 +314,7 @@ describe('Browse Mode Navigation Integration', () => {
   describe('Browse Mode Session Integration', () => {
     test('should include session information in navigation results', async () => {
       const enableResult = await browseModeService.enableBrowseMode();
-      
+
       const result = sequencingEngine.evaluateNavigationRequestInBrowseMode(
         'activity1',
         'activity2',
@@ -327,7 +327,7 @@ describe('Browse Mode Navigation Integration', () => {
     test('should handle session cleanup during navigation', async () => {
       await browseModeService.enableBrowseMode();
       await browseModeService.disableBrowseMode();
-      
+
       const result = sequencingEngine.evaluateNavigationRequestInBrowseMode(
         'activity1',
         'activity2',
@@ -338,4 +338,6 @@ describe('Browse Mode Navigation Integration', () => {
       expect(result.reason).toContain('not enabled');
     });
   });
+
+
 });

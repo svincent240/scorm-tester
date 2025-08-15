@@ -49,16 +49,16 @@ export function getInitialUIState() {
       notifications: []
     },
 
-    // Testing mode state
-    testingMode: {
+    // Browse mode state (SCORM-compliant)
+    browseMode: {
       enabled: false,
-      overrides: {
-        bypassSequencing: false,
-        forceNavigation: false,
-        ignorePrerequisites: false,
-        unlimitedAttempts: false
-      },
-      testStates: new Map()
+      session: null,
+      config: {
+        navigationUnrestricted: true,
+        trackingDisabled: true,
+        dataIsolation: true,
+        visualIndicators: true
+      }
     },
 
     // LMS simulation state

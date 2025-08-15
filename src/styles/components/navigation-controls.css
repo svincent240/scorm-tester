@@ -233,42 +233,45 @@
   color: white;
 }
 
-.mode-btn--testing.active {
-  background: var(--warning-color);
-  color: var(--warning-dark);
+.mode-btn--browse.active {
+  background: var(--info-color);
+  color: var(--info-text);
 }
 
-/* Testing Mode Styles */
-.navigation-controls--testing {
-  border-color: var(--warning-color);
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--warning-color-alpha) 100%);
+/* Browse Mode Styles (SCORM-compliant) */
+.navigation-controls--browse {
+  border-color: var(--info-color);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--info-color-alpha) 50%);
+  box-shadow: 0 0 0 1px var(--info-color-alpha);
 }
 
-.navigation-controls--testing .navigation-controls__title {
-  color: var(--warning-dark);
+.navigation-controls--browse .navigation-controls__title {
+  color: var(--info-dark);
 }
 
-.testing-mode-indicator {
-  background: var(--warning-color);
-  color: var(--warning-dark);
+.browse-mode-indicator {
+  background: var(--info-color-alpha);
+  color: var(--info-dark);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-sm);
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-normal);
   margin-top: var(--spacing-xs);
   text-align: center;
-  border: 1px solid var(--warning-dark);
+  border: 1px solid var(--info-color);
+  opacity: 0.8;
+  transition: opacity var(--transition-base);
 }
 
-.navigation-controls__btn.nav-testing-mode {
-  border-color: var(--warning-color);
-  background: var(--warning-color-alpha);
-  color: var(--warning-dark);
+.navigation-controls__btn.nav-browse-mode {
+  border-color: var(--info-color);
+  background: var(--info-color-alpha);
+  color: var(--info-dark);
 }
 
-.navigation-controls__btn.nav-testing-mode:hover {
-  background: var(--warning-color);
-  color: var(--warning-dark);
+.navigation-controls__btn.nav-browse-mode:hover {
+  background: var(--info-color);
+  color: var(--info-text);
 }
 
 /* Learner Mode Styles */

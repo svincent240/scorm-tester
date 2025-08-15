@@ -362,7 +362,7 @@ class ScormSNService {
    */
   getSequencingState() {
     const currentActivity = this.activityTreeManager.currentActivity;
-    
+
     return {
       sessionState: this.sessionState,
       sessionId: this.sequencingSession?.sessionId || null,
@@ -376,6 +376,15 @@ class ScormSNService {
       globalObjectives: this.rollupManager.getAllGlobalObjectives(),
       activityTreeStats: this.activityTreeManager.getTreeStats()
     };
+  }
+
+  /**
+   * Refresh navigation availability (useful when browse mode state changes)
+   * @returns {Object} Updated sequencing state with refreshed navigation
+   */
+  refreshNavigationAvailability() {
+    this.navigationHandler.refreshNavigationAvailability();
+    return this.getSequencingState();
   }
 
   /**

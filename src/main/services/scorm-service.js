@@ -797,7 +797,8 @@ class ScormService extends BaseService {
     // Initialize Browse Mode service for testing functionality (before SN service)
     this.browseModeService = new BrowseModeService(this.logger, {
       defaultTimeout: this.config.browseModeTimeout || (30 * 60 * 1000), // 30 minutes
-      maxSessions: this.config.maxBrowseSessions || 10
+      maxSessions: this.config.maxBrowseSessions || 10,
+      scormService: this // Pass reference to SCORM service for navigation refresh
     });
 
     // Initialize SN service for sequencing support with browse mode integration

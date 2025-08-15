@@ -845,7 +845,7 @@ class ScormApiHandler {
       launchMode: this.options.launchMode,
       memoryOnlyStorage: this.options.memoryOnlyStorage,
       sessionId: this.sessionId,
-      browseSession: this.dataModel.browseSession
+      browseSession: this.dataModel.getBrowseSessionStatus()
     };
   }
 }

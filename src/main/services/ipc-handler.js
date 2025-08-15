@@ -1115,6 +1115,16 @@ class IpcHandler extends BaseService {
     return result;
   }
 
+  async handleSNRefreshNavigation(event) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = snService.refreshNavigationAvailability();
+    return { success: true, ...result };
+  }
+
   async handleSNUpdateActivityProgress(event, { activityId, progressData } = {}) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();

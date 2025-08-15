@@ -461,10 +461,23 @@ class NavigationHandler {
    */
   updateAvailableNavigation() {
     this.navigationSession.availableNavigation.clear();
-    
+
     const currentActivity = this.navigationSession.currentActivity;
     if (!currentActivity) return;
 
+    // In browse mode, enable unrestricted navigation
+    if (this.isBrowseModeEnabled()) {
+      // Add all navigation types in browse mode
+      this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.CONTINUE);
+      this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.PREVIOUS);
+      this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.EXIT);
+      this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.CHOICE);
+
+      this.logger?.debug('NavigationHandler: Browse mode - all navigation enabled');
+      return;
+    }
+
+    // Standard SCORM navigation processing
     // Check each navigation type
     if (this.checkNavigationValidity(NAVIGATION_REQUESTS.CONTINUE).valid) {
       this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.CONTINUE);
@@ -475,7 +488,7 @@ class NavigationHandler {
     if (this.checkNavigationValidity(NAVIGATION_REQUESTS.EXIT).valid) {
       this.navigationSession.availableNavigation.add(NAVIGATION_REQUESTS.EXIT);
     }
-    
+
     // Check if choice navigation is enabled
     const controlModeCheck = this.checkControlModePermissions(currentActivity, NAVIGATION_REQUESTS.CHOICE);
     if (controlModeCheck.allowed) {
@@ -489,6 +502,18 @@ class NavigationHandler {
    */
   getAvailableNavigation() {
     return Array.from(this.navigationSession.availableNavigation);
+  }
+
+  /**
+   * Refresh navigation availability (useful when browse mode state changes)
+   * @public
+   */
+  refreshNavigationAvailability() {
+    this.updateAvailableNavigation();
+    this.logger?.debug('NavigationHandler: Navigation availability refreshed', {
+      browseMode: this.isBrowseModeEnabled(),
+      availableNavigation: this.getAvailableNavigation()
+    });
   }
 
   /**
@@ -593,6 +618,22 @@ class NavigationHandler {
           };
       }
 
+      // In browse mode, if standard navigation fails, provide browse mode alternatives
+      if (!result.success && (navigationRequest === NAVIGATION_REQUESTS.CONTINUE || navigationRequest === NAVIGATION_REQUESTS.PREVIOUS)) {
+        // For continue/previous in browse mode, if no natural target exists,
+        // find any available activity as per browse mode unrestricted navigation
+        const fallbackActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
+        if (fallbackActivity) {
+          result = {
+            success: true,
+            reason: `Browse mode ${navigationRequest} - using fallback activity (no natural ${navigationRequest === NAVIGATION_REQUESTS.CONTINUE ? 'next' : 'previous'} available)`,
+            targetActivity: fallbackActivity,
+            action: 'launch',
+            fallback: true
+          };
+        }
+      }
+
       // Enhance result with browse mode information
       return {
         ...result,
@@ -619,6 +660,8 @@ class NavigationHandler {
   isBrowseModeEnabled() {
     return this.browseModeService?.isBrowseModeEnabled() || false;
   }
+
+
 
   // Placeholder methods for remaining navigation requests
   processResumeAllRequest() { return { success: true, reason: 'Resume all processed', action: 'resume' }; }

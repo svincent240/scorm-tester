@@ -64,7 +64,7 @@ class BrowseModeService extends EventEmitter {
         return {
           success: true,
           alreadyEnabled: true,
-          session: this.currentSession
+          session: this.serializeSession(this.currentSession)
         };
       }
 
@@ -83,10 +83,13 @@ class BrowseModeService extends EventEmitter {
       
       // Emit browse mode enabled event
       this.emit('browse-mode-enabled', { session });
-      
+
+      // Trigger navigation availability refresh
+      this.refreshNavigationAvailability();
+
       return {
         success: true,
-        session: session
+        session: this.serializeSession(session)
       };
       
     } catch (error) {
@@ -126,7 +129,10 @@ class BrowseModeService extends EventEmitter {
       
       // Emit browse mode disabled event
       this.emit('browse-mode-disabled', { sessionId });
-      
+
+      // Trigger navigation availability refresh
+      this.refreshNavigationAvailability();
+
       return {
         success: true,
         sessionId: sessionId
@@ -250,15 +256,34 @@ class BrowseModeService extends EventEmitter {
   getBrowseModeStatus() {
     return {
       enabled: this.enabled,
-      currentSession: this.currentSession ? {
-        id: this.currentSession.id,
-        startTime: this.currentSession.startTime,
-        lastActivity: this.currentSession.lastActivity,
-        duration: Date.now() - this.currentSession.startTime.getTime(),
-        options: this.currentSession.options
-      } : null,
+      currentSession: this.currentSession ? this.serializeSession(this.currentSession) : null,
       totalSessions: this.sessions.size,
-      navigationOverrides: this.navigationOverrides
+      navigationOverrides: { ...this.navigationOverrides }
+    };
+  }
+
+  /**
+   * Serialize session for IPC communication
+   * @param {Object} session - Session object to serialize
+   * @returns {Object} Serializable session object
+   * @private
+   */
+  serializeSession(session) {
+    if (!session) return null;
+
+    return {
+      id: session.id,
+      startTime: session.startTime,
+      lastActivity: session.lastActivity,
+      launchMode: session.launchMode,
+      duration: Date.now() - session.startTime.getTime(),
+      options: { ...session.options },
+      state: {
+        operationsCount: session.state?.operations?.length || 0,
+        temporaryDataSize: session.state?.temporaryData?.size || 0,
+        hasOriginalState: !!session.state?.originalState
+      },
+      active: session.timeoutHandle !== null
     };
   }
 
@@ -322,9 +347,28 @@ class BrowseModeService extends EventEmitter {
         timestamp: new Date(),
         details
       });
-      
+
       // Reset timeout
       this.setupSessionTimeout(this.currentSession);
+    }
+  }
+
+  /**
+   * Refresh navigation availability when browse mode state changes
+   * @private
+   */
+  refreshNavigationAvailability() {
+    try {
+      // Get the SN service from the SCORM service
+      if (this.options.scormService) {
+        const snService = this.options.scormService.getSNService();
+        if (snService && typeof snService.refreshNavigationAvailability === 'function') {
+          snService.refreshNavigationAvailability();
+          this.logger?.debug('Browse mode: Navigation availability refreshed');
+        }
+      }
+    } catch (error) {
+      this.logger?.warn('Browse mode: Failed to refresh navigation availability', error);
     }
   }
 

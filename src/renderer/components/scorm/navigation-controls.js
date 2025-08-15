@@ -65,6 +65,9 @@ class NavigationControls extends BaseComponent {
     await this.initializeSNServiceBridge();
     this.loadNavigationState();
 
+    // Initialize browse mode status
+    await this.initializeBrowseModeStatus();
+
     // Subscribe to authoritative navigation state from UIState
     try {
       this._unsubscribeNav = this.uiState.subscribe((newNavState) => {
@@ -74,6 +77,47 @@ class NavigationControls extends BaseComponent {
       }, 'navigationState');
     } catch (e) {
       this.logger?.warn('NavigationControls: Failed to subscribe to UIState navigationState', e?.message || e);
+    }
+
+    // Subscribe to browse mode state changes
+    try {
+      this._unsubscribeBrowseMode = this.uiState.subscribe((browseModeState) => {
+        if (browseModeState && typeof browseModeState.enabled === 'boolean') {
+          this.updateModeToggle(browseModeState.enabled);
+          this.updateNavigationForBrowseMode(browseModeState.enabled);
+        }
+      }, 'browseMode');
+    } catch (e) {
+      this.logger?.warn('NavigationControls: Failed to subscribe to UIState browseMode', e?.message || e);
+    }
+  }
+
+  /**
+   * Initialize browse mode status
+   */
+  async initializeBrowseModeStatus() {
+    try {
+      // Check current browse mode status
+      const status = await window.electronAPI.invoke('browse-mode-status');
+
+      if (status && status.enabled) {
+        // Update UI state
+        if (this.uiState) {
+          this.uiState.setState('browseMode', {
+            enabled: true,
+            session: status.session,
+            config: status.config || {}
+          });
+        }
+
+        // Update UI to reflect browse mode
+        this.updateModeToggle(true);
+        this.updateNavigationForBrowseMode(true);
+
+        this.logger?.info('NavigationControls: Browse mode already enabled', status);
+      }
+    } catch (error) {
+      this.logger?.warn('NavigationControls: Failed to initialize browse mode status', error);
     }
   }
 
@@ -134,8 +178,8 @@ class NavigationControls extends BaseComponent {
         <div class="navigation-controls__right">
           <!-- Mode Toggle -->
           <div class="mode-toggle" id="${this.elementId}-mode-toggle">
-            <button class="mode-btn mode-btn--learner active" id="${this.elementId}-learner-mode">🎓 Learner Mode</button>  
-            <button class="mode-btn mode-btn--testing" id="${this.elementId}-testing-mode">🔧 Testing Mode</button>
+            <button class="mode-btn mode-btn--learner active" id="${this.elementId}-learner-mode">🎓 Learner Mode</button>
+            <button class="mode-btn mode-btn--browse" id="${this.elementId}-browse-mode">🔍 Browse Mode</button>
           </div>
           
           <button 
@@ -196,7 +240,7 @@ class NavigationControls extends BaseComponent {
     // Mode toggle elements
     this.modeToggle = this.find('.mode-toggle');
     this.learnerModeBtn = this.find('.mode-btn--learner');
-    this.testingModeBtn = this.find('.mode-btn--testing');
+    this.browseModeBtn = this.find('.mode-btn--browse');
     
     // Navigation context elements
     this.contextElement = this.find('.navigation-controls__context');
@@ -240,7 +284,7 @@ class NavigationControls extends BaseComponent {
         handlePreviousClick: this.handlePreviousClick.bind(this),
         handleNextClick: this.handleNextClick.bind(this),
         handleLearnerModeClick: this.handleLearnerModeClick.bind(this),
-        handleTestingModeClick: this.handleTestingModeClick.bind(this),
+        handleBrowseModeClick: this.handleBrowseModeClick.bind(this),
         handleKeyDown: this.handleKeyDown.bind(this)
       };
     }
@@ -265,9 +309,9 @@ class NavigationControls extends BaseComponent {
     if (this.learnerModeBtn && this._boundHandlers.handleLearnerModeClick) {
       this.learnerModeBtn.addEventListener('click', this._boundHandlers.handleLearnerModeClick);
     }
-    
-    if (this.testingModeBtn && this._boundHandlers.handleTestingModeClick) {
-      this.testingModeBtn.addEventListener('click', this._boundHandlers.handleTestingModeClick);
+
+    if (this.browseModeBtn && this._boundHandlers.handleBrowseModeClick) {
+      this.browseModeBtn.addEventListener('click', this._boundHandlers.handleBrowseModeClick);
     }
     
     // Keyboard navigation with guard against missing binding
@@ -280,7 +324,12 @@ class NavigationControls extends BaseComponent {
    * Handle previous button click
    */
   async handlePreviousClick() {
-    if (!this.isNavigationAvailable('previous')) return;
+    // In browse mode, always allow navigation, otherwise check availability
+    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    if (!browseMode && !this.isNavigationAvailable('previous')) {
+      this.logger?.debug('NavigationControls: Previous navigation not available in normal mode');
+      return;
+    }
 
     // Emit centralized intent for AppManager orchestration
     try {
@@ -298,7 +347,12 @@ class NavigationControls extends BaseComponent {
    * Handle next button click
    */
   async handleNextClick() {
-    if (!this.isNavigationAvailable('continue')) return;
+    // In browse mode, always allow navigation, otherwise check availability
+    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    if (!browseMode && !this.isNavigationAvailable('continue')) {
+      this.logger?.debug('NavigationControls: Continue navigation not available in normal mode');
+      return;
+    }
 
     // Emit centralized intent for AppManager orchestration
     try {
@@ -354,14 +408,14 @@ class NavigationControls extends BaseComponent {
    * Handle learner mode button click
    */
   async handleLearnerModeClick() {
-    await this.setTestingMode(false);
+    await this.setBrowseMode(false);
   }
 
   /**
-   * Handle testing mode button click
+   * Handle browse mode button click
    */
-  async handleTestingModeClick() {
-    await this.setTestingMode(true);
+  async handleBrowseModeClick() {
+    await this.setBrowseMode(true);
   }
 
   /**
@@ -668,21 +722,41 @@ class NavigationControls extends BaseComponent {
    * Update button states based on available navigation
    */
   updateButtonStates() {
-    // Use authoritative booleans from UIState-normalized data when present
-    const canNavigatePrevious = !!this.navigationState.canNavigatePrevious || this.isNavigationAvailable('previous');
-    const canNavigateNext = !!this.navigationState.canNavigateNext || this.isNavigationAvailable('continue');
+    // Check if browse mode is enabled
+    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    
+    // In browse mode, enable all navigation; in normal mode, check availability
+    const canNavigatePrevious = browseMode || 
+      !!this.navigationState.canNavigatePrevious || 
+      this.isNavigationAvailable('previous');
+      
+    const canNavigateNext = browseMode || 
+      !!this.navigationState.canNavigateNext || 
+      this.isNavigationAvailable('continue');
     
     if (this.previousBtn) {
       this.previousBtn.disabled = !canNavigatePrevious;
       this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
-      this.previousBtn.title = canNavigatePrevious ? 'Previous Activity (respects course sequencing)' : 'Previous navigation not available';
+      
+      if (browseMode) {
+        this.previousBtn.title = 'Previous Activity (Browse Mode - Unrestricted Navigation)';
+      } else {
+        this.previousBtn.title = canNavigatePrevious ? 'Previous Activity (respects course sequencing)' : 'Previous navigation not available';
+      }
+      
       this.previousBtn.setAttribute('aria-disabled', String(!canNavigatePrevious));
     }
     
     if (this.nextBtn) {
       this.nextBtn.disabled = !canNavigateNext;
       this.nextBtn.classList.toggle('disabled', !canNavigateNext);
-      this.nextBtn.title = canNavigateNext ? 'Next Activity (respects course sequencing)' : 'Next navigation not available';
+      
+      if (browseMode) {
+        this.nextBtn.title = 'Next Activity (Browse Mode - Unrestricted Navigation)';
+      } else {
+        this.nextBtn.title = canNavigateNext ? 'Next Activity (respects course sequencing)' : 'Next navigation not available';
+      }
+      
       this.nextBtn.setAttribute('aria-disabled', String(!canNavigateNext));
     }
     
@@ -760,111 +834,160 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Set testing mode
+   * Set browse mode (SCORM-compliant)
    */
-  async setTestingMode(enabled) {
+  async setBrowseMode(enabled) {
     try {
+      if (enabled) {
+        // Enable browse mode via IPC
+        const result = await window.electronAPI.invoke('browse-mode-enable', {
+          navigationUnrestricted: true,
+          trackingDisabled: true,
+          dataIsolation: true,
+          visualIndicators: true
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to enable browse mode');
+        }
+
+        this.logger?.info('NavigationControls: Browse mode enabled', result);
+      } else {
+        // Disable browse mode via IPC
+        const result = await window.electronAPI.invoke('browse-mode-disable');
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to disable browse mode');
+        }
+
+        this.logger?.info('NavigationControls: Browse mode disabled', result);
+      }
+
       // Update UI state
       if (this.uiState) {
-        const currentTestingMode = this.uiState.getState('testingMode') || {};
-        const newTestingMode = {
-          ...currentTestingMode,
+        const currentBrowseMode = this.uiState.getState('browseMode') || {};
+        const newBrowseMode = {
+          ...currentBrowseMode,
           enabled: enabled
         };
-        this.uiState.setState('testingMode', newTestingMode);
+        this.uiState.setState('browseMode', newBrowseMode);
       }
-      
+
       // Update mode toggle buttons
       this.updateModeToggle(enabled);
-      
+
       // Update navigation controls display based on mode
-      this.updateNavigationForTestingMode(enabled);
-      
+      this.updateNavigationForBrowseMode(enabled);
+
+      // Refresh navigation availability after mode change
+      await this.refreshNavigationAvailability();
+
       // Emit mode change event
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('testingMode:changed', { enabled });
-      
-      this.logger?.info('NavigationControls: Testing mode changed', { enabled });
-      
+      eventBus.emit('browseMode:changed', { enabled });
+
     } catch (error) {
-      this.logger?.error('NavigationControls: Failed to set testing mode', error);
+      this.logger?.error('NavigationControls: Failed to set browse mode', error);
+
+      // Show error notification
+      if (this.uiState) {
+        this.uiState.setState('ui.error', `Failed to ${enabled ? 'enable' : 'disable'} browse mode: ${error.message}`);
+      }
     }
   }
 
   /**
    * Update mode toggle button states
    */
-  updateModeToggle(testingModeEnabled) {
-    if (this.learnerModeBtn && this.testingModeBtn) {
-      this.learnerModeBtn.classList.toggle('active', !testingModeEnabled);
-      this.testingModeBtn.classList.toggle('active', testingModeEnabled);
+  updateModeToggle(browseModeEnabled) {
+    if (this.learnerModeBtn && this.browseModeBtn) {
+      this.learnerModeBtn.classList.toggle('active', !browseModeEnabled);
+      this.browseModeBtn.classList.toggle('active', browseModeEnabled);
     }
   }
 
   /**
-   * Update navigation controls for testing mode
+   * Update navigation controls for browse mode (SCORM-compliant)
    */
-  updateNavigationForTestingMode(testingModeEnabled) {
-    // Update navigation controls container to show testing mode
+  updateNavigationForBrowseMode(browseModeEnabled) {
+    // Update navigation controls container to show browse mode
     if (this.element) {
-      this.element.classList.toggle('navigation-controls--testing', testingModeEnabled);
-      this.element.classList.toggle('navigation-controls--learner', !testingModeEnabled);
+      this.element.classList.toggle('navigation-controls--browse', browseModeEnabled);
+      this.element.classList.toggle('navigation-controls--learner', !browseModeEnabled);
     }
-    
-    // Update button labels and behavior for testing mode
-    if (testingModeEnabled) {
+
+    // Update button labels and behavior for browse mode
+    if (browseModeEnabled) {
       if (this.previousBtn) {
-        this.previousBtn.title = 'Previous Activity (TESTING MODE - Can override sequencing)';
-        this.previousBtn.classList.add('nav-testing-mode');
+        this.previousBtn.title = 'Previous Activity (Browse Mode - Unrestricted Navigation)';
+        this.previousBtn.classList.add('nav-browse-mode');
       }
       if (this.nextBtn) {
-        this.nextBtn.title = 'Next Activity (TESTING MODE - Can override sequencing)';
-        this.nextBtn.classList.add('nav-testing-mode');
+        this.nextBtn.title = 'Next Activity (Browse Mode - Unrestricted Navigation)';
+        this.nextBtn.classList.add('nav-browse-mode');
       }
-      
-      // Show testing mode indicator
-      this.showTestingModeIndicator();
+
+      // Show browse mode indicator
+      this.showBrowseModeIndicator();
     } else {
       if (this.previousBtn) {
         this.previousBtn.title = 'Previous Activity (respects course sequencing)';
-        this.previousBtn.classList.remove('nav-testing-mode');
+        this.previousBtn.classList.remove('nav-browse-mode');
       }
       if (this.nextBtn) {
         this.nextBtn.title = 'Next Activity (respects course sequencing)';
-        this.nextBtn.classList.remove('nav-testing-mode');
+        this.nextBtn.classList.remove('nav-browse-mode');
       }
-      
-      // Hide testing mode indicator
-      this.hideTestingModeIndicator();
+
+      // Hide browse mode indicator
+      this.hideBrowseModeIndicator();
     }
   }
 
   /**
-   * Show testing mode indicator
+   * Refresh navigation availability from SN service
    */
-  showTestingModeIndicator() {
-    if (this.statusElement && !this.testingModeIndicator) {
-      this.testingModeIndicator = document.createElement('div');
-      this.testingModeIndicator.className = 'testing-mode-indicator';
-      this.testingModeIndicator.innerHTML = '🔧 TESTING MODE - Sequencing Rules Can Be Overridden';
-      
+  async refreshNavigationAvailability() {
+    try {
+      if (this.snService) {
+        // Get updated sequencing state which includes available navigation
+        const state = await this.snService.getSequencingState();
+        if (state && state.availableNavigation) {
+          this.updateAvailableNavigation(state.availableNavigation);
+          this.logger?.debug('NavigationControls: Navigation availability refreshed', state.availableNavigation);
+        }
+      }
+    } catch (error) {
+      this.logger?.warn('NavigationControls: Failed to refresh navigation availability', error);
+    }
+  }
+
+  /**
+   * Show browse mode indicator (SCORM-compliant)
+   */
+  showBrowseModeIndicator() {
+    if (this.statusElement && !this.browseModeIndicator) {
+      this.browseModeIndicator = document.createElement('div');
+      this.browseModeIndicator.className = 'browse-mode-indicator';
+      this.browseModeIndicator.innerHTML = '🔍 Browse Mode - Data Not Tracked';
+
       // Insert after status element
       if (this.statusElement.parentNode) {
-        this.statusElement.parentNode.insertBefore(this.testingModeIndicator, this.statusElement.nextSibling);
+        this.statusElement.parentNode.insertBefore(this.browseModeIndicator, this.statusElement.nextSibling);
       }
     }
-    
-    if (this.testingModeIndicator) {
-      this.testingModeIndicator.style.display = 'block';
+
+    if (this.browseModeIndicator) {
+      this.browseModeIndicator.style.display = 'block';
     }
   }
 
   /**
-   * Hide testing mode indicator
+   * Hide browse mode indicator
    */
-  hideTestingModeIndicator() {
-    if (this.testingModeIndicator) {
-      this.testingModeIndicator.style.display = 'none';
+  hideBrowseModeIndicator() {
+    if (this.browseModeIndicator) {
+      this.browseModeIndicator.style.display = 'none';
     }
   }
 
@@ -1142,6 +1265,11 @@ class NavigationControls extends BaseComponent {
       try { this._unsubscribeNav(); } catch (e) { this.logger?.warn('NavigationControls: Error unsubscribing from UIState', e?.message || e); }
       this._unsubscribeNav = null;
     }
+
+    if (typeof this._unsubscribeBrowseMode === 'function') {
+      try { this._unsubscribeBrowseMode(); } catch (e) { this.logger?.warn('NavigationControls: Error unsubscribing from browse mode state', e?.message || e); }
+      this._unsubscribeBrowseMode = null;
+    }
     // Remove listeners with the same bound references to avoid leaks
     if (this.options.enableKeyboardNavigation && this._boundHandlers && this._boundHandlers.handleKeyDown) {
       document.removeEventListener('keydown', this._boundHandlers.handleKeyDown);
@@ -1156,8 +1284,8 @@ class NavigationControls extends BaseComponent {
     if (this.learnerModeBtn && this._boundHandlers && this._boundHandlers.handleLearnerModeClick) {
       this.learnerModeBtn.removeEventListener('click', this._boundHandlers.handleLearnerModeClick);
     }
-    if (this.testingModeBtn && this._boundHandlers && this._boundHandlers.handleTestingModeClick) {
-      this.testingModeBtn.removeEventListener('click', this._boundHandlers.handleTestingModeClick);
+    if (this.browseModeBtn && this._boundHandlers && this._boundHandlers.handleBrowseModeClick) {
+      this.browseModeBtn.removeEventListener('click', this._boundHandlers.handleBrowseModeClick);
     }
     super.destroy();
   }

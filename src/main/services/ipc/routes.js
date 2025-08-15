@@ -231,6 +231,13 @@ module.exports = [
     }
   },
   {
+    channel: 'sn:refreshNavigation',
+    handlerName: 'handleSNRefreshNavigation',
+    options: {
+      rateLimitProfile: 'snBypass'
+    }
+  },
+  {
     channel: 'sn:updateActivityProgress',
     handlerName: 'handleSNUpdateActivityProgress',
     options: {

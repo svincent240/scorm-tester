@@ -133,6 +133,23 @@ class SNBridge {
   }
 
   /**
+   * Refresh navigation availability
+   */
+  async refreshNavigationAvailability() {
+    try {
+      if (!this.isConnected) {
+        throw new Error('SN service not connected');
+      }
+
+      const result = await this.invokeMain('sn:refreshNavigation');
+      return result;
+    } catch (error) {
+      try { this.logger.error('SNBridge: Failed to refresh navigation availability', error?.message || error); } catch (_) {}
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Reset SN service
    */
   async reset() {

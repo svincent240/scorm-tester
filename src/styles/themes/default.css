@@ -116,6 +116,7 @@
   --info-color: var(--info-600);
   --info-hover: var(--info-700);
   --info-active: var(--info-800);
+  --info-dark: var(--info-800);
   --info-text: #ffffff;
   --info-color-alpha: rgba(2, 132, 199, 0.1);
   
