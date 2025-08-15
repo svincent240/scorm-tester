@@ -21,20 +21,23 @@ const {
  * Manages navigation requests and determines valid navigation paths
  */
 class NavigationHandler {
-  constructor(activityTreeManager, sequencingEngine, errorHandler, logger) {
+  constructor(activityTreeManager, sequencingEngine, errorHandler, logger, browseModeService = null) {
     this.activityTreeManager = activityTreeManager;
     this.sequencingEngine = sequencingEngine;
     this.errorHandler = errorHandler;
     this.logger = logger;
-    
+    this.browseModeService = browseModeService;
+
     // Navigation state
     this.navigationSession = {
       active: false,
       currentActivity: null,
       availableNavigation: new Set()
     };
-    
-    this.logger?.debug('NavigationHandler initialized');
+
+    this.logger?.debug('NavigationHandler initialized', {
+      browseModeSupport: !!this.browseModeService
+    });
   }
 
   /**
@@ -45,7 +48,10 @@ class NavigationHandler {
    */
   processNavigationRequest(navigationRequest, targetActivityId = null) {
     try {
-      this.logger?.debug(`Processing navigation request: ${navigationRequest}`, { targetActivityId });
+      this.logger?.debug(`Processing navigation request: ${navigationRequest}`, {
+        targetActivityId,
+        browseMode: this.isBrowseModeEnabled()
+      });
 
       // Validate navigation request type
       if (!Object.values(NAVIGATION_REQUESTS).includes(navigationRequest)) {
@@ -54,6 +60,13 @@ class NavigationHandler {
         return { success: false, reason: 'Invalid navigation request type' };
       }
 
+      // Check if browse mode is enabled - if so, use browse mode processing
+      if (this.isBrowseModeEnabled()) {
+        this.logger?.debug('Using browse mode navigation processing');
+        return this.processBrowseModeNavigation(navigationRequest, targetActivityId);
+      }
+
+      // Standard SCORM navigation processing
       // Check if navigation is currently allowed
       const validityCheck = this.checkNavigationValidity(navigationRequest, targetActivityId);
       if (!validityCheck.valid) {
@@ -476,6 +489,135 @@ class NavigationHandler {
    */
   getAvailableNavigation() {
     return Array.from(this.navigationSession.availableNavigation);
+  }
+
+  /**
+   * Process browse mode navigation request
+   * Handles unrestricted activity selection and choice navigation in browse mode
+   * @param {string} navigationRequest - Type of navigation request
+   * @param {string} targetActivityId - Target activity ID (for choice requests)
+   * @returns {Object} Browse mode navigation processing result
+   */
+  processBrowseModeNavigation(navigationRequest, targetActivityId = null) {
+    try {
+      // Check if browse mode is available and enabled
+      if (!this.browseModeService || !this.browseModeService.isBrowseModeEnabled()) {
+        return {
+          success: false,
+          reason: 'Browse mode not available or not enabled',
+          browseMode: false
+        };
+      }
+
+      this.logger?.debug('Processing browse mode navigation request', {
+        navigationRequest,
+        targetActivityId
+      });
+
+      // For choice navigation, validate target activity exists
+      if (navigationRequest === NAVIGATION_REQUESTS.CHOICE && targetActivityId) {
+        const targetActivity = this.activityTreeManager.findActivity(targetActivityId);
+        if (!targetActivity) {
+          return {
+            success: false,
+            reason: `Target activity not found: ${targetActivityId}`,
+            browseMode: true
+          };
+        }
+
+        // Use sequencing engine's browse mode evaluation
+        const currentActivityId = this.navigationSession.currentActivity?.identifier;
+        const evaluationResult = this.sequencingEngine.evaluateNavigationRequestInBrowseMode(
+          currentActivityId,
+          targetActivityId,
+          'choice'
+        );
+
+        if (!evaluationResult.success || !evaluationResult.allowed) {
+          return {
+            success: false,
+            reason: evaluationResult.reason,
+            browseMode: true,
+            evaluationResult
+          };
+        }
+
+        return {
+          success: true,
+          reason: 'Browse mode choice navigation processed',
+          targetActivity: targetActivity,
+          action: 'launch',
+          browseMode: true,
+          sessionId: evaluationResult.sessionId,
+          standardEvaluation: evaluationResult.standardEvaluation
+        };
+      }
+
+      // For other navigation types, process with browse mode allowances
+      const currentActivityId = this.navigationSession.currentActivity?.identifier;
+      const evaluationResult = this.sequencingEngine.evaluateNavigationRequestInBrowseMode(
+        currentActivityId,
+        null,
+        navigationRequest
+      );
+
+      if (!evaluationResult.success || !evaluationResult.allowed) {
+        return {
+          success: false,
+          reason: evaluationResult.reason,
+          browseMode: true,
+          evaluationResult
+        };
+      }
+
+      // Process the navigation request with browse mode overrides
+      let result;
+      switch (navigationRequest) {
+        case NAVIGATION_REQUESTS.START:
+          result = this.processStartRequest();
+          break;
+        case NAVIGATION_REQUESTS.CONTINUE:
+          result = this.processContinueRequest();
+          break;
+        case NAVIGATION_REQUESTS.PREVIOUS:
+          result = this.processPreviousRequest();
+          break;
+        case NAVIGATION_REQUESTS.EXIT:
+          result = this.processExitRequest();
+          break;
+        default:
+          result = {
+            success: true,
+            reason: `Browse mode ${navigationRequest} processed`,
+            action: navigationRequest
+          };
+      }
+
+      // Enhance result with browse mode information
+      return {
+        ...result,
+        browseMode: true,
+        sessionId: evaluationResult.sessionId,
+        standardEvaluation: evaluationResult.standardEvaluation
+      };
+
+    } catch (error) {
+      this.logger?.error('Error processing browse mode navigation:', error);
+      return {
+        success: false,
+        reason: `Browse mode navigation processing failed: ${error.message}`,
+        browseMode: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Check if browse mode is enabled
+   * @returns {boolean} True if browse mode is enabled
+   */
+  isBrowseModeEnabled() {
+    return this.browseModeService?.isBrowseModeEnabled() || false;
   }
 
   // Placeholder methods for remaining navigation requests

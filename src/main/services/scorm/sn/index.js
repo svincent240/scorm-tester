@@ -21,9 +21,10 @@ const { SN_ERROR_CODES, SEQUENCING_SESSION_STATES } = require('../../../../share
  * integration points with RTE and CAM services.
  */
 class ScormSNService {
-  constructor(errorHandler, logger, options = {}) {
+  constructor(errorHandler, logger, options = {}, browseModeService = null) {
     this.errorHandler = errorHandler;
     this.logger = logger;
+    this.browseModeService = browseModeService;
     this.options = {
       enableGlobalObjectives: true,
       enableRollupProcessing: true,
@@ -33,12 +34,18 @@ class ScormSNService {
 
     // Initialize core SN components
     this.activityTreeManager = new ActivityTreeManager(errorHandler, logger);
-    this.sequencingEngine = new SequencingEngine(this.activityTreeManager, errorHandler, logger);
+    this.sequencingEngine = new SequencingEngine(
+      this.activityTreeManager,
+      errorHandler,
+      logger,
+      this.browseModeService
+    );
     this.navigationHandler = new NavigationHandler(
-      this.activityTreeManager, 
-      this.sequencingEngine, 
-      errorHandler, 
-      logger
+      this.activityTreeManager,
+      this.sequencingEngine,
+      errorHandler,
+      logger,
+      this.browseModeService
     );
     this.rollupManager = new RollupManager(this.activityTreeManager, errorHandler, logger);
 
@@ -47,7 +54,9 @@ class ScormSNService {
     this.currentPackage = null;
     this.sequencingSession = null;
 
-    this.logger?.debug('ScormSNService initialized');
+    this.logger?.debug('ScormSNService initialized', {
+      browseModeSupport: !!this.browseModeService
+    });
   }
 
   /**

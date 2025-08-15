@@ -15,6 +15,7 @@ const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
 const { ScormSNService } = require('./scorm/sn/index');
 const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
+const BrowseModeService = require('./browse-mode-service');
 const ErrorHandler = require('../../shared/utils/error-handler');
 const {
   SERVICE_DEFAULTS,
@@ -42,6 +43,7 @@ class ScormService extends BaseService {
     this.rteService = null;
     this.camService = null; // Will be initialized in initializeScormServices
     this.snService = null;
+    this.browseModeService = null; // Browse mode service for testing functionality
     // Per-session RTE handler instances (system-of-record for data model)
     this.rteInstances = new Map();
     
@@ -132,9 +134,12 @@ class ScormService extends BaseService {
   /**
    * Initialize SCORM session
    * @param {string} sessionId - Session identifier
+   * @param {Object} options - Session options
+   * @param {string} options.launchMode - Launch mode ('normal', 'browse', 'review')
+   * @param {boolean} options.memoryOnlyStorage - Use memory-only storage
    * @returns {Promise<Object>} Initialization result
    */
-  async initializeSession(sessionId) {
+  async initializeSession(sessionId, options = {}) {
     try {
       this.logger?.info(`ScormService: Initializing SCORM session: ${sessionId}`);
       
@@ -164,7 +169,10 @@ class ScormService extends BaseService {
         apiCalls: [],
         errors: [],
         lmsProfile: null,
-        lastActivity: Date.now()
+        lastActivity: Date.now(),
+        launchMode: options.launchMode || 'normal',
+        browseMode: options.launchMode === 'browse',
+        memoryOnlyStorage: options.memoryOnlyStorage || false
       };
       
       this.sessions.set(sessionId, session);
@@ -204,7 +212,15 @@ class ScormService extends BaseService {
         };
         
         const telemetryStore = this.getDependency('telemetryStore');
-        const rte = new ScormApiHandler(sessionManager, this.logger, { strictMode: this.config.strictRteMode }, telemetryStore);
+
+        // Configure RTE options with browse mode support
+        const rteOptions = {
+          strictMode: this.config.strictRteMode,
+          launchMode: options.launchMode || 'normal',
+          memoryOnlyStorage: options.memoryOnlyStorage || false
+        };
+
+        const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore);
         // Initialize RTE session and then bind its internal session id to our session id for mapping
         try { rte.Initialize(''); } catch (_) {}
         // Override generated sessionId with our provided sessionId for consistency
@@ -236,10 +252,19 @@ class ScormService extends BaseService {
       
       
       
-      this.logger?.info(`ScormService: Session ${sessionId} initialized successfully`);
+      this.logger?.info(`ScormService: Session ${sessionId} initialized successfully`, {
+        launchMode: options.launchMode || 'normal',
+        browseMode: options.launchMode === 'browse'
+      });
       this.recordOperation('initializeSession', true);
-      
-      return { success: true, errorCode: '0' };
+
+      return {
+        success: true,
+        errorCode: '0',
+        sessionId: sessionId,
+        launchMode: options.launchMode || 'normal',
+        browseMode: options.launchMode === 'browse'
+      };
       
     } catch (error) {
       this.errorHandler?.setError(
@@ -768,13 +793,31 @@ class ScormService extends BaseService {
   async initializeScormServices() {
     // Initialize CAM service
     this.camService = new ScormCAMService(this.errorHandler, this.logger);
-    // Initialize SN service for sequencing support
+
+    // Initialize Browse Mode service for testing functionality (before SN service)
+    this.browseModeService = new BrowseModeService(this.logger, {
+      defaultTimeout: this.config.browseModeTimeout || (30 * 60 * 1000), // 30 minutes
+      maxSessions: this.config.maxBrowseSessions || 10
+    });
+
+    // Initialize SN service for sequencing support with browse mode integration
     this.snService = new ScormSNService(this.errorHandler, this.logger, {
       enableGlobalObjectives: this.config.enableGlobalObjectives,
       enableRollupProcessing: this.config.enableRollupProcessing,
       maxSequencingDepth: this.config.maxSequencingDepth
+    }, this.browseModeService);
+
+    // Set up browse mode event handlers
+    this.browseModeService.on('browse-mode-enabled', (data) => {
+      this.logger?.info('Browse mode enabled', data);
+      this.eventEmitter.emit('browse-mode-enabled', data);
     });
-    
+
+    this.browseModeService.on('browse-mode-disabled', (data) => {
+      this.logger?.info('Browse mode disabled', data);
+      this.eventEmitter.emit('browse-mode-disabled', data);
+    });
+
     this.logger?.debug('ScormService: SCORM service components initialized');
   }
 
@@ -1060,6 +1103,142 @@ class ScormService extends BaseService {
     } catch (error) {
       this.logger?.error('Error getting current data model:', error);
       return {};
+    }
+  }
+
+  // ===== BROWSE MODE METHODS =====
+
+  /**
+   * Enable browse mode
+   * @param {Object} options - Browse mode options
+   * @returns {Promise<Object>} Result with session information
+   */
+  async enableBrowseMode(options = {}) {
+    try {
+      if (!this.browseModeService) {
+        return {
+          success: false,
+          error: 'Browse mode service not initialized'
+        };
+      }
+
+      const result = await this.browseModeService.enableBrowseMode(options);
+
+      if (result.success) {
+        this.logger?.info('Browse mode enabled via ScormService', {
+          sessionId: result.session?.id,
+          options
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger?.error('Failed to enable browse mode:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Disable browse mode
+   * @returns {Promise<Object>} Result of disable operation
+   */
+  async disableBrowseMode() {
+    try {
+      if (!this.browseModeService) {
+        return {
+          success: false,
+          error: 'Browse mode service not initialized'
+        };
+      }
+
+      const result = await this.browseModeService.disableBrowseMode();
+
+      if (result.success) {
+        this.logger?.info('Browse mode disabled via ScormService', {
+          sessionId: result.sessionId
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger?.error('Failed to disable browse mode:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get browse mode status
+   * @returns {Object} Browse mode status information
+   */
+  getBrowseModeStatus() {
+    if (!this.browseModeService) {
+      return {
+        enabled: false,
+        error: 'Browse mode service not initialized'
+      };
+    }
+
+    return this.browseModeService.getBrowseModeStatus();
+  }
+
+  /**
+   * Check if browse mode is enabled
+   * @returns {boolean} True if browse mode is enabled
+   */
+  isBrowseModeEnabled() {
+    return this.browseModeService?.isBrowseModeEnabled() || false;
+  }
+
+  /**
+   * Create SCORM session with browse mode support
+   * @param {Object} options - Session options
+   * @param {string} options.launchMode - Launch mode ('normal', 'browse', 'review')
+   * @param {boolean} options.memoryOnlyStorage - Use memory-only storage
+   * @returns {Promise<Object>} Session creation result
+   */
+  async createSessionWithBrowseMode(options = {}) {
+    try {
+      // Create regular session first
+      const sessionResult = await this.createSession();
+
+      if (!sessionResult.success) {
+        return sessionResult;
+      }
+
+      const sessionId = sessionResult.sessionId;
+
+      // If browse mode requested, configure the RTE instance
+      if (options.launchMode === 'browse') {
+        const rte = this.rteInstances.get(sessionId);
+        if (rte && typeof rte.enableBrowseMode === 'function') {
+          const browseResult = rte.enableBrowseMode({
+            memoryOnlyStorage: options.memoryOnlyStorage !== false
+          });
+
+          if (!browseResult) {
+            this.logger?.warn('Failed to enable browse mode for RTE instance');
+          }
+        }
+      }
+
+      return {
+        ...sessionResult,
+        launchMode: options.launchMode || 'normal',
+        browseMode: options.launchMode === 'browse'
+      };
+
+    } catch (error) {
+      this.logger?.error('Failed to create session with browse mode:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 }

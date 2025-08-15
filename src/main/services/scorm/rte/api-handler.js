@@ -35,6 +35,8 @@ class ScormApiHandler {
    * @param {Object} sessionManager - Session manager instance
    * @param {Object} logger - Logger instance
    * @param {Object} options - Configuration options
+   * @param {string} options.launchMode - Launch mode ('normal', 'browse', 'review')
+   * @param {boolean} options.memoryOnlyStorage - Use memory-only storage (for browse mode)
    * @param {Object} telemetryStore - SCORM Inspector telemetry store instance
    */
   constructor(sessionManager, logger, options = {}, telemetryStore = null) {
@@ -44,25 +46,36 @@ class ScormApiHandler {
     this.options = {
       strictMode: true,
       maxCommitFrequency: 10000, // Max commits per 10 seconds
+      launchMode: 'normal', // Default to normal mode
+      memoryOnlyStorage: false, // Default to persistent storage
       ...options
     };
 
     // Initialize core components
     this.errorHandler = new ScormErrorHandler(logger);
-    this.dataModel = new ScormDataModel(this.errorHandler, logger);
+
+    // Initialize data model with browse mode support
+    const dataModelOptions = {
+      launchMode: this.options.launchMode,
+      memoryOnlyStorage: this.options.memoryOnlyStorage
+    };
+    this.dataModel = new ScormDataModel(this.errorHandler, logger, dataModelOptions);
     this.eventEmitter = new EventEmitter();
-    
+
     // API state tracking
     this.isInitialized = false;
     this.isTerminated = false;
     this.lastCommitTime = 0;
     this.commitCount = 0;
-    
+
     // Session information
     this.sessionId = null;
     this.startTime = null;
-    
-    this.logger?.debug('ScormApiHandler initialized');
+
+    this.logger?.debug('ScormApiHandler initialized', {
+      launchMode: this.options.launchMode,
+      memoryOnlyStorage: this.options.memoryOnlyStorage
+    });
   }
 
   /**
@@ -174,14 +187,27 @@ class ScormApiHandler {
           sessionId: this.sessionId,
           timestamp: new Date().toISOString(),
           data: this.dataModel.getAllData(),
-          errorState: this.errorHandler.getErrorState()
+          errorState: this.errorHandler.getErrorState(),
+          launchMode: this.options.launchMode,
+          browseMode: this.isBrowseMode()
         };
 
-        // Persist via session manager
-        if (this.sessionManager) {
-          const result = this.sessionManager.persistSessionData(this.sessionId, dataToCommit);
-          if (!result) {
-            this.logger?.warn('Final commit failed during termination');
+        // Browse mode data isolation - no persistence to production data
+        if (this.isBrowseMode() || this.options.memoryOnlyStorage) {
+          this.logger?.debug('Browse mode termination - data not persisted to production storage', {
+            sessionId: this.sessionId,
+            launchMode: this.options.launchMode
+          });
+
+          // Clean up browse session data
+          this.dataModel.destroyBrowseSessionData();
+        } else {
+          // Normal mode - persist via session manager
+          if (this.sessionManager) {
+            const result = this.sessionManager.persistSessionData(this.sessionId, dataToCommit);
+            if (!result) {
+              this.logger?.warn('Final commit failed during termination');
+            }
           }
         }
       } catch (error) {
@@ -498,8 +524,13 @@ class ScormApiHandler {
     // Set credit mode (could come from launch parameters)
     this.dataModel._setInternalValue('cmi.credit', 'credit');
 
-    // Set lesson mode
-    this.dataModel._setInternalValue('cmi.mode', 'normal');
+    // Set lesson mode using dynamic launch mode (SCORM-compliant)
+    this.dataModel._setInternalValue('cmi.mode', this.options.launchMode);
+
+    // Create browse session if in browse mode
+    if (this.options.launchMode === 'browse') {
+      this.dataModel.createBrowseSessionData();
+    }
 
     // Initialize learner information if available
     if (this.sessionManager) {
@@ -509,7 +540,10 @@ class ScormApiHandler {
       }
     }
 
-    this.logger?.debug('Session data initialized');
+    this.logger?.debug('Session data initialized', {
+      launchMode: this.options.launchMode,
+      entryMode: entryMode
+    });
   }
 
   /**
@@ -585,10 +619,29 @@ class ScormApiHandler {
         sessionId: this.sessionId,
         timestamp: new Date().toISOString(),
         data: this.dataModel.getAllData(),
-        errorState: this.errorHandler.getErrorState()
+        errorState: this.errorHandler.getErrorState(),
+        launchMode: this.options.launchMode,
+        browseMode: this.isBrowseMode()
       };
 
-      // Persist via session manager
+      // Browse mode data isolation - no persistence to production data
+      if (this.isBrowseMode() || this.options.memoryOnlyStorage) {
+        this.logger?.debug('Browse mode commit - data not persisted to production storage', {
+          sessionId: this.sessionId,
+          launchMode: this.options.launchMode,
+          dataSize: Object.keys(dataToCommit.data).length
+        });
+
+        // Store in browse session temporary data if available
+        if (this.dataModel.browseSession) {
+          this.dataModel.browseSession.temporaryData.set('lastCommit', dataToCommit);
+          this.dataModel.browseSession.temporaryData.set('commitCount', this.commitCount);
+        }
+
+        return true; // Always succeed for browse mode
+      }
+
+      // Normal mode - persist via session manager
       if (this.sessionManager) {
         try {
           const result = this.sessionManager.persistSessionData(this.sessionId, dataToCommit);
@@ -710,7 +763,7 @@ class ScormApiHandler {
    */
   _broadcastDataModelUpdate() {
     try {
-      if (this.telemetryStore && this.telemetryStore.windowManager && 
+      if (this.telemetryStore && this.telemetryStore.windowManager &&
           typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
         const dataModel = this.dataModel.getAllData();
         this.telemetryStore.windowManager.broadcastToAllWindows('scorm-data-model-updated', dataModel);
@@ -719,6 +772,81 @@ class ScormApiHandler {
     } catch (error) {
       this.logger?.warn('Failed to broadcast data model update:', error.message);
     }
+  }
+
+  // ===== BROWSE MODE METHODS =====
+
+  /**
+   * Check if currently in browse mode
+   * @returns {boolean} True if in browse mode
+   */
+  isBrowseMode() {
+    return this.options.launchMode === 'browse';
+  }
+
+  /**
+   * Get current launch mode
+   * @returns {string} Current launch mode
+   */
+  getLaunchMode() {
+    return this.options.launchMode;
+  }
+
+  /**
+   * Switch to browse mode (SCORM-compliant)
+   * @param {Object} browseOptions - Browse mode options
+   * @returns {boolean} True if successful
+   */
+  enableBrowseMode(browseOptions = {}) {
+    try {
+      this.options.launchMode = 'browse';
+      this.options.memoryOnlyStorage = browseOptions.memoryOnlyStorage !== false;
+
+      // Update data model
+      this.dataModel.setLaunchMode('browse');
+      this.dataModel.createBrowseSessionData();
+
+      this.logger?.info('Browse mode enabled', browseOptions);
+      return true;
+    } catch (error) {
+      this.logger?.error('Failed to enable browse mode:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Switch to normal mode
+   * @returns {boolean} True if successful
+   */
+  disableBrowseMode() {
+    try {
+      this.options.launchMode = 'normal';
+      this.options.memoryOnlyStorage = false;
+
+      // Clean up browse session
+      this.dataModel.destroyBrowseSessionData();
+      this.dataModel.setLaunchMode('normal');
+
+      this.logger?.info('Browse mode disabled');
+      return true;
+    } catch (error) {
+      this.logger?.error('Failed to disable browse mode:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Get browse mode status
+   * @returns {Object} Browse mode status information
+   */
+  getBrowseModeStatus() {
+    return {
+      enabled: this.isBrowseMode(),
+      launchMode: this.options.launchMode,
+      memoryOnlyStorage: this.options.memoryOnlyStorage,
+      sessionId: this.sessionId,
+      browseSession: this.dataModel.browseSession
+    };
   }
 }
 

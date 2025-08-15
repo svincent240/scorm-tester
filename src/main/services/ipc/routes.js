@@ -62,6 +62,41 @@ module.exports = [
     }
   },
   {
+    channel: 'browse-mode-enable',
+    handlerName: 'handleBrowseModeEnable',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'browse-mode-disable',
+    handlerName: 'handleBrowseModeDisable',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'browse-mode-status',
+    handlerName: 'handleBrowseModeStatus',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'browse-mode-create-session',
+    handlerName: 'handleBrowseModeCreateSession',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
     channel: 'select-scorm-package',
     handlerName: 'handleSelectScormPackage',
     options: {

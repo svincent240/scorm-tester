@@ -253,6 +253,12 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-set-value', this.handleScormSetValue.bind(this));
       this.registerHandler('scorm-commit', this.handleScormCommit.bind(this));
       this.registerHandler('scorm-terminate', this.handleScormTerminate.bind(this));
+
+      // Browse Mode handlers
+      this.registerHandler('browse-mode-enable', this.handleBrowseModeEnable.bind(this));
+      this.registerHandler('browse-mode-disable', this.handleBrowseModeDisable.bind(this));
+      this.registerHandler('browse-mode-status', this.handleBrowseModeStatus.bind(this));
+      this.registerHandler('browse-mode-create-session', this.handleBrowseModeCreateSession.bind(this));
       
       // File operation handlers
       this.registerHandler('select-scorm-package', this.handleSelectScormPackage.bind(this));
@@ -623,9 +629,9 @@ class IpcHandler extends BaseService {
   // --- Start of merged IpcHandlers methods ---
 
   // SCORM API handlers
-  async handleScormInitialize(event, sessionId) {
+  async handleScormInitialize(event, sessionId, options = {}) {
     const scormService = this.getDependency('scormService');
-    return await scormService.initializeSession(sessionId);
+    return await scormService.initializeSession(sessionId, options);
   }
 
   async handleScormGetValue(event, sessionId, element) {
@@ -641,6 +647,102 @@ class IpcHandler extends BaseService {
   async handleScormCommit(event, sessionId) {
     const scormService = this.getDependency('scormService');
     return await scormService.commit(sessionId);
+  }
+
+  // Browse Mode handlers
+  async handleBrowseModeEnable(event, options = {}) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          success: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      const result = await scormService.enableBrowseMode(options);
+      this.logger?.debug('Browse mode enable result:', result);
+      return result;
+    } catch (error) {
+      this.logger?.error('Failed to enable browse mode:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async handleBrowseModeDisable(event) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          success: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      const result = await scormService.disableBrowseMode();
+      this.logger?.debug('Browse mode disable result:', result);
+      return result;
+    } catch (error) {
+      this.logger?.error('Failed to disable browse mode:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async handleBrowseModeStatus(event) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          enabled: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      const status = scormService.getBrowseModeStatus();
+      this.logger?.debug('Browse mode status:', status);
+      return status;
+    } catch (error) {
+      this.logger?.error('Failed to get browse mode status:', error.message);
+      return {
+        enabled: false,
+        error: error.message
+      };
+    }
+  }
+
+  async handleBrowseModeCreateSession(event, options = {}) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          success: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      // Set browse mode options
+      const sessionOptions = {
+        launchMode: 'browse',
+        memoryOnlyStorage: true,
+        ...options
+      };
+
+      const result = await scormService.createSessionWithBrowseMode(sessionOptions);
+      this.logger?.debug('Browse mode session creation result:', result);
+      return result;
+    } catch (error) {
+      this.logger?.error('Failed to create browse mode session:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   async handleScormTerminate(event, sessionId) {

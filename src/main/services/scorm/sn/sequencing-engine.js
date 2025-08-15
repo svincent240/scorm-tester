@@ -23,12 +23,15 @@ const {
  * Handles all sequencing rule evaluation and processing
  */
 class SequencingEngine {
-  constructor(activityTreeManager, errorHandler, logger) {
+  constructor(activityTreeManager, errorHandler, logger, browseModeService = null) {
     this.activityTreeManager = activityTreeManager;
     this.errorHandler = errorHandler;
     this.logger = logger;
-    
-    this.logger?.debug('SequencingEngine initialized');
+    this.browseModeService = browseModeService;
+
+    this.logger?.debug('SequencingEngine initialized', {
+      browseModeSupport: !!this.browseModeService
+    });
   }
 
   /**
@@ -410,6 +413,103 @@ class SequencingEngine {
    */
   processPreviousAction(activity) {
     return { success: true, reason: 'Return to previous activity', nextAction: 'previous' };
+  }
+
+  /**
+   * Evaluate navigation request in browse mode
+   * Provides SCORM-compliant navigation bypass for testing purposes
+   * @param {string} from - Source activity ID
+   * @param {string} to - Target activity ID
+   * @param {string} requestType - Type of navigation request
+   * @returns {Object} Navigation evaluation result with browse mode overrides
+   */
+  evaluateNavigationRequestInBrowseMode(from, to, requestType = 'choice') {
+    try {
+      // Check if browse mode is available and enabled
+      if (!this.browseModeService || !this.browseModeService.isBrowseModeEnabled()) {
+        return {
+          success: false,
+          allowed: false,
+          reason: 'Browse mode not available or not enabled',
+          browseMode: false
+        };
+      }
+
+      this.logger?.debug('Evaluating navigation request in browse mode', {
+        from,
+        to,
+        requestType
+      });
+
+      // Get browse mode navigation permission
+      const browseResult = this.browseModeService.isNavigationAllowedInBrowseMode(from, to, requestType);
+
+      if (!browseResult.allowed) {
+        return {
+          success: false,
+          allowed: false,
+          reason: browseResult.reason,
+          browseMode: true
+        };
+      }
+
+      // In browse mode, we still evaluate standard SCORM rules for compliance
+      // but override the result to allow navigation for testing purposes
+      let standardEvaluation = null;
+
+      try {
+        // Get activities for standard evaluation (if available)
+        const fromActivity = from ? this.activityTreeManager.findActivity(from) : null;
+        const toActivity = to ? this.activityTreeManager.findActivity(to) : null;
+
+        if (toActivity) {
+          // Evaluate standard sequencing rules for audit trail
+          const preConditionResult = this.evaluatePreConditionRules(toActivity);
+          const controlModeResult = this.checkControlModePermissions(toActivity, requestType);
+
+          standardEvaluation = {
+            preConditions: preConditionResult,
+            controlModes: controlModeResult,
+            wouldAllowInNormalMode: preConditionResult.action === null && controlModeResult
+          };
+        }
+      } catch (error) {
+        this.logger?.warn('Error during standard rule evaluation in browse mode:', error);
+        standardEvaluation = {
+          error: error.message,
+          wouldAllowInNormalMode: false
+        };
+      }
+
+      // Browse mode result - always allow navigation but preserve rule evaluation
+      return {
+        success: true,
+        allowed: true,
+        reason: 'Browse mode - navigation restrictions bypassed',
+        browseMode: true,
+        sessionId: browseResult.sessionId,
+        standardEvaluation,
+        scormCompliant: true // Using SCORM browse mode specification
+      };
+
+    } catch (error) {
+      this.logger?.error('Error evaluating navigation request in browse mode:', error);
+      return {
+        success: false,
+        allowed: false,
+        reason: `Browse mode navigation evaluation failed: ${error.message}`,
+        browseMode: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Check if browse mode is enabled
+   * @returns {boolean} True if browse mode is enabled
+   */
+  isBrowseModeEnabled() {
+    return this.browseModeService?.isBrowseModeEnabled() || false;
   }
 }
 

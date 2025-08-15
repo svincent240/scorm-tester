@@ -29,24 +29,35 @@ class ScormDataModel {
    * Initialize the data model
    * @param {Object} errorHandler - Error handler instance
    * @param {Object} logger - Logger instance
+   * @param {Object} options - Configuration options
+   * @param {string} options.launchMode - Launch mode ('normal', 'browse', 'review')
+   * @param {boolean} options.memoryOnlyStorage - Use memory-only storage (for browse mode)
    */
-  constructor(errorHandler, logger) {
+  constructor(errorHandler, logger, options = {}) {
     this.errorHandler = errorHandler;
     this.logger = logger;
-    
+
+    // Browse mode configuration
+    this.launchMode = options.launchMode || 'normal';
+    this.memoryOnlyStorage = options.memoryOnlyStorage || false;
+    this.browseSession = null;
+
     // Main data storage
     this.data = new Map();
-    
+
     // Collection storage
     this.interactions = [];
     this.objectives = [];
     this.commentsFromLearner = [];
     this.commentsFromLms = [];
-    
+
     // Initialize with default values
     this.initializeDefaults();
-    
-    this.logger?.debug('ScormDataModel initialized');
+
+    this.logger?.debug('ScormDataModel initialized', {
+      launchMode: this.launchMode,
+      memoryOnlyStorage: this.memoryOnlyStorage
+    });
   }
 
   /**
@@ -135,7 +146,12 @@ class ScormDataModel {
 
       // Set the value
       this.data.set(element, value);
-      
+
+      // Log browse mode operation if in browse mode
+      if (this.isBrowseMode()) {
+        this.logBrowseOperation('setValue', { element, value });
+      }
+
       this.logger?.debug(`Set ${element} = ${value}`);
       this.errorHandler.clearError();
       return true;
@@ -269,11 +285,13 @@ class ScormDataModel {
     this.data.set('cmi.learner_id', '');
     this.data.set('cmi.learner_name', '');
     this.data.set('cmi.credit', 'credit');
-    this.data.set('cmi.mode', 'normal');
+    this.data.set('cmi.mode', this.launchMode); // Dynamic launch mode
     this.data.set('cmi.launch_data', '');
     this.data.set('cmi.scaled_passing_score', '');
 
-    this.logger?.debug('Data model initialized with all SCORM 2004 4th Edition elements');
+    this.logger?.debug('Data model initialized with all SCORM 2004 4th Edition elements', {
+      launchMode: this.launchMode
+    });
   }
 
   /**
@@ -413,8 +431,41 @@ class ScormDataModel {
       return true;
     }
 
-    // Handle comments (similar pattern)
-    // ... implementation for comments collections
+    // Handle comments from learner
+    if (element.startsWith('cmi.comments_from_learner.')) {
+      const match = element.match(/^cmi\.comments_from_learner\.(\d+)\.(.+)$/);
+      if (match) {
+        const index = parseInt(match[1], 10);
+        const property = match[2];
+
+        // Ensure comment exists
+        while (this.commentsFromLearner.length <= index) {
+          this.commentsFromLearner.push({});
+        }
+
+        this.commentsFromLearner[index][property] = value;
+        this.data.set('cmi.comments_from_learner._count', String(this.commentsFromLearner.length));
+        return true;
+      }
+    }
+
+    // Handle comments from LMS
+    if (element.startsWith('cmi.comments_from_lms.')) {
+      const match = element.match(/^cmi\.comments_from_lms\.(\d+)\.(.+)$/);
+      if (match) {
+        const index = parseInt(match[1], 10);
+        const property = match[2];
+
+        // Ensure comment exists
+        while (this.commentsFromLms.length <= index) {
+          this.commentsFromLms.push({});
+        }
+
+        this.commentsFromLms[index][property] = value;
+        this.data.set('cmi.comments_from_lms._count', String(this.commentsFromLms.length));
+        return true;
+      }
+    }
 
     this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
       `Cannot set collection element: ${element}`, 'setCollectionValue');
@@ -646,6 +697,175 @@ class ScormDataModel {
       min: this.data.get('cmi.score.min') || null,
       max: this.data.get('cmi.score.max') || null
     };
+  }
+
+  // ===== BROWSE MODE METHODS =====
+
+  /**
+   * Set launch mode (SCORM-compliant)
+   * @param {string} mode - Launch mode ('normal', 'browse', 'review')
+   */
+  setLaunchMode(mode) {
+    const validModes = ['normal', 'browse', 'review'];
+    if (validModes.includes(mode)) {
+      this.launchMode = mode;
+      this.data.set('cmi.mode', mode);
+      this.logger?.debug('Launch mode set to:', mode);
+    } else {
+      this.logger?.warn('Invalid launch mode:', mode);
+    }
+  }
+
+  /**
+   * Get current launch mode
+   * @returns {string} Current launch mode
+   */
+  getLaunchMode() {
+    return this.launchMode;
+  }
+
+  /**
+   * Check if currently in browse mode
+   * @returns {boolean} True if in browse mode
+   */
+  isBrowseMode() {
+    return this.launchMode === 'browse';
+  }
+
+  /**
+   * Create browse mode session data container
+   * @param {Object} options - Session options
+   * @param {number} options.timeoutMs - Session timeout in milliseconds (default: 30 minutes)
+   * @returns {Object} Browse session data
+   */
+  createBrowseSessionData(options = {}) {
+    if (this.isBrowseMode()) {
+      const timeoutMs = options.timeoutMs || (30 * 60 * 1000); // 30 minutes default
+
+      this.browseSession = {
+        id: `browse_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        startTime: new Date(),
+        lastActivity: new Date(),
+        launchMode: 'browse',
+        temporaryData: new Map(),
+        isolated: true,
+        timeoutMs: timeoutMs,
+        timeoutHandle: null,
+        operations: []
+      };
+
+      // Set up session timeout
+      this.setupSessionTimeout();
+
+      this.logger?.debug('Browse session created:', {
+        id: this.browseSession.id,
+        timeoutMs: timeoutMs
+      });
+
+      return this.browseSession;
+    }
+    return null;
+  }
+
+  /**
+   * Setup session timeout for browse mode
+   * @private
+   */
+  setupSessionTimeout() {
+    if (!this.browseSession) return;
+
+    // Clear existing timeout
+    if (this.browseSession.timeoutHandle) {
+      clearTimeout(this.browseSession.timeoutHandle);
+    }
+
+    // Set new timeout
+    this.browseSession.timeoutHandle = setTimeout(() => {
+      this.logger?.info('Browse session timed out:', this.browseSession.id);
+      this.destroyBrowseSessionData();
+    }, this.browseSession.timeoutMs);
+  }
+
+  /**
+   * Update browse session activity (resets timeout)
+   */
+  updateBrowseSessionActivity() {
+    if (this.browseSession) {
+      this.browseSession.lastActivity = new Date();
+      this.setupSessionTimeout(); // Reset timeout
+    }
+  }
+
+  /**
+   * Log browse mode operation
+   * @param {string} operation - Operation name
+   * @param {Object} details - Operation details
+   */
+  logBrowseOperation(operation, details = {}) {
+    if (this.browseSession) {
+      this.browseSession.operations.push({
+        operation,
+        timestamp: new Date(),
+        details
+      });
+      this.updateBrowseSessionActivity();
+    }
+  }
+
+  /**
+   * Destroy browse mode session data
+   */
+  destroyBrowseSessionData() {
+    if (this.browseSession) {
+      this.logger?.debug('Destroying browse session:', {
+        id: this.browseSession.id,
+        duration: Date.now() - this.browseSession.startTime.getTime(),
+        operations: this.browseSession.operations.length
+      });
+
+      // Clear timeout
+      if (this.browseSession.timeoutHandle) {
+        clearTimeout(this.browseSession.timeoutHandle);
+      }
+
+      // Clear temporary data
+      this.browseSession.temporaryData.clear();
+
+      // Reset to normal mode
+      this.browseSession = null;
+    }
+  }
+
+  /**
+   * Get browse session status
+   * @returns {Object|null} Session status or null if not in browse mode
+   */
+  getBrowseSessionStatus() {
+    if (!this.browseSession) return null;
+
+    const now = new Date();
+    const duration = now.getTime() - this.browseSession.startTime.getTime();
+    const timeSinceActivity = now.getTime() - this.browseSession.lastActivity.getTime();
+
+    return {
+      id: this.browseSession.id,
+      startTime: this.browseSession.startTime,
+      lastActivity: this.browseSession.lastActivity,
+      duration: duration,
+      timeSinceActivity: timeSinceActivity,
+      timeoutMs: this.browseSession.timeoutMs,
+      operationsCount: this.browseSession.operations.length,
+      temporaryDataSize: this.browseSession.temporaryData.size,
+      active: timeSinceActivity < this.browseSession.timeoutMs
+    };
+  }
+
+  /**
+   * Check if data should be persisted (false for browse mode)
+   * @returns {boolean} True if data should be persisted
+   */
+  shouldPersistData() {
+    return !this.memoryOnlyStorage && !this.isBrowseMode();
   }
 }
 

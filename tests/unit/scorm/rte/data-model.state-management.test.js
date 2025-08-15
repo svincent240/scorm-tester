@@ -103,9 +103,14 @@ describe('SCORM Data Model State Management Tests', () => {
     });
 
     test('should log initialization', () => {
-      expect(mockLogger.debug).toHaveBeenCalledWith('ScormDataModel initialized');
+      expect(mockLogger.debug).toHaveBeenCalledWith('ScormDataModel initialized', {
+        launchMode: 'normal',
+        memoryOnlyStorage: false
+      });
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Data model initialized with all SCORM 2004 4th Edition elements'
+        'Data model initialized with all SCORM 2004 4th Edition elements', {
+          launchMode: 'normal'
+        }
       );
     });
   });
