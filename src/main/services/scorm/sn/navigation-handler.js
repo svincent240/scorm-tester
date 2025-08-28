@@ -8,12 +8,10 @@
  * @fileoverview Navigation request processing and validation
  */
 
-const { 
+const {
   SN_ERROR_CODES,
   NAVIGATION_REQUESTS,
-  NAVIGATION_VALIDITY,
-  ACTIVITY_STATES,
-  CONTROL_MODES
+  ACTIVITY_STATES
 } = require('../../../../shared/constants/sn-constants');
 
 /**
@@ -541,7 +539,7 @@ class NavigationHandler {
 
       // For choice navigation, validate target activity exists
       if (navigationRequest === NAVIGATION_REQUESTS.CHOICE && targetActivityId) {
-        const targetActivity = this.activityTreeManager.findActivity(targetActivityId);
+        const targetActivity = this.activityTreeManager.getActivity(targetActivityId);
         if (!targetActivity) {
           return {
             success: false,
@@ -578,34 +576,17 @@ class NavigationHandler {
         };
       }
 
-      // For other navigation types, process with browse mode allowances
-      const currentActivityId = this.navigationSession.currentActivity?.identifier;
-      const evaluationResult = this.sequencingEngine.evaluateNavigationRequestInBrowseMode(
-        currentActivityId,
-        null,
-        navigationRequest
-      );
-
-      if (!evaluationResult.success || !evaluationResult.allowed) {
-        return {
-          success: false,
-          reason: evaluationResult.reason,
-          browseMode: true,
-          evaluationResult
-        };
-      }
-
-      // Process the navigation request with browse mode overrides
+      // For other navigation types, use browse mode specific logic instead of SCORM sequencing
       let result;
       switch (navigationRequest) {
         case NAVIGATION_REQUESTS.START:
-          result = this.processStartRequest();
+          result = this.processBrowseModeStart();
           break;
         case NAVIGATION_REQUESTS.CONTINUE:
-          result = this.processContinueRequest();
+          result = this.processBrowseModeContinue();
           break;
         case NAVIGATION_REQUESTS.PREVIOUS:
-          result = this.processPreviousRequest();
+          result = this.processBrowseModePrevious();
           break;
         case NAVIGATION_REQUESTS.EXIT:
           result = this.processExitRequest();
@@ -618,28 +599,15 @@ class NavigationHandler {
           };
       }
 
-      // In browse mode, if standard navigation fails, provide browse mode alternatives
-      if (!result.success && (navigationRequest === NAVIGATION_REQUESTS.CONTINUE || navigationRequest === NAVIGATION_REQUESTS.PREVIOUS)) {
-        // For continue/previous in browse mode, if no natural target exists,
-        // find any available activity as per browse mode unrestricted navigation
-        const fallbackActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
-        if (fallbackActivity) {
-          result = {
-            success: true,
-            reason: `Browse mode ${navigationRequest} - using fallback activity (no natural ${navigationRequest === NAVIGATION_REQUESTS.CONTINUE ? 'next' : 'previous'} available)`,
-            targetActivity: fallbackActivity,
-            action: 'launch',
-            fallback: true
-          };
-        }
-      }
+      // Get browse mode session information
+      const currentSession = this.browseModeService?.getCurrentSession();
 
       // Enhance result with browse mode information
       return {
         ...result,
         browseMode: true,
-        sessionId: evaluationResult.sessionId,
-        standardEvaluation: evaluationResult.standardEvaluation
+        sessionId: currentSession?.id,
+        standardEvaluation: null // Not applicable for non-choice navigation
       };
 
     } catch (error) {
@@ -661,7 +629,121 @@ class NavigationHandler {
     return this.browseModeService?.isBrowseModeEnabled() || false;
   }
 
+  /**
+   * Process browse mode start - find first launchable activity
+   */
+  processBrowseModeStart() {
+    const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
+    if (firstActivity) {
+      return {
+        success: true,
+        reason: 'Browse mode start - first activity found',
+        targetActivity: firstActivity,
+        action: 'launch',
+        browseMode: true
+      };
+    }
+    return {
+      success: false,
+      reason: 'Browse mode start - no launchable activities found',
+      browseMode: true
+    };
+  }
 
+  /**
+   * Process browse mode continue - find next available activity
+   */
+  processBrowseModeContinue() {
+    const currentActivity = this.navigationSession.currentActivity;
+    if (!currentActivity) {
+      // No current activity, start from beginning
+      return this.processBrowseModeStart();
+    }
+
+    // Get all launchable activities
+    const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
+    const currentIndex = allActivities.findIndex(act => act.identifier === currentActivity.identifier);
+    
+    if (currentIndex >= 0 && currentIndex < allActivities.length - 1) {
+      // Found next activity
+      const nextActivity = allActivities[currentIndex + 1];
+      return {
+        success: true,
+        reason: 'Browse mode continue - next activity found',
+        targetActivity: nextActivity,
+        action: 'launch',
+        browseMode: true
+      };
+    }
+
+    // No next activity, stay on current or wrap to first
+    const fallbackActivity = allActivities[0] || currentActivity;
+    return {
+      success: true,
+      reason: 'Browse mode continue - wrapping to first activity (end reached)',
+      targetActivity: fallbackActivity,
+      action: 'launch',
+      browseMode: true,
+      wrapped: true
+    };
+  }
+
+  /**
+   * Process browse mode previous - find previous available activity
+   */
+  processBrowseModePrevious() {
+    const currentActivity = this.navigationSession.currentActivity;
+    if (!currentActivity) {
+      // No current activity, start from beginning
+      return this.processBrowseModeStart();
+    }
+
+    // Get all launchable activities
+    const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
+    const currentIndex = allActivities.findIndex(act => act.identifier === currentActivity.identifier);
+    
+    if (currentIndex > 0) {
+      // Found previous activity
+      const previousActivity = allActivities[currentIndex - 1];
+      return {
+        success: true,
+        reason: 'Browse mode previous - previous activity found',
+        targetActivity: previousActivity,
+        action: 'launch',
+        browseMode: true
+      };
+    }
+
+    // No previous activity, stay on current or wrap to last
+    const fallbackActivity = allActivities[allActivities.length - 1] || currentActivity;
+    return {
+      success: true,
+      reason: 'Browse mode previous - wrapping to last activity (beginning reached)',
+      targetActivity: fallbackActivity,
+      action: 'launch',
+      browseMode: true,
+      wrapped: true
+    };
+  }
+
+  /**
+   * Get all launchable activities in tree order
+   */
+  getAllLaunchableActivities(rootActivity) {
+    const activities = [];
+    
+    function collectActivities(activity) {
+      if (activity.isLaunchable()) {
+        activities.push(activity);
+      }
+      for (const child of activity.children || []) {
+        collectActivities(child);
+      }
+    }
+    
+    collectActivities(rootActivity);
+    return activities;
+  }
 
   // Placeholder methods for remaining navigation requests
   processResumeAllRequest() { return { success: true, reason: 'Resume all processed', action: 'resume' }; }

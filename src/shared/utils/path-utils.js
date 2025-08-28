@@ -283,9 +283,28 @@ class PathUtils {
       if (this.isValidPath(appResolvedNorm, normalizedAppRoot, appResolved)) {
         return { success: true, resolvedPath: appResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'appRoot' };
       }
-      
+
+      // Check temp root directory first
       if (this.isValidPath(tempResolvedNorm, normalizedTempRoot, tempResolved)) {
         return { success: true, resolvedPath: tempResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'tempRoot' };
+      }
+
+      // If not found in temp root, check inside SCORM extraction subdirectories
+      try {
+        const tempDirContents = fs.readdirSync(normalizedTempRoot, { withFileTypes: true });
+        for (const item of tempDirContents) {
+          if (item.isDirectory() && item.name.startsWith('scorm_')) {
+            const scormDirPath = path.join(normalizedTempRoot, item.name);
+            const scormResolved = path.resolve(scormDirPath, safeRel);
+            const scormResolvedNorm = this.normalize(scormResolved);
+
+            if (this.isValidPath(scormResolvedNorm, normalizedTempRoot, scormResolved)) {
+              return { success: true, resolvedPath: scormResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'scormExtraction' };
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore directory reading errors - fall through to not found
       }
 
       // Nothing found

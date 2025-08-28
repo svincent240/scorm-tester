@@ -23,7 +23,7 @@ class NavigationControls extends BaseComponent {
     super(elementId, options);
     
     this.navigationState = {
-      availableNavigation: [],
+      availableNavigation: ['previous', 'continue'], // Default fallback navigation
       currentActivity: null,
       sequencingState: null,
       menuVisible: false
@@ -113,6 +113,15 @@ class NavigationControls extends BaseComponent {
         // Update UI to reflect browse mode
         this.updateModeToggle(true);
         this.updateNavigationForBrowseMode(true);
+        
+        // Ensure navigation is available in browse mode
+        if (!this.navigationState.availableNavigation.includes('previous')) {
+          this.navigationState.availableNavigation.push('previous');
+        }
+        if (!this.navigationState.availableNavigation.includes('continue')) {
+          this.navigationState.availableNavigation.push('continue');
+        }
+        this.updateButtonStates();
 
         this.logger?.info('NavigationControls: Browse mode already enabled', status);
       }
@@ -326,6 +335,9 @@ class NavigationControls extends BaseComponent {
   async handlePreviousClick() {
     // In browse mode, always allow navigation, otherwise check availability
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    
+    this.logger?.info('NavigationControls: Previous button clicked', { browseMode });
+    
     if (!browseMode && !this.isNavigationAvailable('previous')) {
       this.logger?.debug('NavigationControls: Previous navigation not available in normal mode');
       return;
@@ -335,12 +347,14 @@ class NavigationControls extends BaseComponent {
     try {
       const { eventBus } = await import('../../services/event-bus.js');
       eventBus.emit('navigation:request', { type: 'previous', source: 'navigation-controls' });
+      this.logger?.info('NavigationControls: Emitted navigation:request event for previous');
     } catch (_) {
       // fall through; component-local behavior remains
     }
     
     this.emit('navigationRequested', { direction: 'previous' });
-    await this.processNavigation('previous');
+    const result = await this.processNavigation('previous');
+    this.logger?.info('NavigationControls: Navigation result:', result);
   }
 
   /**
@@ -349,6 +363,9 @@ class NavigationControls extends BaseComponent {
   async handleNextClick() {
     // In browse mode, always allow navigation, otherwise check availability
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    
+    this.logger?.info('NavigationControls: Next button clicked', { browseMode });
+    
     if (!browseMode && !this.isNavigationAvailable('continue')) {
       this.logger?.debug('NavigationControls: Continue navigation not available in normal mode');
       return;
@@ -358,12 +375,14 @@ class NavigationControls extends BaseComponent {
     try {
       const { eventBus } = await import('../../services/event-bus.js');
       eventBus.emit('navigation:request', { type: 'continue', source: 'navigation-controls' });
+      this.logger?.info('NavigationControls: Emitted navigation:request event for continue');
     } catch (_) {
       // fall through; component-local behavior remains
     }
     
     this.emit('navigationRequested', { direction: 'next' });
-    await this.processNavigation('continue');
+    const result = await this.processNavigation('continue');
+    this.logger?.info('NavigationControls: Navigation result:', result);
   }
 
   /**
@@ -458,15 +477,20 @@ class NavigationControls extends BaseComponent {
    */
   async processNavigation(navigationRequest, targetActivityId = null) {
     try {
+      this.logger?.info(`NavigationControls: Processing navigation request: ${navigationRequest}`, {
+        snServiceAvailable: !!this.snService,
+        targetActivityId
+      });
+      
       if (!this.snService) {
         this.logger?.warn('NavigationControls: SN service not available, falling back to content navigation');
         return this.fallbackContentNavigation(navigationRequest);
       }
-
-      this.logger?.debug(`NavigationControls: Processing navigation request: ${navigationRequest}`);
       
       // Use main process SN service for proper SCORM navigation
       const result = await this.snService.processNavigation(navigationRequest, targetActivityId);
+      
+      this.logger?.info('NavigationControls: SN service result:', result);
       
       if (result.success) {
         // Update UI state based on navigation result
@@ -480,6 +504,7 @@ class NavigationControls extends BaseComponent {
           fallback: true 
         });
         // Try fallback navigation for better UX
+        this.logger?.info('NavigationControls: Trying fallback navigation');
         return this.fallbackContentNavigation(navigationRequest);
       }
       
@@ -495,21 +520,34 @@ class NavigationControls extends BaseComponent {
    * Handle navigation result and update content
    */
   async handleNavigationResult(result) {
+    this.logger?.info('NavigationControls: Handling navigation result', result);
+    
     if (result.targetActivity && result.action === 'launch') {
+      this.logger?.info('NavigationControls: Launching activity', result.targetActivity);
+      
       // Load new activity content
       this.emit('activityLaunchRequested', {
         activity: result.targetActivity,
         sequencing: result.sequencing
       });
+      
       // Broadcast centralized launch intent for other listeners
       try {
         const { eventBus } = await import('../../services/event-bus.js');
         eventBus.emit('navigation:launch', {
           activity: result.targetActivity,
           sequencing: result.sequencing,
-          source: 'navigation-controls'
+          source: 'navigation-controls',
+          // Include current activity information for UI synchronization
+          currentActivity: result.targetActivity,
+          navigationResult: result
         });
-      } catch (_) { /* no-op */ }
+        this.logger?.info('NavigationControls: Emitted navigation:launch event', result.targetActivity);
+      } catch (error) {
+        this.logger?.error('NavigationControls: Failed to emit navigation:launch event', error);
+      }
+    } else {
+      this.logger?.warn('NavigationControls: No target activity to launch', { result });
     }
     
     // Update available navigation options
@@ -564,7 +602,114 @@ class NavigationControls extends BaseComponent {
    * Fallback content navigation for when SN service is unavailable
    * This is a simplified version that tries basic content navigation
    */
-  fallbackContentNavigation(navigationRequest) {
+  async fallbackContentNavigation(navigationRequest) {
+    // Check if a course is actually loaded before attempting any navigation
+    const courseInfo = this.uiState?.getState('courseInfo');
+    const courseStructure = this.uiState?.getState('courseStructure');
+    const hasCourseLoaded = !!(courseInfo && courseStructure);
+
+    if (!hasCourseLoaded) {
+      // Only load sample course if there's genuinely no course loaded
+      const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+      if (browseMode && window.loadSampleCourse && typeof window.loadSampleCourse === 'function') {
+        this.logger?.info('NavigationControls: No course loaded in browse mode, attempting to load sample course');
+
+        try {
+          await window.loadSampleCourse();
+          this.logger?.info('NavigationControls: Sample course loaded successfully');
+
+          // After loading, try navigation again with a delay
+          setTimeout(async () => {
+            try {
+              const result = await this.snService?.processNavigation(navigationRequest);
+              if (result?.success) {
+                await this.handleNavigationResult(result);
+                this.logger?.info('NavigationControls: Navigation succeeded after course load');
+              } else {
+                this.logger?.warn('NavigationControls: Navigation still failed after course load');
+              }
+            } catch (retryError) {
+              this.logger?.error('NavigationControls: Retry navigation failed:', retryError);
+            }
+          }, 1000);
+
+          return {
+            success: true,
+            reason: `Browse mode ${navigationRequest} - loaded sample course, retrying navigation`,
+            fallback: true,
+            browseMode: true,
+            courseLoaded: true
+          };
+        } catch (loadError) {
+          this.logger?.error('NavigationControls: Failed to load sample course:', loadError);
+        }
+      }
+
+      // No course loaded and couldn't load sample course
+      this.logger?.warn('NavigationControls: No course loaded, cannot perform navigation');
+      return {
+        success: false,
+        reason: 'No course loaded - cannot perform navigation',
+        fallback: true
+      };
+    }
+
+    // Course is loaded, proceed with browse mode fallback navigation
+    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+    if (browseMode) {
+      this.logger?.info(`NavigationControls: Browse mode fallback navigation for ${navigationRequest} within loaded course`);
+
+      // In browse mode with a loaded course, try to navigate within the current course
+      // Emit navigation request to trigger activity tree or other browse mode navigation
+      try {
+        const { eventBus } = await import('../../services/event-bus.js');
+
+        // Emit browse mode navigation request for current course
+        eventBus.emit('navigation:browse-mode-fallback', {
+          direction: navigationRequest,
+          source: 'navigation-controls',
+          courseLoaded: true,
+          courseInfo: courseInfo
+        });
+
+        // Try to find next/previous activity in current course structure
+        const targetActivity = this.findAdjacentActivity(navigationRequest, courseStructure);
+        if (targetActivity) {
+          eventBus.emit('navigation:launch', {
+            activity: targetActivity,
+            sequencing: null,
+            source: 'navigation-controls-browse-fallback',
+            // Include current activity information for UI synchronization
+            currentActivity: targetActivity,
+            navigationResult: {
+              success: true,
+              targetActivity: targetActivity,
+              action: 'launch'
+            }
+          });
+
+          return {
+            success: true,
+            reason: `Browse mode ${navigationRequest} - found adjacent activity in current course`,
+            fallback: true,
+            browseMode: true,
+            targetActivity: targetActivity
+          };
+        }
+
+        this.logger?.info('NavigationControls: No adjacent activity found, browse mode navigation completed');
+      } catch (error) {
+        this.logger?.error('NavigationControls: Failed to handle browse mode fallback navigation', error);
+      }
+
+      return {
+        success: true,
+        reason: `Browse mode fallback ${navigationRequest} - navigation request emitted`,
+        fallback: true,
+        browseMode: true
+      };
+    }
+
     const contentViewer = this.getContentViewer();
     if (!contentViewer) {
       this.logger?.warn('NavigationControls: No content viewer available for fallback navigation');
@@ -655,10 +800,10 @@ class NavigationControls extends BaseComponent {
    * Try generic button navigation (simplified)
    */
   tryGenericButtonNavigation(contentDocument, direction) {
-    const selectors = direction === 'next' ? 
-      ['.next-btn', '.btn-next', '.continue'] : 
+    const selectors = direction === 'next' ?
+      ['.next-btn', '.btn-next', '.continue'] :
       ['.prev-btn', '.btn-prev', '.previous', '.back'];
-    
+
     for (const selector of selectors) {
       try {
         const button = contentDocument.querySelector(selector);
@@ -671,6 +816,74 @@ class NavigationControls extends BaseComponent {
       }
     }
     return false;
+  }
+
+  /**
+   * Find adjacent activity in current course structure for browse mode navigation
+   * @param {string} direction - 'continue' or 'previous'
+   * @param {Object} courseStructure - Current course structure
+   * @returns {Object|null} Adjacent activity or null if not found
+   */
+  findAdjacentActivity(direction, courseStructure) {
+    if (!courseStructure || !courseStructure.items) {
+      return null;
+    }
+
+    // Get current activity from UIState
+    const currentActivityId = this.uiState?.getState('currentActivity')?.identifier;
+    if (!currentActivityId) {
+      // No current activity, return first or last activity based on direction
+      const activities = this.flattenActivities(courseStructure.items);
+      if (activities.length === 0) return null;
+
+      return direction === 'continue' ? activities[0] : activities[activities.length - 1];
+    }
+
+    // Find current activity and get adjacent one
+    const activities = this.flattenActivities(courseStructure.items);
+    const currentIndex = activities.findIndex(activity => activity.identifier === currentActivityId);
+
+    if (currentIndex === -1) {
+      // Current activity not found, return first activity
+      return activities.length > 0 ? activities[0] : null;
+    }
+
+    if (direction === 'continue' && currentIndex < activities.length - 1) {
+      return activities[currentIndex + 1];
+    } else if (direction === 'previous' && currentIndex > 0) {
+      return activities[currentIndex - 1];
+    }
+
+    // No adjacent activity in that direction
+    return null;
+  }
+
+  /**
+   * Flatten course structure into array of activities
+   * @param {Array} items - Course structure items
+   * @returns {Array} Flattened array of activities
+   */
+  flattenActivities(items) {
+    const activities = [];
+
+    function traverse(item) {
+      if (item.type === 'sco' || item.identifierref) {
+        // This is a launchable activity
+        activities.push({
+          identifier: item.identifier,
+          title: item.title || item.identifier,
+          launchUrl: item.href,
+          type: item.type
+        });
+      }
+
+      // Recursively traverse children
+      const children = item.items || item.children || [];
+      children.forEach(traverse);
+    }
+
+    items.forEach(traverse);
+    return activities;
   }
 
   /**
@@ -878,6 +1091,16 @@ class NavigationControls extends BaseComponent {
 
       // Update navigation controls display based on mode
       this.updateNavigationForBrowseMode(enabled);
+      
+      // In browse mode, ensure navigation is available
+      if (enabled) {
+        if (!this.navigationState.availableNavigation.includes('previous')) {
+          this.navigationState.availableNavigation.push('previous');
+        }
+        if (!this.navigationState.availableNavigation.includes('continue')) {
+          this.navigationState.availableNavigation.push('continue');
+        }
+      }
 
       // Refresh navigation availability after mode change
       await this.refreshNavigationAvailability();
@@ -942,6 +1165,9 @@ class NavigationControls extends BaseComponent {
       // Hide browse mode indicator
       this.hideBrowseModeIndicator();
     }
+    
+    // Update button states to reflect browse mode navigation availability
+    this.updateButtonStates();
   }
 
   /**

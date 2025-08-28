@@ -166,6 +166,12 @@ class CourseOutline extends BaseComponent {
       rendererLogger.debug('CourseOutline: event scorm:dataChanged', data);
       this.handleScormDataChanged(data);
     });
+
+    // Listen for navigation launch events to update current item highlighting
+    this.subscribe('navigation:launch', (data) => {
+      rendererLogger.debug('CourseOutline: event navigation:launch', data);
+      this.handleNavigationLaunch(data);
+    });
   }
 
   bindEvents() {
@@ -496,22 +502,52 @@ class CourseOutline extends BaseComponent {
 
   handleScormDataChanged(data) {
     const { element, value } = data.data || data;
-    
+
     if (!this.currentItem) return;
-    
+
     // Update progress based on SCORM data changes
     if (element === 'cmi.completion_status') {
       const currentProgress = this.progressData.get(this.currentItem) || {};
-      this.updateItemProgress(this.currentItem, { 
-        ...currentProgress, 
-        completionStatus: value 
+      this.updateItemProgress(this.currentItem, {
+        ...currentProgress,
+        completionStatus: value
       });
     } else if (element === 'cmi.success_status') {
       const currentProgress = this.progressData.get(this.currentItem) || {};
-      this.updateItemProgress(this.currentItem, { 
-        ...currentProgress, 
-        successStatus: value 
+      this.updateItemProgress(this.currentItem, {
+        ...currentProgress,
+        successStatus: value
       });
+    }
+  }
+
+  /**
+   * Handle navigation launch event to update current item highlighting
+   */
+  handleNavigationLaunch(data) {
+    try {
+      if (data?.activity?.identifier) {
+        rendererLogger.debug('CourseOutline: Updating current item from navigation launch', {
+          activityId: data.activity.identifier,
+          source: data.source
+        });
+
+        // Update the current item highlighting
+        this.setCurrentItem(data.activity.identifier);
+
+        // Also update UIState with current activity information
+        if (this.uiState) {
+          this.uiState.setState('currentActivity', {
+            identifier: data.activity.identifier,
+            title: data.activity.title,
+            launchUrl: data.activity.launchUrl || data.activity.href
+          });
+        }
+      } else {
+        rendererLogger.warn('CourseOutline: Navigation launch event missing activity identifier', data);
+      }
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error handling navigation launch', error);
     }
   }
 

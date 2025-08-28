@@ -1106,19 +1106,77 @@ class AppManager {
 
   /**
    * Find an item by identifier within a course structure tree.
+   * Ensures the found item belongs to the currently loaded course to prevent course switching.
    */
   _findItemById(structure, id) {
-    if (!structure) return null;
+    if (!structure || !id) return null;
+
+    // Get current course context to validate the found item belongs to the right course
+    const currentCoursePath = this.uiState?.getState('currentCoursePath');
+    const currentCourseInfo = this.uiState?.getState('courseInfo');
+
+    if (!currentCoursePath || !currentCourseInfo) {
+      // No current course loaded, cannot safely navigate
+      this.logger?.warn('AppManager: No current course context available for navigation');
+      return null;
+    }
+
     const stack = [];
     if (Array.isArray(structure.items)) stack.push(...structure.items);
     if (Array.isArray(structure.children)) stack.push(...structure.children);
+
     while (stack.length) {
       const node = stack.shift();
       if (!node) continue;
-      if (node.identifier === id || node.identifierref === id) return node;
+
+      // Check if this node matches the requested ID
+      if (node.identifier === id || node.identifierref === id) {
+        // Validate that this activity belongs to the current course
+        // Check if the activity's launch URL or href contains the current course path
+        const activityUrl = node.href || node.launchUrl || '';
+        const belongsToCurrentCourse = activityUrl.includes(currentCoursePath) ||
+                                     activityUrl.startsWith('scorm-app://') ||
+                                     !activityUrl.includes('/') || // Relative URLs are safe
+                                     activityUrl === 'about:blank'; // Test activities
+
+        if (!belongsToCurrentCourse) {
+          this.logger?.warn('AppManager: Activity does not belong to current course', {
+            activityId: id,
+            activityUrl,
+            currentCoursePath,
+            node: node.identifier
+          });
+          return null;
+        }
+
+        // Additional validation: ensure the activity has a valid launch mechanism
+        if (!node.href && !node.launchUrl && !node.identifierref) {
+          this.logger?.warn('AppManager: Activity missing launch information', {
+            activityId: id,
+            node: node.identifier
+          });
+          return null;
+        }
+
+        this.logger?.debug('AppManager: Found valid activity in current course', {
+          activityId: id,
+          activityUrl,
+          currentCoursePath
+        });
+
+        return node;
+      }
+
+      // Continue searching in child nodes
       const kids = Array.isArray(node.items) ? node.items : (Array.isArray(node.children) ? node.children : []);
       if (kids.length) stack.push(...kids);
     }
+
+    this.logger?.debug('AppManager: Activity not found in current course structure', {
+      activityId: id,
+      currentCoursePath
+    });
+
     return null;
   }
 

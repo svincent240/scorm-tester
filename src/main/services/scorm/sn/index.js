@@ -12,7 +12,7 @@ const { ActivityTreeManager } = require('./activity-tree');
 const SequencingEngine = require('./sequencing-engine');
 const NavigationHandler = require('./navigation-handler');
 const RollupManager = require('./rollup-manager');
-const { SN_ERROR_CODES, SEQUENCING_SESSION_STATES } = require('../../../../shared/constants/sn-constants');
+const { SN_ERROR_CODES, SEQUENCING_SESSION_STATES, ACTIVITY_STATES } = require('../../../../shared/constants/sn-constants');
 
 /**
  * SCORM Sequencing and Navigation Service
@@ -245,6 +245,10 @@ class ScormSNService {
 
       // Set activity as current if no pre-condition actions triggered
       this.activityTreeManager.setCurrentActivity(activity.identifier);
+
+      // Synchronize navigation handler session with current activity
+      // This ensures browse mode navigation works correctly
+      this.navigationHandler.updateNavigationSession(activity);
 
       // Process rollup if enabled
       let rollupResult = null;

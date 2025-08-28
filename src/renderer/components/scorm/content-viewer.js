@@ -142,13 +142,16 @@ class ContentViewer extends BaseComponent {
     // Listen for course loading events
     this.subscribe('course:loaded', this.handleCourseLoaded);
     this.subscribe('course:error', this.handleCourseError);
-    
+
     // Listen for UI state changes
     this.subscribe('ui:updated', this.handleUIUpdate);
-    
+
     // Listen for SCORM events
     this.subscribe('scorm:initialized', this.handleScormInitialized);
     this.subscribe('scorm:error', this.handleScormError);
+
+    // Listen for navigation launch events (CRITICAL for browse mode navigation)
+    this.subscribe('navigation:launch', this.handleNavigationLaunch);
   }
 
   /**
@@ -733,6 +736,41 @@ class ContentViewer extends BaseComponent {
       message: `SCORM Error: ${message}`,
       duration: 0
     });
+  }
+
+  /**
+   * Handle navigation launch event (CRITICAL for browse mode navigation)
+   */
+  handleNavigationLaunch(data) {
+    try {
+      this.logger?.info('ContentViewer: Handling navigation launch', {
+        activityId: data?.activity?.identifier || data?.activity?.id,
+        launchUrl: data?.activity?.launchUrl,
+        href: data?.activity?.href,
+        resourceHref: data?.activity?.resource?.href,
+        source: data?.source
+      });
+
+      // Get launch URL from multiple possible locations
+      const launchUrl = data?.activity?.launchUrl ||
+                       data?.activity?.href ||
+                       data?.activity?.resource?.href;
+
+      if (launchUrl) {
+        // Load the activity content
+        this.loadContent(launchUrl, {
+          activity: data.activity,
+          sequencing: data.sequencing,
+          source: data.source
+        });
+      } else {
+        this.logger?.warn('ContentViewer: No launch URL available for navigation', data);
+        this.showError('Navigation Error', 'Unable to load the requested activity content');
+      }
+    } catch (error) {
+      this.logger?.error('ContentViewer: Error handling navigation launch', error);
+      this.showError('Navigation Error', 'Failed to load activity content');
+    }
   }
 
   /**
