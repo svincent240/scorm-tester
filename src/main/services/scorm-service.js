@@ -489,7 +489,10 @@ class ScormService extends BaseService {
         this.logger?.warn(`ScormService: RTE Terminate failed for session ${sessionId}: ${e?.message || e}`);
         rteSuccess = false;
       }
- 
+
+      // Process navigation request after termination (SCORM 2004 4th Edition requirement)
+      await this.processNavigationRequestAfterTermination(sessionId);
+
       // Update session state
       const preState = session.state;
       session.state = 'terminated';
@@ -1063,6 +1066,142 @@ class ScormService extends BaseService {
    */
   onScormApiCallLogged(callback) {
     this.eventEmitter.on('scorm-api-call-logged', callback);
+  }
+
+  /**
+   * Process navigation request after SCO termination (SCORM 2004 4th Edition requirement)
+   * @private
+   * @param {string} sessionId - Session identifier
+   * @returns {Promise<void>}
+   */
+  async processNavigationRequestAfterTermination(sessionId) {
+    try {
+      // Get the navigation request value from the data model
+      const navRequestResult = await this.getValue(sessionId, 'adl.nav.request');
+
+      if (!navRequestResult.success) {
+        this.logger?.debug(`ScormService: Could not retrieve adl.nav.request for session ${sessionId}`);
+        return;
+      }
+
+      const navRequest = navRequestResult.value;
+
+      // If no navigation request was set (default '_none_'), do nothing
+      if (!navRequest || navRequest === '_none_') {
+        this.logger?.debug(`ScormService: No navigation request set for session ${sessionId}`);
+        return;
+      }
+
+      this.logger?.info(`ScormService: Processing navigation request '${navRequest}' after termination for session ${sessionId}`);
+
+      // Process the navigation request
+      const navResult = await this.processNavigationRequest(sessionId, navRequest);
+
+      if (navResult.success) {
+        this.logger?.info(`ScormService: Navigation request '${navRequest}' processed successfully for session ${sessionId}`);
+      } else {
+        this.logger?.warn(`ScormService: Navigation request '${navRequest}' failed for session ${sessionId}: ${navResult.reason}`);
+      }
+
+    } catch (error) {
+      this.logger?.error(`ScormService: Error processing navigation request after termination for session ${sessionId}:`, error);
+    }
+  }
+
+  /**
+   * Process a specific navigation request
+   * @private
+   * @param {string} sessionId - Session identifier
+   * @param {string} navRequest - Navigation request value
+   * @returns {Promise<Object>} Navigation processing result
+   */
+  async processNavigationRequest(sessionId, navRequest) {
+    try {
+      // Validate the navigation request
+      const validRequests = ['continue', 'previous', 'choice', 'exit', 'exitAll', 'abandon', 'abandonAll', 'suspendAll'];
+      if (!validRequests.includes(navRequest)) {
+        return {
+          success: false,
+          reason: `Invalid navigation request: ${navRequest}`
+        };
+      }
+
+      // Check if SN service is available
+      if (!this.snService) {
+        this.logger?.warn(`ScormService: SN service not available for navigation request processing`);
+        return {
+          success: false,
+          reason: 'SN service not available'
+        };
+      }
+
+      // Get current sequencing state to validate navigation availability
+      const sequencingState = this.snService.getSequencingState();
+
+      // Process based on navigation request type
+      switch (navRequest) {
+        case 'continue':
+          // Check if continue is available
+          if (!sequencingState.availableNavigation?.continue) {
+            this.logger?.debug(`ScormService: Continue navigation not available for session ${sessionId}`);
+            return {
+              success: true, // Not an error, just no action needed
+              reason: 'Continue navigation not available (expected for single SCO courses)'
+            };
+          }
+          return await this.snService.processNavigation('continue');
+
+        case 'previous':
+          // Check if previous is available
+          if (!sequencingState.availableNavigation?.previous) {
+            this.logger?.debug(`ScormService: Previous navigation not available for session ${sessionId}`);
+            return {
+              success: true, // Not an error, just no action needed
+              reason: 'Previous navigation not available'
+            };
+          }
+          return await this.snService.processNavigation('previous');
+
+        case 'exit':
+          // Exit current activity (for single SCO, this is equivalent to exitAll)
+          this.logger?.info(`ScormService: Processing exit navigation request for session ${sessionId}`);
+          return this.snService.terminateSequencing();
+
+        case 'exitAll':
+          // Exit the entire course
+          this.logger?.info(`ScormService: Processing exitAll navigation request for session ${sessionId}`);
+          return this.snService.terminateSequencing();
+
+        case 'suspendAll':
+          // Suspend all activities
+          this.logger?.info(`ScormService: Processing suspendAll navigation request for session ${sessionId}`);
+          // For single SCO courses, suspend is handled by the SCO setting cmi.exit = 'suspend'
+          // The LMS should preserve the session state for resumption
+          return {
+            success: true,
+            reason: 'SuspendAll processed (session state preserved for single SCO course)'
+          };
+
+        case 'abandon':
+        case 'abandonAll':
+          // Abandon the course/session
+          this.logger?.info(`ScormService: Processing ${navRequest} navigation request for session ${sessionId}`);
+          return this.snService.terminateSequencing();
+
+        default:
+          return {
+            success: false,
+            reason: `Unsupported navigation request: ${navRequest}`
+          };
+      }
+
+    } catch (error) {
+      this.logger?.error(`ScormService: Error processing navigation request '${navRequest}' for session ${sessionId}:`, error);
+      return {
+        success: false,
+        reason: `Navigation processing error: ${error.message}`
+      };
+    }
   }
 
   /**

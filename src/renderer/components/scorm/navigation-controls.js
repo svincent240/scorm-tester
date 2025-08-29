@@ -654,87 +654,14 @@ class NavigationControls extends BaseComponent {
       };
     }
 
-    // Course is loaded, proceed with browse mode fallback navigation
-    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
-    if (browseMode) {
-      this.logger?.info(`NavigationControls: Browse mode fallback navigation for ${navigationRequest} within loaded course`);
-
-      // In browse mode with a loaded course, try to navigate within the current course
-      // Emit navigation request to trigger activity tree or other browse mode navigation
-      try {
-        const { eventBus } = await import('../../services/event-bus.js');
-
-        // Emit browse mode navigation request for current course
-        eventBus.emit('navigation:browse-mode-fallback', {
-          direction: navigationRequest,
-          source: 'navigation-controls',
-          courseLoaded: true,
-          courseInfo: courseInfo
-        });
-
-        // Try to find next/previous activity in current course structure
-        const targetActivity = this.findAdjacentActivity(navigationRequest, courseStructure);
-        if (targetActivity) {
-          eventBus.emit('navigation:launch', {
-            activity: targetActivity,
-            sequencing: null,
-            source: 'navigation-controls-browse-fallback',
-            // Include current activity information for UI synchronization
-            currentActivity: targetActivity,
-            navigationResult: {
-              success: true,
-              targetActivity: targetActivity,
-              action: 'launch'
-            }
-          });
-
-          return {
-            success: true,
-            reason: `Browse mode ${navigationRequest} - found adjacent activity in current course`,
-            fallback: true,
-            browseMode: true,
-            targetActivity: targetActivity
-          };
-        }
-
-        this.logger?.info('NavigationControls: No adjacent activity found, browse mode navigation completed');
-      } catch (error) {
-        this.logger?.error('NavigationControls: Failed to handle browse mode fallback navigation', error);
-      }
-
-      return {
-        success: true,
-        reason: `Browse mode fallback ${navigationRequest} - navigation request emitted`,
-        fallback: true,
-        browseMode: true
-      };
-    }
-
-    const contentViewer = this.getContentViewer();
-    if (!contentViewer) {
-      this.logger?.warn('NavigationControls: No content viewer available for fallback navigation');
-      return { success: false, reason: 'No content viewer available' };
-    }
-    
-    const contentWindow = contentViewer.getContentWindow();
-    if (!contentWindow) {
-      this.logger?.warn('NavigationControls: No content window available for fallback navigation');
-      return { success: false, reason: 'No content window available' };
-    }
-    
-    try {
-      const direction = navigationRequest === 'continue' ? 'next' : navigationRequest;
-      const success = this.tryContentNavigation(contentWindow, direction);
-      
-      return {
-        success,
-        reason: success ? `Fallback ${direction} navigation succeeded` : `Fallback ${direction} navigation failed`,
-        fallback: true
-      };
-    } catch (error) {
-      this.logger?.error('NavigationControls: Fallback navigation error:', error);
-      return { success: false, reason: 'Fallback navigation error', error: error.message };
-    }
+    // Course is loaded, but SN service should handle all navigation including browse mode
+    // Remove inconsistent fallback logic that uses different data sources
+    this.logger?.warn(`NavigationControls: SN service unavailable but course loaded - cannot perform ${navigationRequest} navigation`);
+    return {
+      success: false,
+      reason: 'SN service unavailable - navigation requires proper SCORM sequencing service',
+      fallback: true
+    };
   }
 
   /**
@@ -797,12 +724,26 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Try generic button navigation (simplified)
+   * Try generic button navigation (enhanced with common patterns)
    */
   tryGenericButtonNavigation(contentDocument, direction) {
     const selectors = direction === 'next' ?
-      ['.next-btn', '.btn-next', '.continue'] :
-      ['.prev-btn', '.btn-prev', '.previous', '.back'];
+      [
+        '.next-btn', '.btn-next', '.continue',
+        // Add common navigation patterns found in real courses
+        '[data-nav="next"]', '.navigation-next',
+        '[aria-label*="next" i]', '[aria-label*="continue" i]',
+        'button:has-text("Next")', 'button:has-text("Continue")',
+        '.nav-next', '.btn-continue'
+      ] :
+      [
+        '.prev-btn', '.btn-prev', '.previous', '.back',
+        // Add common navigation patterns found in real courses
+        '[data-nav="prev"]', '.navigation-prev',
+        '[aria-label*="previous" i]', '[aria-label*="back" i]',
+        'button:has-text("Previous")', 'button:has-text("Back")',
+        '.nav-prev', '.btn-back'
+      ];
 
     for (const selector of selectors) {
       try {
@@ -1428,11 +1369,24 @@ class NavigationControls extends BaseComponent {
     if (data._fromNavigationControls) {
       return;
     }
-    
-    // Extract actual data and mark as from UI state
+
+    // Add simple deduplication to prevent redundant updates
+    const currentState = this.navigationState;
     const navData = data.data || data;
+
+    // Check if the navigation state actually changed
+    const hasChanged = !currentState ||
+      currentState.canNavigatePrevious !== navData.canNavigatePrevious ||
+      currentState.canNavigateNext !== navData.canNavigateNext ||
+      currentState.currentItem !== navData.currentItem;
+
+    if (!hasChanged) {
+      return; // No change, skip update
+    }
+
+    // Extract actual data and mark as from UI state
     const stateUpdate = { ...navData, _fromUIState: true };
-    
+
     this.updateNavigationState(stateUpdate);
   }
 
@@ -1465,13 +1419,65 @@ class NavigationControls extends BaseComponent {
    * Handle SCORM data changed event
    */
   handleScormDataChanged(data) {
-    // Update progress if completion status changed
-    if (data.element === 'cmi.completion_status' || data.element === 'cmi.progress_measure') {
-      const progressData = this.uiState.getState('progressData');
+    const { element, value } = data.data || data;
+
+    // Update progress indicators reactively when SCORM data changes
+    if (element === 'cmi.completion_status') {
+      this.updateCompletionStatus(value);
+    } else if (element === 'cmi.progress_measure') {
+      this.updateProgressMeasure(value);
+    } else if (element === 'cmi.success_status') {
+      this.updateSuccessStatus(value);
+    }
+
+    // Update overall progress display if any relevant data changed
+    if (['cmi.completion_status', 'cmi.progress_measure', 'cmi.success_status'].includes(element)) {
+      const progressData = this.uiState?.getState('progressData');
       if (progressData) {
         this.updateProgress(progressData);
       }
     }
+  }
+
+  /**
+   * Update completion status display
+   */
+  updateCompletionStatus(status) {
+    // Update any completion status indicators in the navigation bar
+    const statusElement = this.find('.navigation-controls__status');
+    if (statusElement && status) {
+      // Keep existing status text but ensure progress is reflected
+      const currentText = statusElement.textContent;
+      if (currentText && !currentText.includes('No course')) {
+        // Update status to reflect current completion
+        const statusText = status === 'completed' ? 'Course Completed' :
+                          status === 'incomplete' ? 'Course In Progress' :
+                          'Course Status: ' + status;
+        statusElement.textContent = statusText;
+      }
+    }
+  }
+
+  /**
+   * Update progress measure display
+   */
+  updateProgressMeasure(measure) {
+    if (typeof measure === 'number' && measure >= 0 && measure <= 1) {
+      // Update progress bar if visible
+      if (this.progressFill && this.progressText) {
+        const percentage = Math.round(measure * 100);
+        this.progressFill.style.width = `${percentage}%`;
+        this.progressText.textContent = `${percentage}%`;
+      }
+    }
+  }
+
+  /**
+   * Update success status display
+   */
+  updateSuccessStatus(_status) {
+    // Could add success status indicator if needed
+    // For now, this ensures success status changes trigger progress updates
   }
 
   /**

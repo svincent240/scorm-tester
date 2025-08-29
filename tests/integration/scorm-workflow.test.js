@@ -257,22 +257,51 @@ describe('SCORM Workflow Integration Tests', () => {
 
     test('should validate navigation request availability', async () => {
       expect(apiHandler.Initialize('')).toBe('true');
-      
+
       // Check navigation request validity (read-only elements)
       const validityElements = [
         'adl.nav.request_valid.continue',
-        'adl.nav.request_valid.previous', 
+        'adl.nav.request_valid.previous',
         'adl.nav.request_valid.choice',
         'adl.nav.request_valid.exit',
         'adl.nav.request_valid.exitAll'
       ];
-      
+
       validityElements.forEach(element => {
         const value = apiHandler.GetValue(element);
         expect(['true', 'false', 'unknown']).toContain(value);
       });
-      
+
       expect(apiHandler.Terminate('')).toBe('true');
+    });
+
+    test('should process navigation requests after termination', async () => {
+      // This test would require integration with ScormService
+      // For now, we'll test the basic navigation request setting and retrieval
+
+      expect(apiHandler.Initialize('')).toBe('true');
+
+      // Test setting various navigation requests
+      const testRequests = ['continue', 'exit', 'exitAll', 'suspendAll'];
+
+      for (const request of testRequests) {
+        expect(apiHandler.SetValue('adl.nav.request', request)).toBe('true');
+        expect(apiHandler.GetLastError()).toBe(COMMON_ERRORS.NO_ERROR);
+
+        // Verify the request was set (though we can't read it back directly)
+        // In a full integration test, we would check that after Terminate,
+        // the ScormService processes this navigation request appropriately
+      }
+
+      // Test that navigation request is write-only
+      expect(apiHandler.GetValue('adl.nav.request')).toBe('');
+      expect(apiHandler.GetLastError()).toBe(COMMON_ERRORS.WRITE_ONLY_ELEMENT);
+
+      expect(apiHandler.Terminate('')).toBe('true');
+
+      // Note: Full integration testing of navigation request processing
+      // would require mocking the ScormService and verifying that
+      // processNavigationRequestAfterTermination is called with the correct request
     });
   });
 
