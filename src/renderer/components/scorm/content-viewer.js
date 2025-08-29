@@ -278,23 +278,29 @@ class ContentViewer extends BaseComponent {
       clearTimeout(this.loadingTimeout);
       this.loadingTimeout = null;
     }
-    
+
     try {
       this.contentWindow = this.iframe.contentWindow;
+
+      // Inject SCORM API into iframe after it loads
+      if (this._injectApiIntoIframe) {
+        this._injectApiIntoIframe(this.iframe);
+      }
+
       this.hideLoading();
       this.showContent();
-      
+
       // Respect content design after content loads
       this.respectContentDesign();
       this.startResizeObserver();
       this.refreshLayout();
       this.fixNestedIframeSizing();
-      
+
       this.emit('contentLoaded', {
         url: this.currentUrl,
         contentWindow: this.contentWindow
       });
-      
+
     } catch (error) {
       this.showError('Content initialization failed', error?.message || String(error));
     }
@@ -324,15 +330,15 @@ class ContentViewer extends BaseComponent {
     try {
       // Set the SCORM client for the bridge
       scormAPIBridge.setScormClient(scormClient);
-      
+
       // Create direct API methods that call the bridge synchronously
       const createDirectAPI = (version) => {
-        const methods = version === '2004' 
+        const methods = version === '2004'
           ? ['Initialize', 'Terminate', 'GetValue', 'SetValue', 'Commit', 'GetLastError', 'GetErrorString', 'GetDiagnostic']
           : ['LMSInitialize', 'LMSFinish', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSGetLastError', 'LMSGetErrorString', 'LMSGetDiagnostic'];
-          
+
         const api = {};
-        
+
         methods.forEach(method => {
           api[method] = (...args) => {
             try {
@@ -342,7 +348,7 @@ class ContentViewer extends BaseComponent {
             }
           };
         });
-        
+
         // Add SCORM 1.2 compatibility methods
         if (version === '1.2') {
           api.Initialize = api.LMSInitialize;
@@ -354,14 +360,57 @@ class ContentViewer extends BaseComponent {
           api.GetErrorString = api.LMSGetErrorString;
           api.GetDiagnostic = api.LMSGetDiagnostic;
         }
-        
+
         return api;
       };
-      
-      // Create API objects and inject into window
-      window.API = createDirectAPI('1.2');
-      window.API_1484_11 = createDirectAPI('2004');
-      
+
+      // Create API objects
+      const api12 = createDirectAPI('1.2');
+      const api2004 = createDirectAPI('2004');
+
+      // Inject into main window
+      window.API = api12;
+      window.API_1484_11 = api2004;
+
+      // Also inject into the content viewer's window context for iframe access
+      // This ensures SCOs loaded in iframes can find the API in their parent window
+      if (this.element && this.element.ownerDocument && this.element.ownerDocument.defaultView) {
+        const docWindow = this.element.ownerDocument.defaultView;
+        try {
+          docWindow.API = api12;
+          docWindow.API_1484_11 = api2004;
+        } catch (error) {
+          // Ignore cross-origin errors
+        }
+      }
+
+      // Set up a mechanism to inject API into iframe when it loads
+      this._injectApiIntoIframe = (iframe) => {
+        if (!iframe || !iframe.contentWindow) return;
+
+        try {
+          const contentWindow = iframe.contentWindow;
+
+          // Inject API directly into iframe's window
+          contentWindow.API = api12;
+          contentWindow.API_1484_11 = api2004;
+
+          // Also inject into iframe's parent for SCO discovery
+          if (contentWindow.parent && contentWindow.parent !== contentWindow) {
+            contentWindow.parent.API = api12;
+            contentWindow.parent.API_1484_11 = api2004;
+          }
+
+          // Inject into opener if it exists
+          if (contentWindow.opener) {
+            contentWindow.opener.API = api12;
+            contentWindow.opener.API_1484_11 = api2004;
+          }
+        } catch (error) {
+          // Ignore cross-origin errors - SCO will handle API discovery
+        }
+      };
+
     } catch (error) {
       try {
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {

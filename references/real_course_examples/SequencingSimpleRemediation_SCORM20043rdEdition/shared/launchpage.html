@@ -100,6 +100,9 @@
     
         default:
         alert("error, no match for '" + queryString + "'");
+        // Set a fallback pageArray to prevent undefined errors
+        var pageArray = new Array(1);
+        pageArray[0] = "shared/assessmenttemplate.html?content=default";
         break;
     }
    
@@ -154,11 +157,17 @@
     }
     
     function goToPage(){
-    
+
+        // Ensure pageArray is defined
+        if (typeof pageArray === 'undefined' || !pageArray || pageArray.length === 0) {
+            alert("Error: Content pages not properly configured. Please contact support.");
+            return;
+        }
+
         var theIframe = document.getElementById("contentFrame");
         var prevButton = document.getElementById("butPrevious");
         var nextButton = document.getElementById("butNext");
-        
+
         //navigate the iFrame to the content
         theIframe.src = "../" + pageArray[currentPage];
         

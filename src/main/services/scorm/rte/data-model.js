@@ -95,7 +95,13 @@ class ScormDataModel {
         if (schema && schema.defaultValue !== null) {
           return String(schema.defaultValue);
         }
-        
+
+        // For elements with null default values, return empty string (SCORM standard)
+        if (schema && schema.defaultValue === null) {
+          this.errorHandler.clearError();
+          return '';
+        }
+
         this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
           `Element not initialized: ${element}`, 'getValue');
         return '';
@@ -231,6 +237,12 @@ class ScormDataModel {
         if (schema && schema.defaultValue !== null) {
           return String(schema.defaultValue);
         }
+
+        // For elements with null default values, return empty string (SCORM standard)
+        if (schema && schema.defaultValue === null) {
+          return '';
+        }
+
         this.logger?.warn(`_getInternalValue: Element not initialized: ${element}`);
         return '';
       }
@@ -260,11 +272,11 @@ class ScormDataModel {
     // Core CMI elements
     this.data.set('cmi.completion_status', 'unknown');
     this.data.set('cmi.success_status', 'unknown');
-    this.data.set('cmi.score.scaled', '');
-    this.data.set('cmi.score.raw', '');
-    this.data.set('cmi.score.max', '');
-    this.data.set('cmi.score.min', '');
-    this.data.set('cmi.progress_measure', '');
+    this.data.set('cmi.score.scaled', null);
+    this.data.set('cmi.score.raw', null);
+    this.data.set('cmi.score.max', null);
+    this.data.set('cmi.score.min', null);
+    this.data.set('cmi.progress_measure', null);
     this.data.set('cmi.location', '');
     this.data.set('cmi.suspend_data', '');
     this.data.set('cmi.entry', 'ab-initio');
