@@ -43,6 +43,7 @@ describe('Browse Mode Navigation Integration', () => {
     // Mock activity tree with test activities
     const mockActivity1 = {
       identifier: 'activity1',
+      isLaunchable: jest.fn(() => true),
       sequencing: {
         sequencingRules: {
           preConditionRules: [{
@@ -59,6 +60,7 @@ describe('Browse Mode Navigation Integration', () => {
 
     const mockActivity2 = {
       identifier: 'activity2',
+      isLaunchable: jest.fn(() => true),
       sequencing: {
         sequencingRules: {
           preConditionRules: []
@@ -70,11 +72,26 @@ describe('Browse Mode Navigation Integration', () => {
       }
     };
 
+    // Mock root activity for navigation
+    const mockRootActivity = {
+      identifier: 'root',
+      children: [mockActivity1, mockActivity2],
+      isLaunchable: jest.fn(() => false)
+    };
+
     activityTreeManager.findActivity = jest.fn((id) => {
       if (id === 'activity1') return mockActivity1;
       if (id === 'activity2') return mockActivity2;
       return null;
     });
+
+    activityTreeManager.getActivity = jest.fn((id) => {
+      if (id === 'activity1') return mockActivity1;
+      if (id === 'activity2') return mockActivity2;
+      return null;
+    });
+
+    activityTreeManager.root = mockRootActivity;
   });
 
   afterEach(async () => {

@@ -48,6 +48,7 @@ class ScormApiHandler {
       maxCommitFrequency: 10000, // Max commits per 10 seconds
       launchMode: 'normal', // Default to normal mode
       memoryOnlyStorage: false, // Default to persistent storage
+      browseModeService: null, // Browse mode service reference
       ...options
     };
 
@@ -119,6 +120,19 @@ class ScormApiHandler {
 
       // Initialize data model with session-specific data
       this.initializeSessionData();
+
+      // In browse mode, check for saved location and update entry mode accordingly
+      if (this.isBrowseMode() && this.options.browseModeService) {
+        const lastLocation = this.options.browseModeService.getLastLocation();
+        if (lastLocation && lastLocation.activityId) {
+          // Update entry mode to resume since we have a saved location
+          this.dataModel._setInternalValue('cmi.entry', 'resume');
+          this.logger?.info('Browse mode: Entry mode set to resume due to saved location', {
+            sessionId: this.sessionId,
+            lastLocation: lastLocation.activityId
+          });
+        }
+      }
 
       // Register with session manager (handle failures gracefully)
       if (this.sessionManager) {
@@ -476,7 +490,7 @@ class ScormApiHandler {
   GetErrorString(errorCode) {
     const startTime = process.hrtime.bigint();
     let result = "";
-    let eventErrorCode = errorCode; // The parameter is the error code for the event
+    const eventErrorCode = errorCode; // The parameter is the error code for the event
     let errorMessage = "";
 
     try {
@@ -498,7 +512,7 @@ class ScormApiHandler {
   GetDiagnostic(errorCode) {
     const startTime = process.hrtime.bigint();
     let result = "";
-    let eventErrorCode = errorCode; // The parameter is the error code for the event
+    const eventErrorCode = errorCode; // The parameter is the error code for the event
     let errorMessage = "";
 
     try {
@@ -552,14 +566,20 @@ class ScormApiHandler {
    * @returns {string} Entry mode ('ab-initio' or 'resume')
    */
   determineEntryMode() {
+    // In browse mode, always start fresh since data is not persisted
+    if (this.isBrowseMode()) {
+      this.logger?.debug('Browse mode: Always starting fresh (ab-initio) due to data isolation');
+      return 'ab-initio';
+    }
+
     // Check if there's previous suspend data
     const suspendData = this.dataModel.getValue('cmi.suspend_data');
     const completionStatus = this.dataModel.getValue('cmi.completion_status');
-    
+
     if (suspendData && completionStatus !== 'completed') {
       return 'resume';
     }
-    
+
     return 'ab-initio';
   }
 

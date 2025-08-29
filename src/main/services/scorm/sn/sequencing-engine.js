@@ -8,14 +8,12 @@
  * @fileoverview SCORM sequencing rule processing engine
  */
 
-const { 
+const {
   SN_ERROR_CODES,
   RULE_CONDITIONS,
   RULE_ACTIONS,
-  CONTROL_MODES,
   ACTIVITY_STATES,
-  ATTEMPT_STATES,
-  OBJECTIVE_PROGRESS_STATES
+  ATTEMPT_STATES
 } = require('../../../../shared/constants/sn-constants');
 
 /**
@@ -109,19 +107,36 @@ class SequencingEngine {
   /**
    * Evaluate rule conditions
    * @private
-   * @param {Array} conditions - Array of rule conditions
+   * @param {Object|Array} conditions - Conditions object with conditionCombination and conditions array, or array of conditions
    * @param {ActivityNode} activity - Activity context
    * @returns {Object} Condition evaluation result
    */
   evaluateRuleConditions(conditions, activity) {
-    if (!conditions || conditions.length === 0) {
+    // Handle case where conditions is null/undefined
+    if (!conditions) {
       return { satisfied: false, reason: 'No conditions defined' };
     }
 
-    const conditionCombination = conditions.conditionCombination || 'all';
+    let conditionCombination = 'all';
+    let conditionsArray = [];
+
+    // Handle case where conditions is an array (legacy format)
+    if (Array.isArray(conditions)) {
+      conditionsArray = conditions;
+    }
+    // Handle case where conditions is an object with conditionCombination and conditions array
+    else if (typeof conditions === 'object' && conditions !== null) {
+      conditionCombination = conditions.conditionCombination || 'all';
+      conditionsArray = conditions.conditions || [];
+    }
+
+    if (!Array.isArray(conditionsArray) || conditionsArray.length === 0) {
+      return { satisfied: false, reason: 'No conditions defined' };
+    }
+
     const results = [];
 
-    for (const condition of conditions) {
+    for (const condition of conditionsArray) {
       const result = this.evaluateSingleCondition(condition, activity);
       results.push(result);
     }
@@ -350,7 +365,7 @@ class SequencingEngine {
    * Process disabled action
    * @private
    */
-  processDisabledAction(activity) {
+  processDisabledAction(_activity) {
     return { success: true, reason: 'Activity disabled', nextAction: 'block' };
   }
 
@@ -403,7 +418,7 @@ class SequencingEngine {
    * Process continue action
    * @private
    */
-  processContinueAction(activity) {
+  processContinueAction(_activity) {
     return { success: true, reason: 'Continue to next activity', nextAction: 'continue' };
   }
 
@@ -411,7 +426,7 @@ class SequencingEngine {
    * Process previous action
    * @private
    */
-  processPreviousAction(activity) {
+  processPreviousAction(_activity) {
     return { success: true, reason: 'Return to previous activity', nextAction: 'previous' };
   }
 
@@ -459,7 +474,6 @@ class SequencingEngine {
 
       try {
         // Get activities for standard evaluation (if available)
-        const fromActivity = from ? this.activityTreeManager.findActivity(from) : null;
         const toActivity = to ? this.activityTreeManager.findActivity(to) : null;
 
         if (toActivity) {

@@ -321,23 +321,23 @@ class ScormDataModel {
    * @returns {boolean} True if collection element
    */
   isCollectionElement(element) {
-    // Check interactions
-    if (SCORM_CONSTANTS.REGEX.INTERACTION_ELEMENT.test(element)) {
+    // Check interactions (including count elements)
+    if (element.startsWith('cmi.interactions.')) {
       return true;
     }
 
-    // Check objectives
-    if (SCORM_CONSTANTS.REGEX.OBJECTIVE_ELEMENT.test(element)) {
+    // Check objectives (including count elements)
+    if (element.startsWith('cmi.objectives.')) {
       return true;
     }
 
     // Check comments from learner
-    if (element.startsWith('cmi.comments_from_learner.') && element.includes('.')) {
+    if (element.startsWith('cmi.comments_from_learner.')) {
       return true;
     }
 
     // Check comments from LMS
-    if (element.startsWith('cmi.comments_from_lms.') && element.includes('.')) {
+    if (element.startsWith('cmi.comments_from_lms.')) {
       return true;
     }
 
@@ -352,39 +352,116 @@ class ScormDataModel {
    */
   getCollectionValue(element) {
     // Handle interactions
-    const interactionMatch = element.match(SCORM_CONSTANTS.REGEX.INTERACTION_ELEMENT);
-    if (interactionMatch) {
-      const index = parseInt(interactionMatch[1], 10);
-      const property = element.substring(element.lastIndexOf('.') + 1);
-      
-      if (index >= this.interactions.length) {
-        this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
-          `Interaction ${index} not found`, 'getCollectionValue');
-        return '';
+    if (element.startsWith('cmi.interactions.')) {
+      // Handle count element
+      if (element === 'cmi.interactions._count') {
+        return String(this.interactions.length);
       }
-      
-      const interaction = this.interactions[index];
-      return String(interaction[property] || '');
+
+      const interactionMatch = element.match(SCORM_CONSTANTS.REGEX.INTERACTION_ELEMENT);
+      if (interactionMatch) {
+        const index = parseInt(interactionMatch[1], 10);
+        const property = element.substring(element.lastIndexOf('.') + 1);
+
+        if (index >= this.interactions.length) {
+          this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+            `Interaction ${index} not found`, 'getCollectionValue');
+          return '';
+        }
+
+        const interaction = this.interactions[index];
+        return String(interaction[property] || '');
+      }
+
+      // Handle malformed interaction elements (e.g., "cmi.interactions.")
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid interaction element format: ${element}`, 'getCollectionValue');
+      return '';
     }
 
     // Handle objectives
-    const objectiveMatch = element.match(SCORM_CONSTANTS.REGEX.OBJECTIVE_ELEMENT);
-    if (objectiveMatch) {
-      const index = parseInt(objectiveMatch[1], 10);
-      const property = element.substring(element.lastIndexOf('.') + 1);
-      
-      if (index >= this.objectives.length) {
-        this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
-          `Objective ${index} not found`, 'getCollectionValue');
-        return '';
+    if (element.startsWith('cmi.objectives.')) {
+      // Handle count element
+      if (element === 'cmi.objectives._count') {
+        return String(this.objectives.length);
       }
-      
-      const objective = this.objectives[index];
-      return String(objective[property] || '');
+
+      const objectiveMatch = element.match(SCORM_CONSTANTS.REGEX.OBJECTIVE_ELEMENT);
+      if (objectiveMatch) {
+        const index = parseInt(objectiveMatch[1], 10);
+        const property = element.substring(element.lastIndexOf('.') + 1);
+
+        if (index >= this.objectives.length) {
+          this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+            `Objective ${index} not found`, 'getCollectionValue');
+          return '';
+        }
+
+        const objective = this.objectives[index];
+        return String(objective[property] || '');
+      }
+
+      // Handle malformed objective elements (e.g., "cmi.objectives.")
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid objective element format: ${element}`, 'getCollectionValue');
+      return '';
     }
 
-    // Handle comments (similar pattern)
-    // ... implementation for comments collections
+    // Handle comments from learner
+    if (element.startsWith('cmi.comments_from_learner.')) {
+      // Handle count element
+      if (element === 'cmi.comments_from_learner._count') {
+        return String(this.commentsFromLearner.length);
+      }
+
+      const match = element.match(/^cmi\.comments_from_learner\.(\d+)\.(.+)$/);
+      if (match) {
+        const index = parseInt(match[1], 10);
+        const property = match[2];
+
+        if (index >= this.commentsFromLearner.length) {
+          this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+            `Comment from learner ${index} not found`, 'getCollectionValue');
+          return '';
+        }
+
+        const comment = this.commentsFromLearner[index];
+        return String(comment[property] || '');
+      }
+
+      // Handle malformed comment elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid comment from learner element format: ${element}`, 'getCollectionValue');
+      return '';
+    }
+
+    // Handle comments from LMS
+    if (element.startsWith('cmi.comments_from_lms.')) {
+      // Handle count element
+      if (element === 'cmi.comments_from_lms._count') {
+        return String(this.commentsFromLms.length);
+      }
+
+      const match = element.match(/^cmi\.comments_from_lms\.(\d+)\.(.+)$/);
+      if (match) {
+        const index = parseInt(match[1], 10);
+        const property = match[2];
+
+        if (index >= this.commentsFromLms.length) {
+          this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+            `Comment from LMS ${index} not found`, 'getCollectionValue');
+          return '';
+        }
+
+        const comment = this.commentsFromLms[index];
+        return String(comment[property] || '');
+      }
+
+      // Handle malformed comment elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid comment from LMS element format: ${element}`, 'getCollectionValue');
+      return '';
+    }
 
     this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
       `Collection element not found: ${element}`, 'getCollectionValue');
@@ -400,39 +477,74 @@ class ScormDataModel {
    */
   setCollectionValue(element, value) {
     // Handle interactions
-    const interactionMatch = element.match(SCORM_CONSTANTS.REGEX.INTERACTION_ELEMENT);
-    if (interactionMatch) {
-      const index = parseInt(interactionMatch[1], 10);
-      const property = element.substring(element.lastIndexOf('.') + 1);
-      
-      // Ensure interaction exists
-      while (this.interactions.length <= index) {
-        this.interactions.push({});
+    if (element.startsWith('cmi.interactions.')) {
+      // Handle count element (read-only, cannot be set)
+      if (element === 'cmi.interactions._count') {
+        this.errorHandler.setError(COMMON_ERRORS.READ_ONLY_ELEMENT,
+          `Cannot set read-only element: ${element}`, 'setCollectionValue');
+        return false;
       }
-      
-      this.interactions[index][property] = value;
-      this.data.set('cmi.interactions._count', String(this.interactions.length));
-      return true;
+
+      const interactionMatch = element.match(SCORM_CONSTANTS.REGEX.INTERACTION_ELEMENT);
+      if (interactionMatch) {
+        const index = parseInt(interactionMatch[1], 10);
+        const property = element.substring(element.lastIndexOf('.') + 1);
+
+        // Ensure interaction exists
+        while (this.interactions.length <= index) {
+          this.interactions.push({});
+        }
+
+        this.interactions[index][property] = value;
+        this.data.set('cmi.interactions._count', String(this.interactions.length));
+        return true;
+      }
+
+      // Handle malformed interaction elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid interaction element format: ${element}`, 'setCollectionValue');
+      return false;
     }
 
     // Handle objectives
-    const objectiveMatch = element.match(SCORM_CONSTANTS.REGEX.OBJECTIVE_ELEMENT);
-    if (objectiveMatch) {
-      const index = parseInt(objectiveMatch[1], 10);
-      const property = element.substring(element.lastIndexOf('.') + 1);
-      
-      // Ensure objective exists
-      while (this.objectives.length <= index) {
-        this.objectives.push({});
+    if (element.startsWith('cmi.objectives.')) {
+      // Handle count element (read-only, cannot be set)
+      if (element === 'cmi.objectives._count') {
+        this.errorHandler.setError(COMMON_ERRORS.READ_ONLY_ELEMENT,
+          `Cannot set read-only element: ${element}`, 'setCollectionValue');
+        return false;
       }
-      
-      this.objectives[index][property] = value;
-      this.data.set('cmi.objectives._count', String(this.objectives.length));
-      return true;
+
+      const objectiveMatch = element.match(SCORM_CONSTANTS.REGEX.OBJECTIVE_ELEMENT);
+      if (objectiveMatch) {
+        const index = parseInt(objectiveMatch[1], 10);
+        const property = element.substring(element.lastIndexOf('.') + 1);
+
+        // Ensure objective exists
+        while (this.objectives.length <= index) {
+          this.objectives.push({});
+        }
+
+        this.objectives[index][property] = value;
+        this.data.set('cmi.objectives._count', String(this.objectives.length));
+        return true;
+      }
+
+      // Handle malformed objective elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid objective element format: ${element}`, 'setCollectionValue');
+      return false;
     }
 
     // Handle comments from learner
     if (element.startsWith('cmi.comments_from_learner.')) {
+      // Handle count element (read-only, cannot be set)
+      if (element === 'cmi.comments_from_learner._count') {
+        this.errorHandler.setError(COMMON_ERRORS.READ_ONLY_ELEMENT,
+          `Cannot set read-only element: ${element}`, 'setCollectionValue');
+        return false;
+      }
+
       const match = element.match(/^cmi\.comments_from_learner\.(\d+)\.(.+)$/);
       if (match) {
         const index = parseInt(match[1], 10);
@@ -447,10 +559,22 @@ class ScormDataModel {
         this.data.set('cmi.comments_from_learner._count', String(this.commentsFromLearner.length));
         return true;
       }
+
+      // Handle malformed comment elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid comment from learner element format: ${element}`, 'setCollectionValue');
+      return false;
     }
 
     // Handle comments from LMS
     if (element.startsWith('cmi.comments_from_lms.')) {
+      // Handle count element (read-only, cannot be set)
+      if (element === 'cmi.comments_from_lms._count') {
+        this.errorHandler.setError(COMMON_ERRORS.READ_ONLY_ELEMENT,
+          `Cannot set read-only element: ${element}`, 'setCollectionValue');
+        return false;
+      }
+
       const match = element.match(/^cmi\.comments_from_lms\.(\d+)\.(.+)$/);
       if (match) {
         const index = parseInt(match[1], 10);
@@ -465,6 +589,11 @@ class ScormDataModel {
         this.data.set('cmi.comments_from_lms._count', String(this.commentsFromLms.length));
         return true;
       }
+
+      // Handle malformed comment elements
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid comment from LMS element format: ${element}`, 'setCollectionValue');
+      return false;
     }
 
     this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
@@ -552,24 +681,38 @@ class ScormDataModel {
    * @returns {boolean} True if valid
    */
   validateCollectionValue(element, value) {
+    // Handle count elements (read-only, cannot be validated for setting)
+    if (element.endsWith('._count')) {
+      this.errorHandler.setError(COMMON_ERRORS.READ_ONLY_ELEMENT,
+        `Cannot validate read-only count element: ${element}`, 'validateCollectionValue');
+      return false;
+    }
+
+    // Handle malformed collection elements
+    if (element.endsWith('.') || !element.includes('.')) {
+      this.errorHandler.setError(COMMON_ERRORS.UNDEFINED_ELEMENT,
+        `Invalid collection element format: ${element}`, 'validateCollectionValue');
+      return false;
+    }
+
     // Basic validation for collection elements
     // More specific validation could be added based on element type
-    
+
     if (element.includes('.id')) {
       // IDs should not be empty and within length limits
       return value.length > 0 && value.length <= SCORM_CONSTANTS.DATA_MODEL.LIMITS.INTERACTION_ID;
     }
-    
+
     if (element.includes('.type')) {
       // Interaction types must be from valid vocabulary
       return SCORM_CONSTANTS.DATA_MODEL.INTERACTION_TYPES.includes(value);
     }
-    
+
     if (element.includes('.result')) {
       // Interaction results must be from valid vocabulary
       return SCORM_CONSTANTS.DATA_MODEL.INTERACTION_RESULTS.includes(value);
     }
-    
+
     return true; // Default to valid for other collection elements
   }
 

@@ -12,7 +12,6 @@
  */
 
 const EventEmitter = require('events');
-const SCORM_CONSTANTS = require('../../shared/constants/scorm-constants');
 
 /**
  * Browse Mode Service Class
@@ -350,6 +349,53 @@ class BrowseModeService extends EventEmitter {
 
       // Reset timeout
       this.setupSessionTimeout(this.currentSession);
+    }
+  }
+
+  /**
+   * Save current location for session resumption
+   * @param {string} activityId - Current activity identifier
+   * @param {Object} context - Additional context data
+   */
+  saveCurrentLocation(activityId, context = {}) {
+    if (this.currentSession) {
+      this.currentSession.state.lastLocation = {
+        activityId,
+        timestamp: new Date(),
+        context: { ...context }
+      };
+
+      // Update session activity
+      this.updateSessionActivity('location_saved', { activityId, context });
+
+      this.logger?.debug('Browse mode: Location saved', {
+        sessionId: this.currentSession.id,
+        activityId,
+        context
+      });
+    }
+  }
+
+  /**
+   * Get last saved location for session resumption
+   * @returns {Object|null} Last location data or null
+   */
+  getLastLocation() {
+    if (this.currentSession && this.currentSession.state.lastLocation) {
+      return { ...this.currentSession.state.lastLocation };
+    }
+    return null;
+  }
+
+  /**
+   * Clear saved location
+   */
+  clearLastLocation() {
+    if (this.currentSession) {
+      this.currentSession.state.lastLocation = null;
+      this.logger?.debug('Browse mode: Location cleared', {
+        sessionId: this.currentSession.id
+      });
     }
   }
 

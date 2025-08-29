@@ -565,6 +565,15 @@ class NavigationHandler {
           };
         }
 
+        // Save current location before navigating to choice
+        if (this.browseModeService) {
+          this.browseModeService.saveCurrentLocation(targetActivityId, {
+            navigationType: 'choice',
+            previousActivity: currentActivityId,
+            targetActivity: targetActivityId
+          });
+        }
+
         return {
           success: true,
           reason: 'Browse mode choice navigation processed',
@@ -630,11 +639,44 @@ class NavigationHandler {
   }
 
   /**
-   * Process browse mode start - find first launchable activity
+   * Process browse mode start - find first launchable activity or resume from saved location
    */
   processBrowseModeStart() {
+    // Check if there's a saved location to resume from
+    if (this.browseModeService) {
+      const lastLocation = this.browseModeService.getLastLocation();
+      if (lastLocation && lastLocation.activityId) {
+        const resumeActivity = this.activityTreeManager.getActivity(lastLocation.activityId);
+        if (resumeActivity && resumeActivity.isLaunchable()) {
+          this.logger?.info('Browse mode: Resuming from saved location', {
+            activityId: lastLocation.activityId,
+            timestamp: lastLocation.timestamp
+          });
+
+          return {
+            success: true,
+            reason: 'Browse mode start - resuming from saved location',
+            targetActivity: resumeActivity,
+            action: 'launch',
+            browseMode: true,
+            resumed: true,
+            lastLocation: lastLocation
+          };
+        }
+      }
+    }
+
+    // No saved location or invalid, start from first activity
     const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
     if (firstActivity) {
+      // Save this as the starting location
+      if (this.browseModeService) {
+        this.browseModeService.saveCurrentLocation(firstActivity.identifier, {
+          navigationType: 'start',
+          isFirstActivity: true
+        });
+      }
+
       return {
         success: true,
         reason: 'Browse mode start - first activity found',
@@ -663,10 +705,19 @@ class NavigationHandler {
     // Get all launchable activities
     const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
     const currentIndex = allActivities.findIndex(act => act.identifier === currentActivity.identifier);
-    
+
     if (currentIndex >= 0 && currentIndex < allActivities.length - 1) {
       // Found next activity
       const nextActivity = allActivities[currentIndex + 1];
+
+      // Save current location before moving to next
+      if (this.browseModeService) {
+        this.browseModeService.saveCurrentLocation(nextActivity.identifier, {
+          navigationType: 'continue',
+          previousActivity: currentActivity.identifier
+        });
+      }
+
       return {
         success: true,
         reason: 'Browse mode continue - next activity found',
@@ -701,10 +752,19 @@ class NavigationHandler {
     // Get all launchable activities
     const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
     const currentIndex = allActivities.findIndex(act => act.identifier === currentActivity.identifier);
-    
+
     if (currentIndex > 0) {
       // Found previous activity
       const previousActivity = allActivities[currentIndex - 1];
+
+      // Save current location before moving to previous
+      if (this.browseModeService) {
+        this.browseModeService.saveCurrentLocation(previousActivity.identifier, {
+          navigationType: 'previous',
+          previousActivity: currentActivity.identifier
+        });
+      }
+
       return {
         success: true,
         reason: 'Browse mode previous - previous activity found',

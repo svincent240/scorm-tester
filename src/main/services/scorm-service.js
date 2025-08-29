@@ -217,7 +217,8 @@ class ScormService extends BaseService {
         const rteOptions = {
           strictMode: this.config.strictRteMode,
           launchMode: options.launchMode || 'normal',
-          memoryOnlyStorage: options.memoryOnlyStorage || false
+          memoryOnlyStorage: options.memoryOnlyStorage || false,
+          browseModeService: this.browseModeService // Pass browse mode service reference
         };
 
         const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore);
