@@ -86,6 +86,9 @@ class BrowseModeService extends EventEmitter {
       // Trigger navigation availability refresh
       this.refreshNavigationAvailability();
 
+      // Initialize navigation handler session if available
+      this.initializeNavigationHandlerSession();
+
       return {
         success: true,
         session: this.serializeSession(session)
@@ -359,8 +362,17 @@ class BrowseModeService extends EventEmitter {
    */
   saveCurrentLocation(activityId, context = {}) {
     if (this.currentSession) {
+      // Validate activityId is not null or empty
+      if (!activityId || activityId.trim() === '') {
+        this.logger?.error('Browse mode: Cannot save location with invalid activityId', {
+          activityId,
+          context
+        });
+        return;
+      }
+
       this.currentSession.state.lastLocation = {
-        activityId,
+        activityId: activityId.trim(),
         timestamp: new Date(),
         context: { ...context }
       };
@@ -370,6 +382,12 @@ class BrowseModeService extends EventEmitter {
 
       this.logger?.debug('Browse mode: Location saved', {
         sessionId: this.currentSession.id,
+        activityId,
+        context,
+        timestamp: this.currentSession.state.lastLocation.timestamp
+      });
+    } else {
+      this.logger?.warn('Browse mode: Cannot save location - no active session', {
         activityId,
         context
       });
@@ -400,18 +418,68 @@ class BrowseModeService extends EventEmitter {
   }
 
   /**
-   * Refresh navigation availability when browse mode state changes
+   * Initialize navigation handler session when browse mode is enabled
    * @private
    */
+  initializeNavigationHandlerSession() {
+    try {
+      if (this.options.scormService) {
+        const snService = this.options.scormService.getSNService();
+        if (snService && snService.navigationHandler) {
+          const navHandler = snService.navigationHandler;
+
+          // Initialize browse mode session in navigation handler
+          if (typeof navHandler.initializeBrowseModeSession === 'function') {
+            const initResult = navHandler.initializeBrowseModeSession();
+            this.logger?.debug('Browse mode: Navigation handler session initialized', {
+              success: initResult.success,
+              reason: initResult.reason,
+              currentActivity: navHandler.navigationSession?.currentActivity?.identifier
+            });
+
+            if (!initResult.success) {
+              this.logger?.warn('Browse mode: Navigation handler session initialization failed', {
+                reason: initResult.reason
+              });
+            }
+          } else {
+            this.logger?.warn('Browse mode: Navigation handler does not have initializeBrowseModeSession method');
+          }
+        } else {
+          this.logger?.warn('Browse mode: SN service or navigation handler not available for session initialization');
+        }
+      } else {
+        this.logger?.warn('Browse mode: SCORM service not available for navigation handler initialization');
+      }
+    } catch (error) {
+      this.logger?.warn('Browse mode: Failed to initialize navigation handler session', error);
+    }
+  }
+
+  /**
+   * Refresh navigation availability when browse mode state changes
+    * @private
+    */
   refreshNavigationAvailability() {
     try {
       // Get the SN service from the SCORM service
       if (this.options.scormService) {
         const snService = this.options.scormService.getSNService();
         if (snService && typeof snService.refreshNavigationAvailability === 'function') {
-          snService.refreshNavigationAvailability();
-          this.logger?.debug('Browse mode: Navigation availability refreshed');
+          const result = snService.refreshNavigationAvailability();
+          this.logger?.debug('Browse mode: Navigation availability refreshed', {
+            success: result?.availableNavigation?.length || 0,
+            browseMode: this.enabled
+          });
+        } else {
+          this.logger?.warn('Browse mode: SN service not available for navigation refresh', {
+            hasScormService: !!this.options.scormService,
+            hasSNService: !!snService,
+            hasRefreshMethod: typeof snService?.refreshNavigationAvailability === 'function'
+          });
         }
+      } else {
+        this.logger?.warn('Browse mode: SCORM service not available for navigation refresh');
       }
     } catch (error) {
       this.logger?.warn('Browse mode: Failed to refresh navigation availability', error);

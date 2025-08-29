@@ -40,15 +40,25 @@ class NavigationHandler {
 
   /**
    * Process navigation request
-   * @param {string} navigationRequest - Type of navigation request
-   * @param {string} targetActivityId - Target activity ID (for choice requests)
-   * @returns {Object} Navigation processing result
-   */
+    * @param {string} navigationRequest - Type of navigation request
+    * @param {string} targetActivityId - Target activity ID (for choice requests)
+    * @returns {Object} Navigation processing result
+    */
   processNavigationRequest(navigationRequest, targetActivityId = null) {
     try {
       this.logger?.debug(`Processing navigation request: ${navigationRequest}`, {
         targetActivityId,
-        browseMode: this.isBrowseModeEnabled()
+        browseMode: this.isBrowseModeEnabled(),
+        navigationSessionState: {
+          hasCurrentActivity: !!this.navigationSession.currentActivity,
+          currentActivityId: this.navigationSession.currentActivity?.identifier,
+          availableNavigation: Array.from(this.navigationSession.availableNavigation)
+        },
+        activityTreeState: {
+          hasRoot: !!this.activityTreeManager.root,
+          treeCurrentActivity: this.activityTreeManager.currentActivity?.identifier,
+          totalActivities: this.activityTreeManager.activities?.size || 0
+        }
       });
 
       // Validate navigation request type
@@ -516,15 +526,30 @@ class NavigationHandler {
 
   /**
    * Process browse mode navigation request
-   * Handles unrestricted activity selection and choice navigation in browse mode
-   * @param {string} navigationRequest - Type of navigation request
-   * @param {string} targetActivityId - Target activity ID (for choice requests)
-   * @returns {Object} Browse mode navigation processing result
-   */
+    * Handles unrestricted activity selection and choice navigation in browse mode
+    * @param {string} navigationRequest - Type of navigation request
+    * @param {string} targetActivityId - Target activity ID (for choice requests)
+    * @returns {Object} Browse mode navigation processing result
+    */
   processBrowseModeNavigation(navigationRequest, targetActivityId = null) {
     try {
+      this.logger?.debug('Browse mode navigation: Starting request processing', {
+        navigationRequest,
+        targetActivityId,
+        browseModeServiceAvailable: !!this.browseModeService,
+        browseModeEnabled: this.browseModeService?.isBrowseModeEnabled(),
+        navigationSessionState: {
+          hasCurrentActivity: !!this.navigationSession.currentActivity,
+          currentActivityId: this.navigationSession.currentActivity?.identifier
+        }
+      });
+
       // Check if browse mode is available and enabled
       if (!this.browseModeService || !this.browseModeService.isBrowseModeEnabled()) {
+        this.logger?.error('Browse mode navigation: Browse mode not available or not enabled', {
+          hasBrowseModeService: !!this.browseModeService,
+          isEnabled: this.browseModeService?.isBrowseModeEnabled()
+        });
         return {
           success: false,
           reason: 'Browse mode not available or not enabled',
@@ -532,9 +557,45 @@ class NavigationHandler {
         };
       }
 
+      // Ensure navigation session is synchronized before processing
+      this.synchronizeNavigationSession();
+
+      // Initialize browse mode session if needed
+      const sessionInit = this.initializeBrowseModeSession();
+      if (!sessionInit.success) {
+        this.logger?.error('Browse mode navigation: Session initialization failed', {
+          reason: sessionInit.reason
+        });
+        return {
+          success: false,
+          reason: sessionInit.reason,
+          browseMode: true,
+          sessionInit: sessionInit
+        };
+      }
+
+      // Validate activity tree state
+      const treeValidation = this.validateActivityTreeState();
+      this.logger?.debug('Browse mode navigation: Activity tree validation', treeValidation);
+
+      if (!treeValidation.isValid) {
+        this.logger?.error('Browse mode navigation: Invalid activity tree state', {
+          issues: treeValidation.issues,
+          hasRoot: treeValidation.hasRoot,
+          launchableCount: treeValidation.launchableActivities.length
+        });
+        return {
+          success: false,
+          reason: `Browse mode navigation failed: ${treeValidation.issues.join(', ')}`,
+          browseMode: true,
+          validation: treeValidation
+        };
+      }
+
       this.logger?.debug('Processing browse mode navigation request', {
         navigationRequest,
-        targetActivityId
+        targetActivityId,
+        validationPassed: true
       });
 
       // For choice navigation, validate target activity exists
@@ -631,112 +692,432 @@ class NavigationHandler {
   }
 
   /**
-   * Check if browse mode is enabled
-   * @returns {boolean} True if browse mode is enabled
+   * Synchronize navigation session with activity tree manager
+   * Ensures the navigation handler's session is in sync with the current activity state
+   * @private
    */
+  synchronizeNavigationSession() {
+    try {
+      const treeManagerCurrent = this.activityTreeManager.currentActivity;
+      const sessionCurrent = this.navigationSession.currentActivity;
+
+      // Check if they are out of sync
+      const treeManagerId = treeManagerCurrent?.identifier;
+      const sessionId = sessionCurrent?.identifier;
+
+      if (treeManagerId !== sessionId) {
+        this.logger?.debug('Navigation session synchronization needed', {
+          treeManagerCurrent: treeManagerId,
+          sessionCurrent: sessionId,
+          needsSync: true
+        });
+
+        // Update navigation session to match activity tree manager
+        if (treeManagerCurrent) {
+          this.updateNavigationSession(treeManagerCurrent);
+          this.logger?.debug('Navigation session synchronized with activity tree manager', {
+            synchronizedTo: treeManagerId
+          });
+        } else if (sessionCurrent) {
+          // If tree manager has no current activity but session does, this might be an error
+          this.logger?.warn('Activity tree manager has no current activity but navigation session does', {
+            sessionCurrent: sessionId
+          });
+        }
+      } else {
+        this.logger?.debug('Navigation session already synchronized', {
+          currentActivity: treeManagerId
+        });
+      }
+    } catch (error) {
+      this.logger?.error('Error synchronizing navigation session:', error);
+    }
+  }
+
+  /**
+   * Validate activity tree state for browse mode navigation
+   * @returns {Object} Validation result
+   * @private
+   */
+  validateActivityTreeState() {
+    const validation = {
+      hasRoot: !!this.activityTreeManager.root,
+      hasCurrentActivity: !!this.activityTreeManager.currentActivity,
+      launchableActivities: [],
+      isValid: false,
+      issues: []
+    };
+
+    if (!validation.hasRoot) {
+      validation.issues.push('No root activity in tree');
+      return validation;
+    }
+
+    validation.launchableActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
+    validation.isValid = validation.launchableActivities.length > 0;
+
+    if (!validation.isValid) {
+      validation.issues.push('No launchable activities found');
+    }
+
+    if (!validation.hasCurrentActivity) {
+      validation.issues.push('No current activity set');
+    }
+
+    return validation;
+  }
+
+  /**
+   * Check if browse mode is enabled
+    * @returns {boolean} True if browse mode is enabled
+    */
   isBrowseModeEnabled() {
     return this.browseModeService?.isBrowseModeEnabled() || false;
+  }
+
+  /**
+   * Initialize navigation session for browse mode
+   * Ensures there's a valid current activity when browse mode is enabled
+   * @returns {Object} Initialization result
+   */
+  initializeBrowseModeSession() {
+    try {
+      this.logger?.debug('Initializing browse mode navigation session');
+
+      // First, synchronize with activity tree manager
+      this.synchronizeNavigationSession();
+
+      // If we already have a current activity, we're good
+      if (this.navigationSession.currentActivity) {
+        this.logger?.debug('Browse mode session already has current activity', {
+          currentActivityId: this.navigationSession.currentActivity.identifier
+        });
+        return { success: true, reason: 'Session already initialized' };
+      }
+
+      // Try to get current activity from activity tree manager
+      const treeCurrentActivity = this.activityTreeManager.currentActivity;
+      if (treeCurrentActivity) {
+        this.updateNavigationSession(treeCurrentActivity);
+        this.logger?.debug('Browse mode session initialized from activity tree manager', {
+          currentActivityId: treeCurrentActivity.identifier
+        });
+        return { success: true, reason: 'Initialized from activity tree manager' };
+      }
+
+      // No current activity found, try to find first launchable activity
+      const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
+      if (firstActivity) {
+        this.updateNavigationSession(firstActivity);
+        this.logger?.debug('Browse mode session initialized with first activity', {
+          firstActivityId: firstActivity.identifier
+        });
+        return { success: true, reason: 'Initialized with first activity' };
+      }
+
+      // No launchable activities found
+      this.logger?.error('Browse mode session initialization failed: no launchable activities');
+      return {
+        success: false,
+        reason: 'No launchable activities found for browse mode'
+      };
+
+    } catch (error) {
+      this.logger?.error('Error initializing browse mode session:', error);
+      return {
+        success: false,
+        reason: `Browse mode session initialization failed: ${error.message}`
+      };
+    }
   }
 
   /**
    * Process browse mode start - find first launchable activity or resume from saved location
    */
   processBrowseModeStart() {
-    // Check if there's a saved location to resume from
-    if (this.browseModeService) {
-      const lastLocation = this.browseModeService.getLastLocation();
-      if (lastLocation && lastLocation.activityId) {
-        const resumeActivity = this.activityTreeManager.getActivity(lastLocation.activityId);
-        if (resumeActivity && resumeActivity.isLaunchable()) {
-          this.logger?.info('Browse mode: Resuming from saved location', {
-            activityId: lastLocation.activityId,
-            timestamp: lastLocation.timestamp
+    try {
+      this.logger?.debug('Browse mode start: Beginning navigation processing');
+
+      // Validate activity tree state first
+      const treeValidation = this.validateActivityTreeState();
+      this.logger?.debug('Browse mode start: Activity tree validation', treeValidation);
+
+      if (!treeValidation.isValid) {
+        this.logger?.error('Browse mode start: Invalid activity tree state', {
+          issues: treeValidation.issues
+        });
+        return {
+          success: false,
+          reason: `Browse mode start failed: ${treeValidation.issues.join(', ')}`,
+          browseMode: true,
+          validation: treeValidation
+        };
+      }
+
+      // Check if there's a saved location to resume from
+      if (this.browseModeService) {
+        const lastLocation = this.browseModeService.getLastLocation();
+        this.logger?.debug('Browse mode start: Checking saved location', {
+          hasLastLocation: !!lastLocation,
+          lastActivityId: lastLocation?.activityId,
+          lastTimestamp: lastLocation?.timestamp
+        });
+
+        if (lastLocation && lastLocation.activityId) {
+          const resumeActivity = this.activityTreeManager.getActivity(lastLocation.activityId);
+          this.logger?.debug('Browse mode start: Resume activity lookup', {
+            requestedId: lastLocation.activityId,
+            foundActivity: !!resumeActivity,
+            isLaunchable: resumeActivity?.isLaunchable()
           });
 
-          return {
-            success: true,
-            reason: 'Browse mode start - resuming from saved location',
-            targetActivity: resumeActivity,
-            action: 'launch',
-            browseMode: true,
-            resumed: true,
-            lastLocation: lastLocation
-          };
+          if (resumeActivity && resumeActivity.isLaunchable()) {
+            this.logger?.info('Browse mode: Resuming from saved location', {
+              activityId: lastLocation.activityId,
+              timestamp: lastLocation.timestamp
+            });
+
+            // Update navigation session with resumed activity
+            this.updateNavigationSession(resumeActivity);
+
+            return {
+              success: true,
+              reason: 'Browse mode start - resuming from saved location',
+              targetActivity: resumeActivity,
+              action: 'launch',
+              browseMode: true,
+              resumed: true,
+              lastLocation: lastLocation
+            };
+          } else {
+            this.logger?.warn('Browse mode start: Saved location invalid, clearing', {
+              activityId: lastLocation.activityId,
+              activityExists: !!resumeActivity,
+              isLaunchable: resumeActivity?.isLaunchable()
+            });
+            // Clear invalid saved location
+            this.browseModeService.clearLastLocation();
+          }
         }
       }
-    }
 
-    // No saved location or invalid, start from first activity
-    const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
-    if (firstActivity) {
-      // Save this as the starting location
-      if (this.browseModeService) {
-        this.browseModeService.saveCurrentLocation(firstActivity.identifier, {
-          navigationType: 'start',
-          isFirstActivity: true
+      // No saved location or invalid, start from first activity
+      this.logger?.debug('Browse mode start: Finding first launchable activity');
+      const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
+
+      if (firstActivity) {
+        this.logger?.debug('Browse mode start: First activity found', {
+          firstActivityId: firstActivity.identifier,
+          firstActivityTitle: firstActivity.title
         });
+
+        // Save this as the starting location
+        if (this.browseModeService) {
+          this.browseModeService.saveCurrentLocation(firstActivity.identifier, {
+            navigationType: 'start',
+            isFirstActivity: true
+          });
+        }
+
+        // Update navigation session with first activity
+        this.updateNavigationSession(firstActivity);
+
+        return {
+          success: true,
+          reason: 'Browse mode start - first activity found',
+          targetActivity: firstActivity,
+          action: 'launch',
+          browseMode: true
+        };
       }
 
+      this.logger?.error('Browse mode start: No launchable activities found');
       return {
-        success: true,
-        reason: 'Browse mode start - first activity found',
-        targetActivity: firstActivity,
-        action: 'launch',
-        browseMode: true
+        success: false,
+        reason: 'Browse mode start - no launchable activities found',
+        browseMode: true,
+        availableActivities: treeValidation.launchableActivities.length
+      };
+
+    } catch (error) {
+      this.logger?.error('Browse mode start: Error processing navigation', error);
+      return {
+        success: false,
+        reason: `Browse mode start failed: ${error.message}`,
+        browseMode: true,
+        error: error.message
       };
     }
-    return {
-      success: false,
-      reason: 'Browse mode start - no launchable activities found',
-      browseMode: true
-    };
   }
 
   /**
    * Process browse mode continue - find next available activity
    */
   processBrowseModeContinue() {
-    const currentActivity = this.navigationSession.currentActivity;
-    if (!currentActivity) {
-      // No current activity, start from beginning
-      return this.processBrowseModeStart();
-    }
+    try {
+      this.logger?.debug('Browse mode continue: Starting navigation processing');
 
-    // Get all launchable activities
-    const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
-    const currentIndex = allActivities.findIndex(act => act.identifier === currentActivity.identifier);
+      // First, ensure navigation session is synchronized with activity tree manager
+      this.synchronizeNavigationSession();
 
-    if (currentIndex >= 0 && currentIndex < allActivities.length - 1) {
-      // Found next activity
-      const nextActivity = allActivities[currentIndex + 1];
+      const currentActivity = this.navigationSession.currentActivity;
+      this.logger?.debug('Browse mode continue: Current activity from session', {
+        currentActivityId: currentActivity?.identifier,
+        currentActivityTitle: currentActivity?.title,
+        hasCurrentActivity: !!currentActivity
+      });
 
-      // Save current location before moving to next
+      // If no current activity in navigation session, try to get it from activity tree manager
+      let effectiveCurrentActivity = currentActivity;
+      if (!effectiveCurrentActivity) {
+        effectiveCurrentActivity = this.activityTreeManager.currentActivity;
+        this.logger?.debug('Browse mode continue: Using activity tree manager current activity', {
+          treeManagerCurrentId: effectiveCurrentActivity?.identifier,
+          treeManagerCurrentTitle: effectiveCurrentActivity?.title
+        });
+
+        // Update navigation session if we found an activity
+        if (effectiveCurrentActivity) {
+          this.updateNavigationSession(effectiveCurrentActivity);
+        }
+      }
+
+      // If still no current activity, try to initialize browse mode session
+      if (!effectiveCurrentActivity) {
+        this.logger?.debug('Browse mode continue: No current activity found, attempting session initialization');
+        const sessionInit = this.initializeBrowseModeSession();
+        if (sessionInit.success) {
+          effectiveCurrentActivity = this.navigationSession.currentActivity;
+          this.logger?.debug('Browse mode continue: Session initialized successfully', {
+            newCurrentActivityId: effectiveCurrentActivity?.identifier
+          });
+        } else {
+          this.logger?.warn('Browse mode continue: Session initialization failed, starting from beginning', {
+            reason: sessionInit.reason
+          });
+          return this.processBrowseModeStart();
+        }
+      }
+
+      if (!effectiveCurrentActivity) {
+        this.logger?.error('Browse mode continue: Still no current activity after all attempts');
+        return {
+          success: false,
+          reason: 'No current activity available for continue navigation',
+          browseMode: true,
+          error: 'NO_CURRENT_ACTIVITY'
+        };
+      }
+
+      // Get all launchable activities with validation
+      const allActivities = this.getAllLaunchableActivities(this.activityTreeManager.root);
+      this.logger?.debug('Browse mode continue: Launchable activities found', {
+        totalActivities: allActivities.length,
+        activityIds: allActivities.map(act => act.identifier)
+      });
+
+      if (allActivities.length === 0) {
+        this.logger?.error('Browse mode continue: No launchable activities found in tree');
+        return {
+          success: false,
+          reason: 'No launchable activities available in browse mode',
+          browseMode: true,
+          error: 'EMPTY_ACTIVITY_TREE'
+        };
+      }
+
+      // Find current activity index
+      const currentIndex = allActivities.findIndex(act => act.identifier === effectiveCurrentActivity.identifier);
+      this.logger?.debug('Browse mode continue: Current activity index search', {
+        effectiveCurrentId: effectiveCurrentActivity.identifier,
+        foundIndex: currentIndex,
+        totalActivities: allActivities.length
+      });
+
+      if (currentIndex === -1) {
+        this.logger?.warn('Browse mode continue: Current activity not found in launchable list, using first activity', {
+          currentId: effectiveCurrentActivity.identifier,
+          firstActivityId: allActivities[0]?.identifier
+        });
+
+        // Current activity not in launchable list, use first available
+        const firstActivity = allActivities[0];
+        if (this.browseModeService) {
+          this.browseModeService.saveCurrentLocation(firstActivity.identifier, {
+            navigationType: 'continue',
+            previousActivity: effectiveCurrentActivity.identifier,
+            reason: 'current_not_launchable'
+          });
+        }
+
+        return {
+          success: true,
+          reason: 'Browse mode continue - current activity not launchable, using first available',
+          targetActivity: firstActivity,
+          action: 'launch',
+          browseMode: true,
+          fallback: true
+        };
+      }
+
+      if (currentIndex < allActivities.length - 1) {
+        // Found next activity
+        const nextActivity = allActivities[currentIndex + 1];
+        this.logger?.debug('Browse mode continue: Next activity found', {
+          nextActivityId: nextActivity.identifier,
+          nextActivityTitle: nextActivity.title
+        });
+
+        // Save current location before moving to next
+        if (this.browseModeService) {
+          this.browseModeService.saveCurrentLocation(nextActivity.identifier, {
+            navigationType: 'continue',
+            previousActivity: effectiveCurrentActivity.identifier
+          });
+        }
+
+        return {
+          success: true,
+          reason: 'Browse mode continue - next activity found',
+          targetActivity: nextActivity,
+          action: 'launch',
+          browseMode: true
+        };
+      }
+
+      // No next activity, wrap to first
+      const firstActivity = allActivities[0];
+      this.logger?.debug('Browse mode continue: End of activities reached, wrapping to first', {
+        firstActivityId: firstActivity.identifier,
+        currentActivityId: effectiveCurrentActivity.identifier
+      });
+
       if (this.browseModeService) {
-        this.browseModeService.saveCurrentLocation(nextActivity.identifier, {
+        this.browseModeService.saveCurrentLocation(firstActivity.identifier, {
           navigationType: 'continue',
-          previousActivity: currentActivity.identifier
+          previousActivity: effectiveCurrentActivity.identifier,
+          reason: 'wrapped_to_first'
         });
       }
 
       return {
         success: true,
-        reason: 'Browse mode continue - next activity found',
-        targetActivity: nextActivity,
+        reason: 'Browse mode continue - wrapping to first activity (end reached)',
+        targetActivity: firstActivity,
         action: 'launch',
-        browseMode: true
+        browseMode: true,
+        wrapped: true
+      };
+
+    } catch (error) {
+      this.logger?.error('Browse mode continue: Error processing navigation', error);
+      return {
+        success: false,
+        reason: `Browse mode continue failed: ${error.message}`,
+        browseMode: true,
+        error: error.message
       };
     }
-
-    // No next activity, stay on current or wrap to first
-    const fallbackActivity = allActivities[0] || currentActivity;
-    return {
-      success: true,
-      reason: 'Browse mode continue - wrapping to first activity (end reached)',
-      targetActivity: fallbackActivity,
-      action: 'launch',
-      browseMode: true,
-      wrapped: true
-    };
   }
 
   /**

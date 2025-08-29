@@ -226,14 +226,18 @@ class ContentViewer extends BaseComponent {
             originalPath: url,
             fileUrl: processedUrl
           });
-        }).catch(() => {});
+        }).catch(() => {
+          // Ignore logger import errors
+        });
       } catch (error) {
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.error('[ContentViewer] Failed to convert path to file:// URL', {
             originalPath: url,
             error: error?.message || error
           });
-        }).catch(() => {});
+        }).catch(() => {
+          // Ignore logger import errors
+        });
         throw error;
       }
     }
@@ -790,22 +794,60 @@ class ContentViewer extends BaseComponent {
   /**
    * Handle navigation launch event (CRITICAL for browse mode navigation)
    */
-  handleNavigationLaunch(data) {
+  async handleNavigationLaunch(data) {
     try {
       this.logger?.info('ContentViewer: Handling navigation launch', {
         activityId: data?.activity?.identifier || data?.activity?.id,
         launchUrl: data?.activity?.launchUrl,
         href: data?.activity?.href,
         resourceHref: data?.activity?.resource?.href,
+        parameters: data?.activity?.parameters,
         source: data?.source
       });
 
       // Get launch URL from multiple possible locations
-      const launchUrl = data?.activity?.launchUrl ||
-                       data?.activity?.href ||
-                       data?.activity?.resource?.href;
+      let launchUrl = data?.activity?.launchUrl ||
+                      data?.activity?.href ||
+                      data?.activity?.resource?.href;
 
       if (launchUrl) {
+        // Combine resource href with item parameters if present
+        if (data?.activity?.parameters && data?.activity?.resource?.href) {
+          launchUrl = this.combineResourceUrlWithParameters(
+            data.activity.resource.href,
+            data.activity.parameters
+          );
+          this.logger?.info('ContentViewer: Combined resource URL with parameters', {
+            resourceHref: data.activity.resource.href,
+            parameters: data.activity.parameters,
+            combined: launchUrl
+          });
+        }
+
+        // If the launch URL is from resource.href (raw from manifest), resolve it through PathUtils
+        if (!launchUrl.startsWith('scorm-app://')) {
+          try {
+            // Get the extraction path from the current course context
+            // This should match the path used during initial course loading
+            const extractionPath = this.getExtractionPath();
+            if (extractionPath) {
+              const resolved = await window.electronAPI.pathUtils.resolveScormUrl(launchUrl, extractionPath);
+              if (resolved.success) {
+                launchUrl = resolved.url;
+                this.logger?.info('ContentViewer: Resolved navigation URL', {
+                  original: launchUrl,
+                  resolved: launchUrl
+                });
+              } else {
+                this.logger?.warn('ContentViewer: Failed to resolve navigation URL', resolved);
+              }
+            }
+          } catch (resolveError) {
+            this.logger?.warn('ContentViewer: Error resolving navigation URL', resolveError);
+            // Continue with original URL as fallback
+          }
+        }
+
         // Load the activity content
         this.loadContent(launchUrl, {
           activity: data.activity,
@@ -819,6 +861,84 @@ class ContentViewer extends BaseComponent {
     } catch (error) {
       this.logger?.error('ContentViewer: Error handling navigation launch', error);
       this.showError('Navigation Error', 'Failed to load activity content');
+    }
+  }
+
+  /**
+   * Combine resource URL with item parameters
+   * @param {string} resourceHref - The resource href from manifest
+   * @param {string} parameters - The item parameters from manifest
+   * @returns {string} Combined URL
+   */
+  combineResourceUrlWithParameters(resourceHref, parameters) {
+    try {
+      if (!resourceHref) return resourceHref;
+      if (!parameters) return resourceHref;
+
+      // Remove leading '?' from parameters if present
+      const cleanParams = parameters.startsWith('?') ? parameters.substring(1) : parameters;
+
+      // Check if resource href already has query parameters
+      const [baseUrl, existingQuery] = resourceHref.split('?');
+
+      if (existingQuery) {
+        // Both have parameters, combine them
+        return `${baseUrl}?${existingQuery}&${cleanParams}`;
+      } else {
+        // Only item parameters, append them
+        return `${baseUrl}?${cleanParams}`;
+      }
+    } catch (error) {
+      this.logger?.warn('ContentViewer: Error combining URL with parameters', {
+        resourceHref,
+        parameters,
+        error: error.message
+      });
+      // Return original resource href as fallback
+      return resourceHref;
+    }
+  }
+
+  /**
+   * Get the extraction path for the current course
+   * @returns {string|null} Extraction path or null if not available
+   */
+  getExtractionPath() {
+    try {
+      // Try to get extraction path from various sources
+      // This should match the path used during initial course loading
+
+      // Check if we have it stored from course loading
+      if (this._extractionPath) {
+        return this._extractionPath;
+      }
+
+      // Try to derive from current URL if it's a scorm-app:// URL
+      if (this.currentUrl && this.currentUrl.startsWith('scorm-app://')) {
+        // Extract the base path from the current URL
+        // scorm-app://index.html/shared/launchpage.html?content=playing
+        // We need to get the extraction directory path
+        const urlParts = this.currentUrl.split('/');
+        if (urlParts.length >= 3) {
+          // Remove the protocol and index.html parts
+          const pathParts = urlParts.slice(3);
+          // This is a simplified approach - in practice, we might need more sophisticated path resolution
+          return pathParts.join('/').split('?')[0]; // Remove query params
+        }
+      }
+
+      // Fallback: try to get from UI state or other sources
+      if (this.uiState && typeof this.uiState.getCurrentCourse === 'function') {
+        const course = this.uiState.getCurrentCourse();
+        if (course && course.extractionPath) {
+          return course.extractionPath;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      this.logger?.warn('ContentViewer: Error getting extraction path', error);
+      return null;
     }
   }
 

@@ -250,6 +250,19 @@ class ScormSNService {
       // This ensures browse mode navigation works correctly
       this.navigationHandler.updateNavigationSession(activity);
 
+      // If in browse mode, also update browse mode service with current location
+      if (this.browseModeService?.isBrowseModeEnabled()) {
+        this.browseModeService.saveCurrentLocation(activity.identifier, {
+          navigationType: 'sequencing',
+          source: 'processActivitySequencing',
+          activityTitle: activity.title
+        });
+        this.logger?.debug('SN Service: Updated browse mode location during sequencing', {
+          activityId: activity.identifier,
+          activityTitle: activity.title
+        });
+      }
+
       // Process rollup if enabled
       let rollupResult = null;
       if (this.options.enableRollupProcessing) {
@@ -263,7 +276,8 @@ class ScormSNService {
           identifier: activity.identifier,
           title: activity.title,
           isLaunchable: activity.isLaunchable(),
-          resource: activity.resource
+          resource: activity.resource,
+          parameters: activity.parameters
         },
         preCondition: preConditionResult,
         rollup: rollupResult
