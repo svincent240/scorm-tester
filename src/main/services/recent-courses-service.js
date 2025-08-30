@@ -21,7 +21,10 @@ class RecentCoursesService extends BaseService {
   constructor(errorHandler, logger, options = {}) {
     super('RecentCoursesService', errorHandler, logger, options);
     this.recentsFilePath = path.join(app.getPath('userData'), RECENT_FILE_NAME);
+    this.logger?.debug('RecentCoursesService: Constructor - userData path:', app.getPath('userData'));
+    this.logger?.debug('RecentCoursesService: Constructor - recents file path:', this.recentsFilePath);
     this._items = [];
+    this._saveInProgress = false; // Prevent concurrent saves
   }
 
   /**
@@ -189,13 +192,58 @@ class RecentCoursesService extends BaseService {
    * @private
    */
   async _saveRecents() {
+    // Prevent concurrent saves to avoid temp file conflicts
+    if (this._saveInProgress) {
+      this.logger?.debug('RecentCoursesService: _saveRecents - Save already in progress, skipping');
+      return;
+    }
+
+    this._saveInProgress = true;
+
     try {
       const dir = path.dirname(this.recentsFilePath);
+      this.logger?.debug('RecentCoursesService: _saveRecents - Directory path:', dir);
+      this.logger?.debug('RecentCoursesService: _saveRecents - Full file path:', this.recentsFilePath);
+
+      // Check if directory exists before mkdir
+      try {
+        const dirStats = await fs.stat(dir);
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory exists before mkdir:', dirStats.isDirectory());
+      } catch (statErr) {
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory does not exist before mkdir:', statErr.code);
+      }
+
       await fs.mkdir(dir, { recursive: true });
 
+      // Check if directory exists after mkdir
+      try {
+        const dirStats = await fs.stat(dir);
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory exists after mkdir:', dirStats.isDirectory());
+      } catch (statErr) {
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory does not exist after mkdir:', statErr.code);
+      }
+
       // Write atomically: write to temp file then rename
-      const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}`;
+      const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}.${Math.random().toString(36).substr(2, 9)}`;
+      this.logger?.debug('RecentCoursesService: _saveRecents - Temp file path:', tempPath);
+
       await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');
+
+      // Check if temp file exists before rename
+      try {
+        const tempStats = await fs.stat(tempPath);
+        this.logger?.debug('RecentCoursesService: _saveRecents - Temp file exists before rename:', tempStats.size, 'bytes');
+      } catch (statErr) {
+        this.logger?.debug('RecentCoursesService: _saveRecents - Temp file does not exist before rename:', statErr.code);
+      }
+
+      // Check permissions on directory
+      try {
+        const dirStats = await fs.stat(dir);
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory permissions:', dirStats.mode?.toString(8));
+      } catch (statErr) {
+        this.logger?.debug('RecentCoursesService: _saveRecents - Cannot check directory permissions:', statErr.code);
+      }
 
       try {
         await fs.rename(tempPath, this.recentsFilePath);
@@ -235,6 +283,8 @@ class RecentCoursesService extends BaseService {
         'RecentCoursesService._saveRecents'
       );
       this.logger?.error('RecentCoursesService: Failed to save recent courses', error);
+    } finally {
+      this._saveInProgress = false;
     }
   }
 }

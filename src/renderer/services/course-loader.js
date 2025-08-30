@@ -59,7 +59,13 @@ class CourseLoader {
         'pathUtils'
       ];
 
-      const missingMethods = requiredMethods.filter(method => typeof window.electronAPI[method] !== 'function');
+      const missingMethods = requiredMethods.filter(method => {
+        if (method === 'pathUtils') {
+          // pathUtils is exposed as an object containing multiple methods
+          return typeof window.electronAPI.pathUtils !== 'object';
+        }
+        return typeof window.electronAPI[method] !== 'function';
+      });
       if (missingMethods.length > 0) {
         console.error('CourseLoader: Missing required Electron API methods:', missingMethods);
       } else {
