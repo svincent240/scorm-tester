@@ -260,13 +260,24 @@ class MainProcess {
    */
   async shutdown() {
     if (this.isShuttingDown) return;
-    
+
     this.isShuttingDown = true;
     this.logger?.info('SCORM Tester: Starting graceful shutdown');
-    
+
+    // Signal renderer that shutdown is starting
+    try {
+      const windowManager = this.services.get('windowManager');
+      if (windowManager && typeof windowManager.broadcastToAllWindows === 'function') {
+        windowManager.broadcastToAllWindows('app-quit');
+        this.logger?.debug('SCORM Tester: Broadcasted app-quit signal to all windows');
+      }
+    } catch (error) {
+      this.logger?.warn('SCORM Tester: Failed to broadcast app-quit signal:', error);
+    }
+
     try {
       const shutdownOrder = ['ipcHandler', 'scormService', 'recentCoursesService', 'fileManager', 'windowManager'];
-      
+
       for (const serviceName of shutdownOrder) {
         const service = this.services.get(serviceName);
         if (service) {
@@ -278,10 +289,10 @@ class MainProcess {
           }
         }
       }
-      
+
       this.services.clear();
       this.logger?.info('SCORM Tester: Graceful shutdown completed');
-      
+
     } catch (error) {
       this.logger?.error('SCORM Tester: Error during shutdown:', error);
     }

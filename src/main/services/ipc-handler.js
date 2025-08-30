@@ -244,7 +244,7 @@ class IpcHandler extends BaseService {
   registerHandlers() {
     // Register critical logging handlers first to ensure they're always available
     this._registerCriticalHandlers();
-    
+
     const declarativeChannelSet = new Set((IPC_ROUTES || []).map(r => r.channel));
     try {
       // SCORM API handlers
@@ -363,12 +363,12 @@ class IpcHandler extends BaseService {
       this.logger?.error(`IpcHandler: Declarative route registration failed for ${channel}:`, e?.message || e);
       // Fall back to legacy routing on error
     }
-    
+
     if (!this.securityConfig?.allowedChannels?.includes(channel)) {
       this.logger?.error(`IpcHandler: Channel ${channel} not in allowed channels list`);
       throw new Error(`Channel ${channel} not in allowed channels list`);
     }
-    
+
     try {
       const wrappedHandler = this.wrapHandler(channel, handler);
       ipcMain.handle(channel, wrappedHandler);

@@ -26,15 +26,32 @@ try {
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Simple shutdown guard to prevent IPC calls after handlers are unregistered
+let isShuttingDown = false;
+
+// Listen for app quit to set shutdown flag
+ipcRenderer.on('app-quit', () => {
+  console.log('[PRELOAD] App quit signal received, setting shutdown flag');
+  isShuttingDown = true;
+});
+
 /**
  * Safe IPC invoke wrapper with error handling
  */
 const safeInvoke = async (channel, ...args) => {
+  // Prevent IPC calls during shutdown
+  if (isShuttingDown) {
+    return { success: false, error: 'App is shutting down' };
+  }
+
   try {
     const result = await ipcRenderer.invoke(channel, ...args);
     return result;
   } catch (error) {
-    console.error(`IPC invoke failed for channel '${channel}':`, error);
+    // Also log to main logger if available
+    try {
+      ipcRenderer.invoke('renderer-log-error', `[PRELOAD] IPC invoke failed for channel '${channel}': ${error.message}`);
+    } catch (_) {}
     return { success: false, error: error.message };
   }
 };
