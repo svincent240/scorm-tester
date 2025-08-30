@@ -73,9 +73,14 @@ class MainProcess {
       const logDir = app.getPath('userData');
       // Use singleton logger getter with explicit first-init directory
       this.logger = getLogger(logDir);
-      (this.logger || console).info(`SCORM Tester: Log file path: ${this.logger && this.logger.logFile ? this.logger.logFile : 'unknown'}`);
+      const logFilePath = this.logger && this.logger.logFile ? this.logger.logFile : 'unknown';
+      (this.logger || console).info(`SCORM Tester: Log file path: ${logFilePath}`);
       (this.logger || console).info(`SCORM Tester: process.env.LOG_LEVEL: ${process.env.LOG_LEVEL}`);
       (this.logger || console).info(`SCORM Tester: Logger logLevel: ${this.logger?.logLevel}`);
+
+      // Also output to console for visibility during development
+      console.log(`\n🔍 SCORM Tester Log File: ${logFilePath}\n`);
+      console.log(`📝 Check this file for detailed debugging information\n`);
       
       this.errorHandler = new ScormErrorHandler(this.logger);
       this.logger?.info('SCORM Tester: Core dependencies initialized');

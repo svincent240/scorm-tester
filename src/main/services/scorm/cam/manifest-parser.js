@@ -385,9 +385,6 @@ class ManifestParser {
    * @returns {Object} Resource information
    */
   parseResource(resourceElement, basePath) {
-    const xmlBase = this.getAttribute(resourceElement, 'xml:base') || '';
-    const resolvedBase = path.resolve(basePath, xmlBase);
-
     // Resolve attributes with namespace awareness for adlcp:scormType and xml:base
     const getAttr = (el, qn, nsMap) => {
       if (!el) return null;
@@ -401,9 +398,21 @@ class ManifestParser {
       return (el.getAttributeNS ? el.getAttributeNS(null, qn) : null) || el.getAttribute(qn) || null;
     };
     const nsMap = this.namespaces;
+    const xmlBase = getAttr(resourceElement, 'xml:base', nsMap) || '';
+    const resolvedBase = path.resolve(basePath, xmlBase);
+
     const scormTypeAttr = getAttr(resourceElement, 'adlcp:scormType', nsMap) || getAttr(resourceElement, 'scormType', nsMap);
     const hrefAttr = getAttr(resourceElement, 'href', nsMap);
     const identifier = getAttr(resourceElement, 'identifier', nsMap);
+
+    // Debug logging for xml:base resolution
+    logger.info('ManifestParser: resource xml:base resolution', {
+      resourceId: identifier,
+      xmlBase: xmlBase || null,
+      href: hrefAttr || null,
+      resolvedBase: resolvedBase || null,
+      basePath
+    });
 
     // Validate required attributes
     if (!identifier) {

@@ -303,6 +303,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('open-external', this.handleOpenExternal.bind(this));
       this.registerHandler('path-to-file-url', this.handlePathUtilsToFileUrl.bind(this));
       this.registerHandler('resolve-scorm-url', this.handleResolveScormUrl.bind(this));
+      this.registerHandler('get-app-root', this.handleGetAppRoot.bind(this));
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // SCORM Inspector window management
@@ -953,9 +954,15 @@ class IpcHandler extends BaseService {
   }
 
   // Allow optional options param to pass an allowedBase for folder-based loads
-  async handleResolveScormUrl(event, contentPath, extractionPath) {
-    const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, appRoot);
+  async handleResolveScormUrl(event, contentPath, extractionPath, manifestPath, appRoot) {
+    if (!appRoot) {
+      appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
+    }
+    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, manifestPath, appRoot);
+  }
+
+  async handleGetAppRoot(event) {
+    return PathUtils.normalize(path.resolve(__dirname, '../../../'));
   }
 
   async handlePathNormalize(event, filePath) {

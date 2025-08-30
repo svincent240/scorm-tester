@@ -232,6 +232,7 @@ const SECURITY_CONFIG = {
       'open-external',
       'path-to-file-url',
       'resolve-scorm-url',
+      'get-app-root',
       'path-normalize',
       'path-join',
       'log-message',

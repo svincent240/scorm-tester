@@ -20,10 +20,54 @@ class CourseLoader {
     this.currentCourse = null;
     this.loadingState = false;
 
+    // Check Electron API availability immediately
+    this.checkElectronAPIAvailability();
+
     // Lazy init logger
     import('../utils/renderer-logger.js')
-      .then(({ rendererLogger }) => { this.logger = rendererLogger; })
-      .catch(() => { this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} }; });
+      .then(({ rendererLogger }) => {
+        this.logger = rendererLogger;
+        this.logger?.info && this.logger.info('CourseLoader: Logger initialized');
+      })
+      .catch((error) => {
+        console.warn('CourseLoader: Failed to load renderer logger:', error);
+        this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} };
+      });
+  }
+
+  /**
+   * Check Electron API availability and log details
+   */
+  checkElectronAPIAvailability() {
+    const electronAPIAvailable = typeof window.electronAPI !== 'undefined';
+    console.log('CourseLoader: Electron API availability check:', {
+      available: electronAPIAvailable,
+      windowDefined: typeof window !== 'undefined',
+      electronAPIType: typeof window.electronAPI
+    });
+
+    if (electronAPIAvailable) {
+      const methods = Object.getOwnPropertyNames(window.electronAPI);
+      console.log('CourseLoader: Available Electron API methods:', methods);
+
+      // Check specific methods we need
+      const requiredMethods = [
+        'selectScormPackage',
+        'selectScormFolder',
+        'getCourseManifest',
+        'processScormManifest',
+        'pathUtils'
+      ];
+
+      const missingMethods = requiredMethods.filter(method => typeof window.electronAPI[method] !== 'function');
+      if (missingMethods.length > 0) {
+        console.error('CourseLoader: Missing required Electron API methods:', missingMethods);
+      } else {
+        console.log('CourseLoader: All required Electron API methods available');
+      }
+    } else {
+      console.error('CourseLoader: Electron API not available - this will prevent course loading');
+    }
   }
 /**
    * Convert an ArrayBuffer to a Base64 string in a browser-safe way.
@@ -51,25 +95,35 @@ class CourseLoader {
    * Handle course load request - opens file dialog and processes selection
    */
   async handleCourseLoad() {
-    // console.log('CourseLoader: handleCourseLoad called'); // Removed debug log
-    
     try {
+      this.logger?.info && this.logger.info('CourseLoader: handleCourseLoad called');
+
+      // Check Electron API availability
       if (typeof window.electronAPI === 'undefined') {
+        this.logger?.error && this.logger.error('CourseLoader: Electron API not available');
         throw new Error('Electron API not available');
       }
+      this.logger?.info && this.logger.info('CourseLoader: Electron API available');
+
+      // Check if selectScormPackage method exists
+      if (typeof window.electronAPI.selectScormPackage !== 'function') {
+        this.logger?.error && this.logger.error('CourseLoader: selectScormPackage method not available');
+        throw new Error('selectScormPackage method not available');
+      }
+      this.logger?.info && this.logger.info('CourseLoader: selectScormPackage method available');
 
       const result = await window.electronAPI.selectScormPackage();
-      // console.log('CourseLoader: File selection result:', result); // Removed debug log
-      
+      this.logger?.info && this.logger.info('CourseLoader: File selection result:', result);
+
       if (!result.success) {
-        // console.log('CourseLoader: File selection was cancelled or failed:', result); // Removed debug log
+        this.logger?.info && this.logger.info('CourseLoader: File selection was cancelled or failed:', result);
         return;
       }
-      
-      // console.log('CourseLoader: File selected successfully:', result.filePath); // Removed debug log
-      
+
+      this.logger?.info && this.logger.info('CourseLoader: File selected successfully:', result.filePath);
+
       await this.loadCourseFromPath(result.filePath);
-      
+
     } catch (error) {
       this.logger?.error && this.logger.error('CourseLoader: Error in handleCourseLoad:', error);
       eventBus.emit('course:loadError', { error: error.message });
@@ -103,20 +157,24 @@ class CourseLoader {
    * Load course from file path
    */
   async loadCourseFromPath(filePath) {
-    // console.log('CourseLoader: loadCourseFromPath called with:', filePath); // Removed debug log
-    
+    this.logger?.info && this.logger.info('CourseLoader: loadCourseFromPath called with:', filePath);
+
     try {
       this.setLoadingState(true);
+      this.logger?.info && this.logger.info('CourseLoader: Emitting course:loadStart event');
       eventBus.emit('course:loadStart', { filePath });
-      
+
+      this.logger?.info && this.logger.info('CourseLoader: Calling processCourseFile');
       await this.processCourseFile(filePath);
-      
+      this.logger?.info && this.logger.info('CourseLoader: processCourseFile completed successfully');
+
     } catch (error) {
       this.logger?.error && this.logger.error('CourseLoader: Error in loadCourseFromPath:', error);
       eventBus.emit('course:loadError', { error: error.message });
       return;
     } finally {
       this.setLoadingState(false);
+      this.logger?.info && this.logger.info('CourseLoader: loadCourseFromPath completed');
     }
   }
 
@@ -145,6 +203,7 @@ class CourseLoader {
         throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
       }
       const manifestContent = manifestContentResult.manifestContent;
+      const manifestPath = manifestContentResult.manifestPath;
   
       // Process manifest via CAM in main using canonical path
       const processManifestResult = await window.electronAPI.processScormManifest(unifiedPath, manifestContent);
@@ -161,8 +220,11 @@ class CourseLoader {
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
       }
   
+      // Get app root for path resolution
+      const appRoot = await window.electronAPI.pathUtils.getAppRoot();
+
       // Resolve the launch href against the canonical unified path
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, unifiedPath);
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, unifiedPath, manifestPath, appRoot);
       if (!entryResult.success) {
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }
@@ -253,39 +315,52 @@ class CourseLoader {
    * Process SCORM course file through complete workflow
    */
   async processCourseFile(filePath) {
-    // console.log('CourseLoader: processCourseFile called with:', filePath); // Removed debug log
-    
+    this.logger?.info && this.logger.info('CourseLoader: processCourseFile called with:', filePath);
+
     try {
       // Step 1: Prepare canonical working directory for the SCORM source (zip/temp)
+      this.logger?.info && this.logger.info('CourseLoader: Step 1 - Preparing course source');
       const prepResult = await window.electronAPI.pathUtils.prepareCourseSource({ type: 'zip', path: filePath });
+      this.logger?.info && this.logger.info('CourseLoader: prepareCourseSource result:', prepResult);
+
       if (!prepResult.success) {
+        this.logger?.error && this.logger.error('CourseLoader: Failed to prepare course source:', prepResult.error);
         throw new Error(`Failed to prepare course source: ${prepResult.error}`);
       }
       const extractedPath = prepResult.unifiedPath;
+      this.logger?.info && this.logger.info('CourseLoader: Extracted path:', extractedPath);
   
       if (!extractedPath) {
         throw new Error('PrepareCourseSource did not return a valid unifiedPath');
       }
       
       // Step 2: Get manifest content (FileManager now only returns content, not parsed structure)
-      // console.log('CourseLoader: Step 2 - Getting course manifest content...'); // Removed debug log
+      this.logger?.info && this.logger.info('CourseLoader: Step 2 - Getting course manifest content from:', extractedPath);
       const manifestContentResult = await window.electronAPI.getCourseManifest(extractedPath);
-      
+      this.logger?.info && this.logger.info('CourseLoader: getCourseManifest result:', manifestContentResult);
+
       if (!manifestContentResult.success) {
+        this.logger?.error && this.logger.error('CourseLoader: Failed to get course manifest content:', manifestContentResult.error);
         throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
       }
-      
+
       const manifestContent = manifestContentResult.manifestContent;
-      
+      const manifestPath = manifestContentResult.manifestPath;
+      this.logger?.info && this.logger.info('CourseLoader: Manifest content length:', manifestContent.length);
+      this.logger?.info && this.logger.info('CourseLoader: Manifest path:', manifestPath);
+
       // Step 3: Process manifest using ScormCAMService (via IPC)
-      // console.log('CourseLoader: Step 3 - Processing manifest with CAM service...'); // Removed debug log
+      this.logger?.info && this.logger.info('CourseLoader: Step 3 - Processing manifest with CAM service');
       const processManifestResult = await window.electronAPI.processScormManifest(extractedPath, manifestContent);
-      
+      this.logger?.info && this.logger.info('CourseLoader: processScormManifest result success:', processManifestResult.success);
+
       if (!processManifestResult.success) {
+        this.logger?.error && this.logger.error('CourseLoader: Failed to process SCORM manifest:', processManifestResult.reason || processManifestResult.error);
         throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
       }
-      
+
       const { manifest, validation, analysis } = processManifestResult;
+      this.logger?.info && this.logger.info('CourseLoader: Manifest processing successful, validation:', validation?.valid);
 
       // INFO-LEVEL DIAGNOSTICS (compact to avoid IPC rate limit): capture raw structure and manifest shapes
       try {
@@ -331,17 +406,31 @@ class CourseLoader {
       } catch (_) {}
 
       // Step 4: Determine entry point from processed manifest (single-source from CAM)
+      this.logger?.info && this.logger.info('CourseLoader: Step 4 - Determining entry point');
       const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
         : null;
+      this.logger?.info && this.logger.info('CourseLoader: First launch href:', firstLaunchHref);
+
       if (!firstLaunchHref) {
+        this.logger?.error && this.logger.error('CourseLoader: CAM analysis did not provide a launchable href');
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
       }
+
+      // Get app root for path resolution
+      const appRoot = await window.electronAPI.pathUtils.getAppRoot();
+
       // Resolve the launch href against the canonical extraction path
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath);
+      this.logger?.info && this.logger.info('CourseLoader: Resolving SCORM URL:', { href: firstLaunchHref, extractedPath, manifestPath, appRoot });
+      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath, manifestPath, appRoot);
+      this.logger?.info && this.logger.info('CourseLoader: resolveScormUrl result:', entryResult);
+
       if (!entryResult.success) {
+        this.logger?.error && this.logger.error('CourseLoader: Failed to resolve SCORM entry URL:', entryResult.error);
         throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
       }
+
+      this.logger?.info && this.logger.info('CourseLoader: Entry URL resolved successfully:', entryResult.url);
 
       // Step 5: Build UI structure as a pure passthrough of CAM uiOutline under default-org root.
       // No renderer normalization, no fallback builders, no manifest conversions.
@@ -462,23 +551,37 @@ class CourseLoader {
       } catch (_) {}
 
       // Step 7: Update application state
+      this.logger?.info && this.logger.info('CourseLoader: Step 7 - Updating application state');
       this.currentCourse = courseData;
+      this.logger?.info && this.logger.info('CourseLoader: Course data set, updating UI state');
+
       const uiState = await uiStatePromise; // Await the promise
+      this.logger?.info && this.logger.info('CourseLoader: UI state obtained, calling updateCourse');
       uiState.updateCourse(courseData);
+      this.logger?.info && this.logger.info('CourseLoader: UI state updated successfully');
+
       // Update MRU
       try {
+        this.logger?.info && this.logger.info('CourseLoader: Updating recent courses store');
         const { recentCoursesStore } = await import('./recent-courses.js');
         const title = courseData?.info?.title || 'Course';
         recentCoursesStore.addOrUpdate({ type: 'zip', path: filePath, displayName: title, meta: { title } });
-      } catch (_) { /* no-op */ }
-  
+        this.logger?.info && this.logger.info('CourseLoader: Recent courses updated');
+      } catch (error) {
+        this.logger?.warn && this.logger.warn('CourseLoader: Failed to update recent courses:', error?.message || error);
+      }
+
       // Do NOT emit course:loaded directly here; UIState.updateCourse already emits it.
       // This avoids duplicate event paths and potential double render/update races.
-  
-      // console.log('CourseLoader: Course processing completed successfully!'); // Removed debug log
+
+      this.logger?.info && this.logger.info('CourseLoader: Course processing completed successfully!');
 
     } catch (error) {
-      this.logger?.error && this.logger.error('CourseLoader: Error in processCourseFile:', error);
+      this.logger?.error && this.logger.error('CourseLoader: Error in processCourseFile:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       eventBus.emit('course:loadError', { error: error.message });
       return;
     }

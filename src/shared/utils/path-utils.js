@@ -57,14 +57,32 @@ class PathUtils {
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path provided');
     }
-    
+
+    // Log original path for debugging
+    if (this.logger) {
+      this.logger.debug('PathUtils: Normalizing path:', {
+        original: filePath,
+        platform: process?.platform || 'unknown'
+      });
+    }
+
     // Convert backslashes to forward slashes and remove duplicate slashes
     let normalized = filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
-    
+
     // Remove trailing slash unless it's root
     if (normalized.length > 1 && normalized.endsWith('/')) {
       normalized = normalized.slice(0, -1);
     }
+
+    // Log result for debugging
+    if (this.logger) {
+      this.logger.debug('PathUtils: Path normalized:', {
+        original: filePath,
+        normalized: normalized,
+        changed: normalized !== filePath
+      });
+    }
+
     return normalized;
   }
 
@@ -110,47 +128,153 @@ class PathUtils {
    * Resolve SCORM content URL for iframe loading
    * @param {string} contentPath - Content path from manifest (relative or absolute)
    * @param {string} extractionPath - SCORM package extraction directory (must be under canonical temp root)
+   * @param {string} manifestPath - Full path to the manifest file (used to determine base directory)
    * @param {string} appRoot - Application root directory
    * @returns {Object} Resolution result with URL and metadata
    */
-  static resolveScormContentUrl(contentPath, extractionPath, appRoot) {
+  static resolveScormContentUrl(contentPath, extractionPath, manifestPath, appRoot) {
     try {
-      if (!contentPath || !extractionPath || !appRoot) {
-        throw new Error('Content path, extraction path, and app root are required');
+      if (this.logger) {
+        this.logger.info('PathUtils: Resolving SCORM content URL:', {
+          contentPath,
+          extractionPath,
+          manifestPath,
+          appRoot
+        });
+      }
+
+      if (!contentPath || !extractionPath || !manifestPath || !appRoot) {
+        throw new Error('Content path, extraction path, manifest path, and app root are required');
       }
 
       // Parse content path to separate file and query parameters
       const [filePath, queryString] = contentPath.split('?');
-      
-      // Resolve the file path against extraction directory
+
+      if (this.logger) {
+        this.logger.debug('PathUtils: Parsed content path:', {
+          filePath,
+          queryString,
+          isAbsolute: path.isAbsolute(filePath)
+        });
+      }
+
+      // Get the manifest's directory as the base for relative path resolution
+      const manifestDir = path.dirname(manifestPath);
+
+      if (this.logger) {
+        this.logger.debug('PathUtils: Manifest directory for base resolution:', {
+          manifestPath,
+          manifestDir
+        });
+      }
+
+      // Resolve the file path against manifest directory (not extraction root)
       let resolvedPath;
       if (path.isAbsolute(filePath)) {
         // Already absolute - validate it's within extraction path
         resolvedPath = this.normalize(filePath);
         const normalizedExtraction = this.normalize(extractionPath);
-        
+
+        if (this.logger) {
+          this.logger.debug('PathUtils: Absolute path resolution:', {
+            resolvedPath,
+            normalizedExtraction,
+            startsWith: resolvedPath.startsWith(normalizedExtraction)
+          });
+        }
+
         if (!resolvedPath.startsWith(normalizedExtraction)) {
           throw new Error(`Absolute path outside extraction directory: ${resolvedPath}`);
         }
       } else {
-        // Relative path - resolve against extraction directory
-        resolvedPath = path.resolve(extractionPath, filePath);
+        // Relative path - resolve against manifest directory
+        resolvedPath = path.resolve(manifestDir, filePath);
         resolvedPath = this.normalize(resolvedPath);
+
+        if (this.logger) {
+          this.logger.debug('PathUtils: Relative path resolution:', {
+            originalFilePath: filePath,
+            manifestDir,
+            resolvedPath
+          });
+        }
       }
 
       // Validate the resolved path exists and is within allowed roots
       const normalizedAppRoot = this.normalize(appRoot);
       // Treat the application's canonical temp extraction directory as the only allowed external base.
       const normalizedTempRoot = this.getTempRoot();
- 
+
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
- 
+
+      if (this.logger) {
+        this.logger.debug('PathUtils: Path validation:', {
+          resolvedPath,
+          normalizedAppRoot,
+          normalizedTempRoot,
+          withinAppRoot,
+          withinTempRoot
+        });
+      }
+
       if (!withinAppRoot && !withinTempRoot) {
         throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot}): ${resolvedPath}`);
       }
 
+      // Log file check details
+      if (this.logger) {
+        this.logger.debug('PathUtils: Checking file existence:', {
+          resolvedPath,
+          fileExists: fs.existsSync(resolvedPath)
+        });
+
+        // If file exists, log its stats
+        if (fs.existsSync(resolvedPath)) {
+          try {
+            const stats = fs.statSync(resolvedPath);
+            this.logger.debug('PathUtils: File stats:', {
+              resolvedPath,
+              size: stats.size,
+              isFile: stats.isFile(),
+              isDirectory: stats.isDirectory(),
+              mode: stats.mode.toString(8),
+              uid: stats.uid,
+              gid: stats.gid
+            });
+          } catch (statsError) {
+            this.logger.error('PathUtils: Failed to get file stats:', { resolvedPath, error: statsError.message });
+          }
+        }
+      }
+
+      // Detailed file existence check with directory listing
       if (!fs.existsSync(resolvedPath)) {
+        if (this.logger) {
+          this.logger.error('PathUtils: File does not exist:', resolvedPath);
+
+          // Check if parent directory exists
+          const parentDir = path.dirname(resolvedPath);
+          const parentExists = fs.existsSync(parentDir);
+          this.logger.error('PathUtils: Parent directory exists:', { parentDir, parentExists });
+
+          if (parentExists) {
+            try {
+              const dirContents = fs.readdirSync(parentDir);
+              this.logger.error('PathUtils: Parent directory contents:', { parentDir, contents: dirContents });
+            } catch (dirError) {
+              this.logger.error('PathUtils: Failed to read parent directory:', { parentDir, error: dirError.message });
+            }
+          }
+
+          // Check extraction root contents
+          try {
+            const extractionContents = fs.readdirSync(extractionPath);
+            this.logger.error('PathUtils: Extraction root contents:', { extractionPath, contents: extractionContents });
+          } catch (extractionError) {
+            this.logger.error('PathUtils: Failed to read extraction root:', { extractionPath, error: extractionError.message });
+          }
+        }
         throw new Error(`File does not exist: ${resolvedPath}`);
       }
 
@@ -162,13 +286,20 @@ class PathUtils {
         // For temp root paths, use temp root as base
         protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedTempRoot);
       }
-      
+
+      if (this.logger) {
+        this.logger.debug('PathUtils: Generated protocol URL:', {
+          protocolUrl,
+          usedBase: withinAppRoot ? 'appRoot' : 'tempRoot'
+        });
+      }
+
       // Add query string back if present
       if (queryString) {
         protocolUrl += `?${queryString}`;
       }
 
-      return {
+      const result = {
         success: true,
         url: protocolUrl,
         resolvedPath: resolvedPath,
@@ -178,12 +309,29 @@ class PathUtils {
         usedBase: withinAppRoot ? 'appRoot' : 'tempRoot'
       };
 
+      if (this.logger) {
+        this.logger.info('PathUtils: SCORM content URL resolved successfully:', result);
+      }
+
+      return result;
+
     } catch (error) {
+      if (this.logger) {
+        this.logger.error('PathUtils: Failed to resolve SCORM content URL:', {
+          error: error.message,
+          contentPath,
+          extractionPath,
+          manifestPath,
+          appRoot
+        });
+      }
+
       return {
         success: false,
         error: error.message,
         originalPath: contentPath,
-        extractionPath: extractionPath
+        extractionPath: extractionPath,
+        manifestPath: manifestPath
       };
     }
   }

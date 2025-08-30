@@ -18,10 +18,7 @@ const ContentValidator = require('./content-validator');
 const MetadataHandler = require('./metadata-handler');
 const PackageAnalyzer = require('./package-analyzer');
 const { ParserError } = require('../../../../shared/errors/parser-error');
-// Use the shared logger utility getter and obtain an instance.
-// From this file (src/main/services/scorm/cam/index.js), the correct relative path to src/shared/utils/logger.js is:
-// ../../../../shared/utils/logger
-const getLogger = require('../../../../shared/utils/logger');
+// Logger is obtained via constructor parameter
 
 /**
  * SCORM CAM Service
@@ -101,7 +98,7 @@ class ScormCAMService {
             : (orgs[0] || null);
           const top = defaultOrg ? toArray(defaultOrg.items) : [];
           const ids = top.map(n => (safeStr(n?.identifier) || safeStr(n?.title) || 'node'));
-          const dupCount = ids.length - new Set(ids).size;
+          // const dupCount = ids.length - new Set(ids).size; // Removed unused variable
           const payload = {
             phase: 'CAM_PARSE',
             code: 'PARSE_VALIDATION_ERROR',
@@ -190,17 +187,43 @@ class ScormCAMService {
           ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
           : (orgs[0] || null);
 
-        // 2) Build a resource map using effective href provided by the parser (resolvedBase + href already computed there)
+        // 2) Build a resource map with xml:base resolution
         const resources = toArray(manifest?.resources);
         const resById = new Map();
+
+        // Resolve nested xml:base at resources container and resource node levels
+        const containerBase = safeStr(manifest?.resources?.['xml:base'] || manifest?.resources?.xmlBase || manifest?.resources?.xmlbase || '', '');
+        const normJoin = (base, href) => {
+          const b = safeStr(base, '').replace(/\\/g, '/');
+          const h = safeStr(href, '').replace(/\\/g, '/');
+          if (!h) return '';
+          if (!b) return h.replace(/^\/+/, '');
+          const lhs = b.replace(/\/+$/,'');
+          const rhs = h.replace(/^\/+/,'');
+          return `${lhs}/${rhs}`;
+        };
+
         for (const r of resources) {
           const id = safeStr(r?.identifier);
           if (!id) continue;
-          const href = safeStr(r?.resolvedBase) && safeStr(r?.href)
-            ? `${safeStr(r.resolvedBase).replace(/\\/g,'/').replace(/\/+$/,'')}/${safeStr(r.href).replace(/\\/g,'/').replace(/^\/+/,'')}`
-            : safeStr(r?.href);
+          const localBase = safeStr(r?.['xml:base'] || r?.xmlBase || r?.xmlbase || '', '');
+          const resHref = safeStr(r?.href, '');
+          // Respect precedence: resource.xml:base overrides container base when both present
+          const baseForRes = localBase || containerBase;
+          const effectiveHref = normJoin(baseForRes, resHref);
           const st = safeStr(r?.scormType).toLowerCase();
-          resById.set(id, { href: href || '', scormType: st || '' });
+
+          resById.set(id, { href: effectiveHref || '', scormType: st || '' });
+
+          // Debug logging for xml:base resolution
+          this.logger?.info('CAM: inline resource href resolved', {
+            resourceId: id,
+            xmlBaseContainer: containerBase || null,
+            xmlBaseResource: localBase || null,
+            hrefOriginal: resHref || null,
+            hrefEffective: effectiveHref || null,
+            scormType: st || null
+          });
         }
 
         // 3) Traverse defaultOrg.item[] with item.children[] only; never mix alternative axes
@@ -551,7 +574,7 @@ class ScormCAMService {
    * Returns an array of normalized nodes for the default organization.
    * Node shape: { identifier, title, type: 'cluster'|'sco'|'asset', href, items: [] }
    */
-  buildUiOutlineFromManifest(manifest, basePath) {
+  buildUiOutlineFromManifest(manifest, _basePath) {
     // Helpers
     const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
     const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
@@ -631,10 +654,6 @@ class ScormCAMService {
     }
 
     // joinXmlBase no longer needed here because resourceById contains effective hrefs.
-    const joinXmlBase = (resObj) => {
-      const href = safeStr(resObj?.href || '', '');
-      return href;
-    };
 
     if (!rootOrg) {
       // No organizations — derive from resources as flat outline using effective hrefs

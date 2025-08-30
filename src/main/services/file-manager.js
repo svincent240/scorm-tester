@@ -116,7 +116,14 @@ class FileManager extends BaseService {
   async selectScormPackage() {
     try {
       this.logger?.info('FileManager: Opening SCORM package selection dialog');
-      
+
+      // Log platform information for debugging
+      this.logger?.info('FileManager: Platform info:', {
+        platform: process.platform,
+        arch: process.arch,
+        cwd: process.cwd()
+      });
+
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
         filters: [
@@ -124,25 +131,45 @@ class FileManager extends BaseService {
           { name: 'All Files', extensions: ['*'] }
         ]
       });
-      
+
+      this.logger?.info('FileManager: Dialog result:', {
+        canceled: result.canceled,
+        filePathsCount: result.filePaths?.length || 0,
+        filePaths: result.filePaths
+      });
+
       if (!result.canceled && result.filePaths.length > 0) {
         const filePath = result.filePaths[0];
         this.logger?.info(`FileManager: SCORM package selected: ${path.basename(filePath)}`);
+
+        // Validate the selected file exists and is readable
+        try {
+          const stats = fs.statSync(filePath);
+          this.logger?.info('FileManager: Selected file stats:', {
+            size: stats.size,
+            isFile: stats.isFile(),
+            permissions: stats.mode.toString(8)
+          });
+        } catch (statError) {
+          this.logger?.error('FileManager: Failed to stat selected file:', statError);
+          return { success: false, error: `Cannot access selected file: ${statError.message}` };
+        }
+
         this.recordOperation('selectScormPackage', true);
         return { success: true, filePath: filePath };
       }
-      
+
       this.logger?.info('FileManager: SCORM package selection cancelled');
       this.recordOperation('selectScormPackage', true);
       return { success: false, cancelled: true };
-      
+
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,
         `SCORM package selection failed: ${error.message}`,
         'FileManager.selectScormPackage'
       );
-      
+
       this.logger?.error('FileManager: SCORM package selection failed:', error);
       this.recordOperation('selectScormPackage', false);
       return { success: false, error: error.message };
@@ -273,6 +300,7 @@ class FileManager extends BaseService {
 
   /**
    * Resolve and return the canonical manifest path for a given folder.
+   * Recursively searches for imsmanifest.xml starting from the given folder.
    * Returns { success: true, manifestPath } when found, or { success: false, error }.
    */
   getManifestPath(folderPath) {
@@ -280,13 +308,58 @@ class FileManager extends BaseService {
       if (!folderPath || typeof folderPath !== 'string') {
         return { success: false, error: 'Invalid folder path' };
       }
-      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
-      if (fs.existsSync(manifestPath)) {
-        return { success: true, manifestPath };
+
+      // First try the most common location (direct in folder)
+      const directManifestPath = path.join(folderPath, 'imsmanifest.xml');
+      if (fs.existsSync(directManifestPath)) {
+        this.logger?.debug(`FileManager: Found manifest at root level: ${directManifestPath}`);
+        return { success: true, manifestPath: directManifestPath };
       }
-      // No manifest in expected location — return not found
+
+      // Recursively search for manifest file
+      const findManifestRecursively = (searchPath) => {
+        try {
+          const entries = fs.readdirSync(searchPath, { withFileTypes: true });
+
+          // First check if manifest exists in current directory
+          for (const entry of entries) {
+            if (entry.isFile() && entry.name.toLowerCase() === 'imsmanifest.xml') {
+              const manifestPath = path.join(searchPath, entry.name);
+              this.logger?.debug(`FileManager: Found manifest recursively: ${manifestPath}`);
+              return manifestPath;
+            }
+          }
+
+          // Then recursively search subdirectories (breadth-first for efficiency)
+          for (const entry of entries) {
+            if (entry.isDirectory()) {
+              const subDirPath = path.join(searchPath, entry.name);
+              const found = findManifestRecursively(subDirPath);
+              if (found) {
+                return found;
+              }
+            }
+          }
+
+          return null;
+        } catch (error) {
+          // Skip directories we can't read (permission issues, etc.)
+          this.logger?.debug(`FileManager: Skipping directory during manifest search: ${searchPath} - ${error.message}`);
+          return null;
+        }
+      };
+
+      const foundManifestPath = findManifestRecursively(folderPath);
+      if (foundManifestPath) {
+        this.logger?.info(`FileManager: Manifest found at: ${foundManifestPath}`);
+        return { success: true, manifestPath: foundManifestPath };
+      }
+
+      // No manifest found anywhere
+      this.logger?.warn(`FileManager: No imsmanifest.xml found in ${folderPath} or any subdirectories`);
       return { success: false, error: 'No imsmanifest.xml found' };
     } catch (error) {
+      this.logger?.error(`FileManager: Error searching for manifest: ${error.message}`);
       return { success: false, error: error.message || String(error) };
     }
   }
@@ -754,36 +827,60 @@ class FileManager extends BaseService {
    */
   async ensureTempDirectory() {
     const tempDir = PathUtils.getTempRoot();
+    this.logger?.info(`FileManager: Ensuring temp directory exists: ${tempDir}`);
+
     await this.ensureDirectory(tempDir);
-    
-    // Validate temp directory permissions for Windows filesystem operations
+
+    // Validate temp directory permissions for cross-platform filesystem operations
     try {
+      this.logger?.info('FileManager: Checking temp directory permissions');
+
       // Check read permission
       fs.accessSync(tempDir, fs.constants.R_OK);
-      this.logger?.debug(`FileManager: Temp directory read permission confirmed: ${tempDir}`);
-      
+      this.logger?.info(`FileManager: Temp directory read permission confirmed: ${tempDir}`);
+
       // Check write permission
       fs.accessSync(tempDir, fs.constants.W_OK);
-      this.logger?.debug(`FileManager: Temp directory write permission confirmed: ${tempDir}`);
-      
+      this.logger?.info(`FileManager: Temp directory write permission confirmed: ${tempDir}`);
+
+      // Get directory stats
+      const dirStats = fs.statSync(tempDir);
+      this.logger?.info('FileManager: Temp directory stats:', {
+        mode: dirStats.mode.toString(8),
+        uid: dirStats.uid,
+        gid: dirStats.gid,
+        platform: process.platform
+      });
+
       // Test actual file creation to ensure permissions work
       const testFile = path.join(tempDir, `perm_test_${Date.now()}.tmp`);
+      this.logger?.info(`FileManager: Creating test file: ${testFile}`);
+
       fs.writeFileSync(testFile, 'permission test', 'utf8');
-      
+
       // Verify the test file was created and is readable
       if (fs.existsSync(testFile)) {
         const testContent = fs.readFileSync(testFile, 'utf8');
-        this.logger?.debug(`FileManager: Temp directory write/read test successful: ${testFile}`);
-        
+        this.logger?.info(`FileManager: Temp directory write/read test successful: ${testFile}`);
+
         // Clean up test file
         fs.unlinkSync(testFile);
+        this.logger?.info('FileManager: Test file cleaned up successfully');
       } else {
         this.logger?.error(`FileManager: Temp directory write test FAILED - file not created: ${testFile}`);
+        throw new Error('Permission test file was not created');
       }
-      
+
+      this.logger?.info('FileManager: Temp directory permission validation completed successfully');
+
     } catch (permError) {
-      this.logger?.error(`FileManager: Temp directory permission check FAILED for ${tempDir}: ${permError.code} - ${permError.message}`);
-      throw new Error(`Insufficient permissions for temp directory: ${tempDir}`);
+      this.logger?.error(`FileManager: Temp directory permission check FAILED for ${tempDir}:`, {
+        code: permError.code,
+        message: permError.message,
+        errno: permError.errno,
+        platform: process.platform
+      });
+      throw new Error(`Insufficient permissions for temp directory: ${tempDir} - ${permError.message}`);
     }
   }
 
