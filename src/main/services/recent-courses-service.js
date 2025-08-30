@@ -224,7 +224,9 @@ class RecentCoursesService extends BaseService {
       }
 
       // Write atomically: write to temp file then rename
-      const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}.${Math.random().toString(36).substr(2, 9)}`;
+      // Use shorter random string for Windows compatibility and to avoid long path issues
+      const randomId = Math.random().toString(36).substr(2, 6);
+      const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}.${randomId}`;
       this.logger?.debug('RecentCoursesService: _saveRecents - Temp file path:', tempPath);
 
       await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');
@@ -240,7 +242,7 @@ class RecentCoursesService extends BaseService {
       // Check permissions on directory
       try {
         const dirStats = await fs.stat(dir);
-        this.logger?.debug('RecentCoursesService: _saveRecents - Directory permissions:', dirStats.mode?.toString(8));
+        this.logger?.debug('RecentCoursesService: _saveRecents - Directory permissions:', process.platform === 'win32' ? 'Windows' : dirStats.mode?.toString(8));
       } catch (statErr) {
         this.logger?.debug('RecentCoursesService: _saveRecents - Cannot check directory permissions:', statErr.code);
       }
