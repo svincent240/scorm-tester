@@ -287,18 +287,8 @@ class AppManager {
 
    
 
-    // Debounce guard for navigation requests to avoid IPC rate limiting
-    this._lastNavAt = 0;
-    this._NAV_DEBOUNCE_MS = 300;
-
     // Centralized navigation intents from UI components (NavigationControls, CourseOutline)
     eventBus.on('navigation:request', async (payload) => {
-      const now = Date.now();
-      if (now - (this._lastNavAt || 0) < this._NAV_DEBOUNCE_MS) {
-        try { this.logger.warn('AppManager: navigation:request debounced'); } catch (_) {}
-        return;
-      }
-      this._lastNavAt = now;
 
       try {
         const type = payload && payload.type;
@@ -451,7 +441,6 @@ class AppManager {
     this._snContentLoading = false;
     this._snInitialized = false;
     this._snLastNavigationAt = 0;
-    this._NAVIGATION_COOLDOWN_MS = 1000; // Prevent polling-triggered navigation for 1 second after user navigation
 
     // Helper guards
     const canPoll = () => {
@@ -505,17 +494,6 @@ class AppManager {
         return;
       }
 
-      // Navigation cooldown: Prevent polling from triggering navigation immediately after user navigation
-      const timeSinceLastNavigation = Date.now() - this._snLastNavigationAt;
-      if (timeSinceLastNavigation < this._NAVIGATION_COOLDOWN_MS) {
-        // Skip this polling cycle to prevent triggering navigation
-        try { this.logger.debug('AppManager: SN polling skipped due to navigation cooldown', {
-          timeSinceLastNavigation,
-          cooldownMs: this._NAVIGATION_COOLDOWN_MS
-        }); } catch (_) {}
-        scheduleNext(this._SN_MIN_INTERVAL_MS);
-        return;
-      }
   
       this._snLastTickAt = now;
       try { this.logger.debug('AppManager: SN polling tick'); } catch (_) {}

@@ -30,7 +30,6 @@ class NavigationControls extends BaseComponent {
     };
 
     this.snService = null; // Will be set via IPC bridge
-    this._lastNavigationUpdate = 0; // Initialize cooldown timestamp
   }
 
   /**
@@ -1379,14 +1378,6 @@ class NavigationControls extends BaseComponent {
       this.logger?.debug('NavigationControls: Skipping navigation update from own result');
       return;
     }
-
-    // Add navigation cooldown to prevent double navigation
-    const now = Date.now();
-    if (this._lastNavigationUpdate && (now - this._lastNavigationUpdate) < 1000) {
-      this.logger?.debug('NavigationControls: Skipping navigation update due to cooldown');
-      return;
-    }
-    this._lastNavigationUpdate = now;
 
     // Add simple deduplication to prevent redundant updates
     const currentState = this.navigationState;
