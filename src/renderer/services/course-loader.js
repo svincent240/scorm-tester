@@ -418,6 +418,27 @@ class CourseLoader {
         : null;
       this.logger?.info && this.logger.info('CourseLoader: First launch href:', firstLaunchHref);
 
+      // Diagnostic: Show full launch sequence for debugging
+      if (this.logger?.info && Array.isArray(analysis?.launchSequence)) {
+        this.logger.info('CourseLoader: Full launch sequence:', analysis.launchSequence.map(item => ({
+          href: item.href,
+          title: item.title,
+          identifier: item.identifier
+        })));
+      }
+
+      // Diagnostic: Show what resources the manifest contains
+      if (this.logger?.info && manifest?.resources?.resource) {
+        const resources = Array.isArray(manifest.resources.resource)
+          ? manifest.resources.resource
+          : [manifest.resources.resource];
+        this.logger.info('CourseLoader: Manifest resources:', resources.map(r => ({
+          identifier: r.identifier,
+          href: r.href,
+          scormType: r['adlcp:scormType'] || r.scormType
+        })));
+      }
+
       if (!firstLaunchHref) {
         this.logger?.error && this.logger.error('CourseLoader: CAM analysis did not provide a launchable href');
         throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');

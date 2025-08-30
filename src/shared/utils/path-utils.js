@@ -133,6 +133,9 @@ class PathUtils {
    * @returns {Object} Resolution result with URL and metadata
    */
   static resolveScormContentUrl(contentPath, extractionPath, manifestPath, appRoot) {
+    // Declare variables at method scope for use in catch block
+    let encodedFilePath, queryString, filePath;
+
     try {
       if (this.logger) {
         this.logger.info('PathUtils: Resolving SCORM content URL:', {
@@ -148,13 +151,25 @@ class PathUtils {
       }
 
       // Parse content path to separate file and query parameters
-      const [filePath, queryString] = contentPath.split('?');
+      [encodedFilePath, queryString] = contentPath.split('?');
+
+      // URL decode the file path to handle cases where manifest contains encoded paths
+      filePath = encodedFilePath; // Default to encoded path
+      try {
+        filePath = decodeURIComponent(encodedFilePath);
+      } catch (decodeError) {
+        this.logger?.warn('PathUtils: Failed to decode URI component, using original path:', { encodedFilePath, error: decodeError.message });
+        // filePath remains as encodedFilePath
+      }
 
       if (this.logger) {
         this.logger.debug('PathUtils: Parsed content path:', {
-          filePath,
+          originalPath: contentPath,
+          encodedFilePath,
+          decodedFilePath: filePath,
           queryString,
-          isAbsolute: path.isAbsolute(filePath)
+          isAbsolute: path.isAbsolute(filePath),
+          wasDecoded: filePath !== encodedFilePath
         });
       }
 
@@ -262,18 +277,86 @@ class PathUtils {
             try {
               const dirContents = fs.readdirSync(parentDir);
               this.logger.error('PathUtils: Parent directory contents:', { parentDir, contents: dirContents });
+
+              // Additional diagnostic: check for similar filenames (case-insensitive)
+              const requestedFile = path.basename(resolvedPath);
+              const similarFiles = dirContents.filter(file =>
+                file.toLowerCase() === requestedFile.toLowerCase() ||
+                file.toLowerCase().includes(requestedFile.toLowerCase().replace('.html', '')) ||
+                requestedFile.toLowerCase().includes(file.toLowerCase().replace('.html', ''))
+              );
+              if (similarFiles.length > 0) {
+                this.logger.error('PathUtils: Similar files found in parent directory:', { similarFiles });
+              }
             } catch (dirError) {
               this.logger.error('PathUtils: Failed to read parent directory:', { parentDir, error: dirError.message });
             }
           }
 
-          // Check extraction root contents
+          // Check extraction root contents with recursive listing
           try {
-            const extractionContents = fs.readdirSync(extractionPath);
-            this.logger.error('PathUtils: Extraction root contents:', { extractionPath, contents: extractionContents });
+            const listAllFiles = (dirPath, prefix = '') => {
+              const items = [];
+              const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+              for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.isDirectory()) {
+                  items.push(`${relativePath}/`);
+                  items.push(...listAllFiles(fullPath, relativePath));
+                } else {
+                  items.push(relativePath);
+                }
+              }
+              return items;
+            };
+
+            const allFiles = listAllFiles(extractionPath);
+            this.logger.error('PathUtils: Complete extraction root contents:', {
+              extractionPath,
+              totalFiles: allFiles.filter(f => !f.endsWith('/')).length,
+              totalDirectories: allFiles.filter(f => f.endsWith('/')).length,
+              allContents: allFiles.slice(0, 50) // Limit to first 50 items
+            });
+
+            // Look for HTML files specifically
+            const htmlFiles = allFiles.filter(f => f.toLowerCase().endsWith('.html') && !f.endsWith('/'));
+            this.logger.error('PathUtils: HTML files in extraction:', { htmlFiles });
+
+            // Look for files in directories similar to the requested path
+            const requestedDir = path.dirname(contentPath);
+            const similarDirs = allFiles.filter(f =>
+              f.endsWith('/') &&
+              (f.toLowerCase().includes(requestedDir.toLowerCase()) ||
+               requestedDir.toLowerCase().includes(f.replace('/', '').toLowerCase()))
+            );
+            if (similarDirs.length > 0) {
+              this.logger.error('PathUtils: Similar directories found:', { requestedDir, similarDirs });
+            }
+
           } catch (extractionError) {
             this.logger.error('PathUtils: Failed to read extraction root:', { extractionPath, error: extractionError.message });
           }
+
+          // Additional diagnostic: URL decoding issues
+          const decodedContentPath = decodeURIComponent(contentPath);
+          if (decodedContentPath !== contentPath) {
+            this.logger.error('PathUtils: URL decoding difference detected:', {
+              original: contentPath,
+              decoded: decodedContentPath,
+              resolvedOriginal: resolvedPath,
+              wouldResolveDecoded: path.resolve(manifestDir, decodedContentPath)
+            });
+          }
+
+          // Show the decoded path we actually tried to resolve
+          this.logger.error('PathUtils: Path resolution details:', {
+            manifestDir,
+            originalContentPath: contentPath,
+            decodedFilePath: filePath,
+            resolvedPathAttempted: resolvedPath,
+            resolvedPathExists: fs.existsSync(resolvedPath)
+          });
         }
         throw new Error(`File does not exist: ${resolvedPath}`);
       }
@@ -304,9 +387,11 @@ class PathUtils {
         url: protocolUrl,
         resolvedPath: resolvedPath,
         originalPath: contentPath,
+        decodedPath: filePath,
         hasQuery: !!queryString,
         queryString: queryString || null,
-        usedBase: withinAppRoot ? 'appRoot' : 'tempRoot'
+        usedBase: withinAppRoot ? 'appRoot' : 'tempRoot',
+        wasDecoded: filePath !== encodedFilePath
       };
 
       if (this.logger) {
@@ -330,8 +415,10 @@ class PathUtils {
         success: false,
         error: error.message,
         originalPath: contentPath,
+        decodedPath: filePath,
         extractionPath: extractionPath,
-        manifestPath: manifestPath
+        manifestPath: manifestPath,
+        wasDecoded: filePath !== encodedFilePath
       };
     }
   }
@@ -408,9 +495,38 @@ class PathUtils {
       // Remove query part for resolution and normalize trailing slashes for file names
       const [filePortion, queryString] = requestedPath.split('?');
       let filePathRaw = (filePortion || '').replace(/\\/g, '/');
+
+      // URL decode the file path to handle encoded characters like %20 (spaces)
+      try {
+        filePathRaw = decodeURIComponent(filePathRaw);
+        if (this.logger) {
+          this.logger.debug('PathUtils: URL decoded file path:', {
+            original: filePortion,
+            decoded: filePathRaw
+          });
+        }
+      } catch (decodeError) {
+        if (this.logger) {
+          this.logger.warn('PathUtils: Failed to decode URI component, using original path:', {
+            filePortion,
+            error: decodeError.message
+          });
+        }
+        // filePathRaw remains as the original
+      }
+
       // If the path looks like a file but has a trailing slash (e.g., "index.html/"), trim it.
-      if (filePathRaw.match(/^[^\/]+\.[^\/]+\/$/)) {
+      if (filePathRaw.match(/^[^/]+\.[^/]+\/$/)) {
         filePathRaw = filePathRaw.replace(/\/+$/, '');
+      }
+
+      if (this.logger) {
+        this.logger.debug('PathUtils: handleProtocolRequest processing:', {
+          originalProtocolUrl: protocolUrl,
+          requestedPathAfterPrefix: requestedPath,
+          filePathRaw,
+          queryString
+        });
       }
 
       const normalizedAppRoot = this.normalize(appRoot);
@@ -428,11 +544,25 @@ class PathUtils {
       const tempResolvedNorm = this.normalize(tempResolved);
 
       // Check file existence and validate against allowed roots
+      if (this.logger) {
+        this.logger.debug('PathUtils: Checking app root path:', {
+          appResolvedNorm,
+          normalizedAppRoot,
+          exists: fs.existsSync(appResolved)
+        });
+      }
       if (this.isValidPath(appResolvedNorm, normalizedAppRoot, appResolved)) {
         return { success: true, resolvedPath: appResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'appRoot' };
       }
 
       // Check temp root directory first
+      if (this.logger) {
+        this.logger.debug('PathUtils: Checking temp root path:', {
+          tempResolvedNorm,
+          normalizedTempRoot,
+          exists: fs.existsSync(tempResolved)
+        });
+      }
       if (this.isValidPath(tempResolvedNorm, normalizedTempRoot, tempResolved)) {
         return { success: true, resolvedPath: tempResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'tempRoot' };
       }
@@ -440,11 +570,26 @@ class PathUtils {
       // If not found in temp root, check inside SCORM extraction subdirectories
       try {
         const tempDirContents = fs.readdirSync(normalizedTempRoot, { withFileTypes: true });
+        if (this.logger) {
+          this.logger.debug('PathUtils: Checking SCORM extraction subdirectories:', {
+            tempDirContents: tempDirContents.map(item => ({ name: item.name, isDirectory: item.isDirectory() })),
+            safeRel
+          });
+        }
         for (const item of tempDirContents) {
           if (item.isDirectory() && item.name.startsWith('scorm_')) {
             const scormDirPath = path.join(normalizedTempRoot, item.name);
             const scormResolved = path.resolve(scormDirPath, safeRel);
             const scormResolvedNorm = this.normalize(scormResolved);
+
+            if (this.logger) {
+              this.logger.debug('PathUtils: Checking SCORM subdirectory path:', {
+                scormDirPath,
+                scormResolved,
+                scormResolvedNorm,
+                exists: fs.existsSync(scormResolved)
+              });
+            }
 
             if (this.isValidPath(scormResolvedNorm, normalizedTempRoot, scormResolved)) {
               return { success: true, resolvedPath: scormResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'scormExtraction' };
@@ -452,6 +597,9 @@ class PathUtils {
           }
         }
       } catch (error) {
+        if (this.logger) {
+          this.logger.debug('PathUtils: Error reading temp directory:', error.message);
+        }
         // Ignore directory reading errors - fall through to not found
       }
 
