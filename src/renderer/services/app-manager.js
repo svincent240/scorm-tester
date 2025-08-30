@@ -413,6 +413,22 @@ class AppManager {
     eventBus.on('menuToggled', this.handleMenuToggle.bind(this));
     eventBus.on('menuVisibilityChanged', this.handleMenuVisibilityChanged.bind(this));
 
+    // Menu action handlers
+    if (window.electronAPI && window.electronAPI.onMenuEvent) {
+      window.electronAPI.onMenuEvent((menuData) => {
+        try { this.logger.info('AppManager: Menu event received', menuData); } catch (_) {}
+        if (menuData && menuData.action === 'exit') {
+          try { this.logger.info('AppManager: Handling menu exit action'); } catch (_) {}
+          // Trigger app quit
+          if (window.electronAPI && window.electronAPI.invoke) {
+            window.electronAPI.invoke('quit-app').catch((error) => {
+              try { this.logger.error('AppManager: Failed to quit app via IPC', error); } catch (_) {}
+            });
+          }
+        }
+      });
+    }
+
     // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
 

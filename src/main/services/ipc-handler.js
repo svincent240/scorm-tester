@@ -321,6 +321,9 @@ class IpcHandler extends BaseService {
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
 
+      // App quit handler
+      this.registerHandler('quit-app', this.handleQuitApp.bind(this));
+
       // Direct renderer logging channels already registered in _registerCriticalHandlers()
       
       this.recordOperation('registerHandlers', true);
@@ -1531,6 +1534,22 @@ class IpcHandler extends BaseService {
     if (node.activityState === 'completed') return 'completed';
     if (node.suspended || node.activityState === 'active') return 'incomplete';
     return 'not attempted';
+  }
+
+  /**
+   * Handle quit app request from renderer
+   */
+  async handleQuitApp(event) {
+    try {
+      this.logger?.info('IpcHandler: Received quit-app request from renderer');
+      // Import app here to avoid circular dependencies
+      const { app } = require('electron');
+      app.quit();
+      return { success: true };
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to quit app:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 

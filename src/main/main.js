@@ -209,10 +209,15 @@ class MainProcess {
     });
 
     app.on('before-quit', async (event) => {
+      this.logger?.info('SCORM Tester: before-quit event received');
       if (!this.isShuttingDown) {
+        this.logger?.info('SCORM Tester: Starting graceful shutdown from before-quit');
         event.preventDefault();
         await this.shutdown();
+        this.logger?.info('SCORM Tester: Calling app.quit() after shutdown');
         app.quit();
+      } else {
+        this.logger?.info('SCORM Tester: Already shutting down, allowing quit');
       }
     });
 

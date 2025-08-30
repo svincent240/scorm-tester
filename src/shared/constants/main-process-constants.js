@@ -256,7 +256,9 @@ const SECURITY_CONFIG = {
       'recent:clear',
       // SCORM Inspector channels
       'open-scorm-inspector-window',
-      'scorm-inspector-get-history'
+      'scorm-inspector-get-history',
+      // App control channels
+      'quit-app'
     ]
   },
   

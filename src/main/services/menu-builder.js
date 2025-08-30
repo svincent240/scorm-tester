@@ -40,10 +40,13 @@ class MenuBuilder {
           },
           { type: 'separator' },
           {
-            label: 'Exit',
-            accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-            click: () => this.sendMenuAction('menu-exit')
-          }
+           label: 'Exit',
+           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+           click: () => {
+             this.logger?.info('MenuBuilder: Exit menu clicked');
+             this.sendMenuAction('menu-exit');
+           }
+         }
         ]
       },
       {
@@ -147,7 +150,13 @@ class MenuBuilder {
   sendMenuAction(action, data = null) {
     const mainWindow = this.windowManager.getWindow('main');
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(action, data);
+      // Special handling for exit menu - send as menu-event for renderer processing
+      if (action === 'menu-exit') {
+        mainWindow.webContents.send('menu-event', { action: 'exit', data });
+      } else {
+        // Keep original behavior for other menu items (even if they're not implemented)
+        mainWindow.webContents.send(action, data);
+      }
     }
   }
 }
