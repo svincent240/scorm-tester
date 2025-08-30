@@ -279,6 +279,15 @@ class ActivityTreeManager {
   getActivity(identifier) {
     return this.activities.get(identifier) || null;
   }
+
+  /**
+   * Find activity by identifier (alias for getActivity)
+   * @param {string} identifier - Activity identifier
+   * @returns {ActivityNode|null} Activity node or null if not found
+   */
+  findActivity(identifier) {
+    return this.getActivity(identifier);
+  }
  
   setCurrentActivity(identifier) {
     const activity = this.getActivity(identifier);

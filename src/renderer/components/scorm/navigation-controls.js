@@ -21,15 +21,16 @@ import { snBridge } from '../../services/sn-bridge.js';
 class NavigationControls extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
-    
+
     this.navigationState = {
       availableNavigation: ['previous', 'continue'], // Default fallback navigation
       currentActivity: null,
       sequencingState: null,
       menuVisible: false
     };
-    
+
     this.snService = null; // Will be set via IPC bridge
+    this._lastNavigationUpdate = 0; // Initialize cooldown timestamp
   }
 
   /**
@@ -268,7 +269,6 @@ class NavigationControls extends BaseComponent {
     
     // Listen for navigation events
     this.subscribe('navigation:updated', this.handleNavigationUpdated);
-    this.subscribe('navigation:request', this.handleNavigationRequest);
     
     // Listen for progress events
     this.subscribe('progress:updated', this.handleProgressUpdated);
@@ -335,9 +335,9 @@ class NavigationControls extends BaseComponent {
   async handlePreviousClick() {
     // In browse mode, always allow navigation, otherwise check availability
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
-    
+
     this.logger?.info('NavigationControls: Previous button clicked', { browseMode });
-    
+
     if (!browseMode && !this.isNavigationAvailable('previous')) {
       this.logger?.debug('NavigationControls: Previous navigation not available in normal mode');
       return;
@@ -346,15 +346,16 @@ class NavigationControls extends BaseComponent {
     // Emit centralized intent for AppManager orchestration
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigation:request', { type: 'previous', source: 'navigation-controls' });
+      eventBus.emit('navigation:request', {
+        type: 'previous',
+        source: 'navigation-controls'
+      });
       this.logger?.info('NavigationControls: Emitted navigation:request event for previous');
     } catch (_) {
       // fall through; component-local behavior remains
     }
-    
+
     this.emit('navigationRequested', { direction: 'previous' });
-    const result = await this.processNavigation('previous');
-    this.logger?.info('NavigationControls: Navigation result:', result);
   }
 
   /**
@@ -363,9 +364,9 @@ class NavigationControls extends BaseComponent {
   async handleNextClick() {
     // In browse mode, always allow navigation, otherwise check availability
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
-    
+
     this.logger?.info('NavigationControls: Next button clicked', { browseMode });
-    
+
     if (!browseMode && !this.isNavigationAvailable('continue')) {
       this.logger?.debug('NavigationControls: Continue navigation not available in normal mode');
       return;
@@ -374,15 +375,16 @@ class NavigationControls extends BaseComponent {
     // Emit centralized intent for AppManager orchestration
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigation:request', { type: 'continue', source: 'navigation-controls' });
+      eventBus.emit('navigation:request', {
+        type: 'continue',
+        source: 'navigation-controls'
+      });
       this.logger?.info('NavigationControls: Emitted navigation:request event for continue');
     } catch (_) {
       // fall through; component-local behavior remains
     }
-    
+
     this.emit('navigationRequested', { direction: 'next' });
-    const result = await this.processNavigation('continue');
-    this.logger?.info('NavigationControls: Navigation result:', result);
   }
 
   /**
@@ -521,16 +523,16 @@ class NavigationControls extends BaseComponent {
    */
   async handleNavigationResult(result) {
     this.logger?.info('NavigationControls: Handling navigation result', result);
-    
+
     if (result.targetActivity && result.action === 'launch') {
       this.logger?.info('NavigationControls: Launching activity', result.targetActivity);
-      
+
       // Load new activity content
       this.emit('activityLaunchRequested', {
         activity: result.targetActivity,
         sequencing: result.sequencing
       });
-      
+
       // Broadcast centralized launch intent for other listeners
       try {
         const { eventBus } = await import('../../services/event-bus.js');
@@ -549,7 +551,7 @@ class NavigationControls extends BaseComponent {
     } else {
       this.logger?.warn('NavigationControls: No target activity to launch', { result });
     }
-    
+
     // Update available navigation options
     if (result.availableNavigation) {
       // Normalize into canNavigatePrevious/Next and push through UIState as authority
@@ -566,11 +568,13 @@ class NavigationControls extends BaseComponent {
       this.updateAvailableNavigation(result.availableNavigation);
 
       // Emit centralized availability update to keep interested parties in sync
+      // BUT prevent self-triggering by adding a flag
       try {
         const { eventBus } = await import('../../services/event-bus.js');
         eventBus.emit('navigation:updated', {
           ...normalized,
-          source: 'navigation-controls'
+          source: 'navigation-controls',
+          _fromNavigationResult: true // prevent self-triggering
         });
       } catch (_) { /* no-op */ }
     }
@@ -1370,6 +1374,20 @@ class NavigationControls extends BaseComponent {
       return;
     }
 
+    // Prevent self-triggering from navigation result processing
+    if (data._fromNavigationResult) {
+      this.logger?.debug('NavigationControls: Skipping navigation update from own result');
+      return;
+    }
+
+    // Add navigation cooldown to prevent double navigation
+    const now = Date.now();
+    if (this._lastNavigationUpdate && (now - this._lastNavigationUpdate) < 1000) {
+      this.logger?.debug('NavigationControls: Skipping navigation update due to cooldown');
+      return;
+    }
+    this._lastNavigationUpdate = now;
+
     // Add simple deduplication to prevent redundant updates
     const currentState = this.navigationState;
     const navData = data.data || data;
@@ -1390,16 +1408,6 @@ class NavigationControls extends BaseComponent {
     this.updateNavigationState(stateUpdate);
   }
 
-  /**
-   * Handle navigation request event
-   */
-  handleNavigationRequest(data) {
-    if (data.direction === 'previous') {
-      this.navigatePrevious();
-    } else if (data.direction === 'next') {
-      this.navigateNext();
-    }
-  }
 
   /**
    * Handle progress updated event

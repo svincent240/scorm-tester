@@ -23,9 +23,9 @@ import { rendererLogger } from '../../utils/renderer-logger.js';
 class ContentViewer extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
-    
-    // Logger will be initialized dynamically when needed
-    this.logger = null;
+
+    // Initialize logger immediately
+    this.logger = rendererLogger;
     
     this.iframe = null;
     this.currentUrl = null;

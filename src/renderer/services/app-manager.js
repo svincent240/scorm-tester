@@ -450,6 +450,8 @@ class AppManager {
     this._snNavInFlight = false;
     this._snContentLoading = false;
     this._snInitialized = false;
+    this._snLastNavigationAt = 0;
+    this._NAVIGATION_COOLDOWN_MS = 1000; // Prevent polling-triggered navigation for 1 second after user navigation
 
     // Helper guards
     const canPoll = () => {
@@ -500,6 +502,18 @@ class AppManager {
         // If cannot poll, reschedule with min interval (or backoff if present)
         const next = this._snBackoffMs > 0 ? this._snBackoffMs : this._SN_MIN_INTERVAL_MS;
         scheduleNext(next);
+        return;
+      }
+
+      // Navigation cooldown: Prevent polling from triggering navigation immediately after user navigation
+      const timeSinceLastNavigation = Date.now() - this._snLastNavigationAt;
+      if (timeSinceLastNavigation < this._NAVIGATION_COOLDOWN_MS) {
+        // Skip this polling cycle to prevent triggering navigation
+        try { this.logger.debug('AppManager: SN polling skipped due to navigation cooldown', {
+          timeSinceLastNavigation,
+          cooldownMs: this._NAVIGATION_COOLDOWN_MS
+        }); } catch (_) {}
+        scheduleNext(this._SN_MIN_INTERVAL_MS);
         return;
       }
   
@@ -604,6 +618,7 @@ class AppManager {
     // 2) Navigation in-flight gating
     eventBus.on('navigation:request', () => {
       this._snNavInFlight = true;
+      this._snLastNavigationAt = Date.now(); // Set timestamp for cooldown
       this.pauseSnPolling('navigation');
     });
     eventBus.on('navigation:launch', () => {

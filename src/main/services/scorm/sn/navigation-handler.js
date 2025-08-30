@@ -1168,21 +1168,28 @@ class NavigationHandler {
   }
 
   /**
-   * Get all launchable activities in tree order
+   * Get all launchable activities in sequential order
+   * Uses depth-first traversal to maintain proper navigation sequence
    */
   getAllLaunchableActivities(rootActivity) {
     const activities = [];
-    
-    function collectActivities(activity) {
+
+    // Use depth-first traversal to maintain sequential navigation order
+    function traverseDFS(activity) {
+      // Add launchable activities to the list in sequential order
       if (activity.isLaunchable()) {
         activities.push(activity);
       }
-      for (const child of activity.children || []) {
-        collectActivities(child);
+
+      // Recursively traverse children depth-first
+      if (activity.children && activity.children.length > 0) {
+        for (const child of activity.children) {
+          traverseDFS(child);
+        }
       }
     }
-    
-    collectActivities(rootActivity);
+
+    traverseDFS(rootActivity);
     return activities;
   }
 
