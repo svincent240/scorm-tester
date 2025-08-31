@@ -92,7 +92,7 @@ class ScormCAMService {
           const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
           const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
           const orgContainer = manifest?.organizations || null;
-          const orgs = toArray(orgContainer?.organization);
+          const orgs = toArray(orgContainer?.organizations || orgContainer?.organization || []);
           const defId = safeStr(orgContainer?.default);
           const defaultOrg = defId
             ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
@@ -184,9 +184,9 @@ class ScormCAMService {
 
         analysis = analysis || {};
 
-        // 1) Select default organization strictly from parser output
+        // 1) Select default organization strictly from parser output (match SN service logic)
         const orgContainer = manifest?.organizations || null;
-        const orgs = toArray(orgContainer?.organization);
+        const orgs = toArray(orgContainer?.organizations || orgContainer?.organization || []);
         const defId = safeStr(orgContainer?.default);
         const defaultOrg = defId
           ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
@@ -206,7 +206,7 @@ class ScormCAMService {
           const resHref = safeStr(r?.href, '');
           // Respect precedence: resource.xml:base overrides container base when both present
           const baseForRes = localBase || containerBase;
-          const effectiveHref = PathUtils.combineXmlBaseHref(baseForRes, resHref);
+          const effectiveHref = resHref ? PathUtils.combineXmlBaseHref(baseForRes, resHref) : baseForRes;
           const st = safeStr(r?.scormType).toLowerCase();
 
           resById.set(id, { href: effectiveHref || '', scormType: st || '' });
@@ -247,6 +247,16 @@ class ScormCAMService {
           return { identifier, title, type, href, items: children };
         };
 
+        // Debug: Log defaultOrg structure before uiOutline creation
+        this.logger?.info('CAM: defaultOrg structure for uiOutline', { 
+          hasDefaultOrg: !!defaultOrg,
+          orgKeys: defaultOrg ? Object.keys(defaultOrg) : [],
+          itemLength: toArray(defaultOrg?.item)?.length || 0,
+          itemsLength: toArray(defaultOrg?.items)?.length || 0,
+          childrenLength: toArray(defaultOrg?.children)?.length || 0,
+          orgPreview: JSON.stringify(defaultOrg, null, 2)?.substring(0, 500) + '...'
+        });
+        
         const uiOutline = defaultOrg ? (() => {
           const itemArray = toArray(defaultOrg?.item);
           if (itemArray.length > 0) return itemArray.map(mapItem);
@@ -266,7 +276,15 @@ class ScormCAMService {
           }
           return null;
         };
+        // Debug: Log uiOutline structure
+        this.logger?.info('CAM: uiOutline structure for launch sequence', { 
+          uiOutlineLength: uiOutline?.length || 0, 
+          uiOutlinePreview: JSON.stringify(uiOutline?.slice(0, 2), null, 2)
+        });
+        
         let first = pickFirstSco(uiOutline);
+        this.logger?.info('CAM: pickFirstSco result', { first });
+        
         if (!first) {
           const pickFirstHref = (nodes) => {
             for (const n of nodes || []) {
@@ -279,6 +297,7 @@ class ScormCAMService {
             return null;
           };
           first = pickFirstHref(uiOutline);
+          this.logger?.info('CAM: pickFirstHref result', { first });
         }
 
         // Centralize resolution: convert selected href into final scorm-app:// URL
@@ -305,7 +324,7 @@ class ScormCAMService {
           const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
           const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
           const orgContainer = manifest?.organizations || null;
-          const orgs = toArray(orgContainer?.organization);
+          const orgs = toArray(orgContainer?.organizations || orgContainer?.organization || []);
           const defId = safeStr(orgContainer?.default);
           const defaultOrg = defId
             ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
