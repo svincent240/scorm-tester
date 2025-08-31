@@ -250,7 +250,9 @@ class ScormCAMService {
         const uiOutline = defaultOrg ? (() => {
           const itemArray = toArray(defaultOrg?.item);
           if (itemArray.length > 0) return itemArray.map(mapItem);
-          return toArray(defaultOrg?.items).map(mapItem);
+          const itemsArray = toArray(defaultOrg?.items);
+          if (itemsArray.length > 0) return itemsArray.map(mapItem);
+          return toArray(defaultOrg?.children).map(mapItem);
         })() : [];
 
         // 4) Compute launch by DFS preferring first SCO with href, else first href
@@ -311,7 +313,9 @@ class ScormCAMService {
           const topItems = (() => {
             const itemArray = toArray(defaultOrg?.item);
             if (itemArray.length > 0) return itemArray;
-            return toArray(defaultOrg?.items);
+            const itemsArray = toArray(defaultOrg?.items);
+            if (itemsArray.length > 0) return itemsArray;
+            return toArray(defaultOrg?.children);
           })();
           if (defaultOrg && topItems.length === 0) {
             const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
