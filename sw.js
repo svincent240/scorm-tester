@@ -18,11 +18,11 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Cache opened');
+        self.postMessage({ type: 'log', level: 'info', message: 'SW: Cache opened' });
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
-        console.log('SW: Cache failed to open', error);
+        self.postMessage({ type: 'log', level: 'error', message: 'SW: Cache failed to open', data: error });
       })
   );
 });
@@ -45,7 +45,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('SW: Deleting old cache', cacheName);
+            self.postMessage({ type: 'log', level: 'info', message: 'SW: Deleting old cache', data: cacheName });
             return caches.delete(cacheName);
           }
         })

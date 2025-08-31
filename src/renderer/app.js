@@ -23,21 +23,60 @@
  */
  
 /**
+ * Set up service worker message handling for console mirroring
+ */
+function setupServiceWorkerLogging() {
+  try {
+    // Listen for messages from service worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'log') {
+        const { level, message, data } = event.data;
+
+        // Import renderer logger dynamically to avoid circular dependencies
+        import('./utils/renderer-logger.js').then(({ rendererLogger }) => {
+          if (rendererLogger && typeof rendererLogger[level] === 'function') {
+            const logMessage = `[ServiceWorker] ${message}`;
+            if (data) {
+              rendererLogger[level](logMessage, data);
+            } else {
+              rendererLogger[level](logMessage);
+            }
+          }
+        }).catch((_error) => {
+          // Fallback: try to use electronAPI logger directly
+          if (window.electronAPI && window.electronAPI.logger) {
+            const logMessage = `[ServiceWorker] ${message}`;
+            if (window.electronAPI.logger[level]) {
+              window.electronAPI.logger[level](logMessage, data || '').catch(() => {});
+            }
+          }
+        });
+      }
+    });
+  } catch (error) {
+    // Silently fail if service workers are not supported or other issues
+  }
+}
+
+/**
  * Initialize the application when DOM is ready
  */
 async function initializeApplication() {
   try {
+    // Set up service worker logging before initializing the app
+    setupServiceWorkerLogging();
+
     // Use dynamic import to load the AppManager with absolute path
     const { appManager } = await import(`${window.electronAPI.rendererBaseUrl}services/app-manager.js`);
-    
+
     if (!appManager) {
       throw new Error('AppManager not available - check dynamic import');
     }
-    
+
     // Initialize the application through AppManager
     await appManager.initialize();
 
-    
+
   } catch (error) {
     // Centralized logging and UI notification (no inline HTML)
     const { rendererLogger } = await import('./utils/renderer-logger.js');

@@ -92,12 +92,16 @@ class ScormCAMService {
           const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
           const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
           const orgContainer = manifest?.organizations || null;
-          const orgs = toArray(orgContainer?.organizations);
+          const orgs = toArray(orgContainer?.organization);
           const defId = safeStr(orgContainer?.default);
           const defaultOrg = defId
             ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
             : (orgs[0] || null);
-          const top = defaultOrg ? toArray(defaultOrg.items) : [];
+          const top = defaultOrg ? (() => {
+            const itemArray = toArray(defaultOrg.item);
+            if (itemArray.length > 0) return itemArray;
+            return toArray(defaultOrg.items);
+          })() : [];
           const ids = top.map(n => (safeStr(n?.identifier) || safeStr(n?.title) || 'node'));
           // const dupCount = ids.length - new Set(ids).size; // Removed unused variable
           const payload = {
@@ -182,7 +186,7 @@ class ScormCAMService {
 
         // 1) Select default organization strictly from parser output
         const orgContainer = manifest?.organizations || null;
-        const orgs = toArray(orgContainer?.organizations);
+        const orgs = toArray(orgContainer?.organization);
         const defId = safeStr(orgContainer?.default);
         const defaultOrg = defId
           ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
@@ -289,12 +293,16 @@ class ScormCAMService {
           const toArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
           const safeStr = (v, d = '') => (typeof v === 'string' && v.trim() ? v.trim() : d);
           const orgContainer = manifest?.organizations || null;
-          const orgs = toArray(orgContainer?.organizations);
+          const orgs = toArray(orgContainer?.organization);
           const defId = safeStr(orgContainer?.default);
           const defaultOrg = defId
             ? (orgs.find(o => o && safeStr(o.identifier) === defId) || null)
             : (orgs[0] || null);
-          const topItems = toArray(defaultOrg?.items);
+          const topItems = (() => {
+            const itemArray = toArray(defaultOrg?.item);
+            if (itemArray.length > 0) return itemArray;
+            return toArray(defaultOrg?.items);
+          })();
           if (defaultOrg && topItems.length === 0) {
             const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
             throw new ParserError({
