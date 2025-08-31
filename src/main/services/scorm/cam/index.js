@@ -237,11 +237,21 @@ class ScormCAMService {
             type = st === 'sco' ? 'sco' : (href ? 'asset' : 'cluster');
           }
 
-          const children = toArray(it?.children).map(mapItem);
+          const children = (() => {
+            const itemArray = toArray(it?.item);
+            if (itemArray.length > 0) return itemArray.map(mapItem);
+            const itemsArray = toArray(it?.items);
+            if (itemsArray.length > 0) return itemsArray.map(mapItem);
+            return toArray(it?.children).map(mapItem);
+          })();
           return { identifier, title, type, href, items: children };
         };
 
-        const uiOutline = defaultOrg ? toArray(defaultOrg.items).map(mapItem) : [];
+        const uiOutline = defaultOrg ? (() => {
+          const itemArray = toArray(defaultOrg?.item);
+          if (itemArray.length > 0) return itemArray.map(mapItem);
+          return toArray(defaultOrg?.items).map(mapItem);
+        })() : [];
 
         // 4) Compute launch by DFS preferring first SCO with href, else first href
         const pickFirstSco = (nodes) => {
