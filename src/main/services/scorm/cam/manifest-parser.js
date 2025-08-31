@@ -189,7 +189,7 @@ class ManifestParser {
 
       // Validate identifierref across all items in all organizations
       const allItems = [];
-      for (const org of organizations.organizations || []) {
+      for (const org of organizations.organization || []) {
         this._collectItems(org.items || [], allItems);
       }
       for (const it of allItems) {
@@ -217,7 +217,7 @@ class ManifestParser {
 
       // Success snapshot log per approved contract
       const defaultOrgId = result.organizations?.default || null;
-      const defaultOrg = (result.organizations?.organizations || []).find(o => o.identifier === defaultOrgId) || (result.organizations?.organizations || [])[0] || null;
+      const defaultOrg = (result.organizations?.organization || []).find(o => o.identifier === defaultOrgId) || (result.organizations?.organization || [])[0] || null;
       const topCount = Array.isArray(defaultOrg?.items) ? defaultOrg.items.length : 0;
 
       logger.info('ManifestParser: success', {
@@ -315,7 +315,7 @@ class ManifestParser {
 
     return {
       default: defaultOrg || organizations[0]?.identifier || null,
-      organizations
+      organization: organizations  // Use "organization" property for consistency
     };
   }
 

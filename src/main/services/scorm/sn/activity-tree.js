@@ -110,7 +110,7 @@ class ActivityTreeManager {
     try {
       // Validate organizations presence
       const orgs = manifest?.organizations;
-      const orgList = orgs?.organizations || orgs?.organization || [];
+      const orgList = orgs?.organization || [];  // ManifestParser outputs organizations.organization
       if (!orgs || orgList.length === 0) {
         this.errorHandler?.setError(
           SN_ERROR_CODES.INVALID_ACTIVITY_TREE,

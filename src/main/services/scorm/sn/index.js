@@ -72,10 +72,18 @@ class ScormSNService {
  
       // Diagnostics: summarize orgs/items/sequencing presence prior to validation
       try {
-        // Normalize organizations to a single array regardless of shape
-        const orgs = (Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization)
-          || (Array.isArray(manifest?.organizations?.organizations) && manifest.organizations.organizations)
-          || [];
+        // Debug: Log actual manifest organizations structure
+        this.logger?.info('SN.init: manifest.organizations structure', {
+          hasOrganizations: !!manifest?.organizations,
+          orgKeys: manifest?.organizations ? Object.keys(manifest.organizations) : [],
+          hasOrgProperty: !!manifest?.organizations?.organization,
+          hasOrgsProperty: !!manifest?.organizations?.organizations,
+          orgPropertyType: Array.isArray(manifest?.organizations?.organization) ? 'array' : typeof manifest?.organizations?.organization,
+          orgsPropertyType: Array.isArray(manifest?.organizations?.organizations) ? 'array' : typeof manifest?.organizations?.organizations
+        });
+        
+        // Get organizations array from ManifestParser output
+        const orgs = manifest?.organizations?.organization || [];
  
         const countItems = (items) => (Array.isArray(items) ? items.reduce((n, it) => n + 1 + countItems(it?.children || it?.items || []), 0) : 0);
         const hasExplicitSeq = orgs.some(org => {
@@ -105,9 +113,7 @@ class ScormSNService {
         // Strict policy: throw ParserError with actionable message (no auto-correction/fallback)
         const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
         const defaultOrgId = manifest?.organizations?.default || null;
-        const orgs = (Array.isArray(manifest?.organizations?.organizations) && manifest.organizations.organizations)
-          || (Array.isArray(manifest?.organizations?.organization) && manifest.organizations.organization)
-          || [];
+        const orgs = manifest?.organizations?.organization || [];
         const defaultOrg = defaultOrgId
           ? orgs.find(o => o?.identifier === defaultOrgId)
           : orgs[0];
@@ -481,11 +487,8 @@ class ScormSNService {
     try {
       if (!manifest || !manifest.organizations) return false;
 
-      // Accept both shapes: { organizations: { organizations: [] } } and canonical { organizations: { organization: [] } }
-      const orgs =
-        (Array.isArray(manifest.organizations.organizations) && manifest.organizations.organizations)
-        || (Array.isArray(manifest.organizations.organization) && manifest.organizations.organization)
-        || [];
+      // Get organizations array from ManifestParser output
+      const orgs = manifest.organizations.organization || [];
 
       if (!Array.isArray(orgs) || orgs.length === 0) {
         return false;
