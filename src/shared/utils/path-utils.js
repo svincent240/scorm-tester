@@ -96,31 +96,26 @@ class PathUtils {
     if (!filePath || !appRoot) {
       throw new Error('File path and app root are required');
     }
-    
+
     const normalizedPath = this.normalize(filePath);
     const normalizedRoot = this.normalize(appRoot);
-    
+
     // Ensure path is within app root for security
     if (!normalizedPath.startsWith(normalizedRoot)) {
       throw new Error(`Path outside app root: ${normalizedPath}`);
     }
-    
+
     // Extract relative path from app root
     let relativePath = normalizedPath.substring(normalizedRoot.length);
-    
+
     // Remove leading slash
     if (relativePath.startsWith('/')) {
       relativePath = relativePath.substring(1);
     }
-    
-    // Only use same-origin prefix for SCORM content (files under temp directory)
-    // Main app files (index.html, scorm-inspector.html, etc.) should load directly
-    const normalizedTempRoot = this.getTempRoot();
-    const isScormContent = this.normalize(appRoot).startsWith(normalizedTempRoot);
-    
-    const protocolUrl = isScormContent 
-      ? `scorm-app://index.html/${relativePath}`
-      : `scorm-app://${relativePath}`;
+
+    // Use consistent protocol URL format for all content
+    // Remove the problematic index.html/ prefix that was causing path resolution issues
+    const protocolUrl = `scorm-app://${relativePath}`;
     return protocolUrl;
   }
 
@@ -478,8 +473,15 @@ class PathUtils {
         requestedPath = 'index.html';
       }
       // Handle same-origin paths that start with 'index.html/' - strip this prefix
+      // This maintains backward compatibility with any URLs that still have the prefix
       else if (requestedPath.startsWith('index.html/')) {
         requestedPath = requestedPath.slice('index.html/'.length);
+        if (this.logger) {
+          this.logger.debug('PathUtils: Stripped index.html/ prefix for backward compatibility', {
+            originalPath: protocolUrl,
+            strippedPath: requestedPath
+          });
+        }
       }
 
       // Quick checks for broken content variables

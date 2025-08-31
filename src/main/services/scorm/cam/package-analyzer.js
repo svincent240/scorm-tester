@@ -650,11 +650,21 @@ class PackageAnalyzer {
         if (item.identifierref) {
           const resource = resources.find(r => r.identifier === item.identifierref);
           if (resource && resource.scormType === 'sco') {
+            // Combine href with xmlBase according to SCORM specification
+            // If xmlBase exists, combine it with href; otherwise just use href
+            let fullHref = resource.href;
+            if (resource.xmlBase && resource.href) {
+              // Use path.posix.join to ensure forward slashes for web URLs
+              // Remove trailing slash from xmlBase to avoid double slashes
+              const xmlBase = resource.xmlBase.replace(/\/+$/, '');
+              fullHref = xmlBase ? path.posix.join(xmlBase, resource.href) : resource.href;
+            }
+            
             sequence.push({
               itemId: item.identifier,
               resourceId: item.identifierref,
               title: item.title,
-              href: resource.href,
+              href: fullHref,
               parameters: item.parameters
             });
           }

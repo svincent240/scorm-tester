@@ -46,7 +46,7 @@ class ContentViewer extends BaseComponent {
       showLoadingIndicator: true,
       enableFullscreen: true,
       respectContentDesign: true, // SCORM compliance: respect content author's design
-      sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
+      sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-presentation',
       attributes: {
         'data-component': 'content-viewer'
       }
@@ -291,6 +291,9 @@ class ContentViewer extends BaseComponent {
         this._injectApiIntoIframe(this.iframe);
       }
 
+      // Check for deprecated Flash content and warn user
+      this.detectAndWarnAboutFlashContent();
+
       this.hideLoading();
       this.showContent();
 
@@ -307,6 +310,69 @@ class ContentViewer extends BaseComponent {
 
     } catch (error) {
       this.showError('Content initialization failed', error?.message || String(error));
+    }
+  }
+
+  /**
+   * Detect Flash content and warn user about deprecation
+   */
+  detectAndWarnAboutFlashContent() {
+    try {
+      if (!this.contentWindow || !this.contentWindow.document) {
+        return;
+      }
+
+      const doc = this.contentWindow.document;
+
+      // Check for Flash objects and embeds
+      const flashElements = doc.querySelectorAll('object[type*="flash"], object[data*="swf"], embed[src*="swf"]');
+
+      if (flashElements.length > 0) {
+        // Log the detection for debugging
+        if (this.logger?.info) {
+          this.logger.info('ContentViewer: Detected Flash content', {
+            count: flashElements.length,
+            url: this.currentUrl
+          });
+        }
+
+        // Show user warning about Flash deprecation
+        this.uiState.showNotification({
+          type: 'warning',
+          message: 'Flash Content Detected',
+          details: `This course contains ${flashElements.length} Flash element(s) which are no longer supported by modern browsers. The content may not function properly.`,
+          duration: 0, // Persistent until dismissed
+          actions: [
+            {
+              label: 'Learn More',
+              handler: () => {
+                // Open external link about Flash deprecation
+                if (typeof window !== 'undefined' && window.open) {
+                  window.open('https://www.adobe.com/products/flashplayer/end-of-life.html', '_blank');
+                }
+              }
+            }
+          ]
+        });
+      }
+
+      // Also check for SWF files referenced in links or other elements
+      const swfLinks = doc.querySelectorAll('a[href*="swf"], link[href*="swf"]');
+      if (swfLinks.length > 0 && flashElements.length === 0) {
+        // Only show warning if we haven't already shown one for embedded Flash
+        this.uiState.showNotification({
+          type: 'info',
+          message: 'Flash Files Detected',
+          details: 'This course references Flash files (.swf) which may not be supported in modern browsers.',
+          duration: 10000 // Show for 10 seconds
+        });
+      }
+
+    } catch (error) {
+      // Silently fail Flash detection - don't break content loading
+      if (this.logger?.debug) {
+        this.logger.debug('ContentViewer: Flash detection failed', error?.message || error);
+      }
     }
   }
 
@@ -420,7 +486,9 @@ class ContentViewer extends BaseComponent {
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.error('[ContentViewer] API setup error', error?.message || String(error));
         }).catch(() => {});
-      } catch (_) {}
+      } catch (error) {
+        // Ignore logger import errors - logger is optional
+      }
     }
   }
 
@@ -827,11 +895,16 @@ class ContentViewer extends BaseComponent {
         // If the launch URL is from resource.href (raw from manifest), resolve it through PathUtils
         if (!launchUrl.startsWith('scorm-app://')) {
           try {
-            // Get the extraction path from the current course context
-            // This should match the path used during initial course loading
-            const extractionPath = this.getExtractionPath();
-            if (extractionPath) {
-              const resolved = await window.electronAPI.pathUtils.resolveScormUrl(launchUrl, extractionPath);
+            // Get the required parameters for URL resolution
+            const uiState = await uiStatePromise;
+            const extractionPath = uiState.getState().currentCoursePath;
+            const appRoot = await window.electronAPI.pathUtils.getAppRoot();
+            
+            if (extractionPath && appRoot) {
+              // Construct manifest path from extraction path
+              const manifestPath = extractionPath + '/imsmanifest.xml';
+              
+              const resolved = await window.electronAPI.pathUtils.resolveScormUrl(launchUrl, extractionPath, manifestPath, appRoot);
               if (resolved.success) {
                 launchUrl = resolved.url;
                 this.logger?.info('ContentViewer: Resolved navigation URL', {
@@ -841,6 +914,11 @@ class ContentViewer extends BaseComponent {
               } else {
                 this.logger?.warn('ContentViewer: Failed to resolve navigation URL', resolved);
               }
+            } else {
+              this.logger?.warn('ContentViewer: Missing required parameters for URL resolution', {
+                hasExtractionPath: !!extractionPath,
+                hasAppRoot: !!appRoot
+              });
             }
           } catch (resolveError) {
             this.logger?.warn('ContentViewer: Error resolving navigation URL', resolveError);
@@ -1176,20 +1254,20 @@ class ContentViewer extends BaseComponent {
 
       // Iframe load/error
       if (this.iframe) {
-        try { this.iframe.removeEventListener('load', this._boundHandlers.onIframeLoad); } catch (_) {}
-        try { this.iframe.removeEventListener('error', this._boundHandlers.onIframeError); } catch (_) {}
+        try { this.iframe.removeEventListener('load', this._boundHandlers.onIframeLoad); } catch (_) { /* ignore */ }
+        try { this.iframe.removeEventListener('error', this._boundHandlers.onIframeError); } catch (_) { /* ignore */ }
       }
 
       // Fullscreen button
       if (this.fullscreenBtn) {
-        try { this.fullscreenBtn.removeEventListener('click', this._boundHandlers.onFullscreenBtnClick); } catch (_) {}
+        try { this.fullscreenBtn.removeEventListener('click', this._boundHandlers.onFullscreenBtnClick); } catch (_) { /* ignore */ }
       }
 
       // Retry button (may or may not exist at destroy time)
       try {
         const retryBtn = this.find('.error-retry-btn');
         if (retryBtn) retryBtn.removeEventListener('click', this._boundHandlers.onRetryClick);
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
 
       this._boundHandlers = null;
     }
@@ -1197,10 +1275,10 @@ class ContentViewer extends BaseComponent {
     // Remove host message handler if installed (diagnostic forwarder)
     try {
       if (this._hostMessageHandler) {
-        try { window.removeEventListener('message', this._hostMessageHandler); } catch (_) {}
+        try { window.removeEventListener('message', this._hostMessageHandler); } catch (_) { /* ignore */ }
         this._hostMessageHandler = null;
       }
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
 
 
     this.clearContent();

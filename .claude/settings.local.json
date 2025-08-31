@@ -1,20 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "mcp__playwright__browser_click",
-      "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_evaluate",
-      "mcp__playwright__browser_press_key",
-      "mcp__playwright__browser_close",
-      "Bash(find:*)",
-      "Bash(for file in app-manager.js content-viewer.js navigation-controls.js course-outline.js sn-bridge.js)",
-      "Bash(do echo -n \"$file: \")",
-      "Bash(if find tests -name \"*.js\" -exec grep -l \"$file\" {} ;)",
-      "Bash(/dev/null)",
-      "Bash(then echo \"HAS TESTS\")",
-      "Bash(else echo \"NO TESTS\")",
-      "Bash(fi)",
-      "Bash(done)"
+      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
+      "Read(/Users/seth/Library/**)",
+      "Read(/Users/seth/Library/**)"
     ],
     "deny": [],
     "ask": []
