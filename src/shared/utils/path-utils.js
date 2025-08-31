@@ -99,7 +99,8 @@ class PathUtils {
         relativePath = relativePath.substring(1);
       }
 
-      const protocolUrl = `scorm-app://${relativePath}`;
+      // Always use a fixed host ('app') so all pages share the same origin
+      const protocolUrl = `scorm-app://app/${relativePath}`;
 
       this.logger?.info('PathUtils: toScormProtocolUrl success', {
         operation: 'toScormProtocolUrl',
@@ -182,12 +183,11 @@ class PathUtils {
 
       // Validate the resolved path exists and is within allowed roots
       const normalizedAppRoot = this.normalize(appRoot);
-      // Treat the application's canonical temp extraction directory as the only allowed external base.
+      // Strict policy: only app root and canonical temp root are allowed
       const normalizedTempRoot = this.getTempRoot();
 
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
-
 
       if (!withinAppRoot && !withinTempRoot) {
         throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot}): ${resolvedPath}`);
@@ -203,7 +203,8 @@ class PathUtils {
       if (withinAppRoot) {
         protocolUrl = this.toScormProtocolUrl(resolvedPath, appRoot);
       } else {
-        // For temp root paths, use temp root as base
+        // For extracted content, always use the canonical temp root as base so
+        // the scorm_* directory remains in the URL and the protocol handler can resolve it.
         protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedTempRoot);
       }
 
@@ -308,13 +309,18 @@ class PathUtils {
       const prefix = 'scorm-app://';
       let requestedPath = protocolUrl.startsWith(prefix) ? protocolUrl.slice(prefix.length) : protocolUrl;
 
-      // Handle case where main app requests 'index.html/' (with trailing slash)
+      // Backward/forward compatibility normalization:
+      // - Prefer a constant host 'app'. If present, strip it from the request path.
+      //   Example: scorm-app://app/src/renderer/app.js -> 'src/renderer/app.js'
+      // - Handle legacy forms that used dynamic host segments like 'index.html/' by stripping them too.
+      if (requestedPath.startsWith('app/')) {
+        requestedPath = requestedPath.slice('app/'.length);
+      }
+
+      // Legacy: some builds prefixed with 'index.html/'. Strip for compatibility.
       if (requestedPath === 'index.html/') {
         requestedPath = 'index.html';
-      }
-      // Handle same-origin paths that start with 'index.html/' - strip this prefix
-      // This maintains backward compatibility with any URLs that still have the prefix
-      else if (requestedPath.startsWith('index.html/')) {
+      } else if (requestedPath.startsWith('index.html/')) {
         requestedPath = requestedPath.slice('index.html/'.length);
       }
 

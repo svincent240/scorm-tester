@@ -118,7 +118,7 @@ class WindowManager extends BaseService {
       
       try {
         // Use custom protocol to avoid Windows file:// issues
-        await mainWindow.loadURL('scorm-app://index.html');
+        await mainWindow.loadURL('scorm-app://app/index.html');
         
         this.menuBuilder.createApplicationMenu(mainWindow);
         
@@ -191,7 +191,7 @@ class WindowManager extends BaseService {
       this.setupConsoleLogging(inspectorWindow);
       
       // Load SCORM Inspector window content using simple protocol format
-      await inspectorWindow.loadURL('scorm-app://scorm-inspector.html');
+      await inspectorWindow.loadURL('scorm-app://app/scorm-inspector.html');
       
       inspectorWindow.show();
       this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.READY);

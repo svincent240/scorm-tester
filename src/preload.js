@@ -190,7 +190,7 @@ const electronAPI = {
 };
 
 // Expose a base URL for renderer modules to use for dynamic imports
-electronAPI.rendererBaseUrl = 'scorm-app://src/renderer/';
+electronAPI.rendererBaseUrl = 'scorm-app://app/src/renderer/';
 
 // Performance artifacts writer (JSON + TXT) - optional bridge used by diagnostics benchmarks
 try {

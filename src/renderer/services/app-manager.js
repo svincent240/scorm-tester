@@ -34,7 +34,7 @@ class AppManager {
     try {
       const baseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
         ? window.electronAPI.rendererBaseUrl
-        : 'scorm-app://src/renderer/';
+        : 'scorm-app://app/src/renderer/';
       import(`${baseUrl}utils/renderer-logger.js`)
         .then(({ rendererLogger }) => {
           if (rendererLogger) {

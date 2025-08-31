@@ -11,7 +11,7 @@
   <title>SCORM Tester</title>
   
   <!-- Main stylesheet -->
-  <link rel="stylesheet" href="scorm-app://src/styles/main.css">
+  <link rel="stylesheet" href="scorm-app://app/src/styles/main.css">
   
   <!-- Theme management -->
   <script>
@@ -292,7 +292,7 @@
     
     // Load the main app script as a regular script (uses dynamic imports internally)
     const script = document.createElement('script');
-    script.src = 'scorm-app://src/renderer/app.js';  // Use custom protocol instead of relative path
+    script.src = 'scorm-app://app/src/renderer/app.js';  // Use custom protocol with fixed host for same-origin
     // No type="module" needed - using dynamic imports instead of static imports
     script.onload = () => {
       console.log('CRITICAL DEBUG: app.js loaded successfully');
