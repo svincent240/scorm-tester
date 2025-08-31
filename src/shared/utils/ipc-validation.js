@@ -50,7 +50,7 @@ function validateRequest(event, channel, args = []) {
     }
 
     // For common path-like channels, ensure the path argument is a safe string
-    const pathLikeChannels = ['extract-scorm', 'find-scorm-entry', 'get-course-info', 'get-course-manifest', 'save-temporary-file', 'path-to-file-url', 'resolve-scorm-url', 'path-normalize', 'path-join'];
+    const pathLikeChannels = ['extract-scorm', 'find-scorm-entry', 'get-course-info', 'get-course-manifest', 'save-temporary-file', 'path-to-file-url', 'path-normalize', 'path-join'];
     if (pathLikeChannels.includes(channel)) {
       const firstArg = args && args[0];
       if (typeof firstArg !== 'string') return false;

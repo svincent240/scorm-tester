@@ -201,7 +201,7 @@ class FileManager extends BaseService {
         return { success: false, error: 'Invalid folder path' };
       }
 
-      const manifestCheck = await this.findScormEntry(folderPath);
+      const manifestCheck = this.getManifestPath(folderPath);
       if (!manifestCheck.success) {
         this.logger?.warn('FileManager: Selected folder does not contain imsmanifest.xml');
         this.recordOperation('selectScormFolder', false);
@@ -300,7 +300,7 @@ class FileManager extends BaseService {
 
   /**
    * Resolve and return the canonical manifest path for a given folder.
-   * Recursively searches for imsmanifest.xml starting from the given folder.
+   * SCORM specification requires imsmanifest.xml to be at package root only.
    * Returns { success: true, manifestPath } when found, or { success: false, error }.
    */
   getManifestPath(folderPath) {
@@ -309,59 +309,43 @@ class FileManager extends BaseService {
         return { success: false, error: 'Invalid folder path' };
       }
 
-      // First try the most common location (direct in folder)
-      const directManifestPath = path.join(folderPath, 'imsmanifest.xml');
-      if (fs.existsSync(directManifestPath)) {
-        this.logger?.debug(`FileManager: Found manifest at root level: ${directManifestPath}`);
-        return { success: true, manifestPath: directManifestPath };
-      }
-
-      // Recursively search for manifest file
-      const findManifestRecursively = (searchPath) => {
+      // SCORM spec: imsmanifest.xml MUST be at package root only  
+      const manifestPath = path.join(folderPath, 'imsmanifest.xml');
+      
+      // Debug logging to diagnose the issue
+      this.logger?.info(`FileManager: Checking manifest path: ${manifestPath}`);
+      this.logger?.info(`FileManager: Folder exists: ${fs.existsSync(folderPath)}`);
+      
+      if (fs.existsSync(folderPath)) {
         try {
-          const entries = fs.readdirSync(searchPath, { withFileTypes: true });
-
-          // First check if manifest exists in current directory
-          for (const entry of entries) {
-            if (entry.isFile() && entry.name.toLowerCase() === 'imsmanifest.xml') {
-              const manifestPath = path.join(searchPath, entry.name);
-              this.logger?.debug(`FileManager: Found manifest recursively: ${manifestPath}`);
-              return manifestPath;
-            }
-          }
-
-          // Then recursively search subdirectories (breadth-first for efficiency)
-          for (const entry of entries) {
-            if (entry.isDirectory()) {
-              const subDirPath = path.join(searchPath, entry.name);
-              const found = findManifestRecursively(subDirPath);
-              if (found) {
-                return found;
-              }
-            }
-          }
-
-          return null;
-        } catch (error) {
-          // Skip directories we can't read (permission issues, etc.)
-          this.logger?.debug(`FileManager: Skipping directory during manifest search: ${searchPath} - ${error.message}`);
-          return null;
+          const files = fs.readdirSync(folderPath);
+          this.logger?.info(`FileManager: Directory contents: ${JSON.stringify(files)}`);
+        } catch (e) {
+          this.logger?.error(`FileManager: Error reading directory: ${e.message}`);
         }
-      };
-
-      const foundManifestPath = findManifestRecursively(folderPath);
-      if (foundManifestPath) {
-        this.logger?.info(`FileManager: Manifest found at: ${foundManifestPath}`);
-        return { success: true, manifestPath: foundManifestPath };
+      }
+      
+      if (fs.existsSync(manifestPath)) {
+        this.logger?.info(`FileManager: Found manifest at package root: ${manifestPath}`);
+        return { success: true, manifestPath: manifestPath };
       }
 
-      // No manifest found anywhere
-      this.logger?.warn(`FileManager: No imsmanifest.xml found in ${folderPath} or any subdirectories`);
-      return { success: false, error: 'No imsmanifest.xml found' };
+      // No manifest found at root - fail fast per SCORM compliance
+      this.logger?.error(`FileManager: imsmanifest.xml not found at package root: ${folderPath}`);
+      return { success: false, error: 'imsmanifest.xml not found at package root (SCORM compliance requirement)' };
     } catch (error) {
-      this.logger?.error(`FileManager: Error searching for manifest: ${error.message}`);
+      this.logger?.error(`FileManager: Error checking manifest: ${error.message}`);
       return { success: false, error: error.message || String(error) };
     }
+  }
+
+  /**
+   * Get course manifest content
+   * @param {string} folderPath - Course folder path
+   * @returns {Promise<Object>} Result object with success, manifestPath, and manifestContent
+   */
+  async getCourseManifest(folderPath) {
+    return await this.getManifestInfo(folderPath, { includeContent: true });
   }
 
   /**
@@ -410,10 +394,6 @@ class FileManager extends BaseService {
     }
   }
 
-  // Legacy method aliases for backward compatibility
-  async findScormEntry(folderPath) { return this.getManifestInfo(folderPath); }
-  async getCourseInfo(folderPath) { return this.getManifestInfo(folderPath); }
-  async getCourseManifest(folderPath) { return this.getManifestInfo(folderPath, { includeContent: true }); }
 
   /**
    * Save temporary file from base64 data
@@ -513,7 +493,7 @@ class FileManager extends BaseService {
       await this.ensureDirectory(tempRoot);
 
       // For zip files (or temp files that are zip), extract and return the extracted path
-      if (srcType === 'zip' || (srcType === 'temp' && path.extname(srcPath).toLowerCase() === '.zip')) {
+      if (srcType === 'zip' || (srcType === 'temp' && PathUtils.getExtension(srcPath) === 'zip')) {
         // Reuse existing extract flow which already writes into canonical temp/scorm_<ts>
         const extractResult = await this.extractScorm(srcPath);
         if (!extractResult.success) {
@@ -525,7 +505,7 @@ class FileManager extends BaseService {
       // For folder sources, validate presence of imsmanifest.xml before copying
       if (srcType === 'folder') {
         // Check for manifest in selected folder only (top-level acceptance)
-        const manifestCheck = await this.getManifestInfo(srcPath);
+        const manifestCheck = this.getManifestPath(srcPath);
         if (!manifestCheck.success) {
           return { success: false, error: 'Selected folder does not contain imsmanifest.xml' };
         }
@@ -756,7 +736,7 @@ class FileManager extends BaseService {
     
     // Limit length
     if (sanitized.length > 255) {
-      const ext = path.extname(sanitized);
+      const ext = '.' + PathUtils.getExtension(sanitized);
       const name = path.basename(sanitized, ext);
       sanitized = name.substring(0, 255 - ext.length) + ext;
     }
@@ -827,59 +807,29 @@ class FileManager extends BaseService {
    */
   async ensureTempDirectory() {
     const tempDir = PathUtils.getTempRoot();
-    this.logger?.info(`FileManager: Ensuring temp directory exists: ${tempDir}`);
+    this.logger?.debug(`FileManager: Ensuring temp directory exists: ${tempDir}`);
 
     await this.ensureDirectory(tempDir);
 
-    // Validate temp directory permissions for cross-platform filesystem operations
+    // Validate temp directory permissions
     try {
-      this.logger?.info('FileManager: Checking temp directory permissions');
-
-      // Check read permission
-      fs.accessSync(tempDir, fs.constants.R_OK);
-      this.logger?.info(`FileManager: Temp directory read permission confirmed: ${tempDir}`);
-
-      // Check write permission
-      fs.accessSync(tempDir, fs.constants.W_OK);
-      this.logger?.info(`FileManager: Temp directory write permission confirmed: ${tempDir}`);
-
-      // Get directory stats
-      const dirStats = fs.statSync(tempDir);
-      this.logger?.info('FileManager: Temp directory stats:', {
-        mode: dirStats.mode.toString(8),
-        uid: dirStats.uid,
-        gid: dirStats.gid,
-        platform: process.platform
-      });
+      // Check read and write permissions
+      fs.accessSync(tempDir, fs.constants.R_OK | fs.constants.W_OK);
 
       // Test actual file creation to ensure permissions work
       const testFile = path.join(tempDir, `perm_test_${Date.now()}.tmp`);
-      this.logger?.info(`FileManager: Creating test file: ${testFile}`);
-
       fs.writeFileSync(testFile, 'permission test', 'utf8');
 
-      // Verify the test file was created and is readable
+      // Verify the test file was created
       if (fs.existsSync(testFile)) {
-        const testContent = fs.readFileSync(testFile, 'utf8');
-        this.logger?.info(`FileManager: Temp directory write/read test successful: ${testFile}`);
-
         // Clean up test file
         fs.unlinkSync(testFile);
-        this.logger?.info('FileManager: Test file cleaned up successfully');
       } else {
-        this.logger?.error(`FileManager: Temp directory write test FAILED - file not created: ${testFile}`);
         throw new Error('Permission test file was not created');
       }
 
-      this.logger?.info('FileManager: Temp directory permission validation completed successfully');
-
     } catch (permError) {
-      this.logger?.error(`FileManager: Temp directory permission check FAILED for ${tempDir}:`, {
-        code: permError.code,
-        message: permError.message,
-        errno: permError.errno,
-        platform: process.platform
-      });
+      this.logger?.error(`FileManager: Temp directory permission check failed: ${permError.message}`);
       throw new Error(`Insufficient permissions for temp directory: ${tempDir} - ${permError.message}`);
     }
   }
@@ -991,9 +941,8 @@ class FileManager extends BaseService {
    */
   async verifyExtractedFiles(extractPath, expectedCount) {
     try {
-      
       if (!fs.existsSync(extractPath)) {
-        this.logger?.error(`FileManager: VERIFICATION FAILED - Extract path does not exist: ${extractPath}`);
+        this.logger?.error(`FileManager: Extract path does not exist: ${extractPath}`);
         return;
       }
 
@@ -1008,12 +957,6 @@ class FileManager extends BaseService {
               countFiles(fullPath);
             } else if (entry.isFile()) {
               actualCount++;
-              // Also verify each file is readable
-              try {
-                fs.accessSync(fullPath, fs.constants.R_OK);
-              } catch (accessError) {
-                this.logger?.error(`FileManager: File not readable: ${fullPath}`);
-              }
             }
           }
         } catch (error) {
@@ -1022,11 +965,9 @@ class FileManager extends BaseService {
       };
 
       countFiles(extractPath);
-      
-      this.logger?.info(`FileManager: Post-extraction verification - Expected: ${expectedCount}, Found: ${actualCount} files`);
-      
+
       if (actualCount !== expectedCount) {
-        this.logger?.warn(`FileManager: File count mismatch after extraction - expected ${expectedCount}, found ${actualCount}`);
+        this.logger?.warn(`FileManager: File count mismatch - expected ${expectedCount}, found ${actualCount}`);
       }
 
     } catch (error) {

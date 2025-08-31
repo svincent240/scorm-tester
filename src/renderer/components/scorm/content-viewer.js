@@ -879,51 +879,24 @@ class ContentViewer extends BaseComponent {
                       data?.activity?.resource?.href;
 
       if (launchUrl) {
-        // Combine resource href with item parameters if present
-        if (data?.activity?.parameters && data?.activity?.resource?.href) {
+        // If parameters are present, append them to the launchUrl directly
+        if (data?.activity?.parameters && launchUrl) {
           launchUrl = this.combineResourceUrlWithParameters(
-            data.activity.resource.href,
+            launchUrl,
             data.activity.parameters
           );
           this.logger?.info('ContentViewer: Combined resource URL with parameters', {
-            resourceHref: data.activity.resource.href,
+            baseUrl: launchUrl,
             parameters: data.activity.parameters,
             combined: launchUrl
           });
         }
 
-        // If the launch URL is from resource.href (raw from manifest), resolve it through PathUtils
+        // Enforce final URL format from main (no client-side resolution)
         if (!launchUrl.startsWith('scorm-app://')) {
-          try {
-            // Get the required parameters for URL resolution
-            const uiState = await uiStatePromise;
-            const extractionPath = uiState.getState().currentCoursePath;
-            const appRoot = await window.electronAPI.pathUtils.getAppRoot();
-            
-            if (extractionPath && appRoot) {
-              // Construct manifest path from extraction path
-              const manifestPath = extractionPath + '/imsmanifest.xml';
-              
-              const resolved = await window.electronAPI.pathUtils.resolveScormUrl(launchUrl, extractionPath, manifestPath, appRoot);
-              if (resolved.success) {
-                launchUrl = resolved.url;
-                this.logger?.info('ContentViewer: Resolved navigation URL', {
-                  original: launchUrl,
-                  resolved: launchUrl
-                });
-              } else {
-                this.logger?.warn('ContentViewer: Failed to resolve navigation URL', resolved);
-              }
-            } else {
-              this.logger?.warn('ContentViewer: Missing required parameters for URL resolution', {
-                hasExtractionPath: !!extractionPath,
-                hasAppRoot: !!appRoot
-              });
-            }
-          } catch (resolveError) {
-            this.logger?.warn('ContentViewer: Error resolving navigation URL', resolveError);
-            // Continue with original URL as fallback
-          }
+          this.logger?.error('ContentViewer: Launch URL is not a scorm-app:// URL. Navigation aborted.', { url: launchUrl });
+          this.showError('Navigation Error', 'Invalid launch URL format');
+          return;
         }
 
         // Load the activity content

@@ -17,9 +17,10 @@
  * @fileoverview SCORM package analyzer implementation
  */
 
-const path = require('path');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
 const ContentValidator = require('./content-validator'); // Import ContentValidator
+const PathUtils = require('../../../../shared/utils/path-utils');
+const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
 
 /**
  * SCORM Package Analyzer
@@ -31,6 +32,7 @@ class PackageAnalyzer {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
     this.contentValidator = new ContentValidator(errorHandler); // Initialize ContentValidator
+    this.logger = console; // Default logger, can be overridden
   }
 
   /**
@@ -46,7 +48,7 @@ class PackageAnalyzer {
         structure: this.analyzeStructure(manifest),
         resources: this.analyzeResources(manifest, packagePath),
         dependencies: this.analyzeDependencies(manifest),
-        launchSequence: this.determineLaunchSequence(manifest),
+        launchSequence: this.determineLaunchSequence(manifest, packagePath),
         statistics: this.generateStatistics(manifest),
         compliance: this.checkComplianceSync(packagePath, manifest)
       };
@@ -156,11 +158,11 @@ class PackageAnalyzer {
    * @param {Object} manifest - Parsed manifest object
    * @returns {Array} Launch sequence
    */
-  determineLaunchSequence(manifest) {
+  determineLaunchSequence(manifest, packagePath) {
     const defaultOrg = this.getDefaultOrganization(manifest);
     if (!defaultOrg) return [];
 
-    return this.buildLaunchSequence(defaultOrg.items || [], manifest.resources || []);
+    return this.buildLaunchSequence(defaultOrg.items || [], manifest.resources || [], packagePath);
   }
 
   /**
@@ -482,17 +484,18 @@ class PackageAnalyzer {
   }
 
   classifyFileTypes(resources) {
-    const types = {};
-    resources.forEach(resource => {
-      if (resource.files) {
-        resource.files.forEach(file => {
-          const ext = path.extname(file.href || file).toLowerCase();
-          types[ext] = (types[ext] || 0) + 1;
-        });
-      }
-    });
-    return types;
-  }
+  const types = {};
+  resources.forEach(resource => {
+    if (resource.files) {
+      resource.files.forEach(file => {
+        const filePath = file.href || file;
+        const ext = PathUtils.getExtension(filePath);
+        types[`.${ext}`] = (types[`.${ext}`] || 0) + 1;
+      });
+    }
+  });
+  return types;
+}
 
   identifyLaunchableResources(resources) {
     return resources.filter(resource => 
@@ -512,7 +515,7 @@ class PackageAnalyzer {
     );
   }
 
-  estimatePackageSize(resources, packagePath) {
+  estimatePackageSize(resources, _packagePath) {
     // Simplified size estimation - would need actual file system access
     return this.countTotalFiles(resources) * 50000; // Rough estimate
   }
@@ -642,7 +645,7 @@ class PackageAnalyzer {
       organizations[0];
   }
 
-  buildLaunchSequence(items, resources) {
+  buildLaunchSequence(items, resources, packagePath) {
     const sequence = [];
     
     const processItems = (itemList) => {
@@ -650,23 +653,77 @@ class PackageAnalyzer {
         if (item.identifierref) {
           const resource = resources.find(r => r.identifier === item.identifierref);
           if (resource && resource.scormType === 'sco') {
-            // Combine href with xmlBase according to SCORM specification
-            // If xmlBase exists, combine it with href; otherwise just use href
-            let fullHref = resource.href;
-            if (resource.xmlBase && resource.href) {
-              // Use path.posix.join to ensure forward slashes for web URLs
-              // Remove trailing slash from xmlBase to avoid double slashes
-              const xmlBase = resource.xmlBase.replace(/\/+$/, '');
-              fullHref = xmlBase ? path.posix.join(xmlBase, resource.href) : resource.href;
+            try {
+              // Use PathUtils to combine xmlBase/href properly
+              const contentPath = PathUtils.combineXmlBaseHref(resource.xmlBase, resource.href);
+              
+              // Get full manifest file path (not just directory)
+              const manifestPath = PathUtils.join(packagePath, 'imsmanifest.xml');
+              const appRoot = PathUtils.getAppRoot(__dirname);
+
+              // Log PathUtils integration start
+              this.logger?.info('PackageAnalyzer: Starting PathUtils integration for SCO URL resolution', {
+                operation: 'xmlBaseResolution',
+                resourceId: resource.identifier,
+                xmlBase: resource.xmlBase,
+                href: resource.href,
+                phase: 'CAM_INTEGRATION'
+              });
+
+              const resolutionResult = PathUtils.resolveScormContentUrl(
+                contentPath,
+                packagePath,
+                manifestPath, // Full manifest file path
+                appRoot
+              );
+
+              let fullHref;
+              if (resolutionResult.success) {
+                // Use final scorm-app:// URL from centralized resolution
+                fullHref = resolutionResult.url;
+
+                // Log successful resolution
+                this.logger?.info('PackageAnalyzer: PathUtils integration completed successfully', {
+                  operation: 'xmlBaseResolution',
+                  resourceId: resource.identifier,
+                  resolvedPath: resolutionResult.resolvedPath,
+                  phase: 'CAM_INTEGRATION'
+                });
+              } else {
+                // Use ParserError for consistent error handling
+                const parserError = new ParserError({
+                  code: ParserErrorCode.PATH_RESOLUTION_ERROR,
+                  message: `Path resolution failed for resource ${resource.identifier}: ${resolutionResult.error}`,
+                  detail: { 
+                    originalPath: contentPath, 
+                    resourceId: resource.identifier,
+                    xmlBase: resource.xmlBase,
+                    href: resource.href
+                  },
+                  phase: 'CAM_INTEGRATION'
+                });
+
+                this.errorHandler?.setError('301', parserError.message, 'PathUtilsIntegration');
+                throw parserError;
+              }
+              
+              sequence.push({
+                itemId: item.identifier,
+                resourceId: item.identifierref,
+                title: item.title,
+                href: fullHref,
+                parameters: item.parameters
+              });
+            } catch (error) {
+              // Log error and re-throw
+              this.logger?.error('PackageAnalyzer: SCO path resolution failed', {
+                operation: 'xmlBaseResolution',
+                error: error.message,
+                resourceId: resource.identifier,
+                stack: error.stack?.substring(0, 500)
+              });
+              throw error;
             }
-            
-            sequence.push({
-              itemId: item.identifier,
-              resourceId: item.identifierref,
-              title: item.title,
-              href: fullHref,
-              parameters: item.parameters
-            });
           }
         }
         

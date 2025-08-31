@@ -442,7 +442,7 @@ export interface CourseInfo {
   scormVersion: string;
   packageType: 'content_aggregation' | 'resource';
   courseStructure: CourseStructure;
-  entryPoint: string;
+  entryPoint: string | null;
   launchUrl: string;
   metadata?: ManifestMetadata;
 }

@@ -309,8 +309,8 @@ class AppManager {
           try {
             const structure = this.uiState.getState('courseStructure');
             const target = this._findItemById(structure, activityId);
-            const launchUrl = target && (target.href || target.launchUrl);
-            if (launchUrl) {
+            const launchUrl = target && target.launchUrl;
+            if (launchUrl && String(launchUrl).startsWith('scorm-app://')) {
               this.logger.warn('AppManager: SN unavailable; falling back to direct content load for choice', { activityId, launchUrl });
               const contentViewer = this.components.get('contentViewer');
               if (contentViewer && typeof contentViewer.loadContent === 'function') {
@@ -322,7 +322,7 @@ class AppManager {
               eventBus.emit('navigation:launch', { activity: { identifier: activityId, launchUrl }, sequencing: null, source: 'app-manager-fallback' });
               return;
             } else {
-              this.logger.warn('AppManager: Could not resolve launchUrl for choice fallback', { activityId });
+              this.logger.warn('AppManager: Could not resolve final scorm-app:// launchUrl for choice fallback', { activityId });
             }
           } catch (e) {
             this.logger.error('AppManager: Choice fallback error', e?.message || e);
@@ -1225,26 +1225,29 @@ class AppManager {
 const appManager = new AppManager();
 
 // Make test helper available globally for e2e tests and console debugging
+import { rendererLogger } from '../utils/renderer-logger.js';
+
 if (typeof window !== 'undefined') {
   window.appManager = appManager;
   
   // Add global test helper function
   window.testLoadCourse = async (coursePath, type = 'zip') => {
     const result = await appManager.testLoadCourse(coursePath, type);
-    console.log('testLoadCourse result:', result);
+    try { rendererLogger.info('testLoadCourse result:', result); } catch (_) {}
     return result;
   };
 
   // Add helper to load the sample course for quick testing
   window.loadSampleCourse = async () => {
     const samplePath = 'references/real_course_examples/SL360_LMS_SCORM_2004.zip';
-    console.log('Loading sample course from:', samplePath);
+    try { rendererLogger.info('Loading sample course from:', samplePath); } catch (_) {}
     return await window.testLoadCourse(samplePath);
   };
-
-  console.log('Test helpers available:');
-  console.log('  window.testLoadCourse(path) - Load course from path');
-  console.log('  window.loadSampleCourse() - Load the sample SL360 course');
+  try {
+    rendererLogger.info('Test helpers available:');
+    rendererLogger.info('  window.testLoadCourse(path) - Load course from path');
+    rendererLogger.info('  window.loadSampleCourse() - Load the sample SL360 course');
+  } catch (_) {}
 }
 
 export { AppManager, appManager };

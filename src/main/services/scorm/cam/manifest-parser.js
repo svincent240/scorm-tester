@@ -28,6 +28,7 @@ const { ParserError, ParserErrorCode } = require('../../../../shared/errors/pars
 // The shared logger module exports a getter function; obtain the singleton instance.
 const getLogger = require('../../../../shared/utils/logger');
 const logger = getLogger();
+const PathUtils = require('../../../../shared/utils/path-utils');
 
 /**
  * SCORM Manifest Parser
@@ -90,7 +91,7 @@ class ManifestParser {
   async parseManifestFile(manifestPath) {
     try {
       const manifestContent = await fs.readFile(manifestPath, 'utf8');
-      return this.parseManifestXML(manifestContent, path.dirname(manifestPath));
+      return this.parseManifestXML(manifestContent, PathUtils.dirname(manifestPath));
     } catch (error) {
       this.errorHandler?.setError('301', `Failed to read manifest: ${error.message}`, 'parseManifestFile');
       throw error;
@@ -254,7 +255,7 @@ class ManifestParser {
    * @param {string} basePath - Base path for resolving URLs
    * @returns {Object} Metadata information
    */
-  parseMetadata(manifestElement, basePath) {
+  parseMetadata(manifestElement, _basePath) {
     const metadataElement = this.getChildElement(manifestElement, 'metadata');
     if (!metadataElement) return null;
 
@@ -399,19 +400,28 @@ class ManifestParser {
     };
     const nsMap = this.namespaces;
     const xmlBase = getAttr(resourceElement, 'xml:base', nsMap) || '';
-    const resolvedBase = path.resolve(basePath, xmlBase);
+    const resolvedBase = PathUtils.join(basePath, xmlBase);
 
     const scormTypeAttr = getAttr(resourceElement, 'adlcp:scormType', nsMap) || getAttr(resourceElement, 'scormType', nsMap);
     const hrefAttr = getAttr(resourceElement, 'href', nsMap);
     const identifier = getAttr(resourceElement, 'identifier', nsMap);
 
-    // Debug logging for xml:base resolution
-    logger.info('ManifestParser: resource xml:base resolution', {
+    // Debug logging for xml:base resolution with PathUtils integration
+    logger.info('ManifestParser: Starting PathUtils integration for xml:base resolution', {
+      operation: 'xmlBaseResolution',
       resourceId: identifier,
       xmlBase: xmlBase || null,
       href: hrefAttr || null,
-      resolvedBase: resolvedBase || null,
-      basePath
+      basePath,
+      phase: 'CAM_INTEGRATION'
+    });
+
+    logger.debug('ManifestParser: Path resolution result', {
+      originalPath: xmlBase,
+      resolvedPath: resolvedBase,
+      success: true,
+      usedBase: basePath,
+      duration: Date.now() - (this.startTime || Date.now())
     });
 
     // Validate required attributes
@@ -435,7 +445,7 @@ class ManifestParser {
       href: hrefAttr,
       xmlBase: xmlBase,
       resolvedBase: resolvedBase,
-      files: this.parseFiles(resourceElement, resolvedBase),
+      files: this.parseFiles(resourceElement, resolvedBase, basePath),
       dependencies: this.parseDependencies(resourceElement),
       metadata: this.parseMetadata(resourceElement, basePath)
     };
@@ -620,15 +630,17 @@ class ManifestParser {
    * Parse files within a resource
    * @param {Element} resourceElement - Resource element
    * @param {string} resolvedBase - Resolved base path for the resource
+   * @param {string} basePath - Original base path for consistent resolution
    * @returns {Array} Array of file objects
    */
-  parseFiles(resourceElement, resolvedBase) {
+  parseFiles(resourceElement, resolvedBase, _basePath) {
     const files = [];
     const fileElements = this.getChildElements(resourceElement, 'file');
     for (const fileElement of fileElements) {
+      const href = this.getAttribute(fileElement, 'href');
       files.push({
-        href: this.getAttribute(fileElement, 'href'),
-        resolvedPath: path.resolve(resolvedBase, this.getAttribute(fileElement, 'href'))
+        href: href,
+        resolvedPath: PathUtils.join(resolvedBase, href)
       });
     }
     return files;
@@ -678,7 +690,7 @@ class ManifestParser {
    * @param {string} basePath - Base path for resolving URLs
    * @returns {Array} Array of sub-manifest objects
    */
-  parseSubManifests(manifestElement, basePath) {
+  parseSubManifests(_manifestElement, _basePath) {
     // This method would handle <manifest> elements nested within other <manifest> elements
     // which is not common in SCORM but allowed by IMS CP.
     // For SCORM, organizations are typically top-level within the main manifest.

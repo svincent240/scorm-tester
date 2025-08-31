@@ -18,8 +18,10 @@
  */
 
 const fs = require('fs').promises;
-const path = require('path');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
+const PathUtils = require('../../../../shared/utils/path-utils');
+const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
+const getLogger = require('../../../../shared/utils/logger');
 
 /**
  * SCORM Content Validator
@@ -30,6 +32,7 @@ const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
 class ContentValidator {
   constructor(errorHandler) {
     this.errorHandler = errorHandler;
+    this.logger = getLogger();
     this.validationErrors = [];
     this.validationWarnings = [];
     this.hasRequiredElements = false;
@@ -209,10 +212,28 @@ class ContentValidator {
   async validateResourceFiles(packagePath, resource) {
     const resourceBase = resource.resolvedBase || packagePath;
 
+    // Log PathUtils integration start
+    this.logger?.info('ContentValidator: Starting PathUtils integration for file validation', {
+      operation: 'fileValidation',
+      resourceId: resource.identifier,
+      resourceBase,
+      phase: 'CAM_INTEGRATION'
+    });
+
     // Validate main resource file (href)
     if (resource.href) {
-      const filePath = path.resolve(resourceBase, resource.href);
-      if (!(await this.fileExists(filePath))) {
+      const filePath = PathUtils.join(resourceBase, resource.href);
+      const fileExists = PathUtils.fileExists(filePath);
+
+      this.logger?.debug && this.logger.debug('ContentValidator: File validation result', {
+        operation: 'fileValidation',
+        resourceId: resource.identifier,
+        filePath,
+        fileExists,
+        success: fileExists
+      });
+
+      if (!fileExists) {
         this.addError(`File not found: ${resource.href} (Resource: ${resource.identifier})`);
       }
     }
@@ -220,12 +241,28 @@ class ContentValidator {
     // Validate all listed files
     if (resource.files) {
       for (const file of resource.files) {
-        const filePath = path.resolve(resourceBase, file.href || file);
-        if (!(await this.fileExists(filePath))) {
+        const filePath = PathUtils.join(resourceBase, file.href || file);
+        const fileExists = PathUtils.fileExists(filePath);
+
+        this.logger?.debug && this.logger.debug('ContentValidator: File validation result', {
+          operation: 'fileValidation',
+          resourceId: resource.identifier,
+          filePath,
+          fileExists,
+          success: fileExists
+        });
+
+        if (!fileExists) {
           this.addError(`File not found: ${file.href || file} (Resource: ${resource.identifier})`);
         }
       }
     }
+
+    this.logger?.info('ContentValidator: PathUtils integration completed for file validation', {
+      operation: 'fileValidation',
+      resourceId: resource.identifier,
+      phase: 'CAM_INTEGRATION'
+    });
   }
 
   /**
@@ -378,14 +415,7 @@ class ContentValidator {
    * @param {string} filePath - File path to check
    * @returns {Promise<boolean>} True if file exists
    */
-  async fileExists(filePath) {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  
 
   /**
    * Check if version string is valid

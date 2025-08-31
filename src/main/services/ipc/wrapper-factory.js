@@ -19,8 +19,7 @@ const DEFAULT_ENVELOPE_CHANNELS = new Set([
   'find-scorm-entry',
   'get-course-info',
   'get-course-manifest',
-  'path-to-file-url',
-  'resolve-scorm-url'
+  'path-to-file-url'
 ]);
 
 // Debounce state per channel (channel -> { timer, pending })

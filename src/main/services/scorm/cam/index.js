@@ -18,6 +18,7 @@ const ContentValidator = require('./content-validator');
 const MetadataHandler = require('./metadata-handler');
 const PackageAnalyzer = require('./package-analyzer');
 const { ParserError } = require('../../../../shared/errors/parser-error');
+const PathUtils = require('../../../../shared/utils/path-utils');
 // Logger is obtained via constructor parameter
 
 /**
@@ -193,15 +194,6 @@ class ScormCAMService {
 
         // Resolve nested xml:base at resources container and resource node levels
         const containerBase = safeStr(manifest?.resources?.['xml:base'] || manifest?.resources?.xmlBase || manifest?.resources?.xmlbase || '', '');
-        const normJoin = (base, href) => {
-          const b = safeStr(base, '').replace(/\\/g, '/');
-          const h = safeStr(href, '').replace(/\\/g, '/');
-          if (!h) return '';
-          if (!b) return h.replace(/^\/+/, '');
-          const lhs = b.replace(/\/+$/,'');
-          const rhs = h.replace(/^\/+/,'');
-          return `${lhs}/${rhs}`;
-        };
 
         for (const r of resources) {
           const id = safeStr(r?.identifier);
@@ -210,7 +202,7 @@ class ScormCAMService {
           const resHref = safeStr(r?.href, '');
           // Respect precedence: resource.xml:base overrides container base when both present
           const baseForRes = localBase || containerBase;
-          const effectiveHref = normJoin(baseForRes, resHref);
+          const effectiveHref = PathUtils.combineXmlBaseHref(baseForRes, resHref);
           const st = safeStr(r?.scormType).toLowerCase();
 
           resById.set(id, { href: effectiveHref || '', scormType: st || '' });
@@ -271,6 +263,25 @@ class ScormCAMService {
             return null;
           };
           first = pickFirstHref(uiOutline);
+        }
+
+        // Centralize resolution: convert selected href into final scorm-app:// URL
+        if (first && first.href) {
+          try {
+            const manifestPath = PathUtils.join(packagePath, 'imsmanifest.xml');
+            const appRoot = PathUtils.getAppRoot(__dirname);
+            const resolution = PathUtils.resolveScormContentUrl(first.href, packagePath, manifestPath, appRoot);
+            if (resolution?.success && resolution.url) {
+              first.href = resolution.url; // overwrite with final URL
+            } else {
+              // If resolution fails, throw to surface error and avoid partial output
+              throw new Error(resolution?.error || 'Unknown resolution failure');
+            }
+          } catch (e) {
+            this.logger?.error('ScormCAMService: Failed to resolve launch URL via PathUtils', { href: first.href, error: e?.message || String(e) });
+            // Re-throw to fail processing per strict contract
+            throw e;
+          }
         }
 
         // Strict policy: if default organization exists but has zero top-level items, throw ParserError
@@ -587,15 +598,7 @@ class ScormCAMService {
 
     // Resolve nested xml:base at resources container and resource node levels
     const containerBase = safeStr(resources?.['xml:base'] || resources?.xmlBase || resources?.xmlbase || '', '');
-    const normJoin = (base, href) => {
-      const b = safeStr(base, '').replace(/\\/g, '/');
-      const h = safeStr(href, '').replace(/\\/g, '/');
-      if (!h) return '';
-      if (!b) return h.replace(/^\/+/, '');
-      const lhs = b.replace(/\/+$/,'');
-      const rhs = h.replace(/^\/+/,'');
-      return `${lhs}/${rhs}`;
-    };
+    
 
     for (const res of resourceList) {
       const id = safeStr(res?.identifier);
@@ -604,7 +607,7 @@ class ScormCAMService {
       const resHref = safeStr(res?.href, '');
       // Respect precedence: resource.xml:base overrides container base when both present
       const baseForRes = localBase || containerBase;
-      const effectiveHref = normJoin(baseForRes, resHref);
+      const effectiveHref = PathUtils.combineXmlBaseHref(baseForRes, resHref);
       // Capture scormType across common shapes and normalize
       const scormType = safeStr(
         res?.['adlcp:scormType']

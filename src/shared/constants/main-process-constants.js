@@ -231,7 +231,6 @@ const SECURITY_CONFIG = {
       'get-all-sessions',
       'open-external',
       'path-to-file-url',
-      'resolve-scorm-url',
       'get-app-root',
       'path-normalize',
       'path-join',

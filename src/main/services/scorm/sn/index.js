@@ -9,6 +9,7 @@
  */
 
 const { ActivityTreeManager } = require('./activity-tree');
+const PathUtils = require('../../../../shared/utils/path-utils');
 const SequencingEngine = require('./sequencing-engine');
 const NavigationHandler = require('./navigation-handler');
 const RollupManager = require('./rollup-manager');
@@ -202,6 +203,31 @@ class ScormSNService {
       // If navigation resulted in a new target activity, process sequencing
       if (navResult.targetActivity) {
         const sequencingResult = await this.processActivitySequencing(navResult.targetActivity);
+
+        // Enrich target activity with final scorm-app:// launchUrl using centralized resolution
+        try {
+          const activity = navResult.targetActivity;
+          const res = activity?.resource || null;
+          const href = res?.href || null;
+          const xmlBase = res?.['xml:base'] || res?.xmlBase || res?.xmlbase || '';
+          const folderPath = this.sequencingSession?.packageInfo?.folderPath || this.currentPackage?.folderPath || null;
+          if (href && folderPath) {
+            const contentPath = PathUtils.combineXmlBaseHref(xmlBase, href);
+            const manifestPath = PathUtils.join(folderPath, 'imsmanifest.xml');
+            const appRoot = PathUtils.getAppRoot(__dirname);
+            const resolved = PathUtils.resolveScormContentUrl(contentPath, folderPath, manifestPath, appRoot);
+            if (resolved?.success && resolved.url) {
+              activity.launchUrl = resolved.url;
+            } else {
+              throw new Error(resolved?.error || 'Unknown resolution failure');
+            }
+          } else {
+            this.logger?.warn('SN: Missing href or folderPath for launch URL resolution', { hasHref: !!href, hasFolderPath: !!folderPath });
+          }
+        } catch (e) {
+          this.logger?.error('SN: Failed to resolve final launch URL for target activity', e?.message || e);
+          // Strict: do not override success, but downstream will enforce scorm-app:// requirement
+        }
         
         return {
           ...navResult,

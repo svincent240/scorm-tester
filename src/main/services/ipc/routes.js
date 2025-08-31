@@ -289,15 +289,6 @@ module.exports = [
     }
   },
   {
-    channel: 'resolve-scorm-url',
-    handlerName: 'handleResolveScormUrl',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
-  },
-  {
     channel: 'path-normalize',
     handlerName: 'handlePathNormalize',
     options: {

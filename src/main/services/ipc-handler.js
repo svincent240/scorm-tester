@@ -302,7 +302,6 @@ class IpcHandler extends BaseService {
       // Utility handlers
       this.registerHandler('open-external', this.handleOpenExternal.bind(this));
       this.registerHandler('path-to-file-url', this.handlePathUtilsToFileUrl.bind(this));
-      this.registerHandler('resolve-scorm-url', this.handleResolveScormUrl.bind(this));
       this.registerHandler('get-app-root', this.handleGetAppRoot.bind(this));
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
@@ -954,14 +953,6 @@ class IpcHandler extends BaseService {
         error: error.message || String(error) 
       };
     }
-  }
-
-  // Allow optional options param to pass an allowedBase for folder-based loads
-  async handleResolveScormUrl(event, contentPath, extractionPath, manifestPath, appRoot) {
-    if (!appRoot) {
-      appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
-    }
-    return PathUtils.resolveScormContentUrl(contentPath, extractionPath, manifestPath, appRoot);
   }
 
   async handleGetAppRoot(event) {

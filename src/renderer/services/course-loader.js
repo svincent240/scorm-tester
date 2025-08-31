@@ -9,6 +9,7 @@
 
 import { eventBus } from './event-bus.js';
 import { uiState as uiStatePromise } from './ui-state.js';
+import { rendererLogger } from '../utils/renderer-logger.js';
 
 /**
  * Course Loader Class
@@ -40,15 +41,17 @@ class CourseLoader {
    */
   checkElectronAPIAvailability() {
     const electronAPIAvailable = typeof window.electronAPI !== 'undefined';
-    console.log('CourseLoader: Electron API availability check:', {
-      available: electronAPIAvailable,
-      windowDefined: typeof window !== 'undefined',
-      electronAPIType: typeof window.electronAPI
-    });
+    try {
+      rendererLogger.info('CourseLoader: Electron API availability check:', {
+        available: electronAPIAvailable,
+        windowDefined: typeof window !== 'undefined',
+        electronAPIType: typeof window.electronAPI
+      });
+    } catch (_) {}
 
     if (electronAPIAvailable) {
       const methods = Object.getOwnPropertyNames(window.electronAPI);
-      console.log('CourseLoader: Available Electron API methods:', methods);
+      try { rendererLogger.info('CourseLoader: Available Electron API methods:', methods); } catch (_) {}
 
       // Check specific methods we need
       const requiredMethods = [
@@ -67,12 +70,12 @@ class CourseLoader {
         return typeof window.electronAPI[method] !== 'function';
       });
       if (missingMethods.length > 0) {
-        console.error('CourseLoader: Missing required Electron API methods:', missingMethods);
+        try { rendererLogger.error('CourseLoader: Missing required Electron API methods:', missingMethods); } catch (_) {}
       } else {
-        console.log('CourseLoader: All required Electron API methods available');
+        try { rendererLogger.info('CourseLoader: All required Electron API methods available'); } catch (_) {}
       }
     } else {
-      console.error('CourseLoader: Electron API not available - this will prevent course loading');
+      try { rendererLogger.error('CourseLoader: Electron API not available - this will prevent course loading'); } catch (_) {}
     }
   }
 /**
@@ -218,21 +221,12 @@ class CourseLoader {
       }
       const { manifest, validation, analysis } = processManifestResult;
   
-      // Determine entry point from CAM analysis
-      const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
+      // Determine entry point from CAM analysis (CAM now returns final scorm-app:// URL)
+      const firstLaunchUrl = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
         : null;
-      if (!firstLaunchHref) {
-        throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
-      }
-  
-      // Get app root for path resolution
-      const appRoot = await window.electronAPI.pathUtils.getAppRoot();
-
-      // Resolve the launch href against the canonical unified path
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, unifiedPath, manifestPath, appRoot);
-      if (!entryResult.success) {
-        throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
+      if (!firstLaunchUrl || !String(firstLaunchUrl).startsWith('scorm-app://')) {
+        throw new Error('CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href');
       }
 
       // Build UI structure as passthrough of uiOutline
@@ -275,8 +269,8 @@ class CourseLoader {
         },
         structure: uiStructure,
         path: folderPath,
-        entryPoint: entryResult.resolvedPath,
-        launchUrl: entryResult.url,
+        entryPoint: null,
+        launchUrl: firstLaunchUrl,
         originalFilePath: null,
         validation,
         analysis
@@ -413,10 +407,10 @@ class CourseLoader {
 
       // Step 4: Determine entry point from processed manifest (single-source from CAM)
       this.logger?.info && this.logger.info('CourseLoader: Step 4 - Determining entry point');
-      const firstLaunchHref = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
+      const firstLaunchUrl = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
         : null;
-      this.logger?.info && this.logger.info('CourseLoader: First launch href:', firstLaunchHref);
+      this.logger?.info && this.logger.info('CourseLoader: First launch URL (from CAM):', firstLaunchUrl);
 
       // Diagnostic: Show full launch sequence for debugging
       if (this.logger?.info && Array.isArray(analysis?.launchSequence)) {
@@ -439,25 +433,13 @@ class CourseLoader {
         })));
       }
 
-      if (!firstLaunchHref) {
+      if (!firstLaunchUrl) {
         this.logger?.error && this.logger.error('CourseLoader: CAM analysis did not provide a launchable href');
-        throw new Error('CAM analysis did not provide a launchable href in launchSequence[0].href');
+        throw new Error('CAM analysis did not provide a launchable URL in launchSequence[0].href');
       }
-
-      // Get app root for path resolution
-      const appRoot = await window.electronAPI.pathUtils.getAppRoot();
-
-      // Resolve the launch href against the canonical extraction path
-      this.logger?.info && this.logger.info('CourseLoader: Resolving SCORM URL:', { href: firstLaunchHref, extractedPath, manifestPath, appRoot });
-      const entryResult = await window.electronAPI.pathUtils.resolveScormUrl(firstLaunchHref, extractedPath, manifestPath, appRoot);
-      this.logger?.info && this.logger.info('CourseLoader: resolveScormUrl result:', entryResult);
-
-      if (!entryResult.success) {
-        this.logger?.error && this.logger.error('CourseLoader: Failed to resolve SCORM entry URL:', entryResult.error);
-        throw new Error(`Failed to resolve SCORM entry URL: ${entryResult.error}`);
+      if (!String(firstLaunchUrl).startsWith('scorm-app://')) {
+        throw new Error('CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href');
       }
-
-      this.logger?.info && this.logger.info('CourseLoader: Entry URL resolved successfully:', entryResult.url);
 
       // Step 5: Build UI structure as a pure passthrough of CAM uiOutline under default-org root.
       // No renderer normalization, no fallback builders, no manifest conversions.
@@ -501,8 +483,8 @@ class CourseLoader {
         },
         structure: uiStructure,
         path: extractedPath,
-        entryPoint: entryResult.resolvedPath,
-        launchUrl: entryResult.url,
+        entryPoint: null,
+        launchUrl: firstLaunchUrl,
         originalFilePath: filePath,
         validation,
         analysis
@@ -719,10 +701,6 @@ class CourseLoader {
     if (!courseData.validation.valid) {
       errors.push('Course failed SCORM compliance validation.');
       errors.push(...courseData.validation.errors);
-    }
-    
-    if (!courseData.entryPoint) {
-      errors.push('Course entry point not found after CAM processing.');
     }
     
     if (!courseData.launchUrl) {

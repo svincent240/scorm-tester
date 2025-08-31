@@ -34,18 +34,19 @@ class PathUtils {
    * @returns {string} Normalized temp root path
    */
   static getTempRoot() {
-    return this.normalize(path.join(os.tmpdir(), 'scorm-tester'));
+    return this.join(os.tmpdir(), 'scorm-tester');
   }
 
   /**
-   * Check if path is within allowed root and exists
+   * Check if path is within allowed root and exists (legacy method - use validatePath)
    * @param {string} resolvedPath - The resolved file path
    * @param {string} allowedRoot - The allowed root directory
    * @param {string} nativePath - The native file path for existence check
    * @returns {boolean} True if path is valid and exists
    */
   static isValidPath(resolvedPath, allowedRoot, nativePath) {
-    return resolvedPath.startsWith(allowedRoot) && fs.existsSync(nativePath);
+    // Delegate to validatePath for consistency
+    return this.validatePath(nativePath, allowedRoot);
   }
 
   /**
@@ -58,29 +59,12 @@ class PathUtils {
       throw new Error('Invalid file path provided');
     }
 
-    // Log original path for debugging
-    if (this.logger) {
-      this.logger.debug('PathUtils: Normalizing path:', {
-        original: filePath,
-        platform: process?.platform || 'unknown'
-      });
-    }
-
-    // Convert backslashes to forward slashes and remove duplicate slashes
+    // Convert backslashes to forward slashes and remove duplicate forward slashes
     let normalized = filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
 
     // Remove trailing slash unless it's root
     if (normalized.length > 1 && normalized.endsWith('/')) {
       normalized = normalized.slice(0, -1);
-    }
-
-    // Log result for debugging
-    if (this.logger) {
-      this.logger.debug('PathUtils: Path normalized:', {
-        original: filePath,
-        normalized: normalized,
-        changed: normalized !== filePath
-      });
     }
 
     return normalized;
@@ -93,30 +77,47 @@ class PathUtils {
    * @returns {string} Protocol URL
    */
   static toScormProtocolUrl(filePath, appRoot) {
-    if (!filePath || !appRoot) {
-      throw new Error('File path and app root are required');
+    const startTime = Date.now();
+    try {
+      if (!filePath || !appRoot) {
+        throw new Error('File path and app root are required');
+      }
+
+      const normalizedPath = this.normalize(filePath);
+      const normalizedRoot = this.normalize(appRoot);
+
+      // Ensure path is within app root for security
+      if (!normalizedPath.startsWith(normalizedRoot)) {
+        throw new Error(`Path outside app root: ${normalizedPath}`);
+      }
+
+      // Extract relative path from app root
+      let relativePath = normalizedPath.substring(normalizedRoot.length);
+
+      // Remove leading slash
+      if (relativePath.startsWith('/')) {
+        relativePath = relativePath.substring(1);
+      }
+
+      const protocolUrl = `scorm-app://${relativePath}`;
+
+      this.logger?.info('PathUtils: toScormProtocolUrl success', {
+        operation: 'toScormProtocolUrl',
+        duration: Date.now() - startTime,
+        filePath: normalizedPath,
+        appRoot: normalizedRoot,
+        url: protocolUrl
+      });
+
+      return protocolUrl;
+    } catch (error) {
+      this.logger?.error('PathUtils: toScormProtocolUrl failed', {
+        operation: 'toScormProtocolUrl',
+        error: error?.message || String(error),
+        duration: Date.now() - startTime
+      });
+      throw error;
     }
-
-    const normalizedPath = this.normalize(filePath);
-    const normalizedRoot = this.normalize(appRoot);
-
-    // Ensure path is within app root for security
-    if (!normalizedPath.startsWith(normalizedRoot)) {
-      throw new Error(`Path outside app root: ${normalizedPath}`);
-    }
-
-    // Extract relative path from app root
-    let relativePath = normalizedPath.substring(normalizedRoot.length);
-
-    // Remove leading slash
-    if (relativePath.startsWith('/')) {
-      relativePath = relativePath.substring(1);
-    }
-
-    // Use consistent protocol URL format for all content
-    // Remove the problematic index.html/ prefix that was causing path resolution issues
-    const protocolUrl = `scorm-app://${relativePath}`;
-    return protocolUrl;
   }
 
   /**
@@ -128,18 +129,18 @@ class PathUtils {
    * @returns {Object} Resolution result with URL and metadata
    */
   static resolveScormContentUrl(contentPath, extractionPath, manifestPath, appRoot) {
+    const startTime = Date.now();
     // Declare variables at method scope for use in catch block
     let encodedFilePath, queryString, filePath;
 
     try {
-      if (this.logger) {
-        this.logger.info('PathUtils: Resolving SCORM content URL:', {
-          contentPath,
-          extractionPath,
-          manifestPath,
-          appRoot
-        });
-      }
+      this.logger?.info('PathUtils: Starting content resolution', {
+        operation: 'contentResolution',
+        contentPath,
+        extractionPath,
+        manifestPath,
+        phase: 'CAM_INTEGRATION'
+      });
 
       if (!contentPath || !extractionPath || !manifestPath || !appRoot) {
         throw new Error('Content path, extraction path, manifest path, and app root are required');
@@ -157,26 +158,10 @@ class PathUtils {
         // filePath remains as encodedFilePath
       }
 
-      if (this.logger) {
-        this.logger.debug('PathUtils: Parsed content path:', {
-          originalPath: contentPath,
-          encodedFilePath,
-          decodedFilePath: filePath,
-          queryString,
-          isAbsolute: path.isAbsolute(filePath),
-          wasDecoded: filePath !== encodedFilePath
-        });
-      }
 
       // Get the manifest's directory as the base for relative path resolution
-      const manifestDir = path.dirname(manifestPath);
+      const manifestDir = this.dirname(manifestPath);
 
-      if (this.logger) {
-        this.logger.debug('PathUtils: Manifest directory for base resolution:', {
-          manifestPath,
-          manifestDir
-        });
-      }
 
       // Resolve the file path against manifest directory (not extraction root)
       let resolvedPath;
@@ -185,29 +170,14 @@ class PathUtils {
         resolvedPath = this.normalize(filePath);
         const normalizedExtraction = this.normalize(extractionPath);
 
-        if (this.logger) {
-          this.logger.debug('PathUtils: Absolute path resolution:', {
-            resolvedPath,
-            normalizedExtraction,
-            startsWith: resolvedPath.startsWith(normalizedExtraction)
-          });
-        }
 
         if (!resolvedPath.startsWith(normalizedExtraction)) {
           throw new Error(`Absolute path outside extraction directory: ${resolvedPath}`);
         }
       } else {
         // Relative path - resolve against manifest directory
-        resolvedPath = path.resolve(manifestDir, filePath);
-        resolvedPath = this.normalize(resolvedPath);
+        resolvedPath = this.join(manifestDir, filePath);
 
-        if (this.logger) {
-          this.logger.debug('PathUtils: Relative path resolution:', {
-            originalFilePath: filePath,
-            manifestDir,
-            resolvedPath
-          });
-        }
       }
 
       // Validate the resolved path exists and is within allowed roots
@@ -218,141 +188,13 @@ class PathUtils {
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
 
-      if (this.logger) {
-        this.logger.debug('PathUtils: Path validation:', {
-          resolvedPath,
-          normalizedAppRoot,
-          normalizedTempRoot,
-          withinAppRoot,
-          withinTempRoot
-        });
-      }
 
       if (!withinAppRoot && !withinTempRoot) {
         throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot}): ${resolvedPath}`);
       }
 
-      // Log file check details
-      if (this.logger) {
-        this.logger.debug('PathUtils: Checking file existence:', {
-          resolvedPath,
-          fileExists: fs.existsSync(resolvedPath)
-        });
-
-        // If file exists, log its stats
-        if (fs.existsSync(resolvedPath)) {
-          try {
-            const stats = fs.statSync(resolvedPath);
-            this.logger.debug('PathUtils: File stats:', {
-              resolvedPath,
-              size: stats.size,
-              isFile: stats.isFile(),
-              isDirectory: stats.isDirectory(),
-              mode: stats.mode.toString(8),
-              uid: stats.uid,
-              gid: stats.gid
-            });
-          } catch (statsError) {
-            this.logger.error('PathUtils: Failed to get file stats:', { resolvedPath, error: statsError.message });
-          }
-        }
-      }
-
-      // Detailed file existence check with directory listing
+      // Check file existence
       if (!fs.existsSync(resolvedPath)) {
-        if (this.logger) {
-          this.logger.error('PathUtils: File does not exist:', resolvedPath);
-
-          // Check if parent directory exists
-          const parentDir = path.dirname(resolvedPath);
-          const parentExists = fs.existsSync(parentDir);
-          this.logger.error('PathUtils: Parent directory exists:', { parentDir, parentExists });
-
-          if (parentExists) {
-            try {
-              const dirContents = fs.readdirSync(parentDir);
-              this.logger.error('PathUtils: Parent directory contents:', { parentDir, contents: dirContents });
-
-              // Additional diagnostic: check for similar filenames (case-insensitive)
-              const requestedFile = path.basename(resolvedPath);
-              const similarFiles = dirContents.filter(file =>
-                file.toLowerCase() === requestedFile.toLowerCase() ||
-                file.toLowerCase().includes(requestedFile.toLowerCase().replace('.html', '')) ||
-                requestedFile.toLowerCase().includes(file.toLowerCase().replace('.html', ''))
-              );
-              if (similarFiles.length > 0) {
-                this.logger.error('PathUtils: Similar files found in parent directory:', { similarFiles });
-              }
-            } catch (dirError) {
-              this.logger.error('PathUtils: Failed to read parent directory:', { parentDir, error: dirError.message });
-            }
-          }
-
-          // Check extraction root contents with recursive listing
-          try {
-            const listAllFiles = (dirPath, prefix = '') => {
-              const items = [];
-              const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-              for (const entry of entries) {
-                const fullPath = path.join(dirPath, entry.name);
-                const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-                if (entry.isDirectory()) {
-                  items.push(`${relativePath}/`);
-                  items.push(...listAllFiles(fullPath, relativePath));
-                } else {
-                  items.push(relativePath);
-                }
-              }
-              return items;
-            };
-
-            const allFiles = listAllFiles(extractionPath);
-            this.logger.error('PathUtils: Complete extraction root contents:', {
-              extractionPath,
-              totalFiles: allFiles.filter(f => !f.endsWith('/')).length,
-              totalDirectories: allFiles.filter(f => f.endsWith('/')).length,
-              allContents: allFiles.slice(0, 50) // Limit to first 50 items
-            });
-
-            // Look for HTML files specifically
-            const htmlFiles = allFiles.filter(f => f.toLowerCase().endsWith('.html') && !f.endsWith('/'));
-            this.logger.error('PathUtils: HTML files in extraction:', { htmlFiles });
-
-            // Look for files in directories similar to the requested path
-            const requestedDir = path.dirname(contentPath);
-            const similarDirs = allFiles.filter(f =>
-              f.endsWith('/') &&
-              (f.toLowerCase().includes(requestedDir.toLowerCase()) ||
-               requestedDir.toLowerCase().includes(f.replace('/', '').toLowerCase()))
-            );
-            if (similarDirs.length > 0) {
-              this.logger.error('PathUtils: Similar directories found:', { requestedDir, similarDirs });
-            }
-
-          } catch (extractionError) {
-            this.logger.error('PathUtils: Failed to read extraction root:', { extractionPath, error: extractionError.message });
-          }
-
-          // Additional diagnostic: URL decoding issues
-          const decodedContentPath = decodeURIComponent(contentPath);
-          if (decodedContentPath !== contentPath) {
-            this.logger.error('PathUtils: URL decoding difference detected:', {
-              original: contentPath,
-              decoded: decodedContentPath,
-              resolvedOriginal: resolvedPath,
-              wouldResolveDecoded: path.resolve(manifestDir, decodedContentPath)
-            });
-          }
-
-          // Show the decoded path we actually tried to resolve
-          this.logger.error('PathUtils: Path resolution details:', {
-            manifestDir,
-            originalContentPath: contentPath,
-            decodedFilePath: filePath,
-            resolvedPathAttempted: resolvedPath,
-            resolvedPathExists: fs.existsSync(resolvedPath)
-          });
-        }
         throw new Error(`File does not exist: ${resolvedPath}`);
       }
 
@@ -365,12 +207,6 @@ class PathUtils {
         protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedTempRoot);
       }
 
-      if (this.logger) {
-        this.logger.debug('PathUtils: Generated protocol URL:', {
-          protocolUrl,
-          usedBase: withinAppRoot ? 'appRoot' : 'tempRoot'
-        });
-      }
 
       // Add query string back if present
       if (queryString) {
@@ -389,22 +225,26 @@ class PathUtils {
         wasDecoded: filePath !== encodedFilePath
       };
 
-      if (this.logger) {
-        this.logger.info('PathUtils: SCORM content URL resolved successfully:', result);
-      }
+
+      this.logger?.debug && this.logger.debug('PathUtils: content resolution result', {
+        operation: 'contentResolution',
+        success: true,
+        originalPath: contentPath,
+        resolvedPath: resolvedPath,
+        url: protocolUrl,
+        usedBase: withinAppRoot ? 'appRoot' : 'tempRoot',
+        duration: Date.now() - startTime
+      });
 
       return result;
 
     } catch (error) {
-      if (this.logger) {
-        this.logger.error('PathUtils: Failed to resolve SCORM content URL:', {
-          error: error.message,
-          contentPath,
-          extractionPath,
-          manifestPath,
-          appRoot
-        });
-      }
+      this.logger?.error('PathUtils: content resolution failed', {
+        operation: 'contentResolution',
+        error: error?.message || String(error),
+        context: { contentPath, extractionPath, manifestPath },
+        duration: Date.now() - startTime
+      });
 
       return {
         success: false,
@@ -433,11 +273,6 @@ class PathUtils {
       const normalizedPath = this.normalize(filePath);
       const normalizedRoot = this.normalize(allowedRoot);
       
-      // Check for path traversal attempts
-      if (normalizedPath.includes('..')) {
-        return false;
-      }
-      
       // Ensure path is within allowed root
       if (!normalizedPath.startsWith(normalizedRoot)) {
         return false;
@@ -458,7 +293,12 @@ class PathUtils {
    * @returns {Object} Processing result with resolved path or error
    */
   static handleProtocolRequest(protocolUrl, appRoot) {
+    const startTime = Date.now();
     try {
+      this.logger?.info('PathUtils: handleProtocolRequest start', {
+        operation: 'protocolRequest',
+        url: protocolUrl
+      });
       // Defensive guard
       if (!protocolUrl || typeof protocolUrl !== 'string') {
         return { success: false, error: 'Invalid protocol URL', requestedPath: protocolUrl };
@@ -476,12 +316,6 @@ class PathUtils {
       // This maintains backward compatibility with any URLs that still have the prefix
       else if (requestedPath.startsWith('index.html/')) {
         requestedPath = requestedPath.slice('index.html/'.length);
-        if (this.logger) {
-          this.logger.debug('PathUtils: Stripped index.html/ prefix for backward compatibility', {
-            originalPath: protocolUrl,
-            strippedPath: requestedPath
-          });
-        }
       }
 
       // Quick checks for broken content variables
@@ -501,12 +335,6 @@ class PathUtils {
       // URL decode the file path to handle encoded characters like %20 (spaces)
       try {
         filePathRaw = decodeURIComponent(filePathRaw);
-        if (this.logger) {
-          this.logger.debug('PathUtils: URL decoded file path:', {
-            original: filePortion,
-            decoded: filePathRaw
-          });
-        }
       } catch (decodeError) {
         if (this.logger) {
           this.logger.warn('PathUtils: Failed to decode URI component, using original path:', {
@@ -522,14 +350,6 @@ class PathUtils {
         filePathRaw = filePathRaw.replace(/\/+$/, '');
       }
 
-      if (this.logger) {
-        this.logger.debug('PathUtils: handleProtocolRequest processing:', {
-          originalProtocolUrl: protocolUrl,
-          requestedPathAfterPrefix: requestedPath,
-          filePathRaw,
-          queryString
-        });
-      }
 
       const normalizedAppRoot = this.normalize(appRoot);
       const normalizedTempRoot = this.getTempRoot();
@@ -537,80 +357,30 @@ class PathUtils {
       // Legacy abs/ encoding is no longer supported - all paths should be relative to app root or temp root
 
       // Treat incoming path as relative first to appRoot, then to canonical temp root
-      const safeRel = path.normalize(filePathRaw);
-      const appResolved = path.resolve(normalizedAppRoot, safeRel);
-      const tempResolved = path.resolve(normalizedTempRoot, safeRel);
+      const safeRel = this.normalize(filePathRaw);
+      const appResolved = this.join(normalizedAppRoot, safeRel);
+      const tempResolved = this.join(normalizedTempRoot, safeRel);
 
       // Normalize resolved variants for reliable cross-platform comparisons (forward-slash normalized)
       const appResolvedNorm = this.normalize(appResolved);
       const tempResolvedNorm = this.normalize(tempResolved);
 
       // Check file existence and validate against allowed roots
-      if (this.logger) {
-        this.logger.debug('PathUtils: Checking app root path:', {
-          appResolvedNorm,
-          normalizedAppRoot,
-          exists: fs.existsSync(appResolved)
-        });
-      }
       if (this.isValidPath(appResolvedNorm, normalizedAppRoot, appResolved)) {
         return { success: true, resolvedPath: appResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'appRoot' };
       }
 
-      // Check temp root directory first
-      if (this.logger) {
-        this.logger.debug('PathUtils: Checking temp root path:', {
-          tempResolvedNorm,
-          normalizedTempRoot,
-          exists: fs.existsSync(tempResolved)
-        });
-      }
+      // Check temp root directory
       if (this.isValidPath(tempResolvedNorm, normalizedTempRoot, tempResolved)) {
         return { success: true, resolvedPath: tempResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'tempRoot' };
       }
 
-      // If not found in temp root, check inside SCORM extraction subdirectories
-      try {
-        const tempDirContents = fs.readdirSync(normalizedTempRoot, { withFileTypes: true });
-        if (this.logger) {
-          this.logger.debug('PathUtils: Checking SCORM extraction subdirectories:', {
-            tempDirContents: tempDirContents.map(item => ({ name: item.name, isDirectory: item.isDirectory() })),
-            safeRel
-          });
-        }
-        for (const item of tempDirContents) {
-          if (item.isDirectory() && item.name.startsWith('scorm_')) {
-            const scormDirPath = path.join(normalizedTempRoot, item.name);
-            const scormResolved = path.resolve(scormDirPath, safeRel);
-            const scormResolvedNorm = this.normalize(scormResolved);
-
-            if (this.logger) {
-              this.logger.debug('PathUtils: Checking SCORM subdirectory path:', {
-                scormDirPath,
-                scormResolved,
-                scormResolvedNorm,
-                exists: fs.existsSync(scormResolved)
-              });
-            }
-
-            if (this.isValidPath(scormResolvedNorm, normalizedTempRoot, scormResolved)) {
-              return { success: true, resolvedPath: scormResolvedNorm, requestedPath, queryString: queryString || null, usedBase: 'scormExtraction' };
-            }
-          }
-        }
-      } catch (error) {
-        if (this.logger) {
-          this.logger.debug('PathUtils: Error reading temp directory:', error.message);
-        }
-        // Ignore directory reading errors - fall through to not found
-      }
-
       // Nothing found
-      PathUtils.logger?.warn('PathUtils: handleProtocolRequest - file not found under allowed roots', { requestedPath, appResolvedNorm, tempResolvedNorm });
+      PathUtils.logger?.warn('PathUtils: handleProtocolRequest - file not found under allowed roots', { requestedPath, appResolvedNorm, tempResolvedNorm, duration: Date.now() - startTime });
       return { success: false, error: `File not found under allowed roots (${normalizedAppRoot} or ${normalizedTempRoot})`, requestedPath, resolvedPath: null };
 
     } catch (error) {
-      PathUtils.logger?.error('PathUtils: handleProtocolRequest unexpected error', error?.message || error);
+      PathUtils.logger?.error('PathUtils: handleProtocolRequest unexpected error', { error: error?.message || String(error), duration: Date.now() - startTime });
       return { success: false, error: error?.message || String(error), requestedPath: protocolUrl };
     }
   }
@@ -622,8 +392,7 @@ class PathUtils {
    */
   static getAppRoot(currentDir) {
     // Navigate up from main/services to app root
-    const appRoot = path.resolve(currentDir, '../../../');
-    return this.normalize(appRoot);
+    return this.join(currentDir, '../../../');
   }
 
   /**
@@ -632,8 +401,7 @@ class PathUtils {
    * @returns {string} Resolved preload script path
    */
   static getPreloadPath(currentDir) {
-    const preloadPath = path.join(currentDir, '../../preload.js');
-    return path.resolve(preloadPath);
+    return this.join(currentDir, '../../preload.js');
   }
 
   /**
@@ -643,6 +411,57 @@ class PathUtils {
    */
   static fileExists(filePath) {
     return fs.existsSync(filePath);
+  }
+
+  /**
+   * Join path segments using platform-specific separator
+   * @param {...string} paths - Path segments to join
+   * @returns {string} Joined and normalized path
+   */
+  static join(...paths) {
+    return this.normalize(path.join(...paths));
+  }
+
+  /**
+   * Get the directory name of a path
+   * @param {string} filePath - Path to get directory from
+   * @returns {string} Directory path
+   */
+  static dirname(filePath) {
+    return path.dirname(filePath);
+  }
+
+  /**
+   * Get the file extension from a path (without the dot)
+   * @param {string} filePath - Path to get extension from
+   * @returns {string} File extension in lowercase (without dot)
+   */
+  static getExtension(filePath) {
+    const normalized = this.normalize(filePath);
+    const ext = path.extname(normalized);
+    return ext ? ext.substring(1).toLowerCase() : '';
+  }
+
+  /**
+   * Combine xmlBase and href for SCORM content paths
+   * @param {string} xmlBase - The xml:base value from manifest
+   * @param {string} href - The href value from resource
+   * @returns {string} Combined path with proper normalization
+   */
+  static combineXmlBaseHref(xmlBase, href) {
+    if (!href) {
+      throw new Error('href is required for path combination');
+    }
+    
+    if (!xmlBase) {
+      return href;
+    }
+    
+    // Remove trailing slashes from xmlBase
+    const cleanBase = xmlBase.replace(/\/+$/, '');
+    
+    // Join paths using our normalized join method
+    return this.join(cleanBase, href);
   }
 }
 

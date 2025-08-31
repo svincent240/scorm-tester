@@ -111,7 +111,7 @@ class WindowManager extends BaseService {
       
       // Validate index.html exists before loading
       const appRoot = PathUtils.getAppRoot(__dirname);
-      const indexPath = path.join(appRoot, 'index.html');
+      const indexPath = PathUtils.join(appRoot, 'index.html');
       if (!PathUtils.fileExists(indexPath)) {
         throw new Error(`index.html not found at path: ${indexPath}`);
       }

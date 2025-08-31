@@ -8,11 +8,11 @@
  * @fileoverview Main process service for managing recent SCORM courses.
  */
 
-const path = require('path');
 const fs = require('fs').promises;
 const { app } = require('electron');
 const BaseService = require('./base-service');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
+const PathUtils = require('../../shared/utils/path-utils');
 
 const RECENT_FILE_NAME = 'recents.json';
 const MAX_RECENT_ITEMS = 5; // User-defined limit
@@ -20,8 +20,9 @@ const MAX_RECENT_ITEMS = 5; // User-defined limit
 class RecentCoursesService extends BaseService {
   constructor(errorHandler, logger, options = {}) {
     super('RecentCoursesService', errorHandler, logger, options);
-    this.recentsFilePath = path.join(app.getPath('userData'), RECENT_FILE_NAME);
-    this.logger?.debug('RecentCoursesService: Constructor - userData path:', app.getPath('userData'));
+    const userDataPath = app.getPath('userData');
+    this.recentsFilePath = PathUtils.join(userDataPath, RECENT_FILE_NAME);
+    this.logger?.debug('RecentCoursesService: Constructor - userData path:', userDataPath);
     this.logger?.debug('RecentCoursesService: Constructor - recents file path:', this.recentsFilePath);
     this._items = [];
     this._saveInProgress = false; // Prevent concurrent saves
@@ -201,7 +202,7 @@ class RecentCoursesService extends BaseService {
     this._saveInProgress = true;
 
     try {
-      const dir = path.dirname(this.recentsFilePath);
+      const dir = PathUtils.dirname(this.recentsFilePath);
       this.logger?.debug('RecentCoursesService: _saveRecents - Directory path:', dir);
       this.logger?.debug('RecentCoursesService: _saveRecents - Full file path:', this.recentsFilePath);
 
