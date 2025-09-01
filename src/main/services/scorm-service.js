@@ -308,12 +308,18 @@ class ScormService extends BaseService {
       let errorCode = '0';
       try {
         if (rte && typeof rte.GetValue === 'function') {
+          // Delegate to RTE and use its error state
           value = rte.GetValue(element);
-          errorCode = value === '' ? '401' : '0';
+          if (typeof rte.GetLastError === 'function') {
+            errorCode = rte.GetLastError();
+          } else {
+            errorCode = '0';
+          }
         } else {
           // Fallback to session-local data model if present
-          value = session.data ? (session.data[element] || '') : '';
-          errorCode = value === '' && !(session.data && session.data.hasOwnProperty(element)) ? '401' : '0';
+          value = session.data ? (session.data[element] ?? '') : '';
+          const hasElement = !!(session.data && Object.prototype.hasOwnProperty.call(session.data, element));
+          errorCode = hasElement ? '0' : '404';
         }
       } catch (e) {
         this.logger?.warn(`ScormService: RTE GetValue failed for ${element}: ${e?.message || e}`);
@@ -324,8 +330,9 @@ class ScormService extends BaseService {
       // Log API call
       this.logApiCall(session, 'GetValue', element, value, errorCode);
       
-      this.recordOperation('getValue', errorCode === '0');
-      return { success: errorCode === '0', value, errorCode };
+      const ok = errorCode === '0';
+      this.recordOperation('getValue', ok);
+      return { success: ok, value, errorCode };
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification
@@ -360,29 +367,37 @@ class ScormService extends BaseService {
       // Prefer RTE instance as system-of-record if available
       const rte = this.rteInstances.get(sessionId);
       let success = false;
+      let errorCode = '0';
       try {
         if (rte && typeof rte.SetValue === 'function') {
           const res = rte.SetValue(element, String(value));
           success = (res === 'true');
+          if (typeof rte.GetLastError === 'function') {
+            errorCode = rte.GetLastError();
+          } else {
+            errorCode = success ? '0' : '351';
+          }
         } else {
           // Fallback to session-local data model
           session.data = session.data || {};
           session.data[element] = value;
           success = true;
+          errorCode = '0';
         }
       } catch (e) {
         this.logger?.warn(`ScormService: RTE SetValue failed for ${element}: ${e?.message || e}`);
         success = false;
+        errorCode = '101';
       }
       
       // Log API call
-      this.logApiCall(session, 'SetValue', element, value, success ? '0' : '101');
+      this.logApiCall(session, 'SetValue', element, value, errorCode);
       
       // Process special elements (ensure SN updates still happen)
       await this.processSpecialElement(session, element, value);
       
       this.recordOperation('setValue', success);
-      return { success, errorCode: success ? '0' : '101' };
+      return { success, errorCode };
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification
@@ -413,29 +428,35 @@ class ScormService extends BaseService {
       // Update last activity
       session.lastActivity = Date.now();
       
-      // Log API call
-      this.logApiCall(session, 'Commit', '', '', '0');
-      
       // Prefer RTE commit when available
       const rte = this.rteInstances.get(sessionId);
       let success = true;
+      let errorCode = '0';
       try {
         if (rte && typeof rte.Commit === 'function') {
           const res = rte.Commit('');
           success = (res === 'true');
+          if (typeof rte.GetLastError === 'function') {
+            errorCode = rte.GetLastError();
+          } else {
+            errorCode = success ? '0' : '391';
+          }
         } else {
           // Fallback: nothing to do, treat as success
           success = true;
+          errorCode = '0';
         }
       } catch (e) {
         this.logger?.warn(`ScormService: RTE Commit failed for session ${sessionId}: ${e?.message || e}`);
         success = false;
+        errorCode = '101';
       }
       
-      
+      // Log API call with authoritative error
+      this.logApiCall(session, 'Commit', '', '', errorCode);
       
       this.recordOperation('commit', success);
-      return { success, errorCode: success ? '0' : '101' };
+      return { success, errorCode };
       
     } catch (error) {
       // Route error through ErrorRouter for proper classification

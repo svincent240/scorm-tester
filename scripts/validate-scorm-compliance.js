@@ -310,8 +310,16 @@ class ScormComplianceValidator {
     }
 
     const content = fs.readFileSync(errorHandlerPath, 'utf8');
-    
-    // Check for SCORM error codes
+    const sharedErrorCodesPath = path.join(process.cwd(), 'src/shared/constants/error-codes.js');
+    let SCORM_ERROR_CODES = {};
+    try {
+      // Load shared constants as the source of truth
+      ({ SCORM_ERROR_CODES } = require(sharedErrorCodesPath));
+    } catch (e) {
+      this.errors.push('Failed to load shared SCORM error codes');
+    }
+
+    // Required SCORM 2004 error codes to be present in shared constants
     const requiredErrorCodes = [
       '0',    // No error
       '101',  // General exception
@@ -331,31 +339,38 @@ class ScormComplianceValidator {
       '301',  // General get failure
       '351',  // General set failure
       '391',  // General commit failure
-      '401',  // Undefined data model element
-      '402',  // Unimplemented data model element
-      '403',  // Data model element value not initialized
-      '404',  // Data model element is read only
-      '405',  // Data model element is write only
-      '406',  // Data model element type mismatch
-      '407',  // Data model element value out of range
-      '408'   // Data model dependency not established
+      '401',  // General get failure (SCORM RTE)
+      '402',  // General set failure (SCORM RTE)
+      '403',  // General commit failure (SCORM RTE)
+      '404',  // Undefined data model element
+      '405',  // Unimplemented data model element
+      '406',  // Data model element value not initialized
+      '407',  // Data model element is read only
+      '408'   // Data model element is write only
     ];
 
-    let implementedErrorCodes = 0;
-    for (const errorCode of requiredErrorCodes) {
-      if (content.includes(`'${errorCode}'`) || content.includes(`"${errorCode}"`)) {
-        implementedErrorCodes++;
+    // Verify shared constants include the required codes
+    let availableErrorCodes = 0;
+    for (const code of requiredErrorCodes) {
+      if (Object.prototype.hasOwnProperty.call(SCORM_ERROR_CODES, code)) {
+        availableErrorCodes++;
       }
     }
 
-    this.results.errorHandling.implementedErrorCodes = implementedErrorCodes;
+    // Consider implemented if error handler imports shared constants
+    const usesSharedConstants = content.includes("shared/constants/error-codes");
+
+    this.results.errorHandling.implementedErrorCodes = availableErrorCodes;
     this.results.errorHandling.totalRequired = requiredErrorCodes.length;
-    this.results.errorHandling.percentage = (implementedErrorCodes / requiredErrorCodes.length) * 100;
+    this.results.errorHandling.percentage = (availableErrorCodes / requiredErrorCodes.length) * 100;
 
-    console.log(`  ✅ ${implementedErrorCodes}/${requiredErrorCodes.length} SCORM error codes implemented`);
+    console.log(`  ✅ ${availableErrorCodes}/${requiredErrorCodes.length} required SCORM error codes available in shared constants`);
 
-    if (implementedErrorCodes < requiredErrorCodes.length * 0.9) {
-      this.warnings.push('Not all required SCORM error codes are implemented');
+    if (!usesSharedConstants) {
+      this.warnings.push('Error handler does not import shared SCORM error codes');
+    }
+    if (availableErrorCodes < requiredErrorCodes.length) {
+      this.warnings.push('Not all required SCORM error codes are defined in shared constants');
     }
 
     // Check for error message handling

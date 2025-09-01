@@ -33,6 +33,20 @@ const SCORM_ERROR_CODES = {
   112: "Termination Before Initialization", 
   113: "Termination After Termination",
 
+  // Retrieval/Storage/Commit timing errors (120s/130s/140s)
+  122: "Retrieve Data Before Initialization",
+  123: "Retrieve Data After Termination",
+  132: "Store Data Before Initialization",
+  133: "Store Data After Termination",
+  142: "Commit Before Initialization",
+  143: "Commit After Termination",
+  
+  // Argument/General operation errors
+  201: "General Argument Error",
+  301: "General Get Failure",
+  351: "General Set Failure",
+  391: "General Commit Failure",
+
   // Data Model Errors (400-499)
   401: "General Get Failure",
   402: "General Set Failure",

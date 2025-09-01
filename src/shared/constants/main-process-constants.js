@@ -246,8 +246,13 @@ const SECURITY_CONFIG = {
       'sn:getSequencingState',
       'sn:initialize',
       'sn:processNavigation',
+      'sn:refreshNavigation',
       'sn:updateActivityProgress',
       'sn:reset',
+      // Browse Mode channels (robustness even with declarative routes)
+      'browse-mode-enable',
+      'browse-mode-disable',
+      'browse-mode-status',
       // Recent Courses channels
       'recent:get',
       'recent:addOrUpdate',

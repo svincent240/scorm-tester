@@ -177,7 +177,7 @@ class ScormClient {
 
     // Validate element name using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
-      this.setLastError('401', { element }); // Undefined data model element
+      this.setLastError('404', { element }); // Undefined data model element
       return '';
     }
 
@@ -219,13 +219,13 @@ class ScormClient {
 
     // Validate element name using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidElement(element)) {
-      this.setLastError('401', { element }); // Undefined data model element
+      this.setLastError('404', { element }); // Undefined data model element
       return 'false';
     }
 
     // Validate value format using dynamically loaded validator
     if (this.isValidatorReady() && !this.validator.isValidValue(element, value)) {
-      this.setLastError('405', { element }); // Incorrect data type
+      this.setLastError('409', { element }); // Data model element type mismatch
       return 'false';
     }
 
@@ -306,11 +306,14 @@ class ScormClient {
       '301': 'General get failure',
       '351': 'General set failure',
       '391': 'General commit failure',
-      '401': 'Undefined data model element',
-      '402': 'Unimplemented data model element',
-      '403': 'Data model element value not initialized',
-      '404': 'Data model element is read only',
-      '405': 'Incorrect data type'
+      '404': 'Undefined data model element',
+      '405': 'Unimplemented data model element',
+      '406': 'Data model element value not initialized',
+      '407': 'Data model element is read only',
+      '408': 'Data model element is write only',
+      '409': 'Data model element type mismatch',
+      '410': 'Data model element value out of range',
+      '411': 'Data model dependency not established'
     };
 
     return errorStrings[errorCode] || 'Unknown error';
@@ -525,16 +528,16 @@ class ScormClient {
   setLastError(errorCode, context = {}) {
     this.lastError = errorCode;
 
-    // Downgrade SCORM 2004 401 (Undefined data model element) for adl.data.* access to WARN without emitting scorm:error
+    // Downgrade SCORM 2004 404 (Undefined data model element) for adl.data.* access to WARN without emitting scorm:error
     // Rationale:
     // - Many sample SCOs probe optional ADL data model collections (adl.data.*) that are not required by core LMS/RTE.
-    // - Per spec, undefined elements should return 401 but are not fatal; avoid triggering app-level error loops.
+    // - Per spec, undefined elements should return 404 but are not fatal; avoid triggering app-level error loops.
     try {
       const element = typeof context.element === 'string' ? context.element : null;
-      const is401 = String(errorCode) === '401';
+      const is404 = String(errorCode) === '404';
       const isAdlDataProbe = !!(element && /^adl\.data(\.|$)/i.test(element));
 
-      if (is401 && isAdlDataProbe) {
+      if (is404 && isAdlDataProbe) {
         // Log as WARN to the centralized renderer logger and suppress 'scorm:error' event emission
         import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
           .then(({ rendererLogger }) => {

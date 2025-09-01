@@ -325,9 +325,10 @@ class ScormInspectorTelemetryStore {
    * @returns {string} Severity level
    */
   classifyErrorSeverity(errorCode) {
-    const criticalErrors = ['101', '201', '301']; // Initialize, Terminate, No Error
-    const highErrors = ['401', '402', '403', '404']; // Data Model errors
-    const mediumErrors = ['351', '391']; // General errors
+    const criticalErrors = ['101', '201', '301'];
+    // Treat core data model and general get/set/commit failures as high
+    const highErrors = ['401', '402', '403', '404', '406', '407', '408', '409', '410', '411'];
+    const mediumErrors = ['351', '391'];
     
     if (criticalErrors.includes(errorCode)) return 'critical';
     if (highErrors.includes(errorCode)) return 'high';
@@ -344,21 +345,27 @@ class ScormInspectorTelemetryStore {
     const steps = [];
     
     switch (entry.errorCode) {
-      case '401':
+      case '404': // Undefined data model element
         steps.push(
           'Check if the data element name is spelled correctly',
           'Verify the element exists in the SCORM data model',
           'Ensure proper SCORM session initialization'
         );
         break;
-      case '403':
+      case '406': // Value not initialized
         steps.push(
-          'Check if the data element is read-only',
+          'Set the element before reading (per course logic)',
           'Verify you have called Initialize() first',
           'Ensure the session is not terminated'
         );
         break;
-      case '404':
+      case '407': // Read only
+        steps.push(
+          'Check if the data element is read-only',
+          'Write to the correct writable element instead'
+        );
+        break;
+      case '409': // Type mismatch
         steps.push(
           'Validate the data value format',
           'Check value length limits',

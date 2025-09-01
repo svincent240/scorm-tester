@@ -142,6 +142,22 @@ class NavigationControls extends BaseComponent {
           snServiceAvailable: true,
           snServiceError: null 
         });
+
+        // Proactively pull current sequencing state to sync button availability
+        try {
+          const state = await this.snService.getSequencingState();
+          if (state && Array.isArray(state.availableNavigation)) {
+            this.updateAvailableNavigation(state.availableNavigation);
+            try {
+              const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
+              this.uiState?.updateNavigation({ ...normalized, _fromComponent: true });
+            } catch (e) {
+              this.logger?.warn('NavigationControls: Failed to sync initial availability to UIState', e?.message || e);
+            }
+          }
+        } catch (e) {
+          this.logger?.debug('NavigationControls: Initial sequencing state unavailable', e?.message || e);
+        }
       } else {
         this.snService = null;
         this.updateNavigationState({ 
@@ -393,9 +409,9 @@ class NavigationControls extends BaseComponent {
     const sidebar = document.getElementById('app-sidebar');
     if (!sidebar) {
       // Error logging for missing sidebar - indicates serious DOM issue
-      import('../../utils/renderer-logger.js').then(({ default: logger }) => {
-        logger.error('NavigationControls: Sidebar element not found during menu toggle');
-      });
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger?.error('NavigationControls: Sidebar element not found during menu toggle');
+      }).catch(() => {});
       return;
     }
 
@@ -418,9 +434,9 @@ class NavigationControls extends BaseComponent {
       }
     } catch (error) {
       // Error logging for unexpected failures
-      import('../../utils/renderer-logger.js').then(({ default: logger }) => {
-        logger.error('NavigationControls: Menu toggle failed', error?.message || error);
-      });
+      import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+        rendererLogger?.error('NavigationControls: Menu toggle failed', error?.message || error);
+      }).catch(() => {});
     }
   }
 
@@ -1120,11 +1136,21 @@ class NavigationControls extends BaseComponent {
   async refreshNavigationAvailability() {
     try {
       if (this.snService) {
-        // Get updated sequencing state which includes available navigation
-        const state = await this.snService.getSequencingState();
-        if (state && state.availableNavigation) {
-          this.updateAvailableNavigation(state.availableNavigation);
-          this.logger?.debug('NavigationControls: Navigation availability refreshed', state.availableNavigation);
+        // Ask SN to recompute availability (especially important after mode changes)
+        const refreshed = await this.snService.refreshNavigationAvailability();
+        const available = refreshed && (refreshed.availableNavigation || refreshed?.availableNavigation);
+
+        if (Array.isArray(available)) {
+          // Update local state and propagate authoritative booleans to UIState
+          this.updateAvailableNavigation(available);
+          try {
+            const normalized = this.normalizeAvailableNavigation(available);
+            this.uiState?.updateNavigation({ ...normalized, _fromComponent: true });
+          } catch (e) {
+            this.logger?.warn('NavigationControls: Failed to push refreshed availability to UIState', e?.message || e);
+          }
+          this.logger?.debug('NavigationControls: Navigation availability refreshed', available);
+          return { success: true, availableNavigation: available };
         }
       }
     } catch (error) {
