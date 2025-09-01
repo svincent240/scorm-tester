@@ -26,15 +26,27 @@ TypeError: this.contentViewer.loadActivity is not a function
     at AppManager.handleNavigationRequest (app-manager.js:389)
 ```
 
-**Potential Solutions**:
-1. **Add loadActivity method to ContentViewer**: Create new method that accepts activityObject and extracts URL
-2. **Modify AppManager**: Convert activityObject to URL/scormData format and use existing loadContent method
-3. **Create adapter layer**: Add translation between SN activity objects and ContentViewer format
+**🔗 Related Bugs**: This bug is part of the **Navigation System Core** cluster:
+- **BUG-002**: Creates orphaned events that should trigger this method
+- **BUG-003**: Navigation pipeline needs unified activity processing
+- **BUG-007**: ContentViewer needs event integration to receive activity objects
+
+**Improved Solution Strategy**:
+1. **✅ Add `loadActivity(activityObject)` method to ContentViewer**: 
+   - Extract SCORM-compliant data: `launch_data`, `mastery_score`, `max_time_allowed`, etc.
+   - Validate activity object contains required SCORM 2004 elements
+   - Extract `identifierref` from activity and resolve to resource URL
+   - Maintain backward compatibility with existing `loadContent(url, scormData)`
+
+2. **🔧 SCORM 2004 Compliance Requirements**:
+   - Activity object must conform to SCORM Activity Tree structure
+   - Must contain valid `item` elements with `identifierref` pointing to resources
+   - Respect sequencing constraints during activity loading
 
 **Dependencies**: 
-- Must understand activityObject structure from SN service
-- Need to maintain compatibility with existing loadContent usage
-- Should preserve SCORM data context during conversion
+- **Prerequisites**: Must be implemented alongside BUG-007 (event integration)
+- **Follows**: BUG-002 and BUG-003 fixes provide the unified event pipeline
+- **Integration**: Works with BUG-004 SCORM lifecycle integration
 
 ---
 
@@ -72,16 +84,28 @@ eventBus.emit('activityLaunchRequested', {
 // But NOT 'activityLaunchRequested'
 ```
 
-**Missing Integration Points**:
-1. ContentViewer should subscribe to `activityLaunchRequested`
-2. Or AppManager should relay event to ContentViewer
-3. Or use existing `navigationRequest` event instead
+**🔗 Related Bugs**: This bug is part of the **Navigation System Core** cluster:
+- **BUG-001**: The missing `loadActivity` method this event should trigger
+- **BUG-003**: Part of the dual navigation path problem
+- **BUG-007**: ContentViewer needs event subscriptions to receive these events
 
-**Suggested Fix**:
+**Improved Solution Strategy**:
+**❌ Avoid Event Fragmentation**: Don't create another event handler for `activityLaunchRequested`
+
+**✅ Consolidate to Unified Events**:
+1. **Use existing `navigationRequest` event** instead of `activityLaunchRequested`
+2. **Standardize event payload**: All navigation events use: `{activityId, activityObject, requestType, source}`
+3. **Single event handler pattern**: Route all navigation through `AppManager.handleNavigationRequest()`
+4. **Request type differentiation**: Use `requestType: 'activityLaunch'` to distinguish from other navigation
+
+**Event Consolidation**:
 ```javascript
-// In ContentViewer constructor or AppManager
-eventBus.on('activityLaunchRequested', (data) => {
-  this.loadActivity(data.activityObject); // Requires BUG-001 fix
+// Replace activityLaunchRequested with:
+eventBus.emit('navigationRequest', {
+  activityId: this.currentActivity.id,
+  activityObject: this.currentActivity,
+  requestType: 'activityLaunch',
+  source: 'NavigationControls'
 });
 ```
 
@@ -139,12 +163,38 @@ eventBus.on('activityLaunchRequested', ???);                  // BUG-002
 - Medium: Performance overhead from duplicate processing
 - Medium: Debugging complexity due to non-deterministic behavior
 
-**Consolidation Strategy**:
-1. Create single `processNavigation()` method
-2. Route all navigation events through unified entry point
-3. Implement proper request queuing to prevent race conditions
-4. Add navigation state locking during processing
-5. Ensure consistent error handling across all navigation types
+**🔗 Related Bugs**: This bug is the **core architectural issue** in the Navigation System Core cluster:
+- **BUG-001**: Needs unified activity processing through single pipeline
+- **BUG-002**: Event consolidation eliminates orphaned events
+- **BUG-007**: ContentViewer integration completes the unified architecture
+
+**Enhanced Consolidation Strategy**:
+1. **✅ Navigation State Machine**: Implement proper state management:
+   - States: `IDLE`, `PROCESSING`, `LOADING`
+   - Prevent new navigation requests during processing
+   - Queue navigation requests when busy
+
+2. **✅ Unified Processing Pipeline**: Single `processNavigationRequest(data)` method:
+   - Validates current navigation state
+   - Determines if SN (Sequencing & Navigation) processing needed
+   - Routes through appropriate path (SN service vs direct)
+   - Updates navigation state consistently
+
+3. **✅ SCORM 2004 Compliance**: 
+   - Respect sequencing rules - don't allow navigation when `choice` is disabled
+   - Maintain activity tree integrity during navigation
+   - Enforce prerequisite and post-condition rules
+
+4. **✅ Request Queuing Strategy**:
+   ```javascript
+   processNavigationRequest(data) {
+     if (this.navigationState === 'PROCESSING') {
+       this.navigationQueue.push(data);
+       return;
+     }
+     // Process immediately...
+   }
+   ```
 
 ---
 
@@ -190,29 +240,37 @@ handleActivityExit(activityId, exitData) {
 - Score persistence broken
 - Suspend data not synchronized
 
-**Integration Points Missing**:
+**🔗 Related Bugs**: This bug is part of the **SCORM Integration Chain**:
+- **BUG-008**: Method name error must be fixed first (prerequisite)
+- **BUG-009**: Data model access must work for tracking (prerequisite)
+- **Depends on**: Navigation System Core (BUG-001/002/003/007) for integration points
+
+**Enhanced Integration Strategy**:
+**✅ Navigation Lifecycle Hooks**: Integrate SCORM tracking into unified navigation pipeline:
 ```javascript
-// Should be added to navigation process:
-
-// Before loading new activity:
-await snService.handleActivityExit(currentActivityId, {
-  completionStatus: 'completed',
-  score: getCurrentScore(),
-  timeSpent: getSessionTime()
-});
-
-// After loading new activity:
-await snService.updateActivityLocation(newActivityId, {
-  bookmark: getCurrentLocation(),
-  timestamp: Date.now()
-});
+// In the unified processNavigationRequest method:
+async processNavigationRequest(data) {
+  // Before loading new activity:
+  if (this.currentActivity) {
+    await this.handleActivityExit(this.currentActivity.id);
+  }
+  
+  // Process navigation...
+  
+  // After loading new activity:
+  await this.updateActivityLocation(data.activityId);
+}
 ```
 
-**Data Flow Requirements**:
-- ContentViewer must notify SN service of activity changes
-- AppManager must coordinate SCORM data updates during navigation
-- Error handling needed for SCORM API failures
-- Async handling required to prevent navigation blocking
+**✅ Async Error Handling**: Handle SCORM API errors gracefully:
+- Never block navigation due to SCORM API failures
+- Log tracking errors but continue navigation
+- Retry tracking operations in background
+
+**✅ State Persistence Priority**:
+- Persist suspend data before navigation even if API calls fail
+- Batch SCORM updates to prevent UI blocking
+- Maintain data consistency across navigation failures
 
 ---
 
@@ -277,12 +335,31 @@ NavigationControls.toggleBrowseMode() {
 - Users may get stuck in wrong navigation mode
 - SCORM sequencing rules apply incorrectly
 
-**Centralization Requirements**:
-1. Move browse mode state to UIStateService
-2. All components subscribe to browse mode changes
-3. Single source of truth for browse mode status
-4. Consistent event-driven state updates
-5. Proper state persistence across navigation
+**🔗 Related Bugs**: This bug connects to the **Navigation System Core**:
+- **BUG-003**: Browse mode state affects navigation pipeline behavior
+- **BUG-007**: ContentViewer needs browse mode state for content loading
+
+**✅ Simplified Solution Strategy** (Avoid Over-Engineering):
+**❌ Don't Create UIStateService**: Use existing event bus pattern instead
+
+**✅ Centralized State Management**:
+1. **Single Source of Truth**: Move browse mode state to **AppManager** (already manages navigation state)
+2. **Event-Driven Updates**: Use `browseModeChanged` event with payload: `{enabled: boolean}`
+3. **Component Subscription**: Components subscribe to browse mode changes, don't maintain local state
+4. **Integration with Navigation**: Browse mode state integrated into unified navigation pipeline
+
+**SCORM Compliance Integration**:
+- **Browse Mode ON**: Allow free navigation, ignore sequencing constraints
+- **Browse Mode OFF**: Enforce SCORM 2004 sequencing rules and prerequisites
+
+```javascript
+// In AppManager:
+toggleBrowseMode(enabled) {
+  this.browseMode = enabled;
+  eventBus.emit('browseModeChanged', { enabled });
+  // Update navigation constraints based on browse mode
+}
+```
 
 ---
 
@@ -341,36 +418,35 @@ handleDirectNavigation(data) {
 - User stuck on current content with no navigation options
 - Application appears frozen or broken
 
-**Required Fallback Features**:
+**🔗 Related Bugs**: This bug integrates with the **Navigation System Core**:
+- **BUG-001**: Fallback system needs `loadActivity` method for direct navigation
+- **BUG-003**: Part of the unified navigation pipeline architecture
 
-**1. Service Health Monitoring**:
+**✅ Simplified Solution Strategy** (Avoid Over-Engineering):
+**❌ Don't Create Complex Health Monitoring**: Use simple try/catch pattern
+
+**✅ Streamlined Fallback System**:
+1. **Simple Try/Catch Pattern**: When SN service fails, fall back to direct content loading
+2. **Graceful Degradation**: Direct navigation without sequencing constraints
+3. **User Communication**: Simple notification: "Advanced navigation unavailable, using basic mode"
+4. **Integration**: Use new `loadActivity()` method (from BUG-001) for fallback navigation
+
+**SCORM Compliance in Fallback**:
+- **Disable Sequencing**: Remove sequencing constraints in fallback mode
+- **Maintain Basic SCORM API**: Keep basic SCORM API functionality working
+- **Progress Tracking**: Continue basic progress tracking without advanced sequencing
+
 ```javascript
-// Periodic SN service health check
-checkSNServiceHealth() {
-  // Test SN service responsiveness
-  // Switch to fallback mode if unhealthy
+// Simplified fallback in unified navigation pipeline:
+try {
+  const result = await this.snService.processNavigation(data);
+  // Process SN result
+} catch (error) {
+  console.warn('SN service unavailable, using basic navigation');
+  this.loadActivityDirect(data.activityObject); // Uses BUG-001 fix
+  this.showFallbackNotification();
 }
 ```
-
-**2. Graceful Degradation**:
-```javascript
-// Fallback navigation with basic functionality
-fallbackNavigation(data) {
-  // Simple content loading without sequencing
-  // Basic progress tracking
-  // User notification about limited functionality
-}
-```
-
-**3. Recovery Mechanism**:
-- Attempt SN service reconnection
-- Migrate from fallback to full SN when available
-- Preserve user progress during mode transitions
-
-**4. User Communication**:
-- Clear indication when in fallback mode
-- Explanation of limited functionality
-- Option to retry full navigation mode
 
 ---
 
@@ -423,23 +499,42 @@ User Action → NavigationControls → Event Bus → ??? → ContentViewer
 'navigationError'         // For error handling
 ```
 
-**Missing Event Handlers**:
+**🔗 Related Bugs**: This bug **completes the Navigation System Core** architecture:
+- **BUG-001**: ContentViewer needs `loadActivity` method to handle activity objects
+- **BUG-002**: Needs event subscriptions to receive consolidated navigation events
+- **BUG-003**: Part of the unified navigation pipeline architecture
+
+**Enhanced Event Integration Strategy**:
+**❌ Avoid Multiple Event Types**: Don't subscribe to multiple different navigation events
+
+**✅ Unified Event Handling**: ContentViewer subscribes to single `navigationRequest` event:
 ```javascript
-// These methods need to be implemented:
-handleActivityLaunch(eventData) {
-  // Process activity object and load content
-  // Integrate with SCORM data
-}
+// In ContentViewer constructor:
+eventBus.on('navigationRequest', this.handleNavigationRequest.bind(this));
 
-handleContentLoad(eventData) {
-  // Load content with proper SCORM context
-  // Handle loading states and errors
+handleNavigationRequest(eventData) {
+  const { activityObject, requestType, source } = eventData;
+  
+  switch (requestType) {
+    case 'activityLaunch':
+      this.loadActivity(activityObject); // From BUG-001 fix
+      break;
+    case 'directContent':
+      this.loadContent(eventData.url, eventData.scormData);
+      break;
+    // Handle other request types...
+  }
 }
+```
 
-handleNavigationUpdate(eventData) {
-  // Update content viewer state
-  // Sync with navigation changes
-}
+**✅ Error Propagation**: ContentViewer emits loading errors back to event bus:
+```javascript
+// On loading errors:
+eventBus.emit('navigationError', {
+  error: loadingError,
+  activityId: eventData.activityId,
+  source: 'ContentViewer'
+});
 ```
 
 **Benefits of Event Integration**:
@@ -471,28 +566,297 @@ User Action → NavigationControls → Event Bus → ContentViewer
 ## BUG-008: SCORM Service Method Name Error
 **Severity**: Critical | **Status**: Open
 
+**🔗 Related Bugs**: This bug is part of the **SCORM Integration Chain**:
+- **BUG-004**: Prerequisite for SCORM lifecycle integration
+- **BUG-009**: Related to SCORM service method access patterns
+
 **Problem**: `createSessionWithBrowseMode` calls `this.createSession()` but method is named `initializeSession()`
 **Location**: `src/main/services/scorm-service.js:1369`
 **Impact**: Runtime error when creating sessions with browse mode
-**Fix**: Change `this.createSession()` to `this.initializeSession(options)`
+
+**✅ Validated Fix**: Change `this.createSession()` to `this.initializeSession(options)`
+**⚠️ Additional Verification**: Ensure `initializeSession()` accepts the same parameters that were being passed to the non-existent `createSession()`
 
 ---
 
 ## BUG-009: Data Model Access Bug in getCurrentDataModel
 **Severity**: Critical | **Status**: Open
 
+**🔗 Related Bugs**: This bug is part of the **SCORM Integration Chain**:
+- **BUG-004**: Prerequisite for proper SCORM data tracking
+- **BUG-008**: Related to SCORM service method access patterns
+
 **Problem**: `getCurrentDataModel()` uses wrong property names and data access patterns
 **Location**: `src/main/services/scorm-service.js:1244-1245, 1253-1257`
 **Impact**: Method returns empty object instead of actual data model, breaking inspector functionality
-**Fix**: Use `lastActivity` instead of `lastAccessTime`, access RTE instance from `this.rteInstances.get(sessionId)`
+
+**✅ Enhanced Fix Strategy**:
+1. **Correct Property Access**: Use `lastActivity` instead of `lastAccessTime`
+2. **Correct RTE Access**: Access RTE from `this.rteInstances.get(sessionId)`
+3. **SCORM 2004 Compliance**: Verify data model includes all 15 required SCORM data elements
+4. **Null Safety**: Add proper null checks for missing sessions/RTE instances
+5. **Performance**: Consider caching frequently accessed data model elements
+
+**Data Model Structure Validation**: Must include proper hierarchical structure per SCORM 2004 4th Edition specification
 
 ---
 
 ## BUG-010: Rate Limiter Logger Bug
 **Severity**: Medium | **Status**: Open
 
+**🔗 Related Bugs**: Independent infrastructure fix
+
 **Problem**: RateLimiter uses `this._logger` which is never initialized
 **Location**: `src/main/services/ipc/rate-limiter.js:111, 115-116`
 **Impact**: Logging failures in rate limiting, reduced observability
-**Fix**: Use `this.logger` or accept logger parameter in constructor
-\n+---\n+\n+## BUG-011: IPC RateLimiter Import Path Error\n+**Severity**: High | **Status**: Open | **Priority**: P1\n+\n+**Problem**: `IpcHandler` falls back to requiring a local RateLimiter using `require('./rate-limiter')`, but the file is located under `./ipc/rate-limiter.js`.\n+\n+**Location**: `src/main/services/ipc-handler.js` (around line 160)\n+```javascript\n+// Current (incorrect)\n+const RateLimiter = require('./rate-limiter');\n+\n+// Correct\n+const RateLimiter = require('./ipc/rate-limiter');\n+```\n+\n+**Impact**: When no external rateLimiter is injected, the fallback import throws at runtime, preventing IPC handlers from initializing and breaking renderer ↔ main communication.\n+\n+**Fix**: Update the require path to `./ipc/rate-limiter`. Add a unit test to cover fallback initialization.\n+\n+---\n+\n+## BUG-012: Custom Protocol Registration Misinterprets Return Value\n+**Severity**: Critical | **Status**: Open | **Priority**: P1\n+\n+**Problem**: `WindowManager.registerCustomProtocol()` treats `protocol.registerFileProtocol(...)` as returning a boolean. Electron’s API returns `void` and throws on error. The code then throws a false failure.\n+\n+**Location**: `src/main/services/window-manager.js` (`registerCustomProtocol`)\n+```javascript\n+// Current (incorrect)\n+const success = protocol.registerFileProtocol('scorm-app', handler);\n+if (success) { ... } else { throw new Error('Failed...'); }\n+\n+// Suggested\n+protocol.registerFileProtocol('scorm-app', handler);\n+this.protocolRegistered = true;\n+// Optionally verify\n+// if (!protocol.isProtocolRegistered('scorm-app')) throw new Error('Failed...');\n+```\n+\n+**Impact**: Protocol setup appears to fail and can break window loading (`loadURL('scorm-app://app/index.html')`).\n+\n+**Fix**: Remove boolean check; set `protocolRegistered = true` after call and rely on thrown exceptions for failure. Optionally verify with `protocol.isProtocolRegistered`.\n+\n+---\n+\n+## BUG-013: Build Script References Missing `test:phase6`\n+**Severity**: Medium | **Status**: Open | **Priority**: P2\n+\n+**Problem**: `package.json` script `build:validate` includes `npm run test:phase6`, but no such script exists.\n+\n+**Location**: `package.json` → `scripts.build:validate`\n+\n+**Impact**: Any `build*` script fails immediately, blocking packaging.\n+\n+**Fix**: Remove `&& npm run test:phase6` from `build:validate`, or add a real `test:phase6` script.\n+\n+---\n+\n+## BUG-014: Jest and JSDOM Version Mismatch\n+**Severity**: Medium | **Status**: Open | **Priority**: P3\n+\n+**Problem**: `jest` is pinned to `^29.7.0` while `jest-environment-jsdom` is `^30.0.5`.\n+\n+**Location**: `package.json` → `devDependencies`\n+\n+**Impact**: Tests may error at startup due to incompatible versions.\n+\n+**Fix**: Align versions (either upgrade Jest to `^30.x` or downgrade `jest-environment-jsdom` to `^29.x`).\n+\n+---\n+\n+## BUG-015: Service Worker Messaging and Cache Mismatch\n+**Severity**: Low | **Status**: Open | **Priority**: P4\n+\n+**Problem**:\n+- The service worker uses `self.postMessage(...)`, which doesn’t reach clients.\n+- `urlsToCache` uses `file` paths (e.g., `/src/renderer/app.js`), but the app loads assets via the custom `scorm-app://` scheme.\n+\n+**Location**: `sw.js`\n+\n+**Impact**: Console mirroring and caching don’t work; logs never appear in the app and cache entries rarely match.\n+\n+**Fix**:\n+- Send messages to all clients:\n+```javascript\n+self.clients.matchAll().then(cs => cs.forEach(c => c.postMessage({ type, level, message, data })));\n+```\n+- Either remove the hardcoded cache list or rework strategy to account for the `scorm-app://` scheme (Electron SW support for custom schemes is limited).\n+\n+---\n+\n+## BUG-016: Duplicate `onScormInspectorDataUpdated` in Preload\n+**Severity**: Low | **Status**: Open | **Priority**: P4\n+\n+**Problem**: `electronAPI` defines `onScormInspectorDataUpdated` twice in `src/preload.js`.\n+\n+**Location**: `src/preload.js` (two duplicate keys)\n+\n+**Impact**: No functional break (last wins), but it’s confusing and error-prone.\n+\n+**Fix**: Remove the duplicate export to keep a single definition.\n+
+
+**✅ Simple Fix**: Change `this._logger` to `this.logger` throughout the file
+
+---
+
+## BUG-011: IPC RateLimiter Import Path Error
+**Severity**: High | **Status**: Open | **Priority**: P1
+
+**🔗 Related Bugs**: Independent infrastructure fix (Critical for IPC communication)
+
+**Problem**: `IpcHandler` falls back to requiring a local RateLimiter using `require('./rate-limiter')`, but the file is located under `./ipc/rate-limiter.js`.
+
+**Location**: `src/main/services/ipc-handler.js` (around line 160)
+```javascript
+// Current (incorrect)
+const RateLimiter = require('./rate-limiter');
+
+// Correct
+const RateLimiter = require('./ipc/rate-limiter');
+```
+
+**Impact**: When no external rateLimiter is injected, the fallback import throws at runtime, preventing IPC handlers from initializing and breaking renderer ↔ main communication.
+
+**✅ Critical Fix**: Update the require path to `./ipc/rate-limiter`
+**✅ Additional**: Add unit test to cover fallback initialization
+
+---
+
+## BUG-012: Custom Protocol Registration Misinterprets Return Value
+**Severity**: Critical | **Status**: Open | **Priority**: P1
+
+**🔗 Related Bugs**: Independent infrastructure fix (Critical for app loading)
+
+**Problem**: `WindowManager.registerCustomProtocol()` treats `protocol.registerFileProtocol(...)` as returning a boolean. Electron's API returns `void` and throws on error. The code then throws a false failure.
+
+**Location**: `src/main/services/window-manager.js` (`registerCustomProtocol`)
+```javascript
+// Current (incorrect)
+const success = protocol.registerFileProtocol('scorm-app', handler);
+if (success) { ... } else { throw new Error('Failed...'); }
+
+// Correct
+protocol.registerFileProtocol('scorm-app', handler);
+this.protocolRegistered = true;
+// Optionally verify
+// if (!protocol.isProtocolRegistered('scorm-app')) throw new Error('Failed...');
+```
+
+**Impact**: Protocol setup appears to fail and can break window loading (`loadURL('scorm-app://app/index.html')`).
+
+**✅ Validated Fix**: Remove boolean check; set `protocolRegistered = true` after call and rely on thrown exceptions for failure. Optionally verify with `protocol.isProtocolRegistered`.
+
+---
+
+## BUG-013: Build Script References Missing `test:phase6`
+**Severity**: Medium | **Status**: Open | **Priority**: P2
+
+**🔗 Related Bugs**: Independent infrastructure fix (Critical for builds)
+
+**Problem**: `package.json` script `build:validate` includes `npm run test:phase6`, but no such script exists.
+
+**Location**: `package.json` → `scripts.build:validate`
+
+**Impact**: Any `build*` script fails immediately, blocking packaging.
+
+**✅ Simple Fix**: Remove `&& npm run test:phase6` from `build:validate`
+
+---
+
+## BUG-014: Jest and JSDOM Version Mismatch
+**Severity**: Medium | **Status**: Open | **Priority**: P3
+
+**🔗 Related Bugs**: Independent infrastructure fix (Critical for test stability)
+
+**Problem**: `jest` is pinned to `^29.7.0` while `jest-environment-jsdom` is `^30.0.5`.
+
+**Location**: `package.json` → `devDependencies`
+
+**Impact**: Tests may error at startup due to incompatible versions.
+
+**✅ Validated Fix**: Align versions - either upgrade Jest to `^30.x` or downgrade `jest-environment-jsdom` to `^29.x`
+
+---
+
+## BUG-015: Service Worker Messaging and Cache Mismatch
+**Severity**: Low | **Status**: Open | **Priority**: P4
+
+**🔗 Related Bugs**: Independent infrastructure fix (Consider removal)
+
+**Problem**:
+- The service worker uses `self.postMessage(...)`, which doesn't reach clients.
+- `urlsToCache` uses `file` paths (e.g., `/src/renderer/app.js`), but the app loads assets via the custom `scorm-app://` scheme.
+
+**Location**: `sw.js`
+
+**Impact**: Console mirroring and caching don't work; logs never appear in the app and cache entries rarely match.
+
+**✅ Alternative Approach**: Given complexity and limited benefit in Electron context, **consider removing service worker entirely** rather than fixing caching issues.
+
+**If Keeping SW**:
+- Send messages to all clients:
+```javascript
+self.clients.matchAll().then(cs => cs.forEach(c => c.postMessage({ type, level, message, data })));
+```
+
+---
+
+## BUG-016: Duplicate `onScormInspectorDataUpdated` in Preload
+**Severity**: Low | **Status**: Open | **Priority**: P4
+
+**🔗 Related Bugs**: Independent infrastructure fix (Code cleanliness)
+
+**Problem**: `electronAPI` defines `onScormInspectorDataUpdated` twice in `src/preload.js`.
+
+**Location**: `src/preload.js` (two duplicate keys)
+
+**Impact**: No functional break (last wins), but it's confusing and error-prone.
+
+**✅ Simple Fix**: Remove the duplicate export to keep a single definition.
+
+---
+
+## BUG-017: Memory Leak - Uncleaned Session Cleanup Interval
+**Severity**: Medium | **Status**: Open | **Priority**: P3
+
+**🔗 Related Bugs**: Independent infrastructure fix (Critical for memory management)
+
+**Problem**: ScormService creates a `setInterval()` for session cleanup in `setupSessionCleanup()` but never clears it in `doShutdown()`, causing a memory leak.
+
+**Location**: `src/main/services/scorm-service.js:1035, doShutdown()`
+
+**Impact**:
+- Interval continues running after service shutdown
+- Potential memory leak and resource waste
+- May cause issues if service is restarted
+
+**✅ Essential Fix**: Store the interval ID and clear it in `doShutdown()`:
+```javascript
+// In setupSessionCleanup():
+this.sessionCleanupInterval = setInterval(() => {
+  // ... cleanup logic
+}, 60000);
+
+// In doShutdown():
+if (this.sessionCleanupInterval) {
+  clearInterval(this.sessionCleanupInterval);
+  this.sessionCleanupInterval = null;
+}
+```
+
+---
+
+# 🎯 BUG CONSOLIDATION STRATEGY
+
+## Critical Bug Clusters & Implementation Phases
+
+The 17 individual bugs identified above can be consolidated into **3 coherent fix phases** that minimize code changes while maximizing architectural improvements and maintaining SCORM 2004 4th Edition compliance.
+
+### 🔴 **Phase 1: Navigation System Foundation** (HIGH PRIORITY)
+**Bug Cluster**: Navigation System Core
+- **BUG-001**: Missing ContentViewer.loadActivity Method → Add `loadActivity(activityObject)` method with SCORM compliance
+- **BUG-007**: Missing ContentViewer Event Integration → Add event subscriptions for unified navigation
+- **BUG-002**: Orphaned activityLaunchRequested Event → Consolidate to unified `navigationRequest` events
+- **BUG-003**: Dual Navigation Processing Paths → Implement navigation state machine and request queuing
+- **BUG-005**: Browse Mode State Desynchronization → Centralize browse mode in AppManager with event-driven updates
+
+**🎯 Architectural Goal**: Create unified, event-driven navigation system with proper state management
+
+**🔧 Key Implementation Principles**:
+- Single navigation event type with standardized payload: `{activityId, activityObject, requestType, source}`
+- Navigation state machine: `IDLE`, `PROCESSING`, `LOADING`
+- Request queuing to prevent race conditions
+- SCORM 2004 compliance with sequencing rule enforcement
+- Event-driven architecture eliminating direct component coupling
+
+### 🟡 **Phase 2: SCORM Integration** (MEDIUM PRIORITY)
+**Bug Cluster**: SCORM Integration Chain  
+- **BUG-008**: SCORM Service Method Name Error → Fix `createSession()` → `initializeSession()` call
+- **BUG-009**: Data Model Access Bug → Fix property names and RTE instance access
+- **BUG-004**: SCORM Data Integration Disconnect → Integrate lifecycle tracking into navigation pipeline
+
+**🎯 Architectural Goal**: Complete SCORM lifecycle integration with navigation system
+
+**📋 Dependencies**: Must be implemented **after** Phase 1 navigation foundation is complete
+
+**🔧 Key Implementation Principles**:
+- Integrate SCORM tracking hooks into unified navigation pipeline
+- Async error handling that never blocks navigation
+- Maintain all 15 required SCORM 2004 data elements
+- State persistence priority over API call success
+
+### 🟢 **Phase 3: Infrastructure & Polish** (LOW PRIORITY)
+**Bug Cluster**: Independent Infrastructure Fixes
+- **BUG-006**: Broken Fallback Recovery System → Simplified fallback with basic navigation
+- **BUG-010**: Rate Limiter Logger Bug → Fix `this._logger` → `this.logger`
+- **BUG-011**: IPC RateLimiter Import Path Error → Fix require path to `./ipc/rate-limiter`
+- **BUG-012**: Custom Protocol Registration Error → Remove boolean check, use exception handling
+- **BUG-013**: Build Script Missing test:phase6 → Remove reference to non-existent script
+- **BUG-014**: Jest Version Mismatch → Align Jest and JSDOM versions
+- **BUG-015**: Service Worker Issues → Consider removal vs fixing (low benefit in Electron)
+- **BUG-016**: Duplicate Preload Export → Remove duplicate export
+- **BUG-017**: Memory Leak - Session Cleanup → Store and clear interval ID in shutdown
+
+**🎯 Architectural Goal**: Clean up infrastructure issues and improve maintainability
+
+**⚡ Implementation Strategy**: These can be fixed in parallel with Phase 1 & 2 work as they are independent
+
+## 📊 Implementation Priority Matrix
+
+| Priority | Bugs | Impact | Complexity | Dependencies |
+|----------|------|--------|------------|--------------|
+| **P1 Critical** | BUG-001, 002, 003, 007 | Navigation completely broken | High | Foundation for others |
+| **P1 Critical** | BUG-008, 009 | SCORM service failures | Low | Independent |
+| **P1 Critical** | BUG-011, 012 | App won't start/load | Low | Independent |
+| **P2 High** | BUG-004, 005 | SCORM compliance issues | Medium | Requires Phase 1 |
+| **P2 High** | BUG-013, 017 | Build/memory issues | Low | Independent |
+| **P3 Medium** | BUG-006, 014 | Fallback/testing issues | Medium | Independent |
+| **P4 Low** | BUG-010, 015, 016 | Logging/cleanup issues | Low | Independent |
+
+## 🔧 Architectural Principles for All Fixes
+
+### **🎯 Simplicity Over Complexity**
+- Avoid creating new services when existing patterns work
+- Use event bus pattern consistently rather than direct method calls  
+- Keep SCORM compliance without over-engineering architecture
+
+### **🔄 Event-Driven Architecture**
+- Single navigation event type with standardized payload structure
+- Components communicate via events, not direct references
+- Proper error propagation through event system
+- Loose coupling between navigation components
+
+### **📋 SCORM 2004 4th Edition Compliance**
+- All fixes must maintain 100% SCORM compliance
+- Navigation must respect sequencing rules and constraints
+- Activity tracking and data model access must follow specification
+- Browse mode integration with sequencing rule enforcement
+
+### **⚡ Performance Considerations**
+- Navigation state machine prevents race conditions
+- Async SCORM calls never block UI interactions
+- Proper memory cleanup in shutdown procedures  
+- Request queuing for high-frequency navigation events
+
+## 🚀 Expected Outcomes
+
+**After Phase 1**: Unified navigation system with proper state management and event-driven architecture
+**After Phase 2**: Complete SCORM lifecycle integration with 100% compliance maintained
+**After Phase 3**: Clean, maintainable infrastructure with all critical issues resolved
+
+This consolidation strategy transforms a complex 17-bug backlog into a manageable 3-phase implementation that maintains architectural coherence, ensures SCORM compliance, and avoids unnecessary complexity.
