@@ -136,7 +136,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Setup event subscriptions
+   * Setup event subscriptions (BUG-007 FIX)
    */
   setupEventSubscriptions() {
     // Listen for course loading events
@@ -150,8 +150,18 @@ class ContentViewer extends BaseComponent {
     this.subscribe('scorm:initialized', this.handleScormInitialized);
     this.subscribe('scorm:error', this.handleScormError);
 
+    // BUG-007 FIX: Subscribe to unified navigation events
+    // BUG-020 FIX: Use only standardized navigationRequest event
+    this.subscribe('navigationRequest', this.handleNavigationRequest);
+
     // Listen for navigation launch events (CRITICAL for browse mode navigation)
     this.subscribe('navigation:launch', this.handleNavigationLaunch);
+
+    // Listen for content load events
+    this.subscribe('content:load:request', this.handleContentLoadRequest);
+
+    // Listen for browse mode changes
+    this.subscribe('browseMode:changed', this.handleBrowseModeChanged);
   }
 
   /**
@@ -196,6 +206,72 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
+   * Load SCORM activity (BUG-001 FIX)
+   * @param {Object} activityObject - SCORM activity object with identifier, launchUrl, etc.
+   * @param {Object} options - Loading options
+   */
+  loadActivity(activityObject, options = {}) {
+    if (!activityObject) {
+      this.showError('Invalid activity', 'A valid activity object must be provided.');
+      return;
+    }
+
+    try {
+      // Extract SCORM-compliant data from activity object
+      const activityData = {
+        identifier: activityObject.identifier || activityObject.id,
+        launchUrl: activityObject.launchUrl || activityObject.href,
+        title: activityObject.title,
+        // SCORM 2004 data elements
+        launch_data: activityObject.launch_data || '',
+        mastery_score: activityObject.mastery_score || '',
+        max_time_allowed: activityObject.max_time_allowed || '',
+        time_limit_action: activityObject.time_limit_action || '',
+        data_from_lms: activityObject.data_from_lms || '',
+        prerequisites: activityObject.prerequisites || '',
+        ...options
+      };
+
+      // Validate activity object contains required SCORM 2004 elements
+      if (!activityData.identifier) {
+        throw new Error('Activity missing required identifier');
+      }
+
+      // Extract and resolve identifierref to resource URL if needed
+      let launchUrl = activityData.launchUrl;
+      if (!launchUrl && activityObject.identifierref) {
+        // This would typically require manifest resolution, but we'll pass through
+        // as the main process should have already resolved this
+        launchUrl = activityObject.identifierref;
+      }
+
+      if (!launchUrl) {
+        throw new Error('Activity missing launch URL or identifierref');
+      }
+
+      // Store activity data for SCORM API access
+      this.currentActivity = activityData;
+
+      // Load the content using the existing loadContent method
+      this.loadContent(launchUrl, {
+        ...options,
+        activityData,
+        isActivity: true
+      });
+
+      this.logger?.info('ContentViewer: Loading activity', {
+        identifier: activityData.identifier,
+        launchUrl: launchUrl,
+        title: activityData.title
+      });
+
+    } catch (error) {
+      this.showError('Failed to load activity', error?.message || String(error));
+      this.emit('activityLoadError', { activityObject, error });
+    }
+  }
+
+  /**
    * Load SCORM content
    * @param {string} url - Content URL
    * @param {Object} options - Loading options
@@ -206,40 +282,23 @@ class ContentViewer extends BaseComponent {
       return;
     }
 
-    // Convert local file paths to file:// URLs to avoid cross-origin restrictions
-    // Skip conversion if already using scorm-app:// protocol
-    let processedUrl = url;
-    if (typeof url === 'string' && !url.startsWith('scorm-app://') && (url.includes('\\') || url.startsWith('C:') || url.startsWith('/'))) {
-      try {
-        // Convert Windows path to file:// URL
-        if (url.includes('\\') || (url.match(/^[A-Za-z]:/))) {
-          // Windows path - normalize and convert to file URL
-          const normalizedPath = url.replace(/\\/g, '/');
-          processedUrl = 'file:///' + normalizedPath.replace(/^([A-Za-z]:)/, '$1');
-        } else if (url.startsWith('/')) {
-          // Unix-style absolute path
-          processedUrl = 'file://' + url;
-        }
-
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.info('[ContentViewer] Converted local path to file:// URL', {
-            originalPath: url,
-            fileUrl: processedUrl
-          });
-        }).catch(() => {
-          // Ignore logger import errors
+    // BUG-021 FIX: Use simplified URL processing with better error messages
+    let processedUrl;
+    try {
+      processedUrl = ContentViewer.normalizeURL(url);
+      
+      if (processedUrl !== url) {
+        this.logger?.info('ContentViewer: Normalized URL', {
+          originalPath: url,
+          normalizedUrl: processedUrl
         });
-      } catch (error) {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger.error('[ContentViewer] Failed to convert path to file:// URL', {
-            originalPath: url,
-            error: error?.message || error
-          });
-        }).catch(() => {
-          // Ignore logger import errors
-        });
-        throw error;
       }
+    } catch (error) {
+      this.logger?.error('ContentViewer: URL normalization failed', {
+        originalPath: url,
+        error: error.message
+      });
+      throw new Error(`Content loading failed: ${error.message}`);
     }
 
     this.currentUrl = processedUrl;
@@ -860,6 +919,151 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
+   * Handle unified navigation request event (BUG-007 FIX)
+   */
+  async handleNavigationRequest(eventData) {
+    try {
+      this.logger?.info('ContentViewer: Handling navigation request', {
+        requestType: eventData?.requestType,
+        source: eventData?.source,
+        activityId: eventData?.activityId
+      });
+
+      const { activityObject, requestType, source, url, scormData } = eventData || {};
+
+      switch (requestType) {
+        case 'activityLaunch':
+          if (activityObject) {
+            await this.loadActivity(activityObject);
+          } else {
+            this.logger?.warn('ContentViewer: Activity launch request missing activity object');
+          }
+          break;
+
+        case 'directContent':
+          if (url) {
+            await this.loadContent(url, scormData || {});
+          } else {
+            this.logger?.warn('ContentViewer: Direct content request missing URL');
+          }
+          break;
+
+        case 'choice':
+          // Choice navigation should include activity object
+          if (activityObject) {
+            await this.loadActivity(activityObject);
+          } else {
+            this.logger?.warn('ContentViewer: Choice navigation request missing activity object');
+          }
+          break;
+
+        default:
+          this.logger?.debug('ContentViewer: Unhandled navigation request type', requestType);
+          break;
+      }
+
+    } catch (error) {
+      this.logger?.error('ContentViewer: Error handling navigation request', error);
+      
+      // Emit error back to event bus for centralized error handling
+      try {
+        const { eventBus } = await import('../../services/event-bus.js');
+        eventBus.emit('navigationError', {
+          error: error.message || String(error),
+          source: 'ContentViewer',
+          originalRequest: eventData
+        });
+      } catch (_) {
+        // Fallback error handling
+        this.showError('Navigation Error', error.message || String(error));
+      }
+    }
+  }
+
+  /**
+   * Handle content load request event (BUG-007 FIX)
+   */
+  async handleContentLoadRequest(eventData) {
+    try {
+      const { url, options } = eventData || {};
+      if (url) {
+        await this.loadContent(url, options || {});
+      } else {
+        this.logger?.warn('ContentViewer: Content load request missing URL');
+      }
+    } catch (error) {
+      this.logger?.error('ContentViewer: Error handling content load request', error);
+      this.showError('Content Load Error', error.message || String(error));
+    }
+  }
+
+  /**
+   * Handle browse mode changed event (BUG-007 FIX)
+   */
+  handleBrowseModeChanged(eventData) {
+    try {
+      const { enabled } = eventData || {};
+      this.logger?.info('ContentViewer: Browse mode changed', { enabled });
+      
+      // Update content viewer behavior for browse mode
+      if (this.element) {
+        this.element.classList.toggle('content-viewer--browse-mode', enabled);
+      }
+      
+      // In browse mode, we might want to show additional indicators
+      if (enabled) {
+        this.showBrowseModeIndicator();
+      } else {
+        this.hideBrowseModeIndicator();
+      }
+      
+    } catch (error) {
+      this.logger?.error('ContentViewer: Error handling browse mode change', error);
+    }
+  }
+
+  /**
+   * Show browse mode indicator
+   */
+  showBrowseModeIndicator() {
+    if (!this.browseModeIndicator) {
+      this.browseModeIndicator = document.createElement('div');
+      this.browseModeIndicator.className = 'content-viewer__browse-mode-indicator';
+      this.browseModeIndicator.innerHTML = '🔍 Browse Mode Active - Data Not Tracked';
+      this.browseModeIndicator.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 193, 7, 0.9);
+        color: #000;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 1000;
+        pointer-events: none;
+      `;
+      
+      if (this.element) {
+        this.element.appendChild(this.browseModeIndicator);
+      }
+    }
+    
+    if (this.browseModeIndicator) {
+      this.browseModeIndicator.style.display = 'block';
+    }
+  }
+
+  /**
+   * Hide browse mode indicator
+   */
+  hideBrowseModeIndicator() {
+    if (this.browseModeIndicator) {
+      this.browseModeIndicator.style.display = 'none';
+    }
+  }
+
+  /**
    * Handle navigation launch event (CRITICAL for browse mode navigation)
    */
   async handleNavigationLaunch(data) {
@@ -1253,9 +1457,47 @@ class ContentViewer extends BaseComponent {
       }
     } catch (_) { /* ignore */ }
 
+    // Clean up browse mode indicator
+    if (this.browseModeIndicator) {
+      try {
+        this.browseModeIndicator.remove();
+        this.browseModeIndicator = null;
+      } catch (_) { /* ignore */ }
+    }
 
     this.clearContent();
     super.destroy();
+  }
+
+  /**
+   * BUG-021 FIX: Simplified URL processing with better error messages
+   * @param {string} url - The URL to normalize
+   * @returns {string} - The normalized URL
+   */
+  static normalizeURL(url) {
+    if (!url || typeof url !== 'string') {
+      throw new Error('Invalid URL: URL must be a non-empty string');
+    }
+
+    // Return URLs with protocols as-is
+    if (url.startsWith('scorm-app://') || url.startsWith('http')) {
+      return url;
+    }
+    
+    try {
+      // Simple path conversion for Windows and Unix paths
+      if (url.includes('\\')) {
+        // Windows path - normalize separators
+        const normalizedPath = url.replace(/\\/g, '/');
+        return 'file:///' + normalizedPath;
+      }
+      
+      // Unix-style paths
+      return url.startsWith('/') ? 'file://' + url : 'file:///' + url;
+      
+    } catch (error) {
+      throw new Error(`Failed to normalize URL "${url}": ${error.message}`);
+    }
   }
 }
 

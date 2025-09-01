@@ -177,7 +177,6 @@ const electronAPI = {
   getSSPBuckets: () => safeInvoke('scorm-inspector-get-ssp-buckets'),
   
   // SCORM Inspector Event Listeners
-  onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
   onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
   onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
   

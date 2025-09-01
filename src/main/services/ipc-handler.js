@@ -159,7 +159,7 @@ class IpcHandler extends BaseService {
     // Ensure a rate limiter exists (fallback to local if not provided)
     if (!this.rateLimiter) {
       try {
-        const RateLimiter = require('./rate-limiter');
+        const RateLimiter = require('./ipc/rate-limiter');
         this.rateLimiter = new RateLimiter({ rateLimitWindow: this.config?.rateLimitWindow, rateLimitMax: this.config?.rateLimitMax });
       } catch (e) {
         this.rateLimiter = null;
@@ -293,6 +293,8 @@ class IpcHandler extends BaseService {
       this.registerHandler('sn:processNavigation', this.handleSNProcessNavigation.bind(this));
       this.registerHandler('sn:updateActivityProgress', this.handleSNUpdateActivityProgress.bind(this));
       this.registerHandler('sn:reset', this.handleSNReset.bind(this));
+      this.registerHandler('sn:handleActivityExit', this.handleSNActivityExit.bind(this));
+      this.registerHandler('sn:updateActivityLocation', this.handleSNUpdateActivityLocation.bind(this));
       
       // LMS and testing handlers
       this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
@@ -1144,6 +1146,28 @@ class IpcHandler extends BaseService {
     }
     snService.reset();
     return { success: true };
+  }
+
+  // BUG-004 FIX: SN Activity Exit Handler
+  async handleSNActivityExit(event, { activityId, exitType } = {}) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = snService.handleActivityExit(activityId, exitType || 'navigation');
+    return result;
+  }
+
+  // BUG-004 FIX: SN Activity Location Update Handler
+  async handleSNUpdateActivityLocation(event, { activityId, location } = {}) {
+    const scormService = this.getDependency('scormService');
+    const snService = scormService.getSNService();
+    if (!snService) {
+      return { success: false, error: 'SN service not available' };
+    }
+    const result = snService.updateActivityLocation(activityId, location);
+    return result;
   }
 
   // Recent Courses handlers

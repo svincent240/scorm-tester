@@ -281,7 +281,7 @@ class WindowManager extends BaseService {
     }
 
     try {
-      const success = protocol.registerFileProtocol('scorm-app', (request, callback) => {
+      protocol.registerFileProtocol('scorm-app', (request, callback) => {
         try {
           const appRoot = PathUtils.getAppRoot(__dirname);
           const result = PathUtils.handleProtocolRequest(request.url, appRoot);
@@ -301,12 +301,13 @@ class WindowManager extends BaseService {
         }
       });
 
-      if (success) {
-        this.protocolRegistered = true;
-        this.logger?.info('WindowManager: Custom protocol "scorm-app://" registered successfully');
-        this.logger?.info('WindowManager: Storage-capable origin feature is active');
-      } else {
-        throw new Error('Failed to register custom protocol');
+      this.protocolRegistered = true;
+      this.logger?.info('WindowManager: Custom protocol "scorm-app://" registered successfully');
+      this.logger?.info('WindowManager: Storage-capable origin feature is active');
+      
+      // Optional verification
+      if (!protocol.isProtocolRegistered('scorm-app')) {
+        throw new Error('Protocol registration verification failed');
       }
       
     } catch (error) {

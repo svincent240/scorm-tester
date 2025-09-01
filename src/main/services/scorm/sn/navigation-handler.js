@@ -1193,8 +1193,29 @@ class NavigationHandler {
     return activities;
   }
 
-  // Placeholder methods for remaining navigation requests
-  processResumeAllRequest() { return { success: true, reason: 'Resume all processed', action: 'resume' }; }
+  // Resume functionality
+  processResumeAllRequest() {
+    try {
+      // Check for saved location in browse mode service
+      const savedLocation = this.browseModeService?.getLastLocation();
+      if (!savedLocation?.activityId) {
+        return { success: false, reason: 'No saved location found', action: 'resume' };
+      }
+      
+      // Validate saved activity still exists and is launchable
+      const targetActivity = this.activityTreeManager.findActivityById(savedLocation.activityId);
+      if (!targetActivity) {
+        return { success: false, reason: 'Saved activity no longer exists', action: 'resume' };
+      }
+      
+      // Process navigation to the saved location
+      return this.processNavigationRequest('choice', savedLocation.activityId);
+      
+    } catch (error) {
+      this.logger?.error('Error processing resume all request:', error);
+      return { success: false, reason: 'Resume processing failed', action: 'resume' };
+    }
+  }
   processExitAllRequest() { return { success: true, reason: 'Exit all processed', action: 'exitAll' }; }
   processAbandonRequest() { return { success: true, reason: 'Abandon processed', action: 'abandon' }; }
   processAbandonAllRequest() { return { success: true, reason: 'Abandon all processed', action: 'abandonAll' }; }

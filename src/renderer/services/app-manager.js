@@ -22,6 +22,22 @@ class AppManager {
     // Prevent recursive initialization error handling loops
     this._handlingInitError = false;
 
+    // BUG-003 FIX: Navigation state machine
+    this.navigationState = 'IDLE'; // IDLE, PROCESSING, LOADING
+    this.navigationQueue = [];
+    this.currentNavigationRequest = null;
+
+    // BUG-005 FIX: Centralized browse mode state
+    this.browseMode = {
+      enabled: false,
+      session: null,
+      config: {}
+    };
+
+    // BUG-004 FIX: SCORM lifecycle tracking integration
+    this.currentActivity = null;
+    this.previousActivity = null;
+
     // Lazy, safe logger reference with no-op fallback
     this.logger = {
       info: () => {},
@@ -82,6 +98,9 @@ class AppManager {
 
       // Step 5: Setup centralized SN status polling
       this.setupSnPollingController();
+
+      // BUG-005 FIX: Setup centralized browse mode management
+      this.setupBrowseModeManagement(eventBus);
 
       this.initialized = true;
 
@@ -287,120 +306,10 @@ class AppManager {
 
    
 
-    // Centralized navigation intents from UI components (NavigationControls, CourseOutline)
-    eventBus.on('navigation:request', async (payload) => {
+    // BUG-003 FIX: Unified navigation pipeline with state machine
+    this.setupUnifiedNavigationPipeline(eventBus);
 
-      try {
-        const type = payload && payload.type;
-        const activityId = payload && payload.activityId ? String(payload.activityId) : null;
-        this.logger.info('AppManager: navigation:request received', { type, activityId, source: payload && payload.source });
-
-        // Prefer NavigationControls SN flow (includes internal fallbacks)
-        const navControls = this.components.get('navigationControls');
-
-        // Decide path based on SN availability
-        const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
-        const snBridge = snBridgeModule.snBridge;
-        const init = await snBridge.initialize().catch(() => ({ success: false }));
-        const snAvailable = !!(init && init.success);
-
-        // Handle CHOICE when SN is unavailable: fall back to direct content load
-        if (type === 'choice' && activityId && !snAvailable) {
-          try {
-            const structure = this.uiState.getState('courseStructure');
-            const target = this._findItemById(structure, activityId);
-            const launchUrl = target && target.launchUrl;
-            if (launchUrl && String(launchUrl).startsWith('scorm-app://')) {
-              this.logger.warn('AppManager: SN unavailable; falling back to direct content load for choice', { activityId, launchUrl });
-              const contentViewer = this.components.get('contentViewer');
-              if (contentViewer && typeof contentViewer.loadContent === 'function') {
-                await contentViewer.loadContent(launchUrl);
-              }
-              // Heuristic availability: set next enabled, previous enabled to keep UI responsive
-              try { this.uiState.updateNavigation({ canNavigatePrevious: true, canNavigateNext: true, _fromComponent: true }); } catch (_) {}
-              // Emit launch signal for any listeners
-              eventBus.emit('navigation:launch', { activity: { identifier: activityId, launchUrl }, sequencing: null, source: 'app-manager-fallback' });
-              return;
-            } else {
-              this.logger.warn('AppManager: Could not resolve final scorm-app:// launchUrl for choice fallback', { activityId });
-            }
-          } catch (e) {
-            this.logger.error('AppManager: Choice fallback error', e?.message || e);
-          }
-          // If fallback unsuccessful, do not proceed to SN (since unavailable)
-          return;
-        }
-
-        // If SN available, execute via NavigationControls or directly via snBridge
-        if (navControls && typeof navControls.processNavigation === 'function') {
-          if (type === 'choice' && activityId) {
-            await navControls.processNavigation('choice', activityId);
-          } else if (type === 'previous') {
-            await navControls.processNavigation('previous');
-          } else if (type === 'continue' || type === 'next') {
-            await navControls.processNavigation('continue');
-          } else {
-            this.logger.warn('AppManager: Unknown navigation type; ignoring', type);
-          }
-          return;
-        }
-
-        if (!snAvailable) {
-          this.logger.warn('AppManager: SN bridge unavailable; navigation request cannot be processed');
-          return;
-        }
-
-        let requestType = null;
-        let targetId = null;
-        if (type === 'choice' && activityId) {
-          requestType = 'choice'; targetId = activityId;
-        } else if (type === 'previous') {
-          requestType = 'previous';
-        } else if (type === 'continue' || type === 'next') {
-          requestType = 'continue';
-        }
-
-        if (!requestType) {
-          this.logger.warn('AppManager: Invalid navigation request payload', payload);
-          return;
-        }
-
-        const result = await snBridge.processNavigation(requestType, targetId);
-        if (result && result.success) {
-          // Update availability in UIState (authoritative)
-          if (result.availableNavigation) {
-            const normalized = this.normalizeAvailableNavigation(result.availableNavigation);
-            try {
-              this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
-            } catch (e) {
-              this.logger.warn('AppManager: Failed to update UIState after navigation', e?.message || e);
-            }
-          }
-          // Handle launch
-          if (result.targetActivity && result.action === 'launch') {
-            eventBus.emit('navigation:launch', {
-              activity: result.targetActivity,
-              sequencing: result.sequencing,
-              source: 'app-manager'
-            });
-            const contentViewer = this.components.get('contentViewer');
-            try {
-              if (contentViewer && typeof contentViewer.loadActivity === 'function') {
-                await contentViewer.loadActivity(result.targetActivity);
-              } else if (contentViewer && typeof contentViewer.loadContent === 'function' && result.targetActivity?.launchUrl) {
-                await contentViewer.loadContent(result.targetActivity.launchUrl);
-              }
-            } catch (e) {
-              this.logger.error('AppManager: Failed to instruct ContentViewer for launch', e?.message || e);
-            }
-          }
-        } else {
-          this.logger.warn('AppManager: Navigation request failed', result && (result.reason || 'unknown'));
-        }
-      } catch (err) {
-        try { this.logger.error('AppManager: Error handling navigation:request', err?.message || err); } catch (_) {}
-      }
-    });
+    // BUG-020 FIX: Removed legacy navigation:request support - all events now use standardized navigationRequest
 
     // Optional: reflect navigation launch to components that rely on centralized signal
     eventBus.on('navigation:launch', (data) => {
@@ -610,7 +519,7 @@ class AppManager {
     });
 
     // 2) Navigation in-flight gating
-    eventBus.on('navigation:request', () => {
+    eventBus.on('navigationRequest', () => {
       this._snNavInFlight = true;
       this._snLastNavigationAt = Date.now(); // Set timestamp for cooldown
       this.pauseSnPolling('navigation');
@@ -729,6 +638,8 @@ class AppManager {
     try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) {}
 
     try {
+      // Reset fallback notification flag for new course
+      this._fallbackNotificationShown = false;
 
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
@@ -867,6 +778,21 @@ class AppManager {
       type: 'success',
       duration: 5000 // Auto-dismiss after 5 seconds
     });
+  }
+
+  /**
+   * Show fallback navigation notification
+   * BUG-006 FIX: Inform user when advanced navigation is unavailable
+   */
+  showFallbackNotification() {
+    if (!this._fallbackNotificationShown) {
+      this._fallbackNotificationShown = true;
+      this.uiState.showNotification({
+        message: 'Advanced navigation unavailable, using basic mode',
+        type: 'warning',
+        duration: 8000 // Auto-dismiss after 8 seconds
+      });
+    }
   }
 
   /**
@@ -1038,6 +964,562 @@ class AppManager {
       try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) {}
     }
   }
+  /**
+   * BUG-005 FIX: Setup centralized browse mode management
+   */
+  setupBrowseModeManagement(eventBus) {
+    // Listen for browse mode toggle requests
+    eventBus.on('browseMode:toggle', async (data) => {
+      const enabled = data?.enabled !== undefined ? data.enabled : !this.browseMode.enabled;
+      await this.setBrowseMode(enabled, data?.config);
+    });
+
+    // Listen for browse mode queries
+    eventBus.on('browseMode:query', () => {
+      eventBus.emit('browseMode:status', this.browseMode);
+    });
+
+    // Initialize browse mode state from main process if available
+    this.initializeBrowseModeFromMain();
+  }
+
+  /**
+   * BUG-005 FIX: Initialize browse mode state from main process
+   */
+  async initializeBrowseModeFromMain() {
+    try {
+      if (window.electronAPI && window.electronAPI.invoke) {
+        const status = await window.electronAPI.invoke('browse-mode-status');
+        if (status && status.enabled) {
+          this.browseMode = {
+            enabled: status.enabled,
+            session: status.session,
+            config: status.config || {}
+          };
+          
+          // Update UI state to reflect browse mode
+          this.uiState.setState('browseMode', this.browseMode);
+          
+          // Broadcast browse mode change
+          const { eventBus } = await import('./event-bus.js');
+          eventBus.emit('browseMode:changed', this.browseMode);
+          
+          this.logger.info('AppManager: Browse mode initialized from main process', this.browseMode);
+        }
+      }
+    } catch (error) {
+      this.logger.warn('AppManager: Failed to initialize browse mode from main process', error);
+    }
+  }
+
+  /**
+   * BUG-005 FIX: Set browse mode (centralized state management)
+   */
+  async setBrowseMode(enabled, config = {}) {
+    try {
+      const previousState = { ...this.browseMode };
+
+      if (enabled) {
+        // Enable browse mode via IPC
+        const result = await window.electronAPI.invoke('browse-mode-enable', {
+          navigationUnrestricted: true,
+          trackingDisabled: true,
+          dataIsolation: true,
+          visualIndicators: true,
+          ...config
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to enable browse mode');
+        }
+
+        // Update internal state
+        this.browseMode = {
+          enabled: true,
+          session: result.session || Date.now().toString(),
+          config: { navigationUnrestricted: true, trackingDisabled: true, ...config }
+        };
+
+        this.logger.info('AppManager: Browse mode enabled', this.browseMode);
+
+      } else {
+        // Disable browse mode via IPC
+        const result = await window.electronAPI.invoke('browse-mode-disable');
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to disable browse mode');
+        }
+
+        // Update internal state
+        this.browseMode = {
+          enabled: false,
+          session: null,
+          config: {}
+        };
+
+        this.logger.info('AppManager: Browse mode disabled');
+      }
+
+      // Update UI state (single source of truth)
+      this.uiState.setState('browseMode', this.browseMode);
+
+      // Broadcast change to all components
+      const { eventBus } = await import('./event-bus.js');
+      eventBus.emit('browseMode:changed', this.browseMode);
+
+      // Update navigation availability based on browse mode
+      if (enabled) {
+        // In browse mode, enable all navigation
+        this.uiState.updateNavigation({
+          canNavigatePrevious: true,
+          canNavigateNext: true,
+          _fromComponent: true
+        });
+      } else {
+        // In normal mode, refresh from SN service
+        await this.refreshNavigationFromSNService();
+      }
+
+      return { success: true, browseMode: this.browseMode };
+
+    } catch (error) {
+      this.logger.error('AppManager: Failed to set browse mode', error);
+      
+      // Revert state on error
+      this.browseMode = previousState;
+      this.uiState.setState('browseMode', this.browseMode);
+
+      // Show error notification
+      this.uiState.showNotification({
+        type: 'error',
+        message: `Failed to ${enabled ? 'enable' : 'disable'} browse mode: ${error.message}`,
+        duration: 5000
+      });
+
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * BUG-005 FIX: Get current browse mode state
+   */
+  getBrowseMode() {
+    return { ...this.browseMode };
+  }
+
+  /**
+   * BUG-005 FIX: Check if browse mode is enabled
+   */
+  isBrowseModeEnabled() {
+    return this.browseMode.enabled;
+  }
+
+  /**
+   * BUG-005 FIX: Refresh navigation state from SN service
+   */
+  async refreshNavigationFromSNService() {
+    try {
+      const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
+      const snBridge = snBridgeModule.snBridge;
+      
+      const state = await snBridge.getSequencingState();
+      if (state && state.success && Array.isArray(state.availableNavigation)) {
+        const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
+        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+      }
+    } catch (error) {
+      this.logger.warn('AppManager: Failed to refresh navigation from SN service', error);
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Setup unified navigation pipeline with state machine
+   */
+  setupUnifiedNavigationPipeline(eventBus) {
+    // Listen for unified navigationRequest events
+    eventBus.on('navigationRequest', async (payload) => {
+      await this.processNavigationRequest(payload);
+    });
+  }
+
+  /**
+   * BUG-003 FIX: Process navigation request with state machine and queuing
+   */
+  async processNavigationRequest(payload) {
+    try {
+      // Validate payload
+      if (!payload || !payload.requestType) {
+        this.logger.warn('AppManager: Invalid navigation request payload', payload);
+        return { success: false, reason: 'Invalid request payload' };
+      }
+
+      const { requestType, activityId, activityObject, source } = payload;
+
+      this.logger.info('AppManager: Processing navigation request', {
+        requestType,
+        activityId,
+        source,
+        currentState: this.navigationState,
+        queueLength: this.navigationQueue.length
+      });
+
+      // Check navigation state - queue if busy
+      if (this.navigationState === 'PROCESSING') {
+        this.logger.info('AppManager: Navigation in progress, queuing request');
+        this.navigationQueue.push(payload);
+        return { success: true, reason: 'Request queued' };
+      }
+
+      // Set state to processing
+      this.setNavigationState('PROCESSING', payload);
+
+      try {
+        // BUG-004 FIX: Handle activity exit before loading new activity
+        if (this.currentActivity && this.currentActivity.id !== activityId) {
+          await this.handleActivityExit(this.currentActivity.id, 'navigation');
+        }
+
+        // Determine if SN service processing is needed
+        const needsSNProcessing = this.needsSNProcessing(requestType);
+        let result;
+
+        if (needsSNProcessing) {
+          result = await this.processThroughSNService(requestType, activityId, activityObject);
+        } else {
+          result = await this.processDirectNavigation(requestType, activityId, activityObject, payload);
+        }
+
+        // Update navigation state consistently
+        await this.updateNavigationStateFromResult(result);
+
+        // Handle successful navigation result
+        if (result && result.success) {
+          await this.handleSuccessfulNavigation(result, payload);
+          
+          // BUG-004 FIX: Update activity location after successful navigation
+          if (activityId && activityId !== this.currentActivity?.id) {
+            await this.updateActivityLocation(activityId, window.location.href);
+            
+            // Update current activity tracking
+            this.currentActivity = {
+              id: activityId,
+              object: activityObject || result.targetActivity,
+              launchedAt: Date.now()
+            };
+          }
+        } else {
+          this.logger.warn('AppManager: Navigation request failed', result?.reason);
+        }
+
+        return result;
+
+      } finally {
+        // Always reset state and process queue
+        this.setNavigationState('IDLE');
+        await this.processNavigationQueue();
+      }
+
+    } catch (error) {
+      this.logger.error('AppManager: Error processing navigation request', error);
+      this.setNavigationState('IDLE');
+      
+      // BUG-024 FIX: Emit navigation error event for error handling
+      eventBus.emit('navigationError', {
+        error: error.message,
+        source: 'AppManager',
+        originalRequest: payload
+      });
+      
+      return { success: false, reason: error.message, error };
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Set navigation state with logging
+   * BUG-019 FIX: Add navigation state broadcasting
+   */
+  setNavigationState(state, request = null) {
+    const prevState = this.navigationState;
+    this.navigationState = state;
+    this.currentNavigationRequest = request;
+
+    if (prevState !== state) {
+      this.logger.debug('AppManager: Navigation state changed', {
+        from: prevState,
+        to: state,
+        requestType: request?.requestType
+      });
+      
+      // BUG-019 FIX: Broadcast navigation state changes to other components
+      eventBus.emit('navigation:state:updated', {
+        state: this.navigationState,
+        previousState: prevState,
+        currentRequest: request
+      });
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Determine if request needs SN service processing
+   */
+  needsSNProcessing(requestType) {
+    return ['previous', 'continue', 'choice'].includes(requestType);
+  }
+
+  /**
+   * BUG-003 FIX: Process navigation through SN service
+   */
+  async processThroughSNService(requestType, activityId, activityObject) {
+    try {
+      // Get SN bridge
+      const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
+      const snBridge = snBridgeModule.snBridge;
+      
+      // Initialize if needed
+      const init = await snBridge.initialize().catch(() => ({ success: false }));
+      
+      if (!init || !init.success) {
+        this.logger.warn('AppManager: SN service unavailable, trying fallback');
+        this.showFallbackNotification();
+        return await this.processFallbackNavigation(requestType, activityId, activityObject);
+      }
+
+      // Process through SN service
+      const result = await snBridge.processNavigation(requestType, activityId);
+      
+      if (result && result.success) {
+        return result;
+      } else {
+        this.logger.warn('AppManager: SN processing failed, trying fallback', result?.reason);
+        this.showFallbackNotification();
+        return await this.processFallbackNavigation(requestType, activityId, activityObject);
+      }
+
+    } catch (error) {
+      this.logger.error('AppManager: Error in SN processing, trying fallback', error);
+      this.showFallbackNotification();
+      return await this.processFallbackNavigation(requestType, activityId, activityObject);
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Process direct navigation without SN service
+   */
+  async processDirectNavigation(requestType, activityId, activityObject, payload) {
+    try {
+      if (requestType === 'activityLaunch' && activityObject) {
+        // Direct activity launch
+        return {
+          success: true,
+          action: 'launch',
+          targetActivity: activityObject,
+          source: 'direct-navigation'
+        };
+      } else if (requestType === 'directContent' && payload.url) {
+        // Direct content load
+        return {
+          success: true,
+          action: 'loadContent',
+          url: payload.url,
+          scormData: payload.scormData,
+          source: 'direct-navigation'
+        };
+      } else {
+        return {
+          success: false,
+          reason: `Unsupported direct navigation type: ${requestType}`
+        };
+      }
+    } catch (error) {
+      // BUG-024 FIX: Emit navigation error event
+      eventBus.emit('navigationError', {
+        error: error.message,
+        source: 'AppManager',
+        context: 'processDirectNavigation'
+      });
+      
+      return {
+        success: false,
+        reason: 'Direct navigation error',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Process fallback navigation (simplified)
+   */
+  async processFallbackNavigation(requestType, activityId, activityObject) {
+    try {
+      // Simple fallback for when SN service is unavailable
+      if (requestType === 'choice' && activityId) {
+        // Try to find activity in course structure
+        const structure = this.uiState.getState('courseStructure');
+        const target = this._findItemById(structure, activityId);
+        
+        if (target && target.launchUrl) {
+          return {
+            success: true,
+            action: 'launch',
+            targetActivity: target,
+            availableNavigation: ['previous', 'continue'], // Heuristic
+            source: 'fallback-choice'
+          };
+        }
+      }
+      
+      return {
+        success: false,
+        reason: `Fallback navigation not available for ${requestType}`,
+        fallback: true
+      };
+    } catch (error) {
+      // BUG-024 FIX: Emit navigation error event
+      eventBus.emit('navigationError', {
+        error: error.message,
+        source: 'AppManager',
+        context: 'processFallbackNavigation'
+      });
+      
+      return {
+        success: false,
+        reason: 'Fallback navigation error',
+        error: error.message,
+        fallback: true
+      };
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Update navigation state from result
+   */
+  async updateNavigationStateFromResult(result) {
+    try {
+      if (result && result.availableNavigation) {
+        const normalized = this.normalizeAvailableNavigation(result.availableNavigation);
+        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+      }
+    } catch (error) {
+      this.logger.warn('AppManager: Failed to update navigation state from result', error);
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Handle successful navigation
+   */
+  async handleSuccessfulNavigation(result, originalPayload) {
+    try {
+      if (result.action === 'launch' && result.targetActivity) {
+        // Emit launch event
+        const { eventBus } = await import('./event-bus.js');
+        eventBus.emit('navigation:launch', {
+          activity: result.targetActivity,
+          sequencing: result.sequencing,
+          source: 'app-manager-unified'
+        });
+
+        // Instruct ContentViewer
+        const contentViewer = this.components.get('contentViewer');
+        if (contentViewer && typeof contentViewer.loadActivity === 'function') {
+          await contentViewer.loadActivity(result.targetActivity);
+        } else if (contentViewer && typeof contentViewer.loadContent === 'function' && result.targetActivity.launchUrl) {
+          await contentViewer.loadContent(result.targetActivity.launchUrl);
+        }
+
+      } else if (result.action === 'loadContent') {
+        // Direct content loading
+        const contentViewer = this.components.get('contentViewer');
+        if (contentViewer && typeof contentViewer.loadContent === 'function') {
+          await contentViewer.loadContent(result.url, result.scormData);
+        }
+      }
+    } catch (error) {
+      this.logger.error('AppManager: Error handling successful navigation', error);
+    }
+  }
+
+  /**
+   * BUG-003 FIX: Process queued navigation requests
+   */
+  async processNavigationQueue() {
+    if (this.navigationQueue.length === 0) {
+      return;
+    }
+
+    this.logger.debug('AppManager: Processing navigation queue', {
+      queueLength: this.navigationQueue.length
+    });
+
+    // Process next request in queue
+    const nextRequest = this.navigationQueue.shift();
+    if (nextRequest) {
+      // Process with a small delay to avoid overwhelming the system
+      setTimeout(() => {
+        this.processNavigationRequest(nextRequest);
+      }, 100);
+    }
+  }
+
+  /**
+   * BUG-004 FIX: Handle activity exit for SCORM lifecycle tracking
+   */
+  async handleActivityExit(activityId, exitType = 'navigation') {
+    try {
+      if (!this.snService) {
+        this.logger.debug('AppManager: SN service not available, skipping activity exit tracking');
+        return { success: true, reason: 'SN service unavailable' };
+      }
+
+      // Call SN service to handle activity exit
+      const result = await window.electronAPI.invoke('sn:handleActivityExit', {
+        activityId,
+        exitType
+      });
+
+      if (result.success) {
+        this.logger.debug('AppManager: Activity exit handled successfully', { activityId, exitType });
+      } else {
+        this.logger.warn('AppManager: Activity exit handling failed', result.reason);
+      }
+
+      return result;
+    } catch (error) {
+      // Never block navigation due to SCORM API failures
+      this.logger.warn('AppManager: Error handling activity exit, continuing navigation', error);
+      return { success: true, reason: 'Error handled gracefully' };
+    }
+  }
+
+  /**
+   * BUG-004 FIX: Update activity location for SCORM lifecycle tracking
+   */
+  async updateActivityLocation(activityId, location) {
+    try {
+      if (!this.snService) {
+        this.logger.debug('AppManager: SN service not available, skipping location update');
+        return { success: true, reason: 'SN service unavailable' };
+      }
+
+      // Call SN service to update activity location
+      const result = await window.electronAPI.invoke('sn:updateActivityLocation', {
+        activityId,
+        location
+      });
+
+      if (result.success) {
+        this.logger.debug('AppManager: Activity location updated successfully', { activityId, location });
+      } else {
+        this.logger.warn('AppManager: Activity location update failed', result.reason);
+      }
+
+      return result;
+    } catch (error) {
+      // Never block navigation due to SCORM API failures
+      this.logger.warn('AppManager: Error updating activity location, continuing navigation', error);
+      return { success: true, reason: 'Error handled gracefully' };
+    }
+  }
+
   /**
    * Normalize availableNavigation array into booleans for UIState authority.
    * Mirrors NavigationControls.normalizeAvailableNavigation to avoid duplication drift.

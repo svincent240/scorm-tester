@@ -310,21 +310,7 @@
     document.head.appendChild(script);
   </script>
   
-  <!-- Service Worker Registration for console logging -->
-  <script>
-    // Register service worker for console logging capture
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered successfully:', registration.scope);
-        })
-        .catch((error) => {
-          console.log('Service Worker registration failed:', error);
-        });
-    } else {
-      console.log('Service Workers not supported in this browser');
-    }
-  </script>
+  <!-- Service Worker removed - not beneficial in Electron context -->
 </body>
 </html>
                       

@@ -294,6 +294,9 @@ class NavigationControls extends BaseComponent {
     
     // Listen for UI events
     this.subscribe('ui:updated', this.handleUIUpdated);
+    
+    // BUG-022 FIX: Subscribe to navigation state updates
+    this.subscribe('navigation:state:updated', this.handleNavigationStateUpdate);
   }
 
   /**
@@ -358,14 +361,16 @@ class NavigationControls extends BaseComponent {
       return;
     }
 
-    // Emit centralized intent for AppManager orchestration
+    // BUG-002 FIX: Emit unified navigationRequest with standardized payload
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigation:request', {
-        type: 'previous',
-        source: 'navigation-controls'
+      eventBus.emit('navigationRequest', {
+        activityId: null, // Previous navigation doesn't target specific activity
+        activityObject: null,
+        requestType: 'previous',
+        source: 'NavigationControls'
       });
-      this.logger?.info('NavigationControls: Emitted navigation:request event for previous');
+      this.logger?.info('NavigationControls: Emitted navigationRequest event for previous');
     } catch (_) {
       // fall through; component-local behavior remains
     }
@@ -387,14 +392,16 @@ class NavigationControls extends BaseComponent {
       return;
     }
 
-    // Emit centralized intent for AppManager orchestration
+    // BUG-002 FIX: Emit unified navigationRequest with standardized payload
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigation:request', {
-        type: 'continue',
-        source: 'navigation-controls'
+      eventBus.emit('navigationRequest', {
+        activityId: null, // Continue navigation doesn't target specific activity
+        activityObject: null,
+        requestType: 'continue',
+        source: 'NavigationControls'
       });
-      this.logger?.info('NavigationControls: Emitted navigation:request event for continue');
+      this.logger?.info('NavigationControls: Emitted navigationRequest event for continue');
     } catch (_) {
       // fall through; component-local behavior remains
     }
@@ -441,17 +448,29 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Handle learner mode button click
+   * Handle learner mode button click (BUG-005 FIX)
    */
   async handleLearnerModeClick() {
-    await this.setBrowseMode(false);
+    // Use centralized browse mode management
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('browseMode:toggle', { enabled: false });
+    } catch (error) {
+      this.logger?.error('NavigationControls: Failed to disable browse mode', error);
+    }
   }
 
   /**
-   * Handle browse mode button click
+   * Handle browse mode button click (BUG-005 FIX)
    */
   async handleBrowseModeClick() {
-    await this.setBrowseMode(true);
+    // Use centralized browse mode management
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      eventBus.emit('browseMode:toggle', { enabled: true });
+    } catch (error) {
+      this.logger?.error('NavigationControls: Failed to enable browse mode', error);
+    }
   }
 
   /**
@@ -542,15 +561,20 @@ class NavigationControls extends BaseComponent {
     if (result.targetActivity && result.action === 'launch') {
       this.logger?.info('NavigationControls: Launching activity', result.targetActivity);
 
-      // Load new activity content
-      this.emit('activityLaunchRequested', {
-        activity: result.targetActivity,
-        sequencing: result.sequencing
-      });
-
-      // Broadcast centralized launch intent for other listeners
+      // BUG-002 FIX: Use unified navigationRequest event instead of activityLaunchRequested
       try {
         const { eventBus } = await import('../../services/event-bus.js');
+        
+        // Emit unified navigationRequest with standardized payload
+        eventBus.emit('navigationRequest', {
+          activityId: result.targetActivity?.identifier || result.targetActivity?.id,
+          activityObject: result.targetActivity,
+          requestType: 'activityLaunch',
+          source: 'NavigationControls',
+          sequencing: result.sequencing
+        });
+
+        // Also emit navigation:launch for components that need launch-specific handling
         eventBus.emit('navigation:launch', {
           activity: result.targetActivity,
           sequencing: result.sequencing,
@@ -559,9 +583,19 @@ class NavigationControls extends BaseComponent {
           currentActivity: result.targetActivity,
           navigationResult: result
         });
-        this.logger?.info('NavigationControls: Emitted navigation:launch event', result.targetActivity);
+        
+        this.logger?.info('NavigationControls: Emitted unified navigation events', {
+          activityId: result.targetActivity?.identifier,
+          requestType: 'activityLaunch'
+        });
       } catch (error) {
-        this.logger?.error('NavigationControls: Failed to emit navigation:launch event', error);
+        this.logger?.error('NavigationControls: Failed to emit navigation events', error);
+        
+        // Fallback to component-level event if global event bus fails
+        this.emit('activityLaunchRequested', {
+          activity: result.targetActivity,
+          sequencing: result.sequencing
+        });
       }
     } else {
       this.logger?.warn('NavigationControls: No target activity to launch', { result });
@@ -1007,75 +1041,15 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Set browse mode (SCORM-compliant)
+   * BUG-005 FIX: Browse mode handling now centralized in AppManager
+   * This method kept for backward compatibility but delegates to centralized system
    */
   async setBrowseMode(enabled) {
     try {
-      if (enabled) {
-        // Enable browse mode via IPC
-        const result = await window.electronAPI.invoke('browse-mode-enable', {
-          navigationUnrestricted: true,
-          trackingDisabled: true,
-          dataIsolation: true,
-          visualIndicators: true
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to enable browse mode');
-        }
-
-        this.logger?.info('NavigationControls: Browse mode enabled', result);
-      } else {
-        // Disable browse mode via IPC
-        const result = await window.electronAPI.invoke('browse-mode-disable');
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to disable browse mode');
-        }
-
-        this.logger?.info('NavigationControls: Browse mode disabled', result);
-      }
-
-      // Update UI state
-      if (this.uiState) {
-        const currentBrowseMode = this.uiState.getState('browseMode') || {};
-        const newBrowseMode = {
-          ...currentBrowseMode,
-          enabled: enabled
-        };
-        this.uiState.setState('browseMode', newBrowseMode);
-      }
-
-      // Update mode toggle buttons
-      this.updateModeToggle(enabled);
-
-      // Update navigation controls display based on mode
-      this.updateNavigationForBrowseMode(enabled);
-      
-      // In browse mode, ensure navigation is available
-      if (enabled) {
-        if (!this.navigationState.availableNavigation.includes('previous')) {
-          this.navigationState.availableNavigation.push('previous');
-        }
-        if (!this.navigationState.availableNavigation.includes('continue')) {
-          this.navigationState.availableNavigation.push('continue');
-        }
-      }
-
-      // Refresh navigation availability after mode change
-      await this.refreshNavigationAvailability();
-
-      // Emit mode change event
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('browseMode:changed', { enabled });
-
+      eventBus.emit('browseMode:toggle', { enabled });
     } catch (error) {
-      this.logger?.error('NavigationControls: Failed to set browse mode', error);
-
-      // Show error notification
-      if (this.uiState) {
-        this.uiState.setState('ui.error', `Failed to ${enabled ? 'enable' : 'disable'} browse mode: ${error.message}`);
-      }
+      this.logger?.error('NavigationControls: Failed to set browse mode via centralized system', error);
     }
   }
 
@@ -1511,6 +1485,31 @@ class NavigationControls extends BaseComponent {
   handleUIUpdated(data) {
     if (data.loading !== undefined) {
       this.element.classList.toggle('navigation-controls--loading', data.loading);
+    }
+  }
+
+  /**
+   * BUG-022 FIX: Handle navigation state updates from AppManager
+   */
+  handleNavigationStateUpdate(stateData) {
+    try {
+      const { state, currentRequest } = stateData || {};
+      
+      // Update button states based on navigation state
+      if (state === 'PROCESSING') {
+        this.element.classList.add('navigation-controls--processing');
+        // Disable buttons during processing
+        this.setButtonEnabled('previous', false);
+        this.setButtonEnabled('continue', false);
+      } else {
+        this.element.classList.remove('navigation-controls--processing');
+        // Re-enable buttons based on available navigation
+        this.updateButtonStates();
+      }
+      
+      this.logger?.debug('NavigationControls: Updated for navigation state change', { state, requestType: currentRequest?.requestType });
+    } catch (error) {
+      this.logger?.error('NavigationControls: Error handling navigation state update', error);
     }
   }
 

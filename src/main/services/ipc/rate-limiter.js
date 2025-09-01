@@ -112,8 +112,8 @@ class TokenBucketRateLimiter {
     if (bucket.length >= max) {
       // Exceeded: return false; wrapper/further callers may inspect profileDef.softDropOnLimit to determine soft drop behavior
       // Log a more informative message for diagnostics
-      if (this._logger) {
-        try { this._logger.info && this._logger.info(`RateLimiter: limit hit (profile=${profileName}) channel=${channel} sender=${senderId}`); } catch (_) {}
+      if (this.logger) {
+        try { this.logger.info && this.logger.info(`RateLimiter: limit hit (profile=${profileName}) channel=${channel} sender=${senderId}`); } catch (_) {}
       }
       return false;
     }

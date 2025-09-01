@@ -172,6 +172,11 @@ class CourseOutline extends BaseComponent {
       rendererLogger.debug('CourseOutline: event navigation:launch', data);
       this.handleNavigationLaunch(data);
     });
+
+    // BUG-022 FIX: Subscribe to navigation state updates
+    this.subscribe('navigation:state:updated', (stateData) => {
+      this.handleNavigationStateUpdate(stateData);
+    });
   }
 
   bindEvents() {
@@ -337,7 +342,7 @@ class CourseOutline extends BaseComponent {
       try {
         const { eventBus } = await import('../../services/event-bus.js');
         // SCORM SN uses "choice" requests with target activity
-        eventBus.emit('navigation:request', { type: 'choice', activityId: itemId, source: 'course-outline' });
+        eventBus.emit('navigationRequest', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
       } catch (_) { /* no-op */ }
     })();
 
@@ -548,6 +553,26 @@ class CourseOutline extends BaseComponent {
       }
     } catch (error) {
       rendererLogger.error('CourseOutline: Error handling navigation launch', error);
+    }
+  }
+
+  /**
+   * BUG-022 FIX: Handle navigation state updates from AppManager
+   */
+  handleNavigationStateUpdate(stateData) {
+    try {
+      const { state, currentRequest } = stateData || {};
+      
+      // Update course outline visual state based on navigation state
+      if (state === 'PROCESSING') {
+        this.element.classList.add('course-outline--processing');
+      } else {
+        this.element.classList.remove('course-outline--processing');
+      }
+      
+      rendererLogger.debug('CourseOutline: Updated for navigation state change', { state, requestType: currentRequest?.requestType });
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error handling navigation state update', error);
     }
   }
 

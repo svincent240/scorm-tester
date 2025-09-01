@@ -249,6 +249,8 @@ const SECURITY_CONFIG = {
       'sn:refreshNavigation',
       'sn:updateActivityProgress',
       'sn:reset',
+      'sn:handleActivityExit',
+      'sn:updateActivityLocation',
       // Browse Mode channels (robustness even with declarative routes)
       'browse-mode-enable',
       'browse-mode-disable',

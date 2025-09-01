@@ -125,6 +125,12 @@ class ScormService extends BaseService {
       this.snService.reset();
     }
 
+    // BUG-017 FIX: Clear session cleanup interval to prevent memory leak
+    if (this.sessionCleanupInterval) {
+      clearInterval(this.sessionCleanupInterval);
+      this.sessionCleanupInterval = null;
+    }
+
     this.sessions.clear();
     this.activeWorkflows.clear();
 
@@ -1032,7 +1038,7 @@ class ScormService extends BaseService {
    * @private
    */
   setupSessionCleanup() {
-    setInterval(() => {
+    this.sessionCleanupInterval = setInterval(() => {
       const now = Date.now();
       const timeout = this.config.sessionTimeout;
       
@@ -1240,25 +1246,51 @@ class ScormService extends BaseService {
         return {};
       }
       
-      // Find the most recently used session
+      // BUG-009 FIX: Use correct property names and RTE access patterns
+      // Find the most recently used session using correct property name
       const mostRecentSession = sessions.reduce((latest, current) => {
-        const latestTime = latest.lastAccessTime || 0;
-        const currentTime = current.lastAccessTime || 0;
+        const latestTime = latest.lastActivity || 0;
+        const currentTime = current.lastActivity || 0;
         return currentTime > latestTime ? current : latest;
       });
       
       this.logger?.debug(`getCurrentDataModel: Most recent session ID: ${mostRecentSession?.sessionId || 'unknown'}`);
       
-      // Get data model from the session's API handler
-      if (mostRecentSession && mostRecentSession.apiHandler && 
-          mostRecentSession.apiHandler.dataModel && 
-          typeof mostRecentSession.apiHandler.dataModel.getAllData === 'function') {
+      // Get RTE instance from this.rteInstances.get(sessionId) - correct access pattern
+      const sessionId = mostRecentSession?.sessionId;
+      if (sessionId) {
+        const rte = this.rteInstances.get(sessionId);
         
-        const dataModel = mostRecentSession.apiHandler.dataModel.getAllData();
-        this.logger?.debug(`getCurrentDataModel: Retrieved data model with ${Object.keys(dataModel.coreData || {}).length} core data items`);
-        return dataModel;
+        if (rte && rte.dataModel && typeof rte.dataModel.getAllData === 'function') {
+          const dataModel = rte.dataModel.getAllData();
+          this.logger?.debug(`getCurrentDataModel: Retrieved data model with ${Object.keys(dataModel.coreData || {}).length} core data items`);
+          
+          // Add null safety checks and SCORM 2004 compliance validation
+          if (dataModel && typeof dataModel === 'object') {
+            // Ensure all 15 required SCORM 2004 data elements are present
+            const requiredElements = [
+              'cmi.completion_status', 'cmi.completion_threshold', 'cmi.credit',
+              'cmi.entry', 'cmi.exit', 'cmi.launch_data', 'cmi.learner_id',
+              'cmi.learner_name', 'cmi.location', 'cmi.max_time_allowed',
+              'cmi.mode', 'cmi.progress_measure', 'cmi.scaled_passing_score',
+              'cmi.session_time', 'cmi.success_status'
+            ];
+            
+            // Log any missing elements for debugging
+            const missingElements = requiredElements.filter(element => 
+              !(dataModel.coreData && dataModel.coreData[element] !== undefined)
+            );
+            if (missingElements.length > 0) {
+              this.logger?.debug(`getCurrentDataModel: Missing SCORM elements: ${missingElements.join(', ')}`);
+            }
+          }
+          
+          return dataModel;
+        } else {
+          this.logger?.debug(`getCurrentDataModel: No valid RTE instance found for session ${sessionId}`);
+        }
       } else {
-        this.logger?.debug('getCurrentDataModel: Session has no valid API handler or data model');
+        this.logger?.debug('getCurrentDataModel: No valid session ID found');
       }
       
       return {};
@@ -1366,14 +1398,14 @@ class ScormService extends BaseService {
    */
   async createSessionWithBrowseMode(options = {}) {
     try {
-      // Create regular session first
-      const sessionResult = await this.createSession();
+      // BUG-008 FIX: Use correct method name - initializeSession instead of createSession
+      const sessionId = this.generateSessionId();
+      const sessionResult = await this.initializeSession(sessionId, options);
 
       if (!sessionResult.success) {
         return sessionResult;
       }
 
-      const sessionId = sessionResult.sessionId;
 
       // If browse mode requested, configure the RTE instance
       if (options.launchMode === 'browse') {
