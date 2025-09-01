@@ -319,6 +319,11 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-inspector-get-global-objectives', this.handleScormInspectorGetGlobalObjectives.bind(this));
       this.registerHandler('scorm-inspector-get-ssp-buckets', this.handleScormInspectorGetSSPBuckets.bind(this));
 
+      // Course Outline Navigation handlers
+      this.registerHandler('course-outline-get-activity-tree', this.handleCourseOutlineGetActivityTree.bind(this));
+      this.registerHandler('course-outline-validate-choice', this.handleCourseOutlineValidateChoice.bind(this));
+      this.registerHandler('course-outline-get-available-navigation', this.handleCourseOutlineGetAvailableNavigation.bind(this));
+
       // Logger adapter loader for renderer fallback
       this.registerHandler('load-shared-logger-adapter', this.handleLoadSharedLoggerAdapter.bind(this));
 
@@ -1286,7 +1291,7 @@ class IpcHandler extends BaseService {
    */
   async handleScormInspectorGetActivityTree(event, { sessionId } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetActivityTree called with sessionId: ${sessionId}`);
-    
+
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -1300,13 +1305,159 @@ class IpcHandler extends BaseService {
       }
 
       // Convert activity tree to serializable format for inspector
-      const activityTreeData = this.serializeActivityTree(snService.activityTreeManager);
-      
+      const activityTreeData = this.serializeActivityTree(snService.activityTreeManager, { mode: 'inspector' });
+
       return { success: true, data: activityTreeData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetActivityTree failed: ${error.message}`);
       return { success: false, error: error.message, data: {} };
     }
+  }
+
+  /**
+   * Get available navigation from SN service for course outline
+   */
+  async handleCourseOutlineGetAvailableNavigation(event) {
+    this.logger?.debug('IpcHandler: handleCourseOutlineGetAvailableNavigation called');
+
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', data: [] };
+      }
+
+      // Get SN service which manages navigation
+      const snService = scormService.snService;
+      if (!snService || !snService.navigationHandler) {
+        return { success: false, error: 'Navigation handler not available', data: [] };
+      }
+
+      // Get available navigation from navigation handler
+      const availableNavigation = snService.navigationHandler.getAvailableNavigation() || [];
+      
+      return { 
+        success: true, 
+        data: availableNavigation
+      };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleCourseOutlineGetAvailableNavigation failed: ${error.message}`);
+      return { 
+        success: false, 
+        error: error.message, 
+        data: []
+      };
+    }
+  }
+
+  /**
+   * Validate choice request for course outline navigation
+   */
+  async handleCourseOutlineValidateChoice(event, { targetActivityId } = {}) {
+    this.logger?.debug(`IpcHandler: handleCourseOutlineValidateChoice called with targetActivityId: ${targetActivityId}`);
+
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available', allowed: false };
+      }
+
+      // Get SN service which manages navigation validation
+      const snService = scormService.snService;
+      if (!snService || !snService.navigationHandler) {
+        return { success: false, error: 'Navigation handler not available', allowed: false };
+      }
+
+      // Call authoritative navigation validation
+      const result = await snService.navigationHandler.validateChoiceRequest(targetActivityId);
+      
+      return { 
+        success: true, 
+        allowed: result.allowed || false,
+        reason: result.reason || 'No reason provided',
+        details: result
+      };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleCourseOutlineValidateChoice failed: ${error.message}`);
+      return { 
+        success: false, 
+        error: error.message, 
+        allowed: false,
+        reason: 'Validation error occurred'
+      };
+    }
+  }
+
+  /**
+   * Get activity tree with comprehensive SCORM states for Course Outline
+   */
+  async handleCourseOutlineGetActivityTree(event, { sessionId } = {}) {
+    this.logger?.debug(`IpcHandler: handleCourseOutlineGetActivityTree called with sessionId: ${sessionId}`);
+
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        this.logger?.warn('IpcHandler: SCORM Service not available, returning fallback structure');
+        return this.createFallbackActivityTree('SCORM service unavailable');
+      }
+
+      // Get SN service which manages activity trees
+      const snService = scormService.snService;
+      if (!snService) {
+        this.logger?.warn('IpcHandler: SN service not available, returning fallback structure');
+        return this.createFallbackActivityTree('SN service not initialized');
+      }
+
+      if (!snService.activityTreeManager) {
+        this.logger?.warn('IpcHandler: Activity tree manager not available, returning fallback structure');
+        return this.createFallbackActivityTree('Activity tree manager not available');
+      }
+
+      if (!snService.activityTreeManager.root) {
+        this.logger?.warn('IpcHandler: Activity tree root not available, returning fallback structure');
+        return this.createFallbackActivityTree('No course loaded');
+      }
+
+      // Get comprehensive activity tree data with SCORM states for course outline
+      const activityTreeData = this.serializeActivityTreeForCourseOutline(snService.activityTreeManager, snService.sequencingEngine);
+
+      return { success: true, data: activityTreeData };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleCourseOutlineGetActivityTree failed: ${error.message}`);
+      return this.createFallbackActivityTree(`Error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create fallback activity tree structure when SN service is unavailable
+   */
+  createFallbackActivityTree(reason) {
+    return {
+      success: true,
+      data: {
+        id: 'fallback-root',
+        title: 'Course Structure Unavailable',
+        type: 'cluster',
+        children: [],
+        scormState: {
+          isVisible: true,
+          controlMode: { choice: true, flow: true, forwardOnly: false },
+          attempted: false,
+          attemptCount: 0,
+          suspended: false,
+          completionStatus: 'not attempted',
+          successStatus: 'unknown',
+          preConditionResult: { action: null, reason: reason },
+          objectives: [],
+          sequencingRules: {
+            hasPreConditionRules: false,
+            hasPostConditionRules: false,
+            hasExitConditionRules: false
+          }
+        }
+      },
+      fallback: true,
+      reason: reason
+    };
   }
 
   /**
@@ -1396,10 +1547,12 @@ class IpcHandler extends BaseService {
   // Helper methods for data extraction and serialization
 
   /**
-   * Serialize activity tree for inspector display
+   * Unified activity tree serializer with configurable output modes
    */
-  serializeActivityTree(activityTree) {
-    if (!activityTree || !activityTree.root) {
+  serializeActivityTree(activityTreeManager, options = {}) {
+    const { mode = 'inspector', sequencingEngine = null } = options;
+    
+    if (!activityTreeManager || !activityTreeManager.root) {
       return {};
     }
 
@@ -1408,28 +1561,72 @@ class IpcHandler extends BaseService {
         id: node.identifier,
         title: node.title,
         type: node.resource?.scormType || (node.children.length > 0 ? 'cluster' : 'activity'),
-        status: this.getActivityCompletionStatus(node),
         children: []
       };
 
-      // Add detailed information for inspector
-      if (node.activityState || node.attemptState || node.attemptCount > 0) {
-        serialized.details = {
+      if (mode === 'inspector') {
+        // Inspector mode: basic status and details
+        serialized.status = this.getActivityCompletionStatus(node);
+        
+        if (node.activityState || node.attemptState || node.attemptCount > 0) {
+          serialized.details = {
+            completionStatus: this.mapActivityState(node.activityState),
+            successStatus: this.mapAttemptState(node.attemptState),
+            progressMeasure: node.progressMeasure || 0,
+            attempted: node.attemptCount > 0,
+            attemptCount: node.attemptCount,
+            suspended: node.suspended,
+            objectives: Array.from(node.objectives?.values() || []).map(obj => ({
+              id: obj.id,
+              status: obj.satisfiedStatus ? 'satisfied' : 'not satisfied',
+              score: obj.normalizedMeasure
+            })),
+            sequencingDefinition: {
+              choice: node.sequencing?.choice !== false,
+              flow: node.sequencing?.flow !== false,
+              forwardOnly: node.sequencing?.forwardOnly === true
+            }
+          };
+        }
+      } else if (mode === 'outline') {
+        // Course outline mode: comprehensive SCORM state information
+        serialized.scormState = {
+          // Basic activity state
           completionStatus: this.mapActivityState(node.activityState),
           successStatus: this.mapAttemptState(node.attemptState),
           progressMeasure: node.progressMeasure || 0,
           attempted: node.attemptCount > 0,
           attemptCount: node.attemptCount,
           suspended: node.suspended,
+
+          // SCORM visibility and control modes
+          isVisible: node.isVisible !== false, // SCORM-compliant visibility
+          controlMode: {
+            choice: node.sequencing?.controlMode?.choice !== false,
+            flow: node.sequencing?.controlMode?.flow !== false,
+            forwardOnly: node.sequencing?.controlMode?.forwardOnly === true
+          },
+
+          // Attempt limits
+          attemptLimit: node.sequencing?.limitConditions?.attemptLimit || null,
+          attemptLimitExceeded: this.isAttemptLimitExceeded(node),
+
+          // Pre-condition rule evaluation
+          preConditionResult: sequencingEngine ? this.evaluatePreConditionForNode(node, sequencingEngine) : null,
+
+          // Objectives
           objectives: Array.from(node.objectives?.values() || []).map(obj => ({
             id: obj.id,
-            status: obj.satisfiedStatus ? 'satisfied' : 'not satisfied',
-            score: obj.normalizedMeasure
+            satisfied: obj.satisfiedStatus || false,
+            measure: obj.normalizedMeasure || 0,
+            progressMeasure: obj.progressMeasure || 0
           })),
-          sequencingDefinition: {
-            choice: node.sequencing?.choice !== false,
-            flow: node.sequencing?.flow !== false,
-            forwardOnly: node.sequencing?.forwardOnly === true
+
+          // Sequencing rules summary
+          sequencingRules: {
+            hasPreConditionRules: !!(node.sequencing?.sequencingRules?.preConditionRules?.length > 0),
+            hasPostConditionRules: !!(node.sequencing?.sequencingRules?.postConditionRules?.length > 0),
+            hasExitConditionRules: !!(node.sequencing?.sequencingRules?.exitConditionRules?.length > 0)
           }
         };
       }
@@ -1442,7 +1639,51 @@ class IpcHandler extends BaseService {
       return serialized;
     };
 
-    return serializeNode(activityTree.root);
+    return serializeNode(activityTreeManager.root);
+  }
+
+  /**
+   * Legacy method for backward compatibility - redirects to unified serializer
+   */
+  serializeActivityTreeForCourseOutline(activityTreeManager, sequencingEngine) {
+    return this.serializeActivityTree(activityTreeManager, { mode: 'outline', sequencingEngine });
+  }
+
+  /**
+   * Evaluate pre-condition rules for a specific node
+   */
+  evaluatePreConditionForNode(node, sequencingEngine) {
+    try {
+      if (!sequencingEngine || !sequencingEngine.evaluatePreConditionRules) {
+        return { action: null, reason: 'Sequencing engine not available' };
+      }
+
+      const result = sequencingEngine.evaluatePreConditionRules(node);
+      return {
+        action: result.action,
+        reason: result.reason,
+        rule: result.rule ? {
+          type: 'preConditionRule',
+          conditions: result.rule.conditions,
+          action: result.rule.action
+        } : null
+      };
+    } catch (error) {
+      this.logger?.error(`Error evaluating pre-condition for node ${node.identifier}:`, error);
+      return { action: null, reason: 'Evaluation error', error: error.message };
+    }
+  }
+
+  /**
+   * Check if attempt limit is exceeded for a node
+   */
+  isAttemptLimitExceeded(node) {
+    if (!node.sequencing?.limitConditions?.attemptLimit) {
+      return false;
+    }
+
+    const limit = node.sequencing.limitConditions.attemptLimit;
+    return limit > 0 && node.attemptCount >= limit;
   }
 
   /**

@@ -263,6 +263,14 @@ const SECURITY_CONFIG = {
       // SCORM Inspector channels
       'open-scorm-inspector-window',
       'scorm-inspector-get-history',
+      'scorm-inspector-get-activity-tree',
+      'scorm-inspector-get-navigation-requests',
+      'scorm-inspector-get-global-objectives',
+      'scorm-inspector-get-ssp-buckets',
+      // Course Outline channels
+      'course-outline-validate-choice',
+      'course-outline-get-activity-tree',
+      'course-outline-get-available-navigation',
       // App control channels
       'quit-app'
     ]

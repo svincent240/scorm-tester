@@ -655,6 +655,13 @@ class ScormService extends BaseService {
         if (snInitResult.success) {
           this.logger?.info(`ScormService: SN service initialized with manifest`);
           this.eventEmitter.emit('course:loaded', { folderPath, manifest: result.manifest });
+          
+          // Emit sn:initialized event to renderer process for course outline integration
+          const windowManager = this.getDependency('windowManager');
+          if (windowManager?.broadcastToAllWindows) {
+            windowManager.broadcastToAllWindows('sn:initialized', {});
+            this.logger?.info(`ScormService: Emitted sn:initialized event to renderer`);
+          }
         } else {
           this.logger?.warn(`ScormService: SN service initialization failed: ${snInitResult.reason}`);
         }
@@ -1176,7 +1183,19 @@ class ScormService extends BaseService {
               reason: 'Continue navigation not available (expected for single SCO courses)'
             };
           }
-          return await this.snService.processNavigation('continue');
+          const continueResult = await this.snService.processNavigation('continue');
+          if (continueResult.success) {
+            // Emit navigation:completed event to renderer for course outline updates
+            const windowManager = this.getDependency('windowManager');
+            if (windowManager?.broadcastToAllWindows) {
+              windowManager.broadcastToAllWindows('navigation:completed', { 
+                activityId: continueResult.targetActivity?.identifier,
+                navigationRequest: 'continue',
+                result: continueResult 
+              });
+            }
+          }
+          return continueResult;
 
         case 'previous':
           // Check if previous is available
@@ -1187,7 +1206,19 @@ class ScormService extends BaseService {
               reason: 'Previous navigation not available'
             };
           }
-          return await this.snService.processNavigation('previous');
+          const previousResult = await this.snService.processNavigation('previous');
+          if (previousResult.success) {
+            // Emit navigation:completed event to renderer for course outline updates
+            const windowManager = this.getDependency('windowManager');
+            if (windowManager?.broadcastToAllWindows) {
+              windowManager.broadcastToAllWindows('navigation:completed', { 
+                activityId: previousResult.targetActivity?.identifier,
+                navigationRequest: 'previous',
+                result: previousResult 
+              });
+            }
+          }
+          return previousResult;
 
         case 'exit':
           // Exit current activity (for single SCO, this is equivalent to exitAll)

@@ -359,6 +359,15 @@ module.exports = [
       useIpcResult: true
     }
   },
+  // Course Outline Navigation routes
+  {
+    channel: 'course-outline-get-activity-tree',
+    handlerName: 'handleCourseOutlineGetActivityTree',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
   {
     channel: 'scorm-inspector-get-navigation-requests',
     handlerName: 'handleScormInspectorGetNavigationRequests',

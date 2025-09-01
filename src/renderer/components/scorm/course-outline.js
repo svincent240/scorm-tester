@@ -17,11 +17,14 @@ import { rendererLogger } from '../../utils/renderer-logger.js';
 class CourseOutline extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
-    
+
     this.courseStructure = null;
     this.currentItem = null;
     this.expandedItems = new Set();
     this.progressData = new Map();
+    this.scormStates = new Map(); // Store comprehensive SCORM states
+    this.availableNavigation = []; // Store available navigation from SN service
+    this.browseModeEnabled = false;
 
     // Bind handlers to preserve 'this' context across event bus calls
     this.handleCourseLoaded = this.handleCourseLoaded.bind(this);
@@ -177,6 +180,42 @@ class CourseOutline extends BaseComponent {
     this.subscribe('navigation:state:updated', (stateData) => {
       this.handleNavigationStateUpdate(stateData);
     });
+
+    // Listen for browse mode changes
+    this.subscribe('browse-mode:changed', (data) => {
+      this.handleBrowseModeChanged(data);
+    });
+
+    // Listen for SN service initialization to fetch SCORM states
+    this.subscribe('sn:initialized', () => {
+      rendererLogger.info('CourseOutline: SN service initialized, fetching SCORM states');
+      this.fetchScormStates().then(() => {
+        if (this.courseStructure) {
+          this.renderCourseStructure(); // Re-render with SCORM states
+        }
+        rendererLogger.info('CourseOutline: SCORM states updated after SN initialization');
+      }).catch(error => {
+        rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', error);
+      });
+    });
+
+    // Listen for navigation completion to refresh SCORM states
+    this.subscribe('navigation:completed', (data) => {
+      rendererLogger.debug('CourseOutline: Navigation completed, refreshing SCORM states');
+      this.refreshScormStates();
+    });
+
+    // Listen for activity progress updates to refresh states
+    this.subscribe('activity:progress:updated', (data) => {
+      rendererLogger.debug('CourseOutline: Activity progress updated, refreshing SCORM states');
+      this.refreshScormStates();
+    });
+
+    // Listen for objective updates to refresh states
+    this.subscribe('objectives:updated', (data) => {
+      rendererLogger.debug('CourseOutline: Objectives updated, refreshing SCORM states');
+      this.refreshScormStates();
+    });
   }
 
   bindEvents() {
@@ -241,46 +280,228 @@ class CourseOutline extends BaseComponent {
     const isExpanded = this.expandedItems.has(item.identifier);
     const isCurrent = this.currentItem === item.identifier;
     const progress = this.progressData.get(item.identifier) || {};
-    
+    const scormState = this.scormStates.get(item.identifier);
+
+    // Determine SCORM-based visual states (use local validation for immediate rendering)
+    const validation = this.validateActivityNavigationLocal(item.identifier);
+    const isHidden = scormState && !scormState.isVisible;
+    const isDisabled = !validation.allowed && !this.browseModeEnabled;
+    const isSuspended = scormState && scormState.suspended;
+    const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
+
     const itemClass = [
       'outline-item',
       hasChildren ? 'outline-item--parent' : 'outline-item--leaf',
       isCurrent ? 'outline-item--current' : '',
-      isExpanded ? 'outline-item--expanded' : ''
+      isExpanded ? 'outline-item--expanded' : '',
+      isHidden ? 'outline-item--hidden' : '',
+      isDisabled ? 'outline-item--disabled' : '',
+      isSuspended ? 'outline-item--suspended' : '',
+      attemptLimitReached ? 'outline-item--attempt-limit-reached' : '',
+      this.browseModeEnabled ? 'outline-item--browse-mode' : ''
     ].filter(Boolean).join(' ');
-    
+
+    // Build tooltip with comprehensive restriction information
+    const tooltip = this.buildRestrictionTooltip(item.identifier, validation, scormState);
+
     return `
-      <li class="${itemClass}" data-item-id="${item.identifier}">
+      <li class="${itemClass}" data-item-id="${item.identifier}" ${tooltip ? `title="${tooltip}"` : ''}>
         <div class="outline-item__content">
           ${hasChildren ? `
             <button class="outline-item__toggle" data-item-id="${item.identifier}">
               ${isExpanded ? '▼' : '▶'}
             </button>
           ` : '<span class="outline-item__spacer"></span>'}
-          
+
           ${this.options.showIcons ? `
-            <span class="outline-item__icon">${this.getItemIcon(item, progress)}</span>
+            <span class="outline-item__icon">${this.getItemIcon(item, progress, scormState)}</span>
           ` : ''}
-          
-          <span class="outline-item__title" data-item-id="${item.identifier}">
+
+          <span class="outline-item__title" data-item-id="${item.identifier}" ${isDisabled ? 'style="cursor: not-allowed;"' : ''}>
             ${item.title || item.identifier}
           </span>
-          
+
+          ${this.renderScormIndicators(scormState)}
           ${this.options.showProgress ? `
             <span class="outline-item__progress">${this.getProgressIndicator(progress)}</span>
           ` : ''}
         </div>
-        
+
         ${hasChildren && isExpanded ? this.renderItems(childList, depth + 1) : ''}
       </li>
     `;
   }
 
-  getItemIcon(item, progress) {
+  getItemIcon(item, progress, scormState) {
+    // Show different icons based on SCORM state
+    if (scormState) {
+      if (!scormState.isVisible) {
+        return '👁️‍🗨️'; // Hidden/eye blocked
+      }
+      if (scormState.suspended) {
+        return '⏸️'; // Suspended
+      }
+      if (scormState.attemptLimitExceeded) {
+        return '🚫'; // Blocked
+      }
+      if (scormState.preConditionResult && scormState.preConditionResult.action) {
+        return '⚠️'; // Warning for restrictions
+      }
+    }
+
     if (item.type === 'sco') {
       return '📄'; // Simple document icon for all SCOs
     }
     return item.type === 'asset' ? '📎' : '📁';
+  }
+
+  /**
+   * Build comprehensive tooltip with restriction information
+   */
+  buildRestrictionTooltip(activityId, validation, scormState) {
+    if (!scormState) {
+      return validation.allowed ? null : `Navigation blocked: ${validation.reason}`;
+    }
+
+    const reasons = [];
+    const prerequisites = [];
+
+    if (!scormState.isVisible) {
+      reasons.push('• Hidden from choice');
+    }
+
+    if (!scormState.controlMode.choice) {
+      reasons.push('• Choice navigation disabled');
+    }
+
+    if (scormState.attemptLimitExceeded) {
+      const limit = scormState.attemptLimit || 'unlimited';
+      reasons.push(`• Attempt limit exceeded (${scormState.attemptCount}/${limit})`);
+    }
+
+    if (scormState.suspended) {
+      reasons.push('• Activity suspended');
+    }
+
+    if (scormState.preConditionResult && scormState.preConditionResult.action) {
+      reasons.push(`• ${scormState.preConditionResult.reason}`);
+
+      // Try to extract prerequisite information from pre-condition rules
+      if (scormState.preConditionResult.rule && scormState.preConditionResult.rule.conditions) {
+        const prereqs = this.extractPrerequisitesFromRule(scormState.preConditionResult.rule);
+        if (prereqs.length > 0) {
+          prerequisites.push(...prereqs);
+        }
+      }
+    }
+
+    if (this.browseModeEnabled) {
+      reasons.push('• Browse mode: Restrictions bypassed');
+    }
+
+    let tooltip = '';
+
+    if (reasons.length > 0) {
+      tooltip += reasons.join('\n');
+    }
+
+    if (prerequisites.length > 0) {
+      if (tooltip) tooltip += '\n\n';
+      tooltip += 'Prerequisites:\n' + prerequisites.join('\n');
+    }
+
+    return tooltip || null;
+  }
+
+  /**
+   * Extract prerequisite information from sequencing rule conditions
+   */
+  extractPrerequisitesFromRule(rule) {
+    const prerequisites = [];
+
+    if (!rule.conditions) return prerequisites;
+
+    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [rule.conditions];
+
+    for (const condition of conditions) {
+      if (!condition) continue;
+
+      const conditionType = condition.condition;
+      const operator = condition.operator || 'noOp';
+
+      let prereqText = '';
+
+      switch (conditionType) {
+        case 'completed':
+          prereqText = operator === 'not' ? 'Must not be completed' : 'Must be completed';
+          break;
+        case 'attempted':
+          prereqText = operator === 'not' ? 'Must not be attempted' : 'Must be attempted';
+          break;
+        case 'satisfied':
+          prereqText = operator === 'not' ? 'Must not be satisfied' : 'Must be satisfied';
+          break;
+        case 'objectiveStatusKnown':
+        case 'objective_status_known': // Support both formats for compatibility
+          prereqText = 'Objective status must be known';
+          break;
+        case 'objectiveMeasureKnown':
+        case 'objective_measure_known': // Support both formats for compatibility
+          prereqText = 'Objective measure must be known';
+          break;
+        default:
+          continue; // Skip unknown conditions
+      }
+
+      if (prereqText) {
+        prerequisites.push(`• ${prereqText}`);
+      }
+    }
+
+    return prerequisites;
+  }
+
+  /**
+   * Render SCORM state indicators (badges)
+   */
+  renderScormIndicators(scormState) {
+    if (!scormState) return '';
+
+    const indicators = [];
+
+    // Attempt count badge
+    if (scormState.attemptCount > 0) {
+      const limit = scormState.attemptLimit;
+      const limitText = limit ? `/${limit}` : '/∞';
+      const isLimitReached = scormState.attemptLimitExceeded;
+      indicators.push(`<span class="scorm-badge scorm-badge--attempts ${isLimitReached ? 'scorm-badge--limit-reached' : ''}" title="Attempts: ${scormState.attemptCount}${limitText}">${scormState.attemptCount}${limitText}</span>`);
+    }
+
+    // Suspension indicator
+    if (scormState.suspended) {
+      indicators.push('<span class="scorm-badge scorm-badge--suspended" title="Activity is suspended">⏸️</span>');
+    }
+
+    // Objective status indicators
+    if (scormState.objectives && scormState.objectives.length > 0) {
+      const satisfiedCount = scormState.objectives.filter(obj => obj.satisfied).length;
+      const totalCount = scormState.objectives.length;
+      const objectiveStatus = satisfiedCount === totalCount ? 'satisfied' : satisfiedCount > 0 ? 'partial' : 'not-satisfied';
+      indicators.push(`<span class="scorm-badge scorm-badge--objectives scorm-badge--objectives-${objectiveStatus}" title="Objectives: ${satisfiedCount}/${totalCount} satisfied">${satisfiedCount}/${totalCount}</span>`);
+    }
+
+    // Pre-condition rule indicator
+    if (scormState.preConditionResult && scormState.preConditionResult.action) {
+      const action = scormState.preConditionResult.action;
+      const actionIcon = {
+        'disabled': '🚫',
+        'hiddenFromChoice': '👁️‍🗨️',
+        'skip': '⏭️'
+      }[action] || '⚠️';
+      indicators.push(`<span class="scorm-badge scorm-badge--restriction" title="${scormState.preConditionResult.reason}">${actionIcon}</span>`);
+    }
+
+    return indicators.length > 0 ? `<div class="outline-item__indicators">${indicators.join('')}</div>` : '';
   }
 
   getProgressIndicator(progress) {
@@ -332,19 +553,25 @@ class CourseOutline extends BaseComponent {
     this.emit('itemToggled', { itemId, expanded: this.expandedItems.has(itemId) });
   }
 
-  navigateToItem(itemId) {
+  async navigateToItem(itemId) {
     if (!this.options.enableNavigation) return;
+
+    // Validate navigation before proceeding (now async)
+    const validation = await this.validateActivityNavigation(itemId);
+    if (!validation.allowed) {
+      rendererLogger.warn('CourseOutline: Navigation blocked for item', itemId, validation.reason);
+      this.showNavigationBlockedMessage(itemId, validation.reason);
+      return;
+    }
 
     this.setCurrentItem(itemId);
 
     // Emit centralized choice intent for AppManager orchestration
-    (async () => {
-      try {
-        const { eventBus } = await import('../../services/event-bus.js');
-        // SCORM SN uses "choice" requests with target activity
-        eventBus.emit('navigationRequest', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
-      } catch (_) { /* no-op */ }
-    })();
+    try {
+      const { eventBus } = await import('../../services/event-bus.js');
+      // SCORM SN uses "choice" requests with target activity
+      eventBus.emit('navigationRequest', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
+    } catch (_) { /* no-op */ }
 
     this.emit('navigationRequested', { itemId });
   }
@@ -443,7 +670,7 @@ class CourseOutline extends BaseComponent {
     this.renderCourseStructure();
   }
 
-  handleCourseLoaded(data) {
+  async handleCourseLoaded(data) {
     const courseData = data.data || data;
     rendererLogger.info('CourseOutline.handleCourseLoaded: received', {
       hasStructure: !!courseData?.structure,
@@ -469,6 +696,15 @@ class CourseOutline extends BaseComponent {
       } catch (_) {}
 
       this.setCourseStructure(courseData.structure);
+
+      // Fetch comprehensive SCORM states for validation
+      try {
+        await this.fetchScormStates();
+        rendererLogger.info('CourseOutline: SCORM states loaded for course validation');
+      } catch (error) {
+        rendererLogger.warn('CourseOutline: Failed to load SCORM states, using fallback validation', error);
+      }
+
       return;
     }
 
@@ -480,6 +716,8 @@ class CourseOutline extends BaseComponent {
     this.courseStructure = null;
     this.expandedItems.clear();
     this.progressData.clear();
+    this.scormStates.clear();
+    this.availableNavigation = [];
     this.currentItem = null;
     this.showEmptyState();
   }
@@ -562,17 +800,36 @@ class CourseOutline extends BaseComponent {
   handleNavigationStateUpdate(stateData) {
     try {
       const { state, currentRequest } = stateData || {};
-      
+
       // Update course outline visual state based on navigation state
       if (state === 'PROCESSING') {
         this.element.classList.add('course-outline--processing');
       } else {
         this.element.classList.remove('course-outline--processing');
       }
-      
+
       rendererLogger.debug('CourseOutline: Updated for navigation state change', { state, requestType: currentRequest?.requestType });
     } catch (error) {
       rendererLogger.error('CourseOutline: Error handling navigation state update', error);
+    }
+  }
+
+  /**
+   * Handle browse mode changes
+   */
+  handleBrowseModeChanged(data) {
+    try {
+      const { enabled } = data || {};
+      this.browseModeEnabled = !!enabled;
+
+      rendererLogger.info('CourseOutline: Browse mode changed', { enabled: this.browseModeEnabled });
+
+      // Refresh the course structure display to reflect browse mode changes
+      if (this.courseStructure) {
+        this.renderCourseStructure();
+      }
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error handling browse mode change', error);
     }
   }
 
@@ -623,29 +880,269 @@ class CourseOutline extends BaseComponent {
   }
 
   /**
-   * Convert manifest data to course structure format
-   * @param {Object} manifest - SCORM manifest data
-   * @returns {Object} Course structure
+   * Fetch comprehensive SCORM states for course outline
    */
-  // Removed manifest-to-structure conversion in renderer to keep single-source of truth from CAM.
-  convertManifestToStructure(_) {
-    return null;
+  async fetchScormStates() {
+    try {
+      if (!window.electronAPI?.getCourseOutlineActivityTree) {
+        rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available');
+        return null;
+      }
+
+      const result = await window.electronAPI.getCourseOutlineActivityTree();
+      if (result.success && result.data) {
+        this.processScormStates(result.data);
+        rendererLogger.info('CourseOutline: SCORM states fetched successfully');
+        
+        // Also fetch available navigation
+        await this.fetchAvailableNavigation();
+        
+        return result.data;
+      } else {
+        rendererLogger.warn('CourseOutline: Failed to fetch SCORM states', result.error);
+        return null;
+      }
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error fetching SCORM states', error);
+      return null;
+    }
   }
 
   /**
-   * Convert manifest items to structure items
-   * @param {Array|Object} items - Manifest items
-   * @returns {Array} Structure items
+   * Refresh SCORM states and available navigation (for real-time sync)
    */
-  convertManifestItems(_) {
-    return [];
+  async refreshScormStates() {
+    try {
+      // Debounce multiple rapid updates
+      if (this._refreshTimeout) {
+        clearTimeout(this._refreshTimeout);
+      }
+      
+      this._refreshTimeout = setTimeout(async () => {
+        try {
+          await this.fetchScormStates(); // This also fetches available navigation
+          if (this.courseStructure) {
+            this.renderCourseStructure(); // Re-render with updated states
+          }
+          rendererLogger.debug('CourseOutline: SCORM states refreshed successfully');
+        } catch (error) {
+          rendererLogger.warn('CourseOutline: Failed to refresh SCORM states', error);
+        }
+      }, 200); // 200ms debounce
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error setting up SCORM state refresh', error);
+    }
   }
 
-  destroy() {
-    this.expandedItems.clear();
-    this.progressData.clear();
-    super.destroy();
+  /**
+   * Fetch available navigation from SN service
+   */
+  async fetchAvailableNavigation() {
+    try {
+      if (!window.electronAPI?.getCourseOutlineAvailableNavigation) {
+        rendererLogger.warn('CourseOutline: getCourseOutlineAvailableNavigation not available');
+        return [];
+      }
+
+      const result = await window.electronAPI.getCourseOutlineAvailableNavigation();
+      if (result.success && Array.isArray(result.data)) {
+        this.availableNavigation = result.data;
+        rendererLogger.info('CourseOutline: Available navigation fetched successfully', this.availableNavigation.length);
+        return result.data;
+      } else {
+        rendererLogger.warn('CourseOutline: Failed to fetch available navigation', result.error);
+        this.availableNavigation = [];
+        return [];
+      }
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Error fetching available navigation', error);
+      this.availableNavigation = [];
+      return [];
+    }
   }
+
+  /**
+   * Process and store SCORM states from activity tree
+   */
+  processScormStates(activityTree) {
+    this.scormStates.clear();
+    this.processActivityNode(activityTree);
+  }
+
+  /**
+   * Recursively process activity tree nodes
+   */
+  processActivityNode(node) {
+    if (node.id && node.scormState) {
+      this.scormStates.set(node.id, node.scormState);
+    }
+
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach(child => this.processActivityNode(child));
+    }
+  }
+
+  /**
+   * Validate if navigation to an activity is allowed using authoritative SN service validation
+   */
+  async validateActivityNavigation(activityId) {
+    // Try authoritative validation first
+    if (window.electronAPI?.validateCourseOutlineChoice) {
+      try {
+        const result = await window.electronAPI.validateCourseOutlineChoice(activityId);
+        if (result.success) {
+          return {
+            allowed: result.allowed,
+            reason: result.reason,
+            authoritative: true
+          };
+        }
+      } catch (error) {
+        rendererLogger.warn('CourseOutline: Authoritative validation failed, falling back to local validation', error);
+      }
+    }
+
+    // Fallback to local SCORM state validation
+    return this.validateActivityNavigationLocal(activityId);
+  }
+
+  /**
+   * Local fallback validation using SCORM states and available navigation
+   */
+  validateActivityNavigationLocal(activityId) {
+    // Check available navigation from SN service first (mirrors Navigation Controls behavior)
+    if (this.availableNavigation.length > 0) {
+      const isInAvailableNavigation = this.availableNavigation.some(navItem => {
+        // Check if this activity is in available navigation
+        return navItem.activityId === activityId || navItem.targetActivityId === activityId;
+      });
+      
+      if (!isInAvailableNavigation) {
+        return { 
+          allowed: false, 
+          reason: 'Activity not in available navigation list',
+          authoritative: false 
+        };
+      }
+    }
+
+    const scormState = this.scormStates.get(activityId);
+
+    if (!scormState) {
+      // If activity is in available navigation but no SCORM state, allow it
+      if (this.availableNavigation.length > 0) {
+        return { allowed: true, reason: 'Available in navigation list', authoritative: false };
+      }
+      // No SCORM state or navigation data available, allow navigation (fallback)
+      return { allowed: true, reason: 'No SCORM validation available', authoritative: false };
+    }
+
+    // Check visibility
+    if (!scormState.isVisible) {
+      return { allowed: false, reason: 'Activity is hidden from choice', authoritative: false };
+    }
+
+    // Check control mode
+    if (!scormState.controlMode.choice) {
+      return { allowed: false, reason: 'Choice navigation disabled by control mode', authoritative: false };
+    }
+
+    // Check attempt limit
+    if (scormState.attemptLimitExceeded) {
+      return { allowed: false, reason: 'Attempt limit exceeded', authoritative: false };
+    }
+
+    // Check pre-condition rules
+    if (scormState.preConditionResult && scormState.preConditionResult.action) {
+      const action = scormState.preConditionResult.action;
+      if (action === 'disabled' || action === 'hiddenFromChoice') {
+        return {
+          allowed: false,
+          reason: scormState.preConditionResult.reason || `Pre-condition rule: ${action}`,
+          authoritative: false
+        };
+      }
+    }
+
+    // Check browse mode override
+    if (this.browseModeEnabled) {
+      return { allowed: true, reason: 'Browse mode enabled - restrictions bypassed', authoritative: false };
+    }
+
+    return { allowed: true, reason: 'Navigation allowed', authoritative: false };
+  }
+
+  /**
+   * Show navigation blocked message to user
+   */
+  showNavigationBlockedMessage(activityId, reason) {
+    // Create a temporary notification element
+    const notification = document.createElement('div');
+    notification.className = 'course-outline__notification course-outline__notification--error';
+    notification.innerHTML = `
+      <div class="notification__content">
+        <div class="notification__icon">⚠️</div>
+        <div class="notification__message">
+          <strong>Navigation Blocked</strong><br>
+          ${reason}
+        </div>
+        <button class="notification__close">×</button>
+      </div>
+    `;
+
+    // Add to DOM
+    this.element.appendChild(notification);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 5000);
+
+    // Close button handler
+    const closeBtn = notification.querySelector('.notification__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      });
+    }
+  }
+
+  /**
+    * Convert manifest data to course structure format
+    * @param {Object} manifest - SCORM manifest data
+    * @returns {Object} Course structure
+    */
+   // Removed manifest-to-structure conversion in renderer to keep single-source of truth from CAM.
+   convertManifestToStructure(_) {
+     return null;
+   }
+
+   /**
+    * Convert manifest items to structure items
+    * @param {Array|Object} items - Manifest items
+    * @returns {Array} Structure items
+    */
+   convertManifestItems(_) {
+     return [];
+   }
+
+   destroy() {
+     // Clean up debounce timeout
+     if (this._refreshTimeout) {
+       clearTimeout(this._refreshTimeout);
+       this._refreshTimeout = null;
+     }
+     
+     this.expandedItems.clear();
+     this.progressData.clear();
+     this.scormStates.clear();
+     this.availableNavigation = [];
+     super.destroy();
+   }
 }
 
 export { CourseOutline };

@@ -775,6 +775,14 @@ class ScormDataModel {
   }
 
   /**
+   * Get objectives data for event emission
+   * @returns {Array} Array of objectives data
+   */
+  getObjectivesData() {
+    return [...this.objectives];
+  }
+
+  /**
    * Reset data model to initial state
    */
   reset() {

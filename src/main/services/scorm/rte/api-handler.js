@@ -373,6 +373,16 @@ class ScormApiHandler {
         errorMessage = "";
         // Broadcast data model update for successful SetValue
         this._broadcastDataModelUpdate();
+        
+        // Emit progress update events for course outline real-time sync
+        if (element === 'cmi.completion_status' || element === 'cmi.success_status') {
+          this._emitProgressUpdateEvent(element, value);
+        }
+        
+        // Emit objective update events
+        if (element.startsWith('cmi.objectives.')) {
+          this._emitObjectiveUpdateEvent();
+        }
       } else {
         errorCode = this.errorHandler.getLastError();
         errorMessage = this.errorHandler.getErrorString(errorCode);
@@ -794,6 +804,53 @@ class ScormApiHandler {
     }
   }
 
+  /**
+   * Emit progress update event for course outline real-time synchronization
+   * @private
+   * @param {string} element - Data model element that was updated
+   * @param {string} value - New value
+   */
+  _emitProgressUpdateEvent(element, value) {
+    try {
+      if (this.telemetryStore && this.telemetryStore.windowManager &&
+          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
+        const progressData = {
+          activityId: this.getCurrentActivityId(),
+          element,
+          value,
+          completionStatus: this.dataModel.getValue('cmi.completion_status'),
+          successStatus: this.dataModel.getValue('cmi.success_status'),
+          timestamp: Date.now()
+        };
+        this.telemetryStore.windowManager.broadcastToAllWindows('activity:progress:updated', progressData);
+        this.logger?.debug('Emitted activity progress update event for course outline');
+      }
+    } catch (error) {
+      this.logger?.warn('Failed to emit progress update event:', error.message);
+    }
+  }
+
+  /**
+   * Emit objective update event for course outline real-time synchronization
+   * @private
+   */
+  _emitObjectiveUpdateEvent() {
+    try {
+      if (this.telemetryStore && this.telemetryStore.windowManager &&
+          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
+        const objectiveData = {
+          activityId: this.getCurrentActivityId(),
+          objectives: this.dataModel.getObjectivesData(),
+          timestamp: Date.now()
+        };
+        this.telemetryStore.windowManager.broadcastToAllWindows('objectives:updated', objectiveData);
+        this.logger?.debug('Emitted objectives update event for course outline');
+      }
+    } catch (error) {
+      this.logger?.warn('Failed to emit objectives update event:', error.message);
+    }
+  }
+
   // ===== BROWSE MODE METHODS =====
 
   /**
@@ -867,6 +924,21 @@ class ScormApiHandler {
       sessionId: this.sessionId,
       browseSession: this.dataModel.getBrowseSessionStatus()
     };
+  }
+
+  /**
+   * Get current activity ID for event emission
+   * @private
+   * @returns {string} Current activity ID or 'unknown'
+   */
+  getCurrentActivityId() {
+    try {
+      // For single SCO courses, use session ID as activity identifier
+      return this.sessionId || 'unknown';
+    } catch (error) {
+      this.logger?.warn('Failed to get current activity ID:', error.message);
+      return 'unknown';
+    }
   }
 }
 

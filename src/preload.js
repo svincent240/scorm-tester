@@ -175,9 +175,13 @@ const electronAPI = {
   getNavigationRequests: () => safeInvoke('scorm-inspector-get-navigation-requests'),
   getGlobalObjectives: () => safeInvoke('scorm-inspector-get-global-objectives'),
   getSSPBuckets: () => safeInvoke('scorm-inspector-get-ssp-buckets'),
+
+  // Course Outline Navigation methods
+  getCourseOutlineActivityTree: () => safeInvoke('course-outline-get-activity-tree'),
+  validateCourseOutlineChoice: (targetActivityId) => safeInvoke('course-outline-validate-choice', { targetActivityId }),
+  getCourseOutlineAvailableNavigation: () => safeInvoke('course-outline-get-available-navigation'),
   
-  // SCORM Inspector Event Listeners
-  onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
+  // SCORM Inspector Event Listeners  
   onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
   
   // App Info

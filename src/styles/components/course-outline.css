@@ -377,6 +377,196 @@
   }
 }
 
+/* SCORM State Styles */
+.outline-item--hidden {
+  opacity: 0.4;
+}
+
+.outline-item--hidden .outline-item__title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.outline-item--disabled {
+  opacity: 0.7;
+}
+
+.outline-item--disabled .outline-item__title {
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.outline-item--suspended {
+  border-left: 3px solid var(--warning-color);
+  background: var(--warning-color-alpha);
+}
+
+.outline-item--attempt-limit-reached {
+  border-left: 3px solid var(--danger-color);
+  background: var(--danger-color-alpha);
+}
+
+.outline-item--browse-mode {
+  border-left: 3px solid var(--success-color);
+  background: var(--success-color-alpha);
+}
+
+.outline-item--browse-mode .outline-item__title {
+  color: var(--success-color);
+}
+
+/* SCORM Indicators and Badges */
+.outline-item__indicators {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.scorm-badge {
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+.scorm-badge--attempts {
+  background: var(--bg-secondary);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.scorm-badge--limit-reached {
+  background: var(--danger-color-alpha);
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+  animation: pulse-error 2s infinite;
+}
+
+.scorm-badge--suspended {
+  background: var(--warning-color-alpha);
+  color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.scorm-badge--objectives {
+  background: var(--primary-color-alpha);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.scorm-badge--objectives-satisfied {
+  background: var(--success-color-alpha);
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.scorm-badge--objectives-partial {
+  background: var(--warning-color-alpha);
+  color: var(--warning-color);
+  border-color: var(--warning-color);
+}
+
+.scorm-badge--objectives-not-satisfied {
+  background: var(--danger-color-alpha);
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.scorm-badge--restriction {
+  background: var(--danger-color-alpha);
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+  font-size: var(--font-size-sm);
+}
+
+/* Notification Styles */
+.course-outline__notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 400px;
+  z-index: 1000;
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.course-outline__notification--error .notification__content {
+  border-left: 4px solid var(--danger-color);
+}
+
+.notification__content {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.notification__icon {
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+
+.notification__message {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.notification__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  transition: all var(--transition-fast) ease;
+}
+
+.notification__close:hover {
+  background: var(--bg-hover);
+  color: var(--text-color);
+}
+
+/* Processing State */
+.course-outline--processing {
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-error {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 /* Print Styles */
 @media print {
   .course-outline__controls {
@@ -396,5 +586,9 @@
     border: 1px solid black !important;
     background: white !important;
     color: black !important;
+  }
+
+  .course-outline__notification {
+    display: none;
   }
 }
