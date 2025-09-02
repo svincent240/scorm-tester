@@ -1246,6 +1246,7 @@ class CourseOutline extends BaseComponent {
   validateActivityNavigationLocal(activityId) {
     rendererLogger.debug('CourseOutline: validateActivityNavigationLocal called', {
       activityId,
+      currentItem: this.currentItem,
       scormStatesLoaded: this.scormStatesLoaded,
       browseModeEnabled: this.browseModeEnabled,
       hasScormState: this.scormStates.has(activityId),
@@ -1256,6 +1257,15 @@ class CourseOutline extends BaseComponent {
     if (!this.scormStatesLoaded) {
       rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- allowing navigation');
       return { allowed: true, reason: 'SCORM states not yet loaded' };
+    }
+
+    // CRITICAL FIX: Allow navigation to the current activity even if choice navigation is disabled
+    if (activityId === this.currentItem) {
+      rendererLogger.debug('CourseOutline: Allowing navigation to current activity', {
+        activityId,
+        currentItem: this.currentItem
+      });
+      return { allowed: true, reason: 'Current activity - navigation allowed' };
     }
 
     // CRITICAL FIX: Check if choice navigation is available in sequencing rules FIRST
