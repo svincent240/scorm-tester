@@ -86,6 +86,15 @@ class CourseOutline extends BaseComponent {
       this.renderContent();
       this.showEmptyState();
     }
+
+    // DEBUG: Log initial state for investigation
+    rendererLogger.info('CourseOutline.setup: Initial component state', {
+      hasScormStates: this.scormStates.size > 0,
+      scormStatesLoaded: this.scormStatesLoaded,
+      availableNavigation: this.availableNavigation,
+      browseModeEnabled: this.browseModeEnabled,
+      courseStructureItems: this.courseStructure?.items?.length || 0
+    });
   }
 
   renderContent() {
@@ -179,9 +188,15 @@ class CourseOutline extends BaseComponent {
       this.handleNavigationStateUpdate(stateData);
     });
 
-    // Listen for browse mode changes
-    this.subscribe('browse-mode:changed', (data) => {
-      this.handleBrowseModeChanged(data);
+    // Listen for browse mode changes (CRITICAL FIX: Event name mismatch)
+    this.subscribe('browse-mode-enabled', (data) => {
+      rendererLogger.info('CourseOutline: Browse mode enabled event received', data);
+      this.handleBrowseModeChanged({ enabled: true, ...data });
+    });
+
+    this.subscribe('browse-mode-disabled', (data) => {
+      rendererLogger.info('CourseOutline: Browse mode disabled event received', data);
+      this.handleBrowseModeChanged({ enabled: false, ...data });
     });
 
     // Listen for SN service initialization to fetch SCORM states
@@ -896,16 +911,31 @@ class CourseOutline extends BaseComponent {
   handleBrowseModeChanged(data) {
     try {
       const { enabled } = data || {};
+      const previousBrowseMode = this.browseModeEnabled;
       this.browseModeEnabled = !!enabled;
 
-      rendererLogger.info('CourseOutline: Browse mode changed', { enabled: this.browseModeEnabled });
+      rendererLogger.info('CourseOutline: Browse mode changed', {
+        enabled: this.browseModeEnabled,
+        previousEnabled: previousBrowseMode,
+        data: data,
+        hasCourseStructure: !!this.courseStructure,
+        scormStatesLoaded: this.scormStatesLoaded,
+        scormStatesCount: this.scormStates.size
+      });
 
       // Refresh the course structure display to reflect browse mode changes
       if (this.courseStructure) {
+        rendererLogger.debug('CourseOutline: Re-rendering course structure for browse mode change');
         this.renderCourseStructure();
+      } else {
+        rendererLogger.warn('CourseOutline: No course structure available for browse mode re-render');
       }
     } catch (error) {
-      rendererLogger.error('CourseOutline: Error handling browse mode change', error);
+      rendererLogger.error('CourseOutline: Error handling browse mode change', {
+        message: error?.message || error,
+        stack: error?.stack,
+        data: data
+      });
     }
   }
 
@@ -960,28 +990,62 @@ class CourseOutline extends BaseComponent {
    */
   async fetchScormStates() {
     try {
+      rendererLogger.info('CourseOutline: fetchScormStates called', {
+        currentScormStatesCount: this.scormStates.size,
+        scormStatesLoaded: this.scormStatesLoaded,
+        browseModeEnabled: this.browseModeEnabled,
+        hasElectronAPI: !!window.electronAPI,
+        hasGetCourseOutlineActivityTree: !!window.electronAPI?.getCourseOutlineActivityTree
+      });
+
       if (!window.electronAPI?.getCourseOutlineActivityTree) {
-        rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available');
+        rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available', {
+          hasElectronAPI: !!window.electronAPI,
+          electronAPIKeys: window.electronAPI ? Object.keys(window.electronAPI) : 'none'
+        });
         this.scormStatesLoaded = false;
         return null;
       }
 
       const result = await window.electronAPI.getCourseOutlineActivityTree();
+      rendererLogger.debug('CourseOutline: fetchScormStates IPC result received', {
+        success: result?.success,
+        hasData: !!result?.data,
+        dataType: typeof result?.data,
+        isFallback: result?.fallback,
+        fallbackReason: result?.reason,
+        error: result?.error
+      });
+
       if (result.success && result.data) {
         this.processScormStates(result.data);
-        rendererLogger.info('CourseOutline: SCORM states fetched successfully');
+        rendererLogger.info('CourseOutline: SCORM states fetched and processed successfully', {
+          stateCount: this.scormStates.size,
+          isFallback: result?.fallback,
+          fallbackReason: result?.reason
+        });
 
         // Also fetch available navigation
         await this.fetchAvailableNavigation();
 
         return result.data;
       } else {
-        rendererLogger.warn('CourseOutline: Failed to fetch SCORM states', result.error);
+        rendererLogger.warn('CourseOutline: Failed to fetch SCORM states', {
+          success: result?.success,
+          hasData: !!result?.data,
+          error: result?.error,
+          fallback: result?.fallback,
+          reason: result?.reason
+        });
         this.scormStatesLoaded = false;
         return null;
       }
     } catch (error) {
-      rendererLogger.error('CourseOutline: Error fetching SCORM states', error);
+      rendererLogger.error('CourseOutline: Error fetching SCORM states', {
+        message: error?.message || error,
+        stack: error?.stack,
+        name: error?.name
+      });
       this.scormStatesLoaded = false;
       return null;
     }
