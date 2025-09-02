@@ -277,6 +277,16 @@ class AppManager {
       this.showError('Course Loading Error', (errorData && (errorData.error || errorData.message)) || 'Unknown error');
     });
 
+    eventBus.on('course:loaded', (courseData) => {
+      try { this.logger.info('AppManager: Course loaded event received'); } catch (_) {}
+      this.handleCourseLoaded(courseData);
+    });
+
+    eventBus.on('course:cleared', () => {
+      try { this.logger.info('AppManager: Course cleared event received'); } catch (_) {}
+      this.handleCourseCleared();
+    });
+
     eventBus.on('course:loadingStateChanged', (stateData) => {
       if (stateData.loading) {
         this.showLoading('Loading course...');
@@ -661,6 +671,16 @@ class AppManager {
         });
       });
     }
+
+    // Reload Course button
+    const reloadBtn = document.getElementById('course-reload-btn');
+    if (reloadBtn) {
+      reloadBtn.addEventListener('click', () => {
+        this.handleCourseReload().catch(error => {
+          try { this.logger.error('AppManager: Course reload error', error?.message || error); } catch (_) {}
+        });
+      });
+    }
  
     // Welcome page buttons (fallback wiring for legacy inline handlers)
     const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
@@ -707,6 +727,73 @@ class AppManager {
   }
 
   /**
+   * Handle course reload request
+   */
+  async handleCourseReload() {
+    try {
+      this.logger.info('AppManager: Course reload requested');
+
+      // Get current course data
+      const courseLoader = this.services.get('courseLoader');
+      if (!courseLoader) {
+        throw new Error('Course loader service not available');
+      }
+
+      const currentCourse = courseLoader.getCurrentCourse();
+      if (!currentCourse) {
+        this.logger.warn('AppManager: No course currently loaded');
+        this.showError('Reload Failed', 'No course is currently loaded');
+        return;
+      }
+
+      // Set loading state on the reload button
+      const reloadBtn = document.getElementById('course-reload-btn');
+      if (reloadBtn) {
+        reloadBtn.disabled = true;
+        const svg = reloadBtn.querySelector('svg');
+        if (svg) {
+          // Change SVG to loading spinner
+          svg.innerHTML = '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416"><animate attributeName="stroke-dashoffset" dur="1s" repeatCount="indefinite" values="31.416;0"/></circle>';
+        }
+        reloadBtn.title = 'Reloading...';
+      }
+
+      // Determine course type and reload accordingly
+      const { originalFilePath, path: folderPath } = currentCourse;
+
+      if (originalFilePath) {
+        // Reload from ZIP file
+        this.logger.info('AppManager: Reloading from ZIP file', originalFilePath);
+        await courseLoader.loadCourseFromPath(originalFilePath);
+      } else if (folderPath) {
+        // Reload from folder
+        this.logger.info('AppManager: Reloading from folder', folderPath);
+        await courseLoader.loadCourseFromFolder(folderPath);
+      } else {
+        throw new Error('Unable to determine course source for reload');
+      }
+
+      this.logger.info('AppManager: Course reload completed successfully');
+
+    } catch (error) {
+      this.logger.error('AppManager: Error reloading course', error);
+      this.showError('Reload Failed', error.message || 'Failed to reload course');
+    } finally {
+      // Reset button state
+      const reloadBtn = document.getElementById('course-reload-btn');
+      if (reloadBtn) {
+        reloadBtn.disabled = false;
+        const svg = reloadBtn.querySelector('svg');
+        if (svg) {
+          // Restore original reload icon
+          svg.innerHTML = '<path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>';
+        }
+        reloadBtn.title = 'Reload Current Course';
+      }
+    }
+  }
+
+  /**
    * Handle course loaded event
    */
   handleCourseLoaded(courseData) {
@@ -736,11 +823,36 @@ class AppManager {
         try { this.logger.info('AppManager: Relying on CourseOutline event subscription for course:loaded'); } catch (_) {}
       }
 
+      // Enable reload button since a course is now loaded
+      const reloadBtn = document.getElementById('course-reload-btn');
+      if (reloadBtn) {
+        reloadBtn.disabled = false;
+        reloadBtn.title = 'Reload Current Course';
+      }
+
       // Show success message
       this.showSuccess('Course Loaded', `Successfully loaded: ${courseData.info?.title || 'Course'}`);
-      
+
     } catch (error) {
       try { this.logger.error('AppManager: Error handling course loaded', error?.message || error); } catch (_) {}
+    }
+  }
+
+  /**
+   * Handle course cleared event
+   */
+  handleCourseCleared() {
+    try {
+      // Disable reload button since no course is loaded
+      const reloadBtn = document.getElementById('course-reload-btn');
+      if (reloadBtn) {
+        reloadBtn.disabled = true;
+        reloadBtn.title = 'No course loaded';
+      }
+
+      this.logger.info('AppManager: Course cleared, reload button disabled');
+    } catch (error) {
+      try { this.logger.error('AppManager: Error handling course cleared', error?.message || error); } catch (_) {}
     }
   }
 

@@ -294,11 +294,11 @@ class CourseOutline extends BaseComponent {
 
   bindEvents() {
     super.bindEvents();
-    
+
     if (this.expandAllBtn) {
       this.expandAllBtn.addEventListener('click', this.expandAll);
     }
-    
+
     if (this.collapseAllBtn) {
       this.collapseAllBtn.addEventListener('click', this.collapseAll);
     }
@@ -743,6 +743,7 @@ class CourseOutline extends BaseComponent {
     });
   }
 
+
   expandAll() {
     this.expandedItems.clear();
     this.addAllItemIds(this.courseStructure?.items || []);
@@ -776,7 +777,7 @@ class CourseOutline extends BaseComponent {
       rendererLogger.warn('CourseOutline: Content area not available for empty state');
       return;
     }
-    
+
     this.contentArea.innerHTML = `
       <div class="course-outline__empty">
         <div class="empty-state">
@@ -786,9 +787,10 @@ class CourseOutline extends BaseComponent {
         </div>
       </div>
     `;
-    
+
     rendererLogger.info('CourseOutline: Empty state displayed');
   }
+
 
   // Removed eager loadCourseStructure path to avoid double-render with course:loaded subscription.
   // Initialization now emits a synthetic course:loaded when needed after subscriptions are ready.
