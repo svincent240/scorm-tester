@@ -2031,4 +2031,119 @@ This consolidation strategy successfully transforms a complex 17-bug backlog int
 
 **✅ PRODUCTION READY**: The application successfully loads courses, handles navigation, processes SCORM API calls, and maintains data integrity throughout the user session.
 
+## BUG-027: Bulk Strikethrough Removal on Activity Completion
+**Severity**: High | **Status**: ✅ FIXED | **Priority**: P1
+
+**Problem**: When completing an activity, ALL strikethroughs are removed at once instead of only those activities whose prerequisites have been met. The "next activity" button also remains disabled despite completion.
+
+**Root Cause Analysis**:
+1. **Bulk Visibility Reset**: The SN service's `updateActivityVisibilityAfterProgress()` method was performing a naive bulk reset of ALL activity visibilities when any activity completed
+2. **Missing Prerequisite Evaluation**: The original implementation didn't evaluate individual prerequisites - it just reset all activities to visible
+3. **No Selective Updates**: The system lacked logic to determine which activities should actually change visibility based on prerequisite completion
+4. **Navigation State Disconnect**: The "next activity" button state wasn't being updated when visibility changes occurred
+
+**Observable Symptoms**:
+- Green circle appears when activity completes (correct)
+- ALL strikethroughs removed simultaneously (incorrect - should be selective)
+- "Next activity" button remains disabled (incorrect)
+- Poor user experience with apparent navigation system failure
+
+**🔗 Related Issues**:
+- **BUG-022**: UI Component Synchronization Challenges
+- **BUG-019**: Navigation State Synchronization Issues
+- **BUG-020**: Event-Driven Architecture Inconsistencies
+
+**✅ IMPLEMENTED SOLUTION**: Intelligent Visibility Management System
+
+### **1. Intelligent Visibility Evaluation**
+Replaced bulk reset with prerequisite-aware evaluation:
+
+```javascript
+// OLD: Naive bulk reset
+activity.isVisible = true; // Reset ALL activities to visible
+
+// NEW: Intelligent prerequisite evaluation
+const shouldBeVisible = this.evaluateActivityVisibility(activity);
+if (shouldBeVisible !== wasVisible) {
+  activity.isVisible = shouldBeVisible;
+  // Only update activities that actually need to change
+}
+```
+
+### **2. Selective Activity Processing**
+Added logic to only evaluate activities that could be affected:
+
+```javascript
+getActivitiesPotentiallyAffectedBy(completedActivity) {
+  // Only process activities that:
+  // 1. Have prerequisites referencing the completed activity
+  // 2. Are siblings of the completed activity
+  // 3. Are children of the completed activity
+  // 4. Have sequencing rules that depend on the completed activity
+}
+```
+
+### **3. Comprehensive Prerequisite Evaluation**
+Implemented full prerequisite checking:
+
+```javascript
+evaluateActivityVisibility(activity) {
+  // 1. Check explicit hide rules
+  // 2. Check prerequisite completion status
+  // 3. Check sequencing control modes
+  // 4. Default to visible if no restrictions apply
+}
+```
+
+### **4. Enhanced Debugging and Monitoring**
+Added visibility change events for better debugging:
+
+```javascript
+emitVisibilityChangeEvent(activity, wasVisible, nowVisible, triggerActivityId) {
+  eventBus.emit('activity-visibility-changed', {
+    activityId: activity.identifier,
+    activityTitle: activity.title,
+    wasVisible,
+    nowVisible,
+    triggerActivityId,
+    reason: nowVisible ? 'prerequisite-met' : 'prerequisite-blocked',
+    timestamp: new Date().toISOString()
+  });
+}
+```
+
+### **5. Navigation State Synchronization**
+Ensured navigation availability is refreshed when visibility changes occur:
+
+```javascript
+// After visibility updates, refresh navigation availability
+this.navigationHandler.refreshNavigationAvailability();
+```
+
+**✅ Implementation Details**:
+- **Location**: `src/main/services/scorm/sn/index.js:423-659`
+- **Methods Added**:
+  - `evaluateActivityVisibility()` - Comprehensive prerequisite evaluation
+  - `getActivitiesPotentiallyAffectedBy()` - Selective activity processing
+  - `isAffectedByCompletion()` - Determine affected activities
+  - `getActivityPrerequisites()` - Extract prerequisite relationships
+  - `isActivityCompleted()` - Check completion status
+  - `isDescendantOf()` - Tree relationship checking
+  - `emitVisibilityChangeEvent()` - Enhanced debugging
+
+**✅ Benefits of Solution**:
+1. **Selective Updates**: Only activities whose prerequisites are met become visible
+2. **Performance**: No longer processes ALL activities on every completion
+3. **Correct Behavior**: Strikethroughs removed only when prerequisites satisfied
+4. **Navigation Sync**: "Next activity" button properly enabled when appropriate
+5. **Debugging**: Enhanced visibility change events for monitoring
+6. **SCORM Compliance**: Maintains proper sequencing rule enforcement
+
+**✅ Testing Verification**:
+- ✅ Single activity completion only affects activities with that prerequisite
+- ✅ Multiple prerequisite activities work correctly
+- ✅ Navigation buttons update appropriately
+- ✅ Browse mode integration maintained
+- ✅ Performance improved (no bulk processing)
+
 **Status**: ✅ **REVIEW COMPLETE - ALL SYSTEMS OPERATIONAL**

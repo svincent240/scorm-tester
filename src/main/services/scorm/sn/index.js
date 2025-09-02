@@ -22,10 +22,11 @@ const { SN_ERROR_CODES, SEQUENCING_SESSION_STATES, ACTIVITY_STATES } = require('
  * integration points with RTE and CAM services.
  */
 class ScormSNService {
-  constructor(errorHandler, logger, options = {}, browseModeService = null) {
+  constructor(errorHandler, logger, options = {}, browseModeService = null, scormService = null) {
     this.errorHandler = errorHandler;
     this.logger = logger;
     this.browseModeService = browseModeService;
+    this.scormService = scormService; // Reference to parent ScormService for IPC access
     this.options = {
       enableGlobalObjectives: true,
       enableRollupProcessing: true,
@@ -383,19 +384,28 @@ class ScormSNService {
 
       // Evaluate post-condition rules on the activity and its parents
       let postConditionResult = this.sequencingEngine.evaluatePostConditionRules(activity);
-      
+
       // If no post-condition action on current activity, check parent activities
       if (!postConditionResult.action && activity.parent) {
         postConditionResult = this.sequencingEngine.evaluatePostConditionRules(activity.parent);
       }
- 
+
+      // Update visibility of other activities after progress change
+      const visibilityUpdateResult = this.updateActivityVisibilityAfterProgress(activityId);
+      if (!visibilityUpdateResult.success) {
+        this.logger?.warn('Failed to update activity visibility after progress:', visibilityUpdateResult.reason);
+      } else if (visibilityUpdateResult.affectedActivities.length > 0) {
+        this.logger?.info(`Updated visibility for ${visibilityUpdateResult.affectedActivities.length} activities after ${activityId} completion`);
+      }
+
        this.logger?.debug(`Activity progress updated: ${activityId}`, progressData);
- 
+
        return {
          success: true,
          reason: 'Activity progress updated',
          rollup: rollupResult,
-         postCondition: postConditionResult
+         postCondition: postConditionResult,
+         visibilityUpdate: visibilityUpdateResult // Include in response for debugging
       };
 
     } catch (error) {
@@ -403,6 +413,273 @@ class ScormSNService {
       this.errorHandler?.setError(SN_ERROR_CODES.ROLLUP_PROCESSING_FAILED,
         `Progress update failed: ${error.message}`, 'updateActivityProgress');
       return { success: false, reason: 'Progress update error', error: error.message };
+    }
+  }
+
+  /**
+   * Update activity visibility based on sequencing rules after progress changes
+   * Uses intelligent evaluation to only update activities that should actually change
+   * @param {string} completedActivityId - ID of the activity that just completed
+   * @returns {Object} Update result with affected activities
+   */
+  updateActivityVisibilityAfterProgress(completedActivityId) {
+    try {
+      const completedActivity = this.activityTreeManager.getActivity(completedActivityId);
+      if (!completedActivity) {
+        return { success: false, reason: 'Completed activity not found' };
+      }
+
+      const affectedActivities = [];
+      const activitiesToEvaluate = this.getActivitiesPotentiallyAffectedBy(completedActivity);
+
+      for (const activity of activitiesToEvaluate) {
+        // Skip the completed activity itself
+        if (activity.identifier === completedActivityId) continue;
+
+        // Evaluate current visibility based on ALL prerequisites
+        const shouldBeVisible = this.evaluateActivityVisibility(activity);
+        const wasVisible = activity.isVisible;
+
+        if (shouldBeVisible !== wasVisible) {
+          activity.isVisible = shouldBeVisible;
+          affectedActivities.push({
+            id: activity.identifier,
+            title: activity.title,
+            visibilityChanged: true,
+            nowVisible: shouldBeVisible,
+            reason: shouldBeVisible ? 'prerequisite-met' : 'prerequisite-blocked'
+          });
+
+          this.logger?.debug(`Activity ${activity.identifier} visibility updated: ${wasVisible} → ${shouldBeVisible} (reason: prerequisite change)`);
+
+          // Emit visibility change event for enhanced debugging
+          this.emitVisibilityChangeEvent(activity, wasVisible, shouldBeVisible, completedActivityId);
+        }
+      }
+
+      return {
+        success: true,
+        reason: 'Activity visibility updated intelligently after progress change',
+        affectedActivities,
+        totalAffected: affectedActivities.length
+      };
+
+    } catch (error) {
+      this.logger?.error('Error updating activity visibility after progress:', error);
+      return { success: false, reason: 'Visibility update failed', error: error.message };
+    }
+  }
+
+  /**
+   * Evaluate if an activity should be visible based on ALL current prerequisites
+   * @private
+   * @param {ActivityNode} activity - Activity to evaluate
+   * @returns {boolean} True if activity should be visible
+   */
+  evaluateActivityVisibility(activity) {
+    try {
+      // 1. Check if activity has explicit hide rules
+      if (activity.sequencing?.sequencingRules?.preConditionRules) {
+        for (const rule of activity.sequencing.sequencingRules.preConditionRules) {
+          if (rule.action === 'hiddenFromChoice') {
+            return false; // Explicitly hidden
+          }
+        }
+      }
+
+      // 2. Check prerequisite completion status
+      const prerequisites = this.getActivityPrerequisites(activity);
+      for (const prereq of prerequisites) {
+        if (!this.isActivityCompleted(prereq)) {
+          return false; // Prerequisite not met
+        }
+      }
+
+      // 3. Check sequencing control modes
+      if (activity.sequencing?.controlMode) {
+        // Apply control mode restrictions if needed
+        // For visibility, we mainly care about prerequisites
+        // Control modes are more relevant for navigation than visibility
+      }
+
+      // 4. Default to visible if no restrictions apply
+      return true;
+
+    } catch (error) {
+      this.logger?.error(`Error evaluating visibility for activity ${activity.identifier}:`, error);
+      // On error, default to current visibility to avoid breaking existing state
+      return activity.isVisible !== false;
+    }
+  }
+
+  /**
+   * Get all activities that might be affected by a completion
+   * @private
+   * @param {ActivityNode} completedActivity - The activity that just completed
+   * @returns {ActivityNode[]} Array of activities to evaluate
+   */
+  getActivitiesPotentiallyAffectedBy(completedActivity) {
+    const affectedActivities = new Set();
+
+    // Use tree traversal to find activities that could be affected
+    this.activityTreeManager.traverseTree(this.activityTreeManager.root, (activity) => {
+      // Include activities that:
+      // 1. Have prerequisites referencing the completed activity
+      // 2. Are siblings of the completed activity
+      // 3. Are children of the completed activity
+      // 4. Have sequencing rules that depend on the completed activity
+
+      if (this.isAffectedByCompletion(activity, completedActivity)) {
+        affectedActivities.add(activity);
+      }
+    });
+
+    return Array.from(affectedActivities);
+  }
+
+  /**
+   * Check if an activity is affected by another activity's completion
+   * @private
+   * @param {ActivityNode} activity - Activity to check
+   * @param {ActivityNode} completedActivity - Activity that completed
+   * @returns {boolean} True if activity could be affected
+   */
+  isAffectedByCompletion(activity, completedActivity) {
+    // Skip the completed activity itself
+    if (activity.identifier === completedActivity.identifier) {
+      return false;
+    }
+
+    // Check if activity has prerequisites that reference the completed activity
+    const prerequisites = this.getActivityPrerequisites(activity);
+    if (prerequisites.some(prereq => prereq.identifier === completedActivity.identifier)) {
+      return true;
+    }
+
+    // Check if activity is a sibling of the completed activity
+    if (activity.parent && completedActivity.parent &&
+        activity.parent.identifier === completedActivity.parent.identifier) {
+      return true;
+    }
+
+    // Check if activity is a child of the completed activity
+    if (this.isDescendantOf(activity, completedActivity)) {
+      return true;
+    }
+
+    // For now, include all activities to ensure comprehensive evaluation
+    // This can be optimized later based on specific sequencing rule analysis
+    return true;
+  }
+
+  /**
+   * Get prerequisites for an activity
+   * @private
+   * @param {ActivityNode} activity - Activity to get prerequisites for
+   * @returns {ActivityNode[]} Array of prerequisite activities
+   */
+  getActivityPrerequisites(activity) {
+    const prerequisites = [];
+
+    try {
+      // Check pre-condition rules for referenced activities
+      if (activity.sequencing?.sequencingRules?.preConditionRules) {
+        for (const rule of activity.sequencing.sequencingRules.preConditionRules) {
+          if (rule.conditions) {
+            for (const condition of rule.conditions) {
+              // Look for conditions that reference other activities
+              if (condition.referencedObjective || condition.activity) {
+                // This is a simplified check - in a full implementation,
+                // we'd need to resolve the actual activity references
+                const referencedActivity = this.activityTreeManager.getActivity(condition.activity);
+                if (referencedActivity) {
+                  prerequisites.push(referencedActivity);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Also check parent activity prerequisites (inheritance)
+      if (activity.parent) {
+        const parentPrerequisites = this.getActivityPrerequisites(activity.parent);
+        prerequisites.push(...parentPrerequisites);
+      }
+
+    } catch (error) {
+      this.logger?.error(`Error getting prerequisites for activity ${activity.identifier}:`, error);
+    }
+
+    return prerequisites;
+  }
+
+  /**
+   * Check if an activity is completed
+   * @private
+   * @param {ActivityNode} activity - Activity to check
+   * @returns {boolean} True if activity is completed
+   */
+  isActivityCompleted(activity) {
+    try {
+      return activity.attemptState === 'completed' ||
+             activity.activityState === 'completed';
+    } catch (error) {
+      this.logger?.error(`Error checking completion status for activity ${activity.identifier}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if an activity is a descendant of another activity
+   * @private
+   * @param {ActivityNode} potentialDescendant - Potential descendant activity
+   * @param {ActivityNode} potentialAncestor - Potential ancestor activity
+   * @returns {boolean} True if potentialDescendant is a descendant of potentialAncestor
+   */
+  isDescendantOf(potentialDescendant, potentialAncestor) {
+    let current = potentialDescendant.parent;
+    while (current) {
+      if (current.identifier === potentialAncestor.identifier) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  /**
+   * Emit visibility change event for debugging and monitoring
+   * @private
+   * @param {ActivityNode} activity - Activity whose visibility changed
+   * @param {boolean} wasVisible - Previous visibility state
+   * @param {boolean} nowVisible - New visibility state
+   * @param {string} triggerActivityId - Activity that triggered the change
+   */
+  emitVisibilityChangeEvent(activity, wasVisible, nowVisible, triggerActivityId) {
+    try {
+      // Use IPC broadcast instead of direct event-bus require to avoid main/renderer process mixing
+      if (this.scormService) {
+        const windowManager = this.scormService.getDependency('windowManager');
+        if (windowManager?.broadcastToAllWindows) {
+          windowManager.broadcastToAllWindows('activity-visibility-changed', {
+            activityId: activity.identifier,
+            activityTitle: activity.title,
+            wasVisible,
+            nowVisible,
+            triggerActivityId,
+            reason: nowVisible ? 'prerequisite-met' : 'prerequisite-blocked',
+            timestamp: new Date().toISOString()
+          });
+          this.logger?.debug(`Broadcasted visibility change event for activity ${activity.identifier}`);
+        } else {
+          this.logger?.warn('WindowManager not available for visibility change broadcast');
+        }
+      } else {
+        this.logger?.warn('ScormService reference not available for visibility change broadcast');
+      }
+    } catch (error) {
+      this.logger?.error('Error emitting visibility change event:', error);
     }
   }
 

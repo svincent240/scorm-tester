@@ -844,7 +844,7 @@ class ScormService extends BaseService {
       enableGlobalObjectives: this.config.enableGlobalObjectives,
       enableRollupProcessing: this.config.enableRollupProcessing,
       maxSequencingDepth: this.config.maxSequencingDepth
-    }, this.browseModeService);
+    }, this.browseModeService, this); // Pass reference to ScormService for IPC access
 
     // Set up browse mode event handlers
     this.browseModeService.on('browse-mode-enabled', (data) => {
