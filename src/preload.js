@@ -181,9 +181,14 @@ const electronAPI = {
   validateCourseOutlineChoice: (targetActivityId) => safeInvoke('course-outline-validate-choice', { targetActivityId }),
   getCourseOutlineAvailableNavigation: () => safeInvoke('course-outline-get-available-navigation'),
   
-  // SCORM Inspector Event Listeners  
+  // SCORM Inspector Event Listeners
   onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
-  
+
+  // Course Outline SCORM Event Listeners
+  onActivityProgressUpdated: (callback) => safeOn('activity:progress:updated', callback),
+  onObjectivesUpdated: (callback) => safeOn('objectives:updated', callback),
+  onNavigationCompleted: (callback) => safeOn('navigation:completed', callback),
+
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),
   getAppPath: () => safeInvoke('get-app-path'),
@@ -257,6 +262,55 @@ electronAPI.testConnection = () => {
 
 // Expose the API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+
+// Forward SCORM events from IPC to Event Bus
+// This ensures that main process events are properly received by renderer components
+const forwardScormEventsToEventBus = () => {
+  // Wait for DOM to be ready before accessing event bus
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', forwardScormEventsToEventBus);
+    return;
+  }
+
+  try {
+    // Import event bus dynamically using the same path as BaseComponent
+    import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`).then(({ eventBus }) => {
+      // Forward activity progress updates
+      ipcRenderer.on('activity:progress:updated', (event, data) => {
+        eventBus.emit('activity:progress:updated', data);
+      });
+
+      // Forward objectives updates
+      ipcRenderer.on('objectives:updated', (event, data) => {
+        eventBus.emit('objectives:updated', data);
+      });
+
+      // Forward navigation completion events
+      ipcRenderer.on('navigation:completed', (event, data) => {
+        eventBus.emit('navigation:completed', data);
+      });
+
+      // Forward sn:initialized event
+      ipcRenderer.on('sn:initialized', (event, data) => {
+        eventBus.emit('sn:initialized', data);
+      });
+
+      // Forward course outline refresh events
+      ipcRenderer.on('course-outline:refresh-required', (event, data) => {
+        eventBus.emit('course-outline:refresh-required', data);
+      });
+
+      console.log('[PRELOAD] SCORM event forwarding to EventBus initialized');
+    }).catch(error => {
+      console.error('[PRELOAD] Failed to initialize SCORM event forwarding:', error);
+    });
+  } catch (error) {
+    console.error('[PRELOAD] Error setting up SCORM event forwarding:', error);
+  }
+};
+
+// Initialize event forwarding
+forwardScormEventsToEventBus();
 
 // Log successful preload (via main logger IPC if available)
 try { ipcRenderer.invoke('renderer-log-info', 'Preload script loaded; electronAPI exposed', Object.keys(electronAPI)); } catch (_) {}

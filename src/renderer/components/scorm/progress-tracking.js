@@ -100,8 +100,8 @@ class ProgressTracking extends BaseComponent {
 
   setupEventSubscriptions() {
     this.subscribe('progress:updated', this.handleProgressUpdated);
-    this.subscribe('scorm:dataChanged', this.handleScormDataChanged);
-    this.subscribe('scorm:initialized', this.handleScormInitialized);
+    this.subscribe('ui:scorm:dataChanged', this.handleScormDataChanged);
+    this.subscribe('ui:scorm:initialized', this.handleScormInitialized);
     this.subscribe('course:loaded', this.handleCourseLoaded);
     this.subscribe('course:cleared', this.handleCourseCleared);
   }

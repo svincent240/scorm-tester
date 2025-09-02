@@ -286,7 +286,7 @@ class AppManager {
     });
 
     // SCORM events
-    eventBus.on('scorm:dataChanged', (data) => {
+    eventBus.on('ui:scorm:dataChanged', (data) => {
       // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
 
@@ -551,6 +551,27 @@ class AppManager {
     eventBus.on('scorm:commit:done', () => this.resumeSnPolling());
     eventBus.on('scorm:terminate:start', () => this.pauseSnPolling('terminate'));
     eventBus.on('scorm:terminate:done', () => this.stopSnPolling());
+
+    // CRITICAL FIX: Handle navigation availability updates from main process
+    // This propagates navigation changes when activities complete
+    eventBus.on('navigation:availability:updated', (data) => {
+      try {
+        const { availableNavigation } = data || {};
+        if (Array.isArray(availableNavigation)) {
+          const normalized = this.normalizeAvailableNavigation(availableNavigation);
+          this.uiState.updateNavigation({
+            ...normalized,
+            _fromNavigationAvailabilityUpdate: true
+          });
+          this.logger.info('AppManager: Navigation availability updated', {
+            availableNavigation,
+            normalized
+          });
+        }
+      } catch (error) {
+        this.logger.warn('AppManager: Failed to process navigation availability update', error);
+      }
+    });
   }
 
   /**
@@ -713,7 +734,10 @@ class AppManager {
 
     // Emit app error for any listeners (avoid re-emitting inside an app:error handling path)
     try {
-      eventBus.emit('app:error', { error });
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('app:error', { error });
+      }
     } catch (_) {}
 
     // Allow future error handling after this tick
@@ -859,11 +883,12 @@ class AppManager {
 
   /**
    * Toggle sidebar visibility (mobile)
-   */
+  */
   toggleSidebar() {
     const sidebar = document.getElementById('app-sidebar');
     if (sidebar) {
-      sidebar.classList.toggle('sidebar--mobile-open');
+      // Use the responsive mobile open class that matches CSS
+      sidebar.classList.toggle('app-sidebar--open');
     }
     
     const overlay = document.querySelector('.sidebar-overlay');
@@ -884,14 +909,39 @@ class AppManager {
   handleMenuToggle(data) {
     const sidebar = document.getElementById('app-sidebar');
     const isVisible = data.visible;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
     
     if (sidebar) {
-      sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
-      
-      // Also update main content area
-      const appContent = document.querySelector('.app-content');
-      if (appContent) {
-        appContent.classList.toggle('app-content--full-width', !isVisible);
+      if (isMobile) {
+        // Mobile uses slide-in panel
+        sidebar.classList.toggle('app-sidebar--open', isVisible);
+
+        // Manage overlay on mobile
+        let overlay = document.querySelector('.sidebar-overlay');
+        if (!overlay && isVisible) {
+          overlay = document.createElement('div');
+          overlay.className = 'sidebar-overlay active';
+          overlay.addEventListener('click', () => this.handleMenuToggle({ visible: false }));
+          document.body.appendChild(overlay);
+        } else if (overlay) {
+          overlay.classList.toggle('active', isVisible);
+          if (!isVisible) {
+            // Allow CSS transition, then remove
+            setTimeout(() => {
+              if (overlay && !overlay.classList.contains('active')) {
+                overlay.remove();
+              }
+            }, 250);
+          }
+        }
+      } else {
+        // Desktop: toggle hidden class and expand content area
+        sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
+
+        const appContent = document.querySelector('.app-content');
+        if (appContent) {
+          appContent.classList.toggle('app-content--full-width', !isVisible);
+        }
       }
       
       // Update UI state
@@ -903,6 +953,12 @@ class AppManager {
     try {
       this.logger.debug('AppManager: Menu toggled', { visible: isVisible });
     } catch (_) {}
+
+    // Broadcast visibility change for other components (e.g., NavigationControls) to react
+    try {
+      const eventBus = this.services.get('eventBus');
+      eventBus?.emit('menuVisibilityChanged', { visible: isVisible });
+    } catch (_) {}
   }
 
   /**
@@ -911,14 +967,34 @@ class AppManager {
   handleMenuVisibilityChanged(data) {
     const sidebar = document.getElementById('app-sidebar');
     const isVisible = data.visible;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
     
     if (sidebar) {
-      sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
-      
-      // Also update main content area
-      const appContent = document.querySelector('.app-content');
-      if (appContent) {
-        appContent.classList.toggle('app-content--full-width', !isVisible);
+      if (isMobile) {
+        sidebar.classList.toggle('app-sidebar--open', isVisible);
+        let overlay = document.querySelector('.sidebar-overlay');
+        if (!overlay && isVisible) {
+          overlay = document.createElement('div');
+          overlay.className = 'sidebar-overlay active';
+          overlay.addEventListener('click', () => this.handleMenuVisibilityChanged({ visible: false }));
+          document.body.appendChild(overlay);
+        } else if (overlay) {
+          overlay.classList.toggle('active', isVisible);
+          if (!isVisible) {
+            setTimeout(() => {
+              if (overlay && !overlay.classList.contains('active')) {
+                overlay.remove();
+              }
+            }, 250);
+          }
+        }
+      } else {
+        sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
+
+        const appContent = document.querySelector('.app-content');
+        if (appContent) {
+          appContent.classList.toggle('app-content--full-width', !isVisible);
+        }
       }
     }
     
@@ -1001,8 +1077,10 @@ class AppManager {
           this.uiState.setState('browseMode', this.browseMode);
           
           // Broadcast browse mode change
-          const { eventBus } = await import('./event-bus.js');
-          eventBus.emit('browseMode:changed', this.browseMode);
+          const eventBus = this.services.get('eventBus');
+          if (eventBus) {
+            eventBus.emit('browseMode:changed', this.browseMode);
+          }
           
           this.logger.info('AppManager: Browse mode initialized from main process', this.browseMode);
         }
@@ -1017,7 +1095,6 @@ class AppManager {
    */
   async setBrowseMode(enabled, config = {}) {
     try {
-      const previousState = { ...this.browseMode };
 
       if (enabled) {
         // Enable browse mode via IPC
@@ -1064,8 +1141,10 @@ class AppManager {
       this.uiState.setState('browseMode', this.browseMode);
 
       // Broadcast change to all components
-      const { eventBus } = await import('./event-bus.js');
-      eventBus.emit('browseMode:changed', this.browseMode);
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('browseMode:changed', this.browseMode);
+      }
 
       // Update navigation availability based on browse mode
       if (enabled) {
@@ -1086,7 +1165,7 @@ class AppManager {
       this.logger.error('AppManager: Failed to set browse mode', error);
       
       // Revert state on error
-      this.browseMode = previousState;
+      this.browseMode = { enabled: false, session: null, config: {} };
       this.uiState.setState('browseMode', this.browseMode);
 
       // Show error notification
@@ -1224,11 +1303,14 @@ class AppManager {
       this.setNavigationState('IDLE');
       
       // BUG-024 FIX: Emit navigation error event for error handling
-      eventBus.emit('navigationError', {
-        error: error.message,
-        source: 'AppManager',
-        originalRequest: payload
-      });
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('navigationError', {
+          error: error.message,
+          source: 'AppManager',
+          originalRequest: payload
+        });
+      }
       
       return { success: false, reason: error.message, error };
     }
@@ -1249,13 +1331,16 @@ class AppManager {
         to: state,
         requestType: request?.requestType
       });
-      
+
       // BUG-019 FIX: Broadcast navigation state changes to other components
-      eventBus.emit('navigation:state:updated', {
-        state: this.navigationState,
-        previousState: prevState,
-        currentRequest: request
-      });
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('navigation:state:updated', {
+          state: this.navigationState,
+          previousState: prevState,
+          currentRequest: request
+        });
+      }
     }
   }
 
@@ -1332,11 +1417,14 @@ class AppManager {
       }
     } catch (error) {
       // BUG-024 FIX: Emit navigation error event
-      eventBus.emit('navigationError', {
-        error: error.message,
-        source: 'AppManager',
-        context: 'processDirectNavigation'
-      });
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('navigationError', {
+          error: error.message,
+          source: 'AppManager',
+          context: 'processDirectNavigation'
+        });
+      }
       
       return {
         success: false,
@@ -1349,7 +1437,7 @@ class AppManager {
   /**
    * BUG-003 FIX: Process fallback navigation (simplified)
    */
-  async processFallbackNavigation(requestType, activityId, activityObject) {
+  async processFallbackNavigation(requestType, activityId, _activityObject) {
     try {
       // Simple fallback for when SN service is unavailable
       if (requestType === 'choice' && activityId) {
@@ -1375,11 +1463,14 @@ class AppManager {
       };
     } catch (error) {
       // BUG-024 FIX: Emit navigation error event
-      eventBus.emit('navigationError', {
-        error: error.message,
-        source: 'AppManager',
-        context: 'processFallbackNavigation'
-      });
+      const eventBus = this.services.get('eventBus');
+      if (eventBus) {
+        eventBus.emit('navigationError', {
+          error: error.message,
+          source: 'AppManager',
+          context: 'processFallbackNavigation'
+        });
+      }
       
       return {
         success: false,
@@ -1407,16 +1498,18 @@ class AppManager {
   /**
    * BUG-003 FIX: Handle successful navigation
    */
-  async handleSuccessfulNavigation(result, originalPayload) {
+  async handleSuccessfulNavigation(result, _originalPayload) {
     try {
       if (result.action === 'launch' && result.targetActivity) {
         // Emit launch event
-        const { eventBus } = await import('./event-bus.js');
-        eventBus.emit('navigation:launch', {
-          activity: result.targetActivity,
-          sequencing: result.sequencing,
-          source: 'app-manager-unified'
-        });
+        const eventBus = this.services.get('eventBus');
+        if (eventBus) {
+          eventBus.emit('navigation:launch', {
+            activity: result.targetActivity,
+            sequencing: result.sequencing,
+            source: 'app-manager-unified'
+          });
+        }
 
         // Instruct ContentViewer
         const contentViewer = this.components.get('contentViewer');
@@ -1527,7 +1620,8 @@ class AppManager {
   normalizeAvailableNavigation(availableNavigation = []) {
     const a = Array.isArray(availableNavigation) ? availableNavigation : [];
     const canNavigatePrevious = a.includes('previous') || a.includes('choice.previous');
-    const canNavigateNext = a.includes('continue') || a.includes('choice.next') || a.includes('choice');
+    // Treat only flow 'continue' as next; 'choice' handled by outline/menu
+    const canNavigateNext = a.includes('continue');
     return { canNavigatePrevious, canNavigateNext };
   }
   

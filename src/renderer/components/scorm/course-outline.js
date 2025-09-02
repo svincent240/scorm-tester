@@ -165,10 +165,7 @@ class CourseOutline extends BaseComponent {
       rendererLogger.debug('CourseOutline: event progress:updated', data);
       this.handleProgressUpdated(data);
     });
-    this.subscribe('scorm:dataChanged', (data) => {
-      rendererLogger.debug('CourseOutline: event scorm:dataChanged', data);
-      this.handleScormDataChanged(data);
-    });
+    // Removed duplicate ui:scorm:dataChanged subscription - handled below with proper filtering
 
     // Listen for navigation launch events to update current item highlighting
     this.subscribe('navigation:launch', (data) => {
@@ -199,22 +196,67 @@ class CourseOutline extends BaseComponent {
       });
     });
 
-    // Listen for navigation completion to refresh SCORM states
-    this.subscribe('navigation:completed', (data) => {
+    // Listen for SCORM data changes that affect validation
+    this.subscribe('ui:scorm:dataChanged', (data) => {
+      const element = data?.data?.element || data?.element;
+      // Only refresh on key data changes that affect sequencing
+      if (element && (
+        element.includes('completion_status') ||
+        element.includes('success_status') ||
+        element.includes('objectives') ||
+        element.includes('progress_measure')
+      )) {
+        rendererLogger.debug('CourseOutline: Key SCORM data changed, refreshing states', element);
+        
+        // For completion/success status changes, refresh immediately without debounce
+        if (element.includes('completion_status') || element.includes('success_status')) {
+          rendererLogger.info('CourseOutline: Activity status changed, immediate refresh', element);
+          this.fetchScormStates().then(() => {
+            if (this.courseStructure) {
+              this.renderCourseStructure();
+            }
+            rendererLogger.info('CourseOutline: Immediate SCORM state refresh completed');
+          }).catch(error => {
+            rendererLogger.warn('CourseOutline: Immediate refresh failed', error);
+            // Fallback to debounced refresh
+            this.refreshScormStates();
+          });
+        } else {
+          // For other changes, use debounced refresh
+          this.refreshScormStates();
+        }
+      }
+    });
+
+    // Listen for navigation completion to refresh states
+    this.subscribe('navigation:completed', () => {
       rendererLogger.debug('CourseOutline: Navigation completed, refreshing SCORM states');
       this.refreshScormStates();
     });
 
     // Listen for activity progress updates to refresh states
     this.subscribe('activity:progress:updated', (data) => {
-      rendererLogger.debug('CourseOutline: Activity progress updated, refreshing SCORM states');
+      rendererLogger.debug('CourseOutline: Activity progress updated, refreshing SCORM states', data);
       this.refreshScormStates();
     });
 
-    // Listen for objective updates to refresh states
+    // Listen for objectives updates to refresh states
     this.subscribe('objectives:updated', (data) => {
-      rendererLogger.debug('CourseOutline: Objectives updated, refreshing SCORM states');
+      rendererLogger.debug('CourseOutline: Objectives updated, refreshing SCORM states', data);
       this.refreshScormStates();
+    });
+
+    // Listen for course outline refresh requests (triggered when completion changes may affect prerequisites)
+    this.subscribe('course-outline:refresh-required', (data) => {
+      rendererLogger.info('CourseOutline: Full refresh requested for prerequisite re-evaluation', data);
+      this.fetchScormStates().then(() => {
+        if (this.courseStructure) {
+          this.renderCourseStructure();
+        }
+        rendererLogger.info('CourseOutline: Full prerequisite refresh completed');
+      }).catch(error => {
+        rendererLogger.warn('CourseOutline: Full refresh failed', error);
+      });
     });
   }
 
@@ -282,12 +324,26 @@ class CourseOutline extends BaseComponent {
     const progress = this.progressData.get(item.identifier) || {};
     const scormState = this.scormStates.get(item.identifier);
 
-    // Determine SCORM-based visual states (use local validation for immediate rendering)
+    // Determine SCORM-based visual states for UI display
     const validation = this.validateActivityNavigationLocal(item.identifier);
     const isHidden = scormState && !scormState.isVisible;
     const isDisabled = !validation.allowed && !this.browseModeEnabled;
     const isSuspended = scormState && scormState.suspended;
     const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
+
+    // Debug logging for SCORM state changes
+    if (scormState) {
+      rendererLogger.debug('CourseOutline: Rendering item with SCORM state', {
+        itemId: item.identifier,
+        isVisible: scormState.isVisible,
+        isDisabled: isDisabled,
+        isSuspended: isSuspended,
+        attemptLimitReached: attemptLimitReached,
+        validationAllowed: validation.allowed,
+        validationReason: validation.reason,
+        browseModeEnabled: this.browseModeEnabled
+      });
+    }
 
     const itemClass = [
       'outline-item',
@@ -356,110 +412,57 @@ class CourseOutline extends BaseComponent {
   }
 
   /**
-   * Build comprehensive tooltip with restriction information
+   * Build tooltip with SCORM sequencing information
    */
   buildRestrictionTooltip(activityId, validation, scormState) {
     if (!scormState) {
-      return validation.allowed ? null : `Navigation blocked: ${validation.reason}`;
+      return validation.allowed ? null : `Navigation: ${validation.reason}`;
     }
 
-    const reasons = [];
-    const prerequisites = [];
+    const info = [];
+    
+    // Activity state information
+    if (scormState.attemptCount > 0) {
+      const limit = scormState.attemptLimit ? `/${scormState.attemptLimit}` : '';
+      info.push(`Attempts: ${scormState.attemptCount}${limit}`);
+    }
+    
+    if (scormState.activityState) {
+      info.push(`State: ${scormState.activityState}`);
+    }
 
+    // Restrictions
+    const restrictions = [];
+    
     if (!scormState.isVisible) {
-      reasons.push('• Hidden from choice');
-    }
-
-    if (!scormState.controlMode.choice) {
-      reasons.push('• Choice navigation disabled');
+      restrictions.push('Hidden from choice');
     }
 
     if (scormState.attemptLimitExceeded) {
-      const limit = scormState.attemptLimit || 'unlimited';
-      reasons.push(`• Attempt limit exceeded (${scormState.attemptCount}/${limit})`);
+      restrictions.push('Attempt limit reached');
     }
 
     if (scormState.suspended) {
-      reasons.push('• Activity suspended');
+      restrictions.push('Activity suspended');
     }
 
-    if (scormState.preConditionResult && scormState.preConditionResult.action) {
-      reasons.push(`• ${scormState.preConditionResult.reason}`);
-
-      // Try to extract prerequisite information from pre-condition rules
-      if (scormState.preConditionResult.rule && scormState.preConditionResult.rule.conditions) {
-        const prereqs = this.extractPrerequisitesFromRule(scormState.preConditionResult.rule);
-        if (prereqs.length > 0) {
-          prerequisites.push(...prereqs);
-        }
-      }
+    if (scormState.preConditionResult?.action) {
+      const action = scormState.preConditionResult.action;
+      const reason = scormState.preConditionResult.reason || `Rule: ${action}`;
+      restrictions.push(reason);
     }
 
-    if (this.browseModeEnabled) {
-      reasons.push('• Browse mode: Restrictions bypassed');
+    if (restrictions.length > 0) {
+      info.push('Restrictions: ' + restrictions.join(', '));
     }
 
-    let tooltip = '';
-
-    if (reasons.length > 0) {
-      tooltip += reasons.join('\n');
+    if (this.browseModeEnabled && restrictions.length > 0) {
+      info.push('Browse mode: Restrictions bypassed');
     }
 
-    if (prerequisites.length > 0) {
-      if (tooltip) tooltip += '\n\n';
-      tooltip += 'Prerequisites:\n' + prerequisites.join('\n');
-    }
-
-    return tooltip || null;
+    return info.length > 0 ? info.join('\n') : null;
   }
 
-  /**
-   * Extract prerequisite information from sequencing rule conditions
-   */
-  extractPrerequisitesFromRule(rule) {
-    const prerequisites = [];
-
-    if (!rule.conditions) return prerequisites;
-
-    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [rule.conditions];
-
-    for (const condition of conditions) {
-      if (!condition) continue;
-
-      const conditionType = condition.condition;
-      const operator = condition.operator || 'noOp';
-
-      let prereqText = '';
-
-      switch (conditionType) {
-        case 'completed':
-          prereqText = operator === 'not' ? 'Must not be completed' : 'Must be completed';
-          break;
-        case 'attempted':
-          prereqText = operator === 'not' ? 'Must not be attempted' : 'Must be attempted';
-          break;
-        case 'satisfied':
-          prereqText = operator === 'not' ? 'Must not be satisfied' : 'Must be satisfied';
-          break;
-        case 'objectiveStatusKnown':
-        case 'objective_status_known': // Support both formats for compatibility
-          prereqText = 'Objective status must be known';
-          break;
-        case 'objectiveMeasureKnown':
-        case 'objective_measure_known': // Support both formats for compatibility
-          prereqText = 'Objective measure must be known';
-          break;
-        default:
-          continue; // Skip unknown conditions
-      }
-
-      if (prereqText) {
-        prerequisites.push(`• ${prereqText}`);
-      }
-    }
-
-    return prerequisites;
-  }
 
   /**
    * Render SCORM state indicators (badges)
@@ -469,36 +472,48 @@ class CourseOutline extends BaseComponent {
 
     const indicators = [];
 
-    // Attempt count badge
+    // Activity state indicator
+    if (scormState.activityState && scormState.activityState !== 'inactive') {
+      const stateIcon = {
+        'active': '🟢',
+        'suspended': '⏸️',
+        'completed': '✅'
+      }[scormState.activityState] || '🔵';
+      indicators.push(`<span class="scorm-badge scorm-badge--state" title="Activity State: ${scormState.activityState}">${stateIcon}</span>`);
+    }
+
+    // Attempt tracking with comprehensive info
     if (scormState.attemptCount > 0) {
       const limit = scormState.attemptLimit;
-      const limitText = limit ? `/${limit}` : '/∞';
+      const limitText = limit ? `/${limit}` : '';
       const isLimitReached = scormState.attemptLimitExceeded;
-      indicators.push(`<span class="scorm-badge scorm-badge--attempts ${isLimitReached ? 'scorm-badge--limit-reached' : ''}" title="Attempts: ${scormState.attemptCount}${limitText}">${scormState.attemptCount}${limitText}</span>`);
+      const badgeClass = isLimitReached ? 'scorm-badge--limit-reached' : 'scorm-badge--attempts';
+      const title = `Attempts: ${scormState.attemptCount}${limit ? ` of ${limit} allowed` : ''}`;
+      indicators.push(`<span class="scorm-badge ${badgeClass}" title="${title}">${scormState.attemptCount}${limitText}</span>`);
     }
 
-    // Suspension indicator
-    if (scormState.suspended) {
-      indicators.push('<span class="scorm-badge scorm-badge--suspended" title="Activity is suspended">⏸️</span>');
-    }
-
-    // Objective status indicators
-    if (scormState.objectives && scormState.objectives.length > 0) {
-      const satisfiedCount = scormState.objectives.filter(obj => obj.satisfied).length;
-      const totalCount = scormState.objectives.length;
-      const objectiveStatus = satisfiedCount === totalCount ? 'satisfied' : satisfiedCount > 0 ? 'partial' : 'not-satisfied';
-      indicators.push(`<span class="scorm-badge scorm-badge--objectives scorm-badge--objectives-${objectiveStatus}" title="Objectives: ${satisfiedCount}/${totalCount} satisfied">${satisfiedCount}/${totalCount}</span>`);
-    }
-
-    // Pre-condition rule indicator
-    if (scormState.preConditionResult && scormState.preConditionResult.action) {
+    // Sequencing rule restrictions with comprehensive actions
+    if (scormState.preConditionResult?.action) {
       const action = scormState.preConditionResult.action;
+      const reason = scormState.preConditionResult.reason || action;
       const actionIcon = {
         'disabled': '🚫',
         'hiddenFromChoice': '👁️‍🗨️',
-        'skip': '⏭️'
+        'skip': '⏭️',
+        'exitParent': '↗️',
+        'exitAll': '🚪',
+        'continue': '▶️'
       }[action] || '⚠️';
-      indicators.push(`<span class="scorm-badge scorm-badge--restriction" title="${scormState.preConditionResult.reason}">${actionIcon}</span>`);
+      indicators.push(`<span class="scorm-badge scorm-badge--rule scorm-badge--rule-${action}" title="Sequencing Rule: ${reason}">${actionIcon}</span>`);
+    }
+
+    // Control mode restrictions
+    if (scormState.controlMode && (!scormState.controlMode.choice || !scormState.controlMode.flow)) {
+      const restrictions = [];
+      if (!scormState.controlMode.choice) restrictions.push('Choice');
+      if (!scormState.controlMode.flow) restrictions.push('Flow');
+      const title = `Navigation restricted: ${restrictions.join(', ')} disabled`;
+      indicators.push(`<span class="scorm-badge scorm-badge--control" title="${title}">🔒</span>`);
     }
 
     return indicators.length > 0 ? `<div class="outline-item__indicators">${indicators.join('')}</div>` : '';
@@ -529,14 +544,16 @@ class CourseOutline extends BaseComponent {
     this.findAll('.outline-item__toggle').forEach(toggle => {
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.toggleItem(e.target.dataset.itemId);
+        const id = (e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.itemId : (e.target && e.target.dataset ? e.target.dataset.itemId : null);
+        if (id) this.toggleItem(id);
       });
     });
     
     if (this.options.enableNavigation) {
       this.findAll('.outline-item__title').forEach(title => {
         title.addEventListener('click', (e) => {
-          this.navigateToItem(e.target.dataset.itemId);
+          const id = (e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.itemId : (e.target && e.target.dataset ? e.target.dataset.itemId : null);
+          if (id) this.navigateToItem(id);
         });
       });
     }
@@ -556,13 +573,8 @@ class CourseOutline extends BaseComponent {
   async navigateToItem(itemId) {
     if (!this.options.enableNavigation) return;
 
-    // Validate navigation before proceeding (now async)
-    const validation = await this.validateActivityNavigation(itemId);
-    if (!validation.allowed) {
-      rendererLogger.warn('CourseOutline: Navigation blocked for item', itemId, validation.reason);
-      this.showNavigationBlockedMessage(itemId, validation.reason);
-      return;
-    }
+    // Always delegate validation to SN service - no local validation
+    rendererLogger.info('CourseOutline: Requesting navigation to item', itemId);
 
     this.setCurrentItem(itemId);
 
@@ -738,8 +750,26 @@ class CourseOutline extends BaseComponent {
 
   handleProgressUpdated(data) {
     const progressData = data.data || data;
+    rendererLogger.debug('CourseOutline: handleProgressUpdated called', {
+      currentItem: this.currentItem,
+      progressData: progressData,
+      hasCompletionStatus: !!progressData?.completionStatus,
+      hasSuccessStatus: !!progressData?.successStatus
+    });
+
     if (this.currentItem && progressData) {
       this.updateItemProgress(this.currentItem, progressData);
+
+      // If completion status changed to 'completed', refresh SCORM states
+      // This ensures the course outline updates visual indicators when activities complete
+      if (progressData.completionStatus === 'completed' || progressData.successStatus === 'passed') {
+        rendererLogger.info('CourseOutline: Activity completed, refreshing SCORM states', {
+          activityId: this.currentItem,
+          completionStatus: progressData.completionStatus,
+          successStatus: progressData.successStatus
+        });
+        this.refreshScormStates();
+      }
     }
   }
 
@@ -909,29 +939,31 @@ class CourseOutline extends BaseComponent {
   }
 
   /**
-   * Refresh SCORM states and available navigation (for real-time sync)
+   * Refresh SCORM states and available navigation - simplified and robust
    */
   async refreshScormStates() {
-    try {
-      // Debounce multiple rapid updates
-      if (this._refreshTimeout) {
-        clearTimeout(this._refreshTimeout);
-      }
-      
-      this._refreshTimeout = setTimeout(async () => {
-        try {
-          await this.fetchScormStates(); // This also fetches available navigation
-          if (this.courseStructure) {
-            this.renderCourseStructure(); // Re-render with updated states
-          }
-          rendererLogger.debug('CourseOutline: SCORM states refreshed successfully');
-        } catch (error) {
-          rendererLogger.warn('CourseOutline: Failed to refresh SCORM states', error);
-        }
-      }, 200); // 200ms debounce
-    } catch (error) {
-      rendererLogger.error('CourseOutline: Error setting up SCORM state refresh', error);
+    // Debounce rapid refresh requests
+    if (this._refreshTimeout) {
+      clearTimeout(this._refreshTimeout);
     }
+    
+    this._refreshTimeout = setTimeout(async () => {
+      try {
+        rendererLogger.info('CourseOutline: Refreshing SCORM states');
+        
+        await this.fetchScormStates();
+        
+        if (this.courseStructure) {
+          this.renderCourseStructure();
+        }
+        
+        rendererLogger.info('CourseOutline: SCORM states refreshed successfully');
+      } catch (error) {
+        rendererLogger.warn('CourseOutline: Failed to refresh SCORM states', error);
+      } finally {
+        this._refreshTimeout = null;
+      }
+    }, 100); // Reduced debounce to 100ms for faster UI updates
   }
 
   /**
@@ -983,93 +1015,39 @@ class CourseOutline extends BaseComponent {
   }
 
   /**
-   * Validate if navigation to an activity is allowed using authoritative SN service validation
-   */
-  async validateActivityNavigation(activityId) {
-    // Try authoritative validation first
-    if (window.electronAPI?.validateCourseOutlineChoice) {
-      try {
-        const result = await window.electronAPI.validateCourseOutlineChoice(activityId);
-        if (result.success) {
-          return {
-            allowed: result.allowed,
-            reason: result.reason,
-            authoritative: true
-          };
-        }
-      } catch (error) {
-        rendererLogger.warn('CourseOutline: Authoritative validation failed, falling back to local validation', error);
-      }
-    }
-
-    // Fallback to local SCORM state validation
-    return this.validateActivityNavigationLocal(activityId);
-  }
-
-  /**
-   * Local fallback validation using SCORM states and available navigation
+   * Get visual validation state for rendering (non-blocking)
    */
   validateActivityNavigationLocal(activityId) {
-    // Check available navigation from SN service first (mirrors Navigation Controls behavior)
-    if (this.availableNavigation.length > 0) {
-      const isInAvailableNavigation = this.availableNavigation.some(navItem => {
-        // Check if this activity is in available navigation
-        return navItem.activityId === activityId || navItem.targetActivityId === activityId;
-      });
-      
-      if (!isInAvailableNavigation) {
-        return { 
-          allowed: false, 
-          reason: 'Activity not in available navigation list',
-          authoritative: false 
-        };
-      }
-    }
-
     const scormState = this.scormStates.get(activityId);
 
     if (!scormState) {
-      // If activity is in available navigation but no SCORM state, allow it
-      if (this.availableNavigation.length > 0) {
-        return { allowed: true, reason: 'Available in navigation list', authoritative: false };
-      }
-      // No SCORM state or navigation data available, allow navigation (fallback)
-      return { allowed: true, reason: 'No SCORM validation available', authoritative: false };
+      return { allowed: true, reason: 'No SCORM state available' };
     }
 
-    // Check visibility
+    // Check basic visibility and restrictions for UI display only
     if (!scormState.isVisible) {
-      return { allowed: false, reason: 'Activity is hidden from choice', authoritative: false };
+      return { allowed: false, reason: 'Activity is hidden from choice' };
     }
 
-    // Check control mode
-    if (!scormState.controlMode.choice) {
-      return { allowed: false, reason: 'Choice navigation disabled by control mode', authoritative: false };
-    }
-
-    // Check attempt limit
     if (scormState.attemptLimitExceeded) {
-      return { allowed: false, reason: 'Attempt limit exceeded', authoritative: false };
+      return { allowed: false, reason: 'Attempt limit exceeded' };
     }
 
-    // Check pre-condition rules
-    if (scormState.preConditionResult && scormState.preConditionResult.action) {
-      const action = scormState.preConditionResult.action;
-      if (action === 'disabled' || action === 'hiddenFromChoice') {
-        return {
-          allowed: false,
-          reason: scormState.preConditionResult.reason || `Pre-condition rule: ${action}`,
-          authoritative: false
-        };
-      }
+    if (scormState.preConditionResult?.action === 'disabled') {
+      rendererLogger.debug('CourseOutline: Activity blocked by prerequisite', {
+        activityId,
+        action: scormState.preConditionResult.action,
+        reason: scormState.preConditionResult.reason
+      });
+      return { allowed: false, reason: scormState.preConditionResult.reason || 'Pre-condition rule blocks navigation' };
     }
 
-    // Check browse mode override
+    // Browse mode always shows as allowed for UI
     if (this.browseModeEnabled) {
-      return { allowed: true, reason: 'Browse mode enabled - restrictions bypassed', authoritative: false };
+      return { allowed: true, reason: 'Browse mode enabled' };
     }
 
-    return { allowed: true, reason: 'Navigation allowed', authoritative: false };
+    return { allowed: true, reason: 'Navigation appears available' };
   }
 
   /**

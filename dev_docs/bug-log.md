@@ -1029,6 +1029,239 @@ cleanup() {
 
 *Add new bug reports below this line...*
 
+### BUG-034: Navigation Availability Not Updated After Activity Completion
+**Severity**: High | **Status**: ✅ FIXED | **Priority**: P1
+
+**Problem**: When activities complete and status changes to "completed", the navigation availability is not recalculated and broadcasted to UI components, leaving course outline links disabled and next activity button unavailable despite the activity being completed.
+
+**Location**: 
+- `src/main/services/scorm/rte/api-handler.js` (_updateActivityTreeState method)
+- `src/renderer/components/scorm/navigation-controls.js` (missing availability update handler)
+- `src/renderer/services/app-manager.js` (missing availability propagation)
+
+**Root Cause Analysis**:
+The activity completion flow was:
+1. ✅ Activity completes → Status indicator updates (working)
+2. ✅ `_updateActivityTreeState` updates activity state (working)
+3. ❌ Navigation availability NOT recalculated (missing)
+4. ❌ UI components never notified of availability changes (missing)
+
+**Impact**:
+- Status shows "completed" but course outline sidebar links remain disabled with strikethrough
+- Next activity button stays disabled even after completion
+- Users cannot navigate to next activities despite completing current ones
+- Poor user experience with apparent navigation system failure
+
+**Observable Symptoms**:
+- Footer status indicator correctly shows "completed"  
+- Course outline links still show strikethrough and are unclickable
+- Next activity button remains disabled
+- Navigation appears broken from user perspective
+
+**✅ IMPLEMENTED Solution**:
+
+**1. ✅ Main Process Navigation Refresh**:
+Added `_refreshNavigationAvailabilityAfterStateChange()` method in `api-handler.js` that:
+- Calls `snService.navigationHandler.refreshNavigationAvailability()` to recalculate navigation
+- Broadcasts `navigation:availability:updated` event to renderer components
+- Also broadcasts `navigation:completed` for existing subscribers
+- Triggers on completion status, success status, AND objectives changes
+
+**2. ✅ Navigation Controls Integration**:
+Added subscription and handler for `navigation:availability:updated` that:
+- Updates local navigation state with new availability
+- Updates UIState for other components
+- Triggers button state refresh automatically
+
+**3. ✅ App Manager Propagation**:
+Added centralized handling of availability updates that:
+- Normalizes navigation availability into boolean flags
+- Updates UIState with `canNavigatePrevious` and `canNavigateNext`
+- Ensures all components receive consistent navigation state
+
+**✅ Implementation Details**:
+```javascript
+// In api-handler.js - Added after rollup processing and success status changes:
+this._refreshNavigationAvailabilityAfterStateChange(activityId);
+
+// New comprehensive refresh method:
+_refreshNavigationAvailabilityAfterStateChange(activityId) {
+  // Force recalculation of available navigation
+  snService.navigationHandler.refreshNavigationAvailability();
+  const availableNavigation = snService.navigationHandler.getAvailableNavigation();
+  
+  // Broadcast to renderer components
+  windowManager.broadcastToAllWindows('navigation:availability:updated', {
+    availableNavigation,
+    trigger: 'activity_state_change',
+    activityId
+  });
+}
+
+// Navigation Controls - Added subscription:
+this.subscribe('navigation:availability:updated', this.handleNavigationAvailabilityUpdated);
+
+// App Manager - Added event propagation:
+eventBus.on('navigation:availability:updated', (data) => {
+  const normalized = this.normalizeAvailableNavigation(data.availableNavigation);
+  this.uiState.updateNavigation({ ...normalized, _fromNavigationAvailabilityUpdate: true });
+});
+```
+
+**✅ Comprehensive Coverage**:
+- **✅ Completion Status Changes**: `cmi.completion_status` → Navigation refresh
+- **✅ Success Status Changes**: `cmi.success_status` → Navigation refresh  
+- **✅ Objectives Changes**: `cmi.objectives.*` → Navigation refresh
+
+**✅ Event Flow Now Working**:
+```
+Activity Completes → 
+  API Handler Updates State → 
+    Calls refreshNavigationAvailability() → 
+      Broadcasts navigation:availability:updated → 
+        Navigation Controls Update Buttons →
+        App Manager Updates UIState →
+        Course Outline Receives navigation:completed →
+          ✅ Sidebar links work
+          ✅ Next button enabled
+```
+
+**Location**: 
+- `src/main/services/scorm/rte/api-handler.js:937,957,397,965-1008` (refresh logic)
+- `src/renderer/components/scorm/navigation-controls.js:303,1310-1342` (handler)
+- `src/renderer/services/app-manager.js:557-574` (propagation)
+
+**Benefits**:
+- ✅ Immediate navigation availability after activity completion
+- ✅ Course outline sidebar links work correctly
+- ✅ Next activity button enables automatically
+- ✅ Consistent navigation state across all UI components
+- ✅ Real-time synchronization between backend state and UI
+
+### BUG-027: NavigationControls expects manifest in course:loaded payload
+**Severity**: Medium | **Status**: OPEN | **Priority**: P2
+
+**Problem**: `NavigationControls.handleCourseLoaded` only initializes the SN service when `data.manifest` is present, but the renderer’s course loader emits `course:loaded` without a `manifest` field (main initializes SN while processing the manifest). This can delay or skip initial availability refresh through this path.
+
+**Impact**:
+- Potential delay before buttons reflect accurate SN availability after a load
+- Confusing code path relying on a payload field not provided by the renderer
+
+**Location**:
+- `src/renderer/components/scorm/navigation-controls.js` (handleCourseLoaded)
+- `src/renderer/services/course-loader.js` (emits `course:loaded`)
+- `src/main/services/scorm-service.js` (SN init during CAM processing)
+
+**Evidence**:
+```js
+// navigation-controls.js
+async handleCourseLoaded(data) {
+  // only attempts snService.initializeCourse if (this.snService && data.manifest)
+}
+```
+
+**Proposed Fix**:
+- Trust main’s SN initialization and always refresh sequencing state via `sn:getSequencingState` after `course:loaded`, independent of a `manifest` field.
+
+
+### BUG-028: Redundant SN initialization responsibilities
+**Severity**: Low | **Status**: OPEN | **Priority**: P3
+
+**Problem**: SN initialization is owned by main during CAM processing; `NavigationControls` also tries to initialize SN during `course:loaded`. This duplication increases complexity and can confuse maintenance.
+
+**Impact**:
+- Conflicting expectations about initialization timing and ownership
+- Harder to reason about availability refresh points
+
+**Location**:
+- `src/renderer/services/app-manager.js` (unified pipeline and SN calls)
+- `src/renderer/components/scorm/navigation-controls.js` (handleCourseLoaded)
+- `src/main/services/scorm-service.js` (SN init during `processScormManifest`)
+
+**Proposed Fix**:
+- Consolidate: let main own SN init; renderer only queries state and reacts to `sn:initialized`.
+
+
+### BUG-029: Fallback retry path invokes snService when unavailable
+**Severity**: Low | **Status**: OPEN | **Priority**: P4
+
+**Problem**: In `NavigationControls.fallbackContentNavigation`, after loading a sample course it retries `this.snService?.processNavigation(...)` even though fallback was entered because SN was not available (may remain null). Optional chaining prevents crashes but the branch is ineffective.
+
+**Impact**:
+- No functional retry when SN is truly unavailable
+- Misleading code path reduces clarity
+
+**Location**:
+- `src/renderer/components/scorm/navigation-controls.js` (fallbackContentNavigation)
+
+**Proposed Fix**:
+- Gate the retry on a fresh SN availability check; otherwise avoid suggesting a retry through SN.
+
+
+### BUG-030: Sidebar toggle has two separate activation pathways
+**Severity**: Low | **Status**: OPEN | **Priority**: P4
+
+**Problem**: The header’s `#sidebar-toggle` calls `AppManager.toggleSidebar()`, while the nav-controls menu button emits `menuToggled` handled by `AppManager.handleMenuToggle`. Both apply classes and update `ui.sidebarVisible`. Functionally correct but duplicated pathways grow surface area.
+
+**Impact**:
+- Slightly higher maintenance risk and testing surface
+
+**Location**:
+- `index.html` (header button `#sidebar-toggle`)
+- `src/renderer/services/app-manager.js` (toggleSidebar, handleMenuToggle/handleMenuVisibilityChanged)
+- `src/renderer/components/scorm/navigation-controls.js` (toggleMenu)
+
+**Proposed Fix**:
+- Normalize all sidebar toggles to a single event path via AppManager (emit a common event, one handler).
+
+
+### BUG-031: CourseOutline local validation permissive before SCORM state fetch
+**Severity**: Medium | **Status**: OPEN | **Priority**: P3
+
+**Problem**: When `scormState` for an item isn’t available yet, local validation allows navigation if `availableNavigation` contains any entries (interpreted as a general hint). This can permit “choice” to targets not truly valid until state arrives, though authoritative IPC validation is attempted first.
+
+**Impact**:
+- Small window where item clicks may be allowed ahead of SCORM-state-backed validation
+
+**Location**:
+- `src/renderer/components/scorm/course-outline.js` (validateActivityNavigation / validateActivityNavigationLocal)
+
+**Proposed Fix**:
+- Until SCORM state is present, show disabled UI or force authoritative validation before allowing navigation.
+
+
+### BUG-032: Inconsistent IPC route registration for Course Outline endpoints
+**Severity**: Low | **Status**: OPEN | **Priority**: P4
+
+**Problem**: `course-outline-get-activity-tree` uses declarative route registration; `course-outline-validate-choice` and `course-outline-get-available-navigation` are registered via the legacy/fallback path. Functionally fine, but inconsistent, which can bypass declarative wrapper behavior.
+
+**Impact**:
+- Inconsistency may surprise maintainers; wrapper features (rate-limit profiles, validation) may differ
+
+**Location**:
+- `src/main/services/ipc/routes.js`
+- `src/main/services/ipc-handler.js`
+- `src/shared/constants/main-process-constants.js` (allowed channels)
+
+**Proposed Fix**:
+- Add declarative entries for all three course-outline routes, or document why two intentionally remain legacy.
+
+
+### BUG-033: Potential HTML injection via unescaped titles in CourseOutline
+**Severity**: Medium | **Status**: OPEN | **Priority**: P2
+
+**Problem**: Outline item titles are inserted via template literals without escaping. If a course title contains HTML, it could render unintended markup inside the sidebar.
+
+**Impact**:
+- Risk of rendering untrusted HTML from package metadata
+
+**Location**:
+- `src/renderer/components/scorm/course-outline.js` (renderItem)
+
+**Proposed Fix**:
+- Escape text content before insertion or set via `textContent` on a created element.
+
+
 **NavigationControls**:
 ```javascript
 // Local state management

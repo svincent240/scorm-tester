@@ -227,13 +227,12 @@
 .outline-item__title {
   flex: 1;
   color: var(--text-color);
-  text-decoration: none;
   font-size: var(--font-size-sm);
   line-height: 1.4;
   cursor: pointer;
   padding: var(--spacing-xs) 0;
   transition: color var(--transition-fast) ease;
-  
+
   /* Text overflow handling */
   white-space: nowrap;
   overflow: hidden;
@@ -243,7 +242,6 @@
 
 .outline-item__title:hover {
   color: var(--primary-color);
-  text-decoration: none;
 }
 
 .outline-item__title:focus {
@@ -380,20 +378,27 @@
 /* SCORM State Styles */
 .outline-item--hidden {
   opacity: 0.4;
+  background: var(--bg-secondary);
 }
 
 .outline-item--hidden .outline-item__title {
   text-decoration: line-through;
+  text-decoration-color: var(--danger-color);
+  text-decoration-thickness: 2px;
   color: var(--text-muted);
 }
 
 .outline-item--disabled {
   opacity: 0.7;
+  background: var(--bg-secondary);
 }
 
 .outline-item--disabled .outline-item__title {
   cursor: not-allowed;
   color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger-color);
+  text-decoration-thickness: 2px;
 }
 
 .outline-item--suspended {

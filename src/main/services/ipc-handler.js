@@ -1369,10 +1369,10 @@ class IpcHandler extends BaseService {
 
       // Call authoritative navigation validation
       const result = await snService.navigationHandler.validateChoiceRequest(targetActivityId);
-      
-      return { 
-        success: true, 
-        allowed: result.allowed || false,
+
+      return {
+        success: true,
+        allowed: result.valid || false,
         reason: result.reason || 'No reason provided',
         details: result
       };
@@ -1592,6 +1592,7 @@ class IpcHandler extends BaseService {
         // Course outline mode: comprehensive SCORM state information
         serialized.scormState = {
           // Basic activity state
+          activityState: node.activityState, // Raw activity state for course outline
           completionStatus: this.mapActivityState(node.activityState),
           successStatus: this.mapAttemptState(node.attemptState),
           progressMeasure: node.progressMeasure || 0,

@@ -238,6 +238,58 @@ The original analysis identified comprehensive SN activity tree functionality th
 
 ### Files to Modify
 
+## Fixes Implemented (September 2025)
+
+The following defects were fixed to align the UI with backend behavior and ensure reliable navigation and sidebar behavior:
+
+- Sidebar mobile toggle not working
+  - Root cause: UI toggled a non-existent CSS class `sidebar--mobile-open`; CSS expects `app-sidebar--open` for mobile slide-in.
+  - Fixes:
+    - `src/renderer/services/app-manager.js`:
+      - `toggleSidebar()` now toggles `app-sidebar--open` and manages a `.sidebar-overlay` element.
+      - `handleMenuToggle()` and `handleMenuVisibilityChanged()` now branch on mobile vs desktop using `matchMedia`:
+        - Mobile: toggle `app-sidebar--open` and overlay.
+        - Desktop: toggle `app-sidebar--hidden` and `app-content--full-width`.
+      - Emits `menuVisibilityChanged` after applying changes so other components can update.
+    - `src/renderer/components/scorm/navigation-controls.js`:
+      - `toggleMenu()` now emits `menuToggled` through the EventBus with target visibility (no direct DOM mutation). It also listens for `menuVisibilityChanged` to update its button label.
+
+- Course Outline incorrectly blocked item navigation
+  - Root cause: Treated `availableNavigation` as a per-activity list, checking `activityId/targetActivityId`. Backend provides only request types like `['choice','continue','previous']`.
+  - Fixes:
+    - `src/renderer/components/scorm/course-outline.js`:
+      - `validateActivityNavigationLocal()` no longer blocks based on `availableNavigation` contents; it relies on SCORM state (visibility, controlMode, pre-conditions) and browse mode.
+      - `bindItemEvents()` now uses `e.currentTarget.dataset.itemId` for robust click targeting.
+
+- Event bus mismatches for SCORM events (handlers never fired)
+  - Root cause: `EventBus` forbids `scorm:*` events; several components listened to `scorm:*`.
+  - Fixes:
+    - Subscriptions updated to `ui:scorm:*`:
+      - `src/renderer/components/scorm/navigation-controls.js`: listens to `ui:scorm:initialized`, `ui:scorm:dataChanged`.
+      - `src/renderer/components/scorm/progress-tracking.js`: listens to `ui:scorm:initialized`, `ui:scorm:dataChanged`.
+      - `src/renderer/components/scorm/course-outline.js`: listens to `ui:scorm:dataChanged`.
+      - `src/renderer/services/app-manager.js`: listens to `ui:scorm:dataChanged`.
+    - `src/renderer/services/event-bus.js`: fixed logger import to use named `rendererLogger` consistently in the forbidden-event path.
+
+- Navigation availability normalization inconsistent between components
+  - Root cause: AppManager treated `'choice'` as enabling “Next”, while NavigationControls only enables Next for `'continue'` (flow navigation).
+  - Fix:
+    - `src/renderer/services/app-manager.js`: `normalizeAvailableNavigation()` now returns `canNavigateNext` only when `'continue'` is present (no longer treats `'choice'` as next).
+
+## Validation Notes
+
+- Sidebar
+  - Desktop: `Course Menu` button toggles `app-sidebar--hidden` and content width; sidebar remains visible by default due to CSS desktop override.
+  - Mobile: `Course Menu` and header burger toggle `app-sidebar--open` with overlay. Clicking overlay closes the sidebar.
+
+- Course Outline navigation
+  - Choice clicks rely on SCORM state and authoritative validation; do not block based on `availableNavigation` shape.
+  - Click handling uses `currentTarget`, making nested elements reliable.
+
+- Events
+  - `ui:scorm:*` signals now reach subscribers; EventBus continues to protect against improper `scorm:*` emissions.
+
+
 1. **Main Process IPC Integration**
    - `src/main/services/scorm/sn/index.js` - Add activity tree state retrieval methods
    - `src/main/ipc/scorm-handlers.js` - Add IPC handlers for activity tree requests
