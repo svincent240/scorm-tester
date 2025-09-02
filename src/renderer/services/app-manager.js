@@ -554,24 +554,78 @@ class AppManager {
 
     // CRITICAL FIX: Handle navigation availability updates from main process
     // This propagates navigation changes when activities complete
-    eventBus.on('navigation:availability:updated', (data) => {
-      try {
-        const { availableNavigation } = data || {};
-        if (Array.isArray(availableNavigation)) {
-          const normalized = this.normalizeAvailableNavigation(availableNavigation);
-          this.uiState.updateNavigation({
-            ...normalized,
-            _fromNavigationAvailabilityUpdate: true
+    // Use preload bridge instead of eventBus since navigation events are blocked by eventBus validation
+    if (window.electronAPI && window.electronAPI.onNavigationAvailabilityUpdated) {
+      window.electronAPI.onNavigationAvailabilityUpdated((data) => {
+        try {
+          this.logger.info('AppManager: RECEIVED navigation:availability:updated event via preload bridge', {
+            data,
+            hasAvailableNavigation: Array.isArray(data?.availableNavigation),
+            availableNavigation: data?.availableNavigation
           });
-          this.logger.info('AppManager: Navigation availability updated', {
-            availableNavigation,
-            normalized
+
+          const { availableNavigation } = data || {};
+          if (Array.isArray(availableNavigation)) {
+            const normalized = this.normalizeAvailableNavigation(availableNavigation);
+
+            this.logger.debug('AppManager: Normalized navigation data', {
+              availableNavigation,
+              normalized,
+              canNavigateNext: normalized.canNavigateNext,
+              canNavigatePrevious: normalized.canNavigatePrevious
+            });
+
+            // Update UI state for other components
+            this.uiState.updateNavigation({
+              ...normalized,
+              _fromNavigationAvailabilityUpdate: true
+            });
+
+            // CRITICAL FIX: Directly notify navigation-controls component to ensure button states update
+            // This bypasses the silent UI state update issue that was preventing button state changes
+            const navigationControls = this.components.get('navigationControls');
+            this.logger.debug('AppManager: Checking navigation-controls component', {
+              componentExists: !!navigationControls,
+              hasMethod: typeof navigationControls?.handleNavigationAvailabilityUpdated === 'function',
+              componentType: typeof navigationControls
+            });
+
+            if (navigationControls && typeof navigationControls.handleNavigationAvailabilityUpdated === 'function') {
+              this.logger.info('AppManager: Calling handleNavigationAvailabilityUpdated on navigation-controls');
+              navigationControls.handleNavigationAvailabilityUpdated(data);
+              this.logger.info('AppManager: Successfully notified navigation-controls component', {
+                availableNavigation,
+                normalized
+              });
+            } else {
+              this.logger.error('AppManager: Navigation-controls component not available for direct notification', {
+                componentExists: !!navigationControls,
+                hasMethod: typeof navigationControls?.handleNavigationAvailabilityUpdated === 'function'
+              });
+            }
+
+            this.logger.info('AppManager: Navigation availability update processing complete', {
+              availableNavigation,
+              normalized,
+              directNotification: !!navigationControls
+            });
+          } else {
+            this.logger.warn('AppManager: Invalid availableNavigation data received', {
+              data,
+              availableNavigationType: typeof availableNavigation
+            });
+          }
+        } catch (error) {
+          this.logger.error('AppManager: Failed to process navigation availability update', {
+            error: error.message,
+            stack: error.stack,
+            data
           });
         }
-      } catch (error) {
-        this.logger.warn('AppManager: Failed to process navigation availability update', error);
-      }
-    });
+      });
+    } else {
+      this.logger.warn('AppManager: Navigation availability preload bridge not available');
+    }
   }
 
   /**

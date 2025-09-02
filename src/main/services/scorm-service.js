@@ -227,7 +227,7 @@ class ScormService extends BaseService {
           browseModeService: this.browseModeService // Pass browse mode service reference
         };
 
-        const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore);
+        const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
         // Initialize RTE session and then bind its internal session id to our session id for mapping
         try { rte.Initialize(''); } catch (_) {}
         // Override generated sessionId with our provided sessionId for consistency

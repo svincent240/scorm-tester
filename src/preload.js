@@ -186,6 +186,7 @@ const electronAPI = {
 
   // SCORM Inspector Event Listeners
   onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
+  onNavigationAvailabilityUpdated: (callback) => safeOn('navigation:availability:updated', callback),
 
   // Course Outline SCORM Event Listeners
   onActivityProgressUpdated: (callback) => safeOn('activity:progress:updated', callback),

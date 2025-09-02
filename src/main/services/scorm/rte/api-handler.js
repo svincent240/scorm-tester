@@ -39,10 +39,11 @@ class ScormApiHandler {
    * @param {boolean} options.memoryOnlyStorage - Use memory-only storage (for browse mode)
    * @param {Object} telemetryStore - SCORM Inspector telemetry store instance
    */
-  constructor(sessionManager, logger, options = {}, telemetryStore = null) {
+  constructor(sessionManager, logger, options = {}, telemetryStore = null, scormService = null) {
     this.sessionManager = sessionManager;
     this.logger = logger;
     this.telemetryStore = telemetryStore;
+    this.scormService = scormService;
     this.options = {
       strictMode: true,
       maxCommitFrequency: 10000, // Max commits per 10 seconds
@@ -378,11 +379,18 @@ class ScormApiHandler {
         if (element === 'cmi.completion_status' || element === 'cmi.success_status') {
           this._updateActivityTreeState(element, value);
           this._emitProgressUpdateEvent(element, value);
-          
-          // When completion status changes, trigger full course outline refresh
+
+          // When completion or success status changes, trigger full course outline refresh
           // because completing an activity may unlock other activities via prerequisites
-          if (element === 'cmi.completion_status' && (value === 'completed' || value === 'incomplete')) {
+          if ((element === 'cmi.completion_status' && (value === 'completed' || value === 'incomplete')) ||
+              (element === 'cmi.success_status' && (value === 'passed' || value === 'failed'))) {
             this._emitCourseOutlineRefreshEvent();
+            // CRITICAL FIX: Refresh navigation availability after completion/success status changes
+            // This ensures the UI components (course outline and navigation controls) get updated
+            const activityId = this.getCurrentActivityId();
+            if (activityId) {
+              this._refreshNavigationAvailabilityAfterStateChange(activityId);
+            }
           }
         }
         
@@ -806,17 +814,16 @@ class ScormApiHandler {
    * @private
    */
   _broadcastDataModelUpdate() {
-    try {
-      if (this.telemetryStore && this.telemetryStore.windowManager &&
-          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
-        const dataModel = this.dataModel.getAllData();
-        this.telemetryStore.windowManager.broadcastToAllWindows('scorm-data-model-updated', dataModel);
-        this.logger?.debug('Broadcasted data model update to inspector windows');
-      }
-    } catch (error) {
-      this.logger?.warn('Failed to broadcast data model update:', error.message);
-    }
-  }
+   try {
+     if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
+       const dataModel = this.dataModel.getAllData();
+       this.telemetryStore.broadcastToAllWindows('scorm-data-model-updated', dataModel);
+       this.logger?.debug('Broadcasted data model update to inspector windows');
+     }
+   } catch (error) {
+     this.logger?.warn('Failed to broadcast data model update:', error.message);
+   }
+ }
 
   /**
    * Emit progress update event for course outline real-time synchronization
@@ -825,64 +832,61 @@ class ScormApiHandler {
    * @param {string} value - New value
    */
   _emitProgressUpdateEvent(element, value) {
-    try {
-      if (this.telemetryStore && this.telemetryStore.windowManager &&
-          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
-        const progressData = {
-          activityId: this.getCurrentActivityId(),
-          element,
-          value,
-          completionStatus: this.dataModel.getValue('cmi.completion_status'),
-          successStatus: this.dataModel.getValue('cmi.success_status'),
-          timestamp: Date.now()
-        };
-        this.telemetryStore.windowManager.broadcastToAllWindows('activity:progress:updated', progressData);
-        this.logger?.debug('Emitted activity progress update event for course outline');
-      }
-    } catch (error) {
-      this.logger?.warn('Failed to emit progress update event:', error.message);
-    }
-  }
+   try {
+     if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
+       const progressData = {
+         activityId: this.getCurrentActivityId(),
+         element,
+         value,
+         completionStatus: this.dataModel.getValue('cmi.completion_status'),
+         successStatus: this.dataModel.getValue('cmi.success_status'),
+         timestamp: Date.now()
+       };
+       this.telemetryStore.broadcastToAllWindows('activity:progress:updated', progressData);
+       this.logger?.debug('Emitted activity progress update event for course outline');
+     }
+   } catch (error) {
+     this.logger?.warn('Failed to emit progress update event:', error.message);
+   }
+ }
 
   /**
    * Emit objective update event for course outline real-time synchronization
    * @private
    */
   _emitObjectiveUpdateEvent() {
-    try {
-      if (this.telemetryStore && this.telemetryStore.windowManager &&
-          typeof this.telemetryStore.windowManager.broadcastToAllWindows === 'function') {
-        const objectiveData = {
-          activityId: this.getCurrentActivityId(),
-          objectives: this.dataModel.getObjectivesData(),
-          timestamp: Date.now()
-        };
-        this.telemetryStore.windowManager.broadcastToAllWindows('objectives:updated', objectiveData);
-        this.logger?.debug('Emitted objectives update event for course outline');
-      }
-    } catch (error) {
-      this.logger?.warn('Failed to emit objectives update event:', error.message);
-    }
-  }
+   try {
+     if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
+       const objectiveData = {
+         activityId: this.getCurrentActivityId(),
+         objectives: this.dataModel.getObjectivesData(),
+         timestamp: Date.now()
+       };
+       this.telemetryStore.broadcastToAllWindows('objectives:updated', objectiveData);
+       this.logger?.debug('Emitted objectives update event for course outline');
+     }
+   } catch (error) {
+     this.logger?.warn('Failed to emit objectives update event:', error.message);
+   }
+ }
 
   /**
    * Emit course outline refresh event to trigger full prerequisite re-evaluation
    * @private
    */
   _emitCourseOutlineRefreshEvent() {
-    try {
-      const windowManager = this.telemetryStore.windowManager;
-      if (windowManager?.broadcastToAllWindows) {
-        windowManager.broadcastToAllWindows('course-outline:refresh-required', {
-          reason: 'completion_status_changed',
-          timestamp: Date.now()
-        });
-        this.logger?.debug('Emitted course outline refresh event for prerequisite re-evaluation');
-      }
-    } catch (error) {
-      this.logger?.warn('Failed to emit course outline refresh event:', error.message);
-    }
-  }
+   try {
+     if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
+       this.telemetryStore.broadcastToAllWindows('course-outline:refresh-required', {
+         reason: 'completion_status_changed',
+         timestamp: Date.now()
+       });
+       this.logger?.debug('Emitted course outline refresh event for prerequisite re-evaluation');
+     }
+   } catch (error) {
+     this.logger?.warn('Failed to emit course outline refresh event:', error.message);
+   }
+ }
 
   /**
    * Update activity tree state when SCORM data changes
@@ -890,7 +894,7 @@ class ScormApiHandler {
    * @param {string} element - The SCORM data element that changed
    * @param {string} value - The new value
    */
-  _updateActivityTreeState(element, value) {
+  _updateActivityTreeState(element, _value) {
     try {
       const activityId = this.getCurrentActivityId();
       if (!activityId) {
@@ -899,68 +903,15 @@ class ScormApiHandler {
       }
 
       // Get the SN service to update activity tree
-      const snService = this.telemetryStore.scormService?.snService;
-      if (!snService?.activityTreeManager) {
-        this.logger?.warn('Cannot update activity tree state: SN service not available');
-        return;
-      }
+      // Note: SN service access needs to be provided through constructor or other means
+      // For now, we'll skip activity tree updates until proper service injection is implemented
+      this.logger?.warn('Cannot update activity tree state: SN service access not available through telemetry store');
 
-      const activity = snService.activityTreeManager.getActivityById(activityId);
-      if (!activity) {
-        this.logger?.warn('Cannot update activity tree state: activity not found', activityId);
-        return;
-      }
-
-      // Update activity state based on completion status
-      if (element === 'cmi.completion_status') {
-        switch (value.toLowerCase()) {
-          case 'completed':
-            activity.activityState = 'completed';
-            break;
-          case 'incomplete':
-            activity.activityState = 'active';
-            break;
-          case 'not attempted':
-            activity.activityState = 'inactive';
-            break;
-          case 'unknown':
-            activity.activityState = 'active';
-            break;
-        }
-        this.logger?.debug('Updated activity state for', activityId, 'to', activity.activityState);
-        
-        // Trigger rollup processing to update objectives and prerequisites
-        if (snService.rollupManager) {
-          const rollupResult = snService.rollupManager.processRollup(activity);
-          if (rollupResult.success) {
-            this.logger?.debug('Rollup processing completed successfully');
-          } else {
-            this.logger?.warn('Rollup processing failed:', rollupResult.reason);
-          }
-        }
-
-        // CRITICAL FIX: Refresh navigation availability after completion status changes
+      // Activity tree updates are disabled until proper SN service injection is implemented
+      // For now, we only handle navigation availability refresh
+      if (element === 'cmi.completion_status' || element === 'cmi.success_status') {
+        // CRITICAL FIX: Refresh navigation availability after completion/success status changes
         // This ensures the UI components (course outline and navigation controls) get updated
-        this._refreshNavigationAvailabilityAfterStateChange(activityId);
-      }
-
-      // Update attempt state based on success status
-      if (element === 'cmi.success_status') {
-        switch (value.toLowerCase()) {
-          case 'passed':
-            activity.attemptState = 'satisfied';
-            break;
-          case 'failed':
-            activity.attemptState = 'not_satisfied';
-            break;
-          case 'unknown':
-            activity.attemptState = 'unknown';
-            break;
-        }
-        this.logger?.debug('Updated attempt state for', activityId, 'to', activity.attemptState);
-        
-        // CRITICAL FIX: Also refresh navigation availability after success status changes
-        // Success status (passed/failed) can also affect navigation rules and prerequisites
         this._refreshNavigationAvailabilityAfterStateChange(activityId);
       }
 
@@ -975,25 +926,28 @@ class ScormApiHandler {
    */
   _refreshNavigationAvailabilityAfterStateChange(activityId) {
     try {
-      const snService = this.telemetryStore.scormService?.snService;
+      const snService = this.scormService?.getSNService();
       if (!snService?.navigationHandler) {
-        this.logger?.warn('Cannot refresh navigation availability: navigation handler not available');
+        this.logger?.warn('Cannot refresh navigation availability: SN service not available');
         return;
       }
 
-      // Force the SN service to recalculate available navigation based on updated activity states
-      snService.navigationHandler.refreshNavigationAvailability();
-      const availableNavigation = snService.navigationHandler.getAvailableNavigation();
+      // Refresh navigation availability in the SN service
+      snService.refreshNavigationAvailability();
+
+      // Get the updated sequencing state
+      const sequencingState = snService.getSequencingState();
+      const availableNavigation = sequencingState.availableNavigation || [];
+
       this.logger?.debug('Navigation availability refreshed after state change', {
         activityId,
         availableNavigation
       });
 
       // Broadcast updated navigation availability to renderer components
-      const windowManager = this.telemetryStore.scormService?.getDependency?.('windowManager');
-      if (windowManager?.broadcastToAllWindows) {
+      if (this.telemetryStore?.broadcastToAllWindows) {
         // Emit navigation:availability:updated for immediate UI refresh
-        windowManager.broadcastToAllWindows('navigation:availability:updated', {
+        this.telemetryStore.broadcastToAllWindows('navigation:availability:updated', {
           availableNavigation,
           trigger: 'activity_state_change',
           activityId,
@@ -1001,7 +955,7 @@ class ScormApiHandler {
         });
 
         // Also emit navigation:completed for components expecting this event
-        windowManager.broadcastToAllWindows('navigation:completed', {
+        this.telemetryStore.broadcastToAllWindows('navigation:completed', {
           activityId,
           navigationRequest: 'state_change',
           result: { success: true, availableNavigation }
@@ -1012,7 +966,7 @@ class ScormApiHandler {
           availableNavigation
         });
       } else {
-        this.logger?.warn('Cannot broadcast navigation availability: window manager not available');
+        this.logger?.warn('Cannot broadcast navigation availability: telemetry store broadcast method not available');
       }
     } catch (error) {
       this.logger?.warn('Failed to refresh navigation availability after state change:', error.message);
