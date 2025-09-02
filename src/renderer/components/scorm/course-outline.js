@@ -201,20 +201,27 @@ class CourseOutline extends BaseComponent {
 
     // Listen for SN service initialization to fetch SCORM states
     this.subscribe('sn:initialized', () => {
-      rendererLogger.info('CourseOutline: SN service initialized, checking SCORM states', {
+      rendererLogger.info('CourseOutline: SN service initialized event received', {
         alreadyLoaded: this.scormStatesLoaded,
-        hasStates: this.scormStates.size > 0
+        hasStates: this.scormStates.size > 0,
+        hasCourseStructure: !!this.courseStructure,
+        courseStructureItems: this.courseStructure?.items?.length || 0
       });
 
       // Only fetch if we don't already have states loaded
       if (!this.scormStatesLoaded) {
+        rendererLogger.info('CourseOutline: Fetching SCORM states after SN initialization');
         this.fetchScormStates().then(() => {
           if (this.courseStructure) {
+            rendererLogger.info('CourseOutline: Re-rendering course structure with new SCORM states');
             this.renderCourseStructure(); // Re-render with SCORM states
           }
           rendererLogger.info('CourseOutline: SCORM states updated after SN initialization');
         }).catch(error => {
-          rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', error);
+          rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', {
+            error: error?.message || error,
+            hasElectronAPI: !!window.electronAPI
+          });
         });
       } else {
         rendererLogger.debug('CourseOutline: SCORM states already loaded, skipping SN init fetch');
@@ -350,15 +357,19 @@ class CourseOutline extends BaseComponent {
     const scormState = this.scormStates.get(item.identifier);
 
     // Determine SCORM-based visual states for UI display
-     const validation = this.validateActivityNavigationLocal(item.identifier);
+    const validation = this.validateActivityNavigationLocal(item.identifier);
 
-     // Log initial render state for debugging
-     rendererLogger.debug('CourseOutline: renderItem called for', item.identifier, {
-       renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',
-       scormStatesLoaded: this.scormStatesLoaded,
-       hasScormState: !!scormState,
-       validationResult: validation
-     });
+    // Log initial render state for debugging
+    rendererLogger.info('CourseOutline: renderItem called for', item.identifier, {
+      renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',
+      scormStatesLoaded: this.scormStatesLoaded,
+      hasScormState: !!scormState,
+      validationAllowed: validation.allowed,
+      validationReason: validation.reason,
+      browseModeEnabled: this.browseModeEnabled,
+      itemType: item.type,
+      hasChildren: hasChildren
+    });
      // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
      // But don't hide items that are just disabled due to sequencing rules
      const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
@@ -607,18 +618,39 @@ class CourseOutline extends BaseComponent {
   }
 
   bindItemEvents() {
+    rendererLogger.info('CourseOutline: bindItemEvents called', {
+      toggleElements: this.findAll('.outline-item__toggle').length,
+      titleElements: this.findAll('.outline-item__title').length,
+      enableNavigation: this.options.enableNavigation
+    });
+
     this.findAll('.outline-item__toggle').forEach(toggle => {
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = (e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.itemId : (e.target && e.target.dataset ? e.target.dataset.itemId : null);
+        rendererLogger.debug('CourseOutline: Toggle clicked', {
+          currentTargetId: e.currentTarget?.dataset?.itemId,
+          targetId: e.target?.dataset?.itemId,
+          resolvedId: id,
+          eventType: 'toggle'
+        });
         if (id) this.toggleItem(id);
       });
     });
-    
+
     if (this.options.enableNavigation) {
       this.findAll('.outline-item__title').forEach(title => {
         title.addEventListener('click', (e) => {
           const id = (e.currentTarget && e.currentTarget.dataset) ? e.currentTarget.dataset.itemId : (e.target && e.target.dataset ? e.target.dataset.itemId : null);
+          rendererLogger.info('CourseOutline: Title clicked', {
+            currentTargetId: e.currentTarget?.dataset?.itemId,
+            targetId: e.target?.dataset?.itemId,
+            resolvedId: id,
+            eventType: 'navigation',
+            scormStatesLoaded: this.scormStatesLoaded,
+            hasScormState: id ? this.scormStates.has(id) : false,
+            browseModeEnabled: this.browseModeEnabled
+          });
           if (id) this.navigateToItem(id);
         });
       });
@@ -646,10 +678,28 @@ class CourseOutline extends BaseComponent {
   }
 
   async navigateToItem(itemId) {
-    if (!this.options.enableNavigation) return;
+    if (!this.options.enableNavigation) {
+      rendererLogger.warn('CourseOutline: Navigation disabled by options', { itemId });
+      return;
+    }
 
     // Always delegate validation to SN service - no local validation
-    rendererLogger.info('CourseOutline: Requesting navigation to item', itemId);
+    rendererLogger.info('CourseOutline: Requesting navigation to item', {
+      itemId,
+      scormStatesLoaded: this.scormStatesLoaded,
+      hasScormState: this.scormStates.has(itemId),
+      browseModeEnabled: this.browseModeEnabled,
+      availableNavigation: this.availableNavigation
+    });
+
+    // Get validation result for logging
+    const validation = this.validateActivityNavigationLocal(itemId);
+    rendererLogger.info('CourseOutline: Pre-navigation validation result', {
+      itemId,
+      validationAllowed: validation.allowed,
+      validationReason: validation.reason,
+      scormStatesLoaded: this.scormStatesLoaded
+    });
 
     this.setCurrentItem(itemId);
 
@@ -657,8 +707,18 @@ class CourseOutline extends BaseComponent {
     try {
       const { eventBus } = await import('../../services/event-bus.js');
       // SCORM SN uses "choice" requests with target activity
+      rendererLogger.info('CourseOutline: Emitting navigationRequest event', {
+        requestType: 'choice',
+        activityId: itemId,
+        source: 'course-outline'
+      });
       eventBus.emit('navigationRequest', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
-    } catch (_) { /* no-op */ }
+    } catch (error) {
+      rendererLogger.error('CourseOutline: Failed to emit navigationRequest', {
+        itemId,
+        error: error?.message || error
+      });
+    }
 
     this.emit('navigationRequested', { itemId });
   }
@@ -765,7 +825,9 @@ class CourseOutline extends BaseComponent {
       itemCount: courseData?.structure?.items?.length || 0,
       currentScormStatesCount: this.scormStates.size,
       scormStatesLoaded: this.scormStatesLoaded,
-      browseModeEnabled: this.browseModeEnabled
+      browseModeEnabled: this.browseModeEnabled,
+      hasManifest: !!courseData?.manifest,
+      courseTitle: courseData?.title || courseData?.courseTitle || 'unknown'
     });
 
     // Single-source renderer: only accept provided structure; do not rebuild from manifest.
@@ -1046,6 +1108,7 @@ class CourseOutline extends BaseComponent {
         return null;
       }
 
+      rendererLogger.info('CourseOutline: Calling getCourseOutlineActivityTree IPC');
       const result = await window.electronAPI.getCourseOutlineActivityTree();
       rendererLogger.debug('CourseOutline: fetchScormStates IPC result received', {
         success: result?.success,
@@ -1061,7 +1124,8 @@ class CourseOutline extends BaseComponent {
         rendererLogger.info('CourseOutline: SCORM states fetched and processed successfully', {
           stateCount: this.scormStates.size,
           isFallback: result?.fallback,
-          fallbackReason: result?.reason
+          fallbackReason: result?.reason,
+          sampleStateKeys: Array.from(this.scormStates.keys()).slice(0, 5)
         });
 
         // Also fetch available navigation
@@ -1184,13 +1248,23 @@ class CourseOutline extends BaseComponent {
       activityId,
       scormStatesLoaded: this.scormStatesLoaded,
       browseModeEnabled: this.browseModeEnabled,
-      hasScormState: this.scormStates.has(activityId)
+      hasScormState: this.scormStates.has(activityId),
+      availableNavigation: this.availableNavigation
     });
 
     // CRITICAL FIX: If SCORM states haven't been loaded yet, allow navigation to prevent premature disabling
     if (!this.scormStatesLoaded) {
       rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- allowing navigation');
       return { allowed: true, reason: 'SCORM states not yet loaded' };
+    }
+
+    // CRITICAL FIX: Check if choice navigation is available in sequencing rules FIRST
+    if (!this.availableNavigation || !this.availableNavigation.includes('choice')) {
+      rendererLogger.debug('CourseOutline: Choice navigation not available in sequencing rules', {
+        activityId,
+        availableNavigation: this.availableNavigation
+      });
+      return { allowed: false, reason: 'Choice navigation disabled by sequencing rules' };
     }
 
     const scormState = this.scormStates.get(activityId);
@@ -1205,12 +1279,12 @@ class CourseOutline extends BaseComponent {
     // CRITICAL FIX: Check if this is fallback data (indicated by preConditionResult reason)
     const isFallbackData = scormState.preConditionResult?.reason &&
       (scormState.preConditionResult.reason.includes('not available') ||
-       scormState.preConditionResult.reason.includes('not initialized') ||
-       scormState.preConditionResult.reason.includes('No course loaded') ||
-       scormState.preConditionResult.reason.includes('SCORM service unavailable') ||
-       scormState.preConditionResult.reason.includes('SN service not') ||
-       scormState.preConditionResult.reason.includes('Activity tree manager not') ||
-       scormState.preConditionResult.reason.includes('Error:'));
+        scormState.preConditionResult.reason.includes('not initialized') ||
+        scormState.preConditionResult.reason.includes('No course loaded') ||
+        scormState.preConditionResult.reason.includes('SCORM service unavailable') ||
+        scormState.preConditionResult.reason.includes('SN service not') ||
+        scormState.preConditionResult.reason.includes('Activity tree manager not') ||
+        scormState.preConditionResult.reason.includes('Error:'));
 
     if (isFallbackData) {
       rendererLogger.debug('CourseOutline: Fallback data detected for', activityId, {

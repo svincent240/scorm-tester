@@ -382,9 +382,6 @@
 }
 
 .outline-item--hidden > .outline-item__content > .outline-item__title {
-  text-decoration: line-through;
-  text-decoration-color: var(--danger-color);
-  text-decoration-thickness: 2px;
   color: var(--text-muted);
 }
 
@@ -393,12 +390,13 @@
   background: var(--bg-secondary);
 }
 
+.outline-item--disabled > .outline-item__content {
+  cursor: not-allowed;
+}
+
 .outline-item--disabled > .outline-item__content > .outline-item__title {
   cursor: not-allowed;
   color: var(--text-muted);
-  text-decoration: line-through;
-  text-decoration-color: var(--danger-color);
-  text-decoration-thickness: 2px;
 }
 
 .outline-item--suspended {
