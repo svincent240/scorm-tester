@@ -351,13 +351,36 @@ class CourseOutline extends BaseComponent {
 
     // Determine SCORM-based visual states for UI display
      const validation = this.validateActivityNavigationLocal(item.identifier);
+
+     // Log initial render state for debugging
+     rendererLogger.debug('CourseOutline: renderItem called for', item.identifier, {
+       renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',
+       scormStatesLoaded: this.scormStatesLoaded,
+       hasScormState: !!scormState,
+       validationResult: validation
+     });
      // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
      // But don't hide items that are just disabled due to sequencing rules
      const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
-     // Only apply disabled styling if SCORM states are loaded
+     // CRITICAL FIX: Only apply disabled styling if SCORM states are loaded AND validation fails AND browse mode is disabled
      const isDisabled = this.scormStatesLoaded && !validation.allowed && !this.browseModeEnabled;
      const isSuspended = scormState && scormState.suspended;
      const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
+
+     // Debug logging for visual state determination
+     rendererLogger.debug('CourseOutline: Visual state determination for', item.identifier, {
+       scormStatesLoaded: this.scormStatesLoaded,
+       validationAllowed: validation.allowed,
+       validationReason: validation.reason,
+       browseModeEnabled: this.browseModeEnabled,
+       hasScormState: !!scormState,
+       isVisible: scormState?.isVisible,
+       isHidden,
+       isDisabled,
+       isSuspended,
+       attemptLimitReached,
+       willHaveStrikethrough: isHidden || isDisabled
+     });
 
      // Debug logging for all items to track visibility issues
      rendererLogger.debug('CourseOutline: Rendering item', {
@@ -739,7 +762,10 @@ class CourseOutline extends BaseComponent {
     rendererLogger.info('CourseOutline.handleCourseLoaded: received', {
       hasStructure: !!courseData?.structure,
       hasItems: !!courseData?.structure?.items,
-      itemCount: courseData?.structure?.items?.length || 0
+      itemCount: courseData?.structure?.items?.length || 0,
+      currentScormStatesCount: this.scormStates.size,
+      scormStatesLoaded: this.scormStatesLoaded,
+      browseModeEnabled: this.browseModeEnabled
     });
 
     // Single-source renderer: only accept provided structure; do not rebuild from manifest.
@@ -761,18 +787,31 @@ class CourseOutline extends BaseComponent {
 
       this.setCourseStructure(courseData.structure);
 
+      // CRITICAL FIX: Reset SCORM states before fetching new ones
+      this.scormStates.clear();
+      this.scormStatesLoaded = false;
+      this.availableNavigation = [];
+
+      rendererLogger.info('CourseOutline: SCORM states reset, fetching new states for course load');
+
       // Fetch comprehensive SCORM states for validation BEFORE initial render
       try {
         rendererLogger.info('CourseOutline: Waiting for SCORM states before initial render');
         await this.fetchScormStates();
-        rendererLogger.info('CourseOutline: SCORM states loaded, performing initial render with validation');
+        rendererLogger.info('CourseOutline: SCORM states loaded, performing initial render with validation', {
+          stateCount: this.scormStates.size,
+          scormStatesLoaded: this.scormStatesLoaded
+        });
 
         // Re-render now that SCORM states are available
         if (this.courseStructure) {
           this.renderCourseStructure();
         }
       } catch (error) {
-        rendererLogger.warn('CourseOutline: Failed to load SCORM states, rendering without validation', error);
+        rendererLogger.warn('CourseOutline: Failed to load SCORM states, rendering without validation', {
+          message: error?.message || error,
+          stack: error?.stack
+        });
         // Ensure flag is reset on failure
         this.scormStatesLoaded = false;
       }
@@ -1141,7 +1180,14 @@ class CourseOutline extends BaseComponent {
    * Get visual validation state for rendering (non-blocking)
    */
   validateActivityNavigationLocal(activityId) {
-    // If SCORM states haven't been loaded yet, allow navigation to prevent premature disabling
+    rendererLogger.debug('CourseOutline: validateActivityNavigationLocal called', {
+      activityId,
+      scormStatesLoaded: this.scormStatesLoaded,
+      browseModeEnabled: this.browseModeEnabled,
+      hasScormState: this.scormStates.has(activityId)
+    });
+
+    // CRITICAL FIX: If SCORM states haven't been loaded yet, allow navigation to prevent premature disabling
     if (!this.scormStatesLoaded) {
       rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- allowing navigation');
       return { allowed: true, reason: 'SCORM states not yet loaded' };
@@ -1149,10 +1195,29 @@ class CourseOutline extends BaseComponent {
 
     const scormState = this.scormStates.get(activityId);
 
-    // If no SCORM state is available for this specific activity, allow navigation
+    // CRITICAL FIX: If no SCORM state is available for this specific activity, allow navigation
+    // This prevents items from being incorrectly disabled when using fallback data
     if (!scormState) {
       rendererLogger.debug('CourseOutline: No SCORM state available for', activityId, '- allowing navigation');
       return { allowed: true, reason: 'No SCORM state available for activity' };
+    }
+
+    // CRITICAL FIX: Check if this is fallback data (indicated by preConditionResult reason)
+    const isFallbackData = scormState.preConditionResult?.reason &&
+      (scormState.preConditionResult.reason.includes('not available') ||
+       scormState.preConditionResult.reason.includes('not initialized') ||
+       scormState.preConditionResult.reason.includes('No course loaded') ||
+       scormState.preConditionResult.reason.includes('SCORM service unavailable') ||
+       scormState.preConditionResult.reason.includes('SN service not') ||
+       scormState.preConditionResult.reason.includes('Activity tree manager not') ||
+       scormState.preConditionResult.reason.includes('Error:'));
+
+    if (isFallbackData) {
+      rendererLogger.debug('CourseOutline: Fallback data detected for', activityId, {
+        reason: scormState.preConditionResult.reason,
+        isFallback: true
+      });
+      return { allowed: true, reason: 'Using fallback data - navigation allowed' };
     }
 
     // Check basic visibility and restrictions for UI display only
@@ -1184,9 +1249,11 @@ class CourseOutline extends BaseComponent {
 
     // Browse mode always shows as allowed for UI
     if (this.browseModeEnabled) {
+      rendererLogger.debug('CourseOutline: Browse mode enabled for', activityId, '- allowing navigation');
       return { allowed: true, reason: 'Browse mode enabled' };
     }
 
+    rendererLogger.debug('CourseOutline: Navigation validation passed for', activityId);
     return { allowed: true, reason: 'Navigation appears available' };
   }
 
