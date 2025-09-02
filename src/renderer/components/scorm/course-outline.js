@@ -25,6 +25,7 @@ class CourseOutline extends BaseComponent {
     this.scormStates = new Map(); // Store comprehensive SCORM states
     this.availableNavigation = []; // Store available navigation from SN service
     this.browseModeEnabled = false;
+    this.scormStatesLoaded = false; // Track whether SCORM states have been loaded
 
     // Bind handlers to preserve 'this' context across event bus calls
     this.handleCourseLoaded = this.handleCourseLoaded.bind(this);
@@ -185,15 +186,24 @@ class CourseOutline extends BaseComponent {
 
     // Listen for SN service initialization to fetch SCORM states
     this.subscribe('sn:initialized', () => {
-      rendererLogger.info('CourseOutline: SN service initialized, fetching SCORM states');
-      this.fetchScormStates().then(() => {
-        if (this.courseStructure) {
-          this.renderCourseStructure(); // Re-render with SCORM states
-        }
-        rendererLogger.info('CourseOutline: SCORM states updated after SN initialization');
-      }).catch(error => {
-        rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', error);
+      rendererLogger.info('CourseOutline: SN service initialized, checking SCORM states', {
+        alreadyLoaded: this.scormStatesLoaded,
+        hasStates: this.scormStates.size > 0
       });
+
+      // Only fetch if we don't already have states loaded
+      if (!this.scormStatesLoaded) {
+        this.fetchScormStates().then(() => {
+          if (this.courseStructure) {
+            this.renderCourseStructure(); // Re-render with SCORM states
+          }
+          rendererLogger.info('CourseOutline: SCORM states updated after SN initialization');
+        }).catch(error => {
+          rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', error);
+        });
+      } else {
+        rendererLogger.debug('CourseOutline: SCORM states already loaded, skipping SN init fetch');
+      }
     });
 
     // Listen for SCORM data changes that affect validation
@@ -325,11 +335,29 @@ class CourseOutline extends BaseComponent {
     const scormState = this.scormStates.get(item.identifier);
 
     // Determine SCORM-based visual states for UI display
-    const validation = this.validateActivityNavigationLocal(item.identifier);
-    const isHidden = scormState && !scormState.isVisible;
-    const isDisabled = !validation.allowed && !this.browseModeEnabled;
-    const isSuspended = scormState && scormState.suspended;
-    const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
+     const validation = this.validateActivityNavigationLocal(item.identifier);
+     // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
+     // But don't hide items that are just disabled due to sequencing rules
+     const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
+     // Only apply disabled styling if SCORM states are loaded
+     const isDisabled = this.scormStatesLoaded && !validation.allowed && !this.browseModeEnabled;
+     const isSuspended = scormState && scormState.suspended;
+     const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
+
+     // Debug logging for all items to track visibility issues
+     rendererLogger.debug('CourseOutline: Rendering item', {
+       itemId: item.identifier,
+       scormStatesLoaded: this.scormStatesLoaded,
+       hasScormState: !!scormState,
+       isVisible: scormState?.isVisible,
+       validationAllowed: validation.allowed,
+       validationReason: validation.reason,
+       isHidden,
+       isDisabled,
+       browseModeEnabled: this.browseModeEnabled,
+       hasChildren: hasChildren,
+       depth
+     });
 
     // Debug logging for SCORM state changes
     if (scormState) {
@@ -560,12 +588,21 @@ class CourseOutline extends BaseComponent {
   }
 
   toggleItem(itemId) {
-    if (this.expandedItems.has(itemId)) {
+    const wasExpanded = this.expandedItems.has(itemId);
+    if (wasExpanded) {
       this.expandedItems.delete(itemId);
     } else {
       this.expandedItems.add(itemId);
     }
-    
+
+    rendererLogger.debug('CourseOutline: toggleItem called', {
+      itemId,
+      wasExpanded,
+      nowExpanded: this.expandedItems.has(itemId),
+      scormStatesLoaded: this.scormStatesLoaded,
+      scormStatesCount: this.scormStates.size
+    });
+
     this.renderCourseStructure();
     this.emit('itemToggled', { itemId, expanded: this.expandedItems.has(itemId) });
   }
@@ -709,12 +746,20 @@ class CourseOutline extends BaseComponent {
 
       this.setCourseStructure(courseData.structure);
 
-      // Fetch comprehensive SCORM states for validation
+      // Fetch comprehensive SCORM states for validation BEFORE initial render
       try {
+        rendererLogger.info('CourseOutline: Waiting for SCORM states before initial render');
         await this.fetchScormStates();
-        rendererLogger.info('CourseOutline: SCORM states loaded for course validation');
+        rendererLogger.info('CourseOutline: SCORM states loaded, performing initial render with validation');
+
+        // Re-render now that SCORM states are available
+        if (this.courseStructure) {
+          this.renderCourseStructure();
+        }
       } catch (error) {
-        rendererLogger.warn('CourseOutline: Failed to load SCORM states, using fallback validation', error);
+        rendererLogger.warn('CourseOutline: Failed to load SCORM states, rendering without validation', error);
+        // Ensure flag is reset on failure
+        this.scormStatesLoaded = false;
       }
 
       return;
@@ -731,6 +776,7 @@ class CourseOutline extends BaseComponent {
     this.scormStates.clear();
     this.availableNavigation = [];
     this.currentItem = null;
+    this.scormStatesLoaded = false; // Reset SCORM states loaded flag
     this.showEmptyState();
   }
 
@@ -916,6 +962,7 @@ class CourseOutline extends BaseComponent {
     try {
       if (!window.electronAPI?.getCourseOutlineActivityTree) {
         rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available');
+        this.scormStatesLoaded = false;
         return null;
       }
 
@@ -923,17 +970,19 @@ class CourseOutline extends BaseComponent {
       if (result.success && result.data) {
         this.processScormStates(result.data);
         rendererLogger.info('CourseOutline: SCORM states fetched successfully');
-        
+
         // Also fetch available navigation
         await this.fetchAvailableNavigation();
-        
+
         return result.data;
       } else {
         rendererLogger.warn('CourseOutline: Failed to fetch SCORM states', result.error);
+        this.scormStatesLoaded = false;
         return null;
       }
     } catch (error) {
       rendererLogger.error('CourseOutline: Error fetching SCORM states', error);
+      this.scormStatesLoaded = false;
       return null;
     }
   }
@@ -946,20 +995,25 @@ class CourseOutline extends BaseComponent {
     if (this._refreshTimeout) {
       clearTimeout(this._refreshTimeout);
     }
-    
+
     this._refreshTimeout = setTimeout(async () => {
       try {
         rendererLogger.info('CourseOutline: Refreshing SCORM states');
-        
+
+        // Reset loaded flag while refreshing
+        this.scormStatesLoaded = false;
+
         await this.fetchScormStates();
-        
+
         if (this.courseStructure) {
           this.renderCourseStructure();
         }
-        
+
         rendererLogger.info('CourseOutline: SCORM states refreshed successfully');
       } catch (error) {
         rendererLogger.warn('CourseOutline: Failed to refresh SCORM states', error);
+        // Keep previous states if refresh fails
+        this.scormStatesLoaded = this.scormStates.size > 0;
       } finally {
         this._refreshTimeout = null;
       }
@@ -999,6 +1053,11 @@ class CourseOutline extends BaseComponent {
   processScormStates(activityTree) {
     this.scormStates.clear();
     this.processActivityNode(activityTree);
+    this.scormStatesLoaded = true;
+    rendererLogger.info('CourseOutline: SCORM states processed and loaded', {
+      stateCount: this.scormStates.size,
+      scormStatesLoaded: this.scormStatesLoaded
+    });
   }
 
   /**
@@ -1018,18 +1077,35 @@ class CourseOutline extends BaseComponent {
    * Get visual validation state for rendering (non-blocking)
    */
   validateActivityNavigationLocal(activityId) {
+    // If SCORM states haven't been loaded yet, allow navigation to prevent premature disabling
+    if (!this.scormStatesLoaded) {
+      rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- allowing navigation');
+      return { allowed: true, reason: 'SCORM states not yet loaded' };
+    }
+
     const scormState = this.scormStates.get(activityId);
 
+    // If no SCORM state is available for this specific activity, allow navigation
     if (!scormState) {
-      return { allowed: true, reason: 'No SCORM state available' };
+      rendererLogger.debug('CourseOutline: No SCORM state available for', activityId, '- allowing navigation');
+      return { allowed: true, reason: 'No SCORM state available for activity' };
     }
 
     // Check basic visibility and restrictions for UI display only
     if (!scormState.isVisible) {
+      rendererLogger.debug('CourseOutline: Activity hidden from choice', {
+        activityId,
+        isVisible: scormState.isVisible,
+        preConditionAction: scormState.preConditionResult?.action
+      });
       return { allowed: false, reason: 'Activity is hidden from choice' };
     }
 
     if (scormState.attemptLimitExceeded) {
+      rendererLogger.debug('CourseOutline: Activity blocked by attempt limit', {
+        activityId,
+        attemptLimitExceeded: scormState.attemptLimitExceeded
+      });
       return { allowed: false, reason: 'Attempt limit exceeded' };
     }
 
@@ -1114,11 +1190,12 @@ class CourseOutline extends BaseComponent {
        clearTimeout(this._refreshTimeout);
        this._refreshTimeout = null;
      }
-     
+
      this.expandedItems.clear();
      this.progressData.clear();
      this.scormStates.clear();
      this.availableNavigation = [];
+     this.scormStatesLoaded = false; // Reset SCORM states loaded flag
      super.destroy();
    }
 }

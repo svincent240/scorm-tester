@@ -36,7 +36,8 @@ class ActivityNode {
     
     // Sequencing information from manifest
     this.sequencing = item.sequencing || {};
-    this.isVisible = item.isvisible !== false;
+    // Handle isvisible attribute correctly - treat "false" as false, everything else as true
+    this.isVisible = item.isvisible !== "false" && item.isvisible !== false;
     this.parameters = item.parameters || '';
     
     // Objective tracking

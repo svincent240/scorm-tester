@@ -507,8 +507,8 @@ class ScormSNService {
 
     } catch (error) {
       this.logger?.error(`Error evaluating visibility for activity ${activity.identifier}:`, error);
-      // On error, default to current visibility to avoid breaking existing state
-      return activity.isVisible !== false;
+      // On error, default to visible to avoid breaking existing state
+      return true;
     }
   }
 
@@ -567,9 +567,14 @@ class ScormSNService {
       return true;
     }
 
-    // For now, include all activities to ensure comprehensive evaluation
-    // This can be optimized later based on specific sequencing rule analysis
-    return true;
+    // Check if activity has sequencing rules that depend on the completed activity
+    if (this.hasSequencingDependencyOn(activity, completedActivity)) {
+      return true;
+    }
+
+    // Only evaluate activities that actually have sequencing rules
+    // This prevents unnecessary evaluation of activities without rules
+    return !!(activity.sequencing?.sequencingRules?.preConditionRules?.length > 0);
   }
 
   /**
@@ -646,6 +651,58 @@ class ScormSNService {
       current = current.parent;
     }
     return false;
+  }
+
+  /**
+   * Check if an activity has sequencing dependency on another activity
+   * @private
+   * @param {ActivityNode} activity - Activity to check
+   * @param {ActivityNode} otherActivity - Activity to check dependency on
+   * @returns {boolean} True if activity has sequencing dependency on otherActivity
+   */
+  hasSequencingDependencyOn(activity, otherActivity) {
+    try {
+      // Check if activity's sequencing rules reference the other activity
+      if (activity.sequencing?.sequencingRules?.preConditionRules) {
+        for (const rule of activity.sequencing.sequencingRules.preConditionRules) {
+          if (rule.conditions) {
+            for (const condition of rule.conditions) {
+              // Check for direct activity references
+              if (condition.activity === otherActivity.identifier) {
+                return true;
+              }
+              // Check for objective references that might be satisfied by the other activity
+              if (condition.referencedObjective) {
+                // This is a simplified check - in practice, we'd need to resolve objective mappings
+                const otherObjectives = otherActivity.objectives || new Map();
+                if (otherObjectives.has(condition.referencedObjective)) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Check if activity's sequencing rules reference objectives that the other activity satisfies
+      if (activity.sequencing?.objectives) {
+        const activityObjectives = activity.sequencing.objectives;
+        const otherObjectives = otherActivity.objectives || new Map();
+
+        // Check primary objective mapping
+        if (activityObjectives.primaryObjective?.mapInfo) {
+          const mapInfo = activityObjectives.primaryObjective.mapInfo;
+          if (mapInfo.targetObjectiveID && otherObjectives.has(mapInfo.targetObjectiveID)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      this.logger?.error(`Error checking sequencing dependency for ${activity.identifier} on ${otherActivity.identifier}:`, error);
+      return false;
+    }
   }
 
   /**

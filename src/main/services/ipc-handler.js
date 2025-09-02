@@ -1601,7 +1601,7 @@ class IpcHandler extends BaseService {
           suspended: node.suspended,
 
           // SCORM visibility and control modes
-          isVisible: node.isVisible !== false, // SCORM-compliant visibility
+          isVisible: node.isVisible, // Use the boolean value directly
           controlMode: {
             choice: node.sequencing?.controlMode?.choice !== false,
             flow: node.sequencing?.controlMode?.flow !== false,
