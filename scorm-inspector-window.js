@@ -5,6 +5,71 @@
 
 // Note: Using console.error instead of rendererLogger to avoid import issues in browser context
 
+// Safe logger that falls back to console if rendererLogger is not available
+const safeLogger = {
+    error: (...args) => {
+        try {
+            if (typeof rendererLogger !== 'undefined' && rendererLogger?.error) {
+                rendererLogger.error(...args);
+            } else {
+                console.error(...args);
+            }
+        } catch (e) {
+            console.error(...args);
+        }
+    },
+    warn: (...args) => {
+        try {
+            if (typeof rendererLogger !== 'undefined' && rendererLogger?.warn) {
+                rendererLogger.warn(...args);
+            } else {
+                console.warn(...args);
+            }
+        } catch (e) {
+            console.warn(...args);
+        }
+    },
+    log: (...args) => {
+        try {
+            if (typeof rendererLogger !== 'undefined' && rendererLogger?.log) {
+                rendererLogger.log(...args);
+            } else {
+                console.log(...args);
+            }
+        } catch (e) {
+            console.log(...args);
+        }
+    }
+};
+
+// Utility function for safe JSON stringification (prevents circular references)
+const safeJsonStringify = (obj, replacer = null, space = null) => {
+    const seen = new WeakSet();
+    
+    const jsonReplacer = (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+                return '[Circular Reference]';
+            }
+            seen.add(value);
+        }
+        
+        // Apply custom replacer if provided
+        if (typeof replacer === 'function') {
+            return replacer(key, value);
+        }
+        
+        return value;
+    };
+    
+    try {
+        return JSON.stringify(obj, jsonReplacer, space);
+    } catch (error) {
+        safeLogger.error('Failed to stringify object:', error);
+        return JSON.stringify({ error: 'Failed to serialize data', type: typeof obj }, null, space);
+    }
+};
+
 class ScormInspectorWindow {
     constructor() {
         // Removed: console.log('SCORM Inspector: Initializing window...');
@@ -15,11 +80,28 @@ class ScormInspectorWindow {
         this.dataModelHistory = new Map();
         this.isLoading = false;
         this.filterText = '';
+        this.isDestroyed = false;
+        this.eventListeners = [];
+        this.logRenderTimeout = null;
+
+        // Use WeakMap for DOM element references to prevent memory leaks
+        this.domElementCache = new WeakMap();
+        this.renderingInProgress = new WeakSet();
+
+        // Animation frame for smooth rendering
+        this.animationFrame = null;
+
+        // Rendering debounce flags
+        this.isRenderingTimeline = false;
+        this.isRenderingErrors = false;
+        this.isRenderingDataModel = false;
+        this.isRenderingLog = false;
 
         // Debouncing for data model updates to prevent race conditions
         this.dataModelUpdateTimeout = null;
         this.lastDataModelUpdate = 0;
         this.isUpdatingDataModel = false;
+        this.pendingDataModel = null;
         
         this.apiTimelineElement = document.getElementById('api-timeline');
         this.errorListElement = document.getElementById('error-list');
@@ -79,118 +161,164 @@ class ScormInspectorWindow {
     }
 
     setupEventListeners() {
-        // Button event listeners
-        this.clearHistoryBtn?.addEventListener('click', () => this.clearHistory());
-        this.refreshBtn?.addEventListener('click', () => this.refreshData());
+        // Initialize event listeners array if not exists
+        if (!this.eventListeners) {
+            this.eventListeners = [];
+        }
+
+        // Button event listeners with proper cleanup tracking
+        this.addEventListenerSafe(this.clearHistoryBtn, 'click', () => this.clearHistory());
+        this.addEventListenerSafe(this.refreshBtn, 'click', () => this.refreshData());
 
         // Data Model event listeners
-        this.dataFilterInput?.addEventListener('input', (e) => this.filterDataModel(e.target.value));
-        this.clearFilterBtn?.addEventListener('click', () => this.clearFilter());
-        this.expandAllDataBtn?.addEventListener('click', () => this.expandAllCategories());
-        this.collapseAllDataBtn?.addEventListener('click', () => this.collapseAllCategories());
-        this.exportDataBtn?.addEventListener('click', () => this.exportDataModel());
+        this.addEventListenerSafe(this.dataFilterInput, 'input', (e) => this.filterDataModel(e.target.value));
+        this.addEventListenerSafe(this.clearFilterBtn, 'click', () => this.clearFilter());
+        this.addEventListenerSafe(this.expandAllDataBtn, 'click', () => this.expandAllCategories());
+        this.addEventListenerSafe(this.collapseAllDataBtn, 'click', () => this.collapseAllCategories());
+        this.addEventListenerSafe(this.exportDataBtn, 'click', () => this.exportDataModel());
 
         // Enhanced Inspector event listeners
-        this.refreshActivityTreeBtn?.addEventListener('click', () => this.refreshActivityTree());
-        this.expandAllActivitiesBtn?.addEventListener('click', () => this.expandAllActivities());
-        this.collapseAllActivitiesBtn?.addEventListener('click', () => this.collapseAllActivities());
-        this.refreshNavigationBtn?.addEventListener('click', () => this.refreshNavigation());
-        this.expandAllNavBtn?.addEventListener('click', () => this.expandAllNavigation());
-        this.collapseAllNavBtn?.addEventListener('click', () => this.collapseAllNavigation());
-        this.refreshObjectivesBtn?.addEventListener('click', () => this.refreshObjectives());
-        this.exportObjectivesBtn?.addEventListener('click', () => this.exportObjectives());
-        this.refreshSspBtn?.addEventListener('click', () => this.refreshSSP());
-        this.exportSspBtn?.addEventListener('click', () => this.exportSSP());
-        this.clearEnhancedLogBtn?.addEventListener('click', () => this.clearEnhancedLog());
-        this.exportEnhancedLogBtn?.addEventListener('click', () => this.exportEnhancedLog());
-        this.expandAllLogBtn?.addEventListener('click', () => this.expandAllLog());
+        this.addEventListenerSafe(this.refreshActivityTreeBtn, 'click', () => this.refreshActivityTree());
+        this.addEventListenerSafe(this.expandAllActivitiesBtn, 'click', () => this.expandAllActivities());
+        this.addEventListenerSafe(this.collapseAllActivitiesBtn, 'click', () => this.collapseAllActivities());
+        this.addEventListenerSafe(this.refreshNavigationBtn, 'click', () => this.refreshNavigation());
+        this.addEventListenerSafe(this.expandAllNavBtn, 'click', () => this.expandAllNavigation());
+        this.addEventListenerSafe(this.collapseAllNavBtn, 'click', () => this.collapseAllNavigation());
+        this.addEventListenerSafe(this.refreshObjectivesBtn, 'click', () => this.refreshObjectives());
+        this.addEventListenerSafe(this.exportObjectivesBtn, 'click', () => this.exportObjectives());
+        this.addEventListenerSafe(this.refreshSspBtn, 'click', () => this.refreshSSP());
+        this.addEventListenerSafe(this.exportSspBtn, 'click', () => this.exportSSP());
+        this.addEventListenerSafe(this.clearEnhancedLogBtn, 'click', () => this.clearEnhancedLog());
+        this.addEventListenerSafe(this.exportEnhancedLogBtn, 'click', () => this.exportEnhancedLog());
+        this.addEventListenerSafe(this.expandAllLogBtn, 'click', () => this.expandAllLog());
 
         // Log filter event listeners
-        this.logControlFilter?.addEventListener('change', () => this.filterEnhancedLog());
-        this.logRuntimeFilter?.addEventListener('change', () => this.filterEnhancedLog());
-        this.logSequencingFilter?.addEventListener('change', () => this.filterEnhancedLog());
-        this.logPcodeFilter?.addEventListener('change', () => this.filterEnhancedLog());
+        this.addEventListenerSafe(this.logControlFilter, 'change', () => this.filterEnhancedLog());
+        this.addEventListenerSafe(this.logRuntimeFilter, 'change', () => this.filterEnhancedLog());
+        this.addEventListenerSafe(this.logSequencingFilter, 'change', () => this.filterEnhancedLog());
+        this.addEventListenerSafe(this.logPcodeFilter, 'change', () => this.filterEnhancedLog());
 
         // Set up IPC event listeners after electronAPI is available
         this.setupIpcEventListeners();
-        
+
         // Set up course and session event listeners
         this.setupCourseEventListeners();
+
+        // Set up cleanup handlers
+        this.setupCleanupHandlers();
     }
 
     async setupIpcEventListeners() {
         try {
             // Wait for electronAPI to be available
-            await this.waitForElectronAPI();
+            const apiAvailable = await this.waitForElectronAPI();
+            if (!apiAvailable || !window.electronAPI) {
+                safeLogger.error('SCORM Inspector: electronAPI not available after wait');
+                return;
+            }
 
             // Listen for real-time updates from main process
-            if (window.electronAPI.onScormInspectorDataUpdated) {
-                window.electronAPI.onScormInspectorDataUpdated((data) => {
-                    // Removed: console.log('SCORM Inspector: Received API call update', data);
-                    this.addApiCall(data);
+            if (typeof window.electronAPI.onScormInspectorDataUpdated === 'function') {
+                try {
+                    window.electronAPI.onScormInspectorDataUpdated((data) => {
+                        // Removed: console.log('SCORM Inspector: Received API call update', data);
+                        this.addApiCall(data);
  
-                    // Note: Data model updates are handled by onScormDataModelUpdated listener
-                    // to avoid race conditions. We don't need to refresh here.
-                });
-                // Removed: console.log('SCORM Inspector: Data update listener registered');
+                        // Note: Data model updates are handled by onScormDataModelUpdated listener
+                        // to avoid race conditions. We don't need to refresh here.
+                    });
+                    // Removed: console.log('SCORM Inspector: Data update listener registered');
+                } catch (error) {
+                    safeLogger.error('SCORM Inspector: Failed to register data update listener:', error);
+                }
+            } else {
+                safeLogger.warn('SCORM Inspector: onScormInspectorDataUpdated method not available');
             }
  
             // Listen for SCORM Inspector error updates
-            if (window.electronAPI.onScormInspectorErrorUpdated) {
-                window.electronAPI.onScormInspectorErrorUpdated((errorData) => {
-                    // Removed: console.log('SCORM Inspector: Received error update', errorData);
-                    this.addError(errorData);
-                });
-                // Removed: console.log('SCORM Inspector: Error update listener registered');
+            if (typeof window.electronAPI.onScormInspectorErrorUpdated === 'function') {
+                try {
+                    window.electronAPI.onScormInspectorErrorUpdated((errorData) => {
+                        // Removed: console.log('SCORM Inspector: Received error update', errorData);
+                        this.addError(errorData);
+                    });
+                    // Removed: console.log('SCORM Inspector: Error update listener registered');
+                } catch (error) {
+                    safeLogger.error('SCORM Inspector: Failed to register error update listener:', error);
+                }
+            } else {
+                safeLogger.warn('SCORM Inspector: onScormInspectorErrorUpdated method not available');
             }
  
             // Listen for SCORM Data Model updates
-            if (window.electronAPI.onScormDataModelUpdated) {
-                window.electronAPI.onScormDataModelUpdated((dataModel) => {
-                    // Removed: console.log('SCORM Inspector: Received data model update', dataModel);
-                    this.updateDataModel(dataModel);
-                });
-                // Removed: console.log('SCORM Inspector: Data model update listener registered');
+            if (typeof window.electronAPI.onScormDataModelUpdated === 'function') {
+                try {
+                    window.electronAPI.onScormDataModelUpdated((dataModel) => {
+                        // Removed: console.log('SCORM Inspector: Received data model update', dataModel);
+                        this.updateDataModel(dataModel);
+                    });
+                    // Removed: console.log('SCORM Inspector: Data model update listener registered');
+                } catch (error) {
+                    safeLogger.error('SCORM Inspector: Failed to register data model update listener:', error);
+                }
+            } else {
+                safeLogger.warn('SCORM Inspector: onScormDataModelUpdated method not available');
             }
         } catch (error) {
-            console.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
+            safeLogger.error('SCORM Inspector: Failed to setup IPC event listeners:', error);
         }
     }
 
     async setupCourseEventListeners() {
         try {
             // Wait for electronAPI to be available
-            await this.waitForElectronAPI();
+            const apiAvailable = await this.waitForElectronAPI();
+            if (!apiAvailable || !window.electronAPI) {
+                safeLogger.error('SCORM Inspector: electronAPI not available after wait');
+                return;
+            }
 
             // Listen for course loaded events
-            if (window.electronAPI.onCourseLoaded) {
-                window.electronAPI.onCourseLoaded(() => {
-                    // Removed: console.log('SCORM Inspector: Course loaded, refreshing data');
-                    // Refresh all inspector data when a new course is loaded
-                    setTimeout(() => {
-                        this.refreshData();
-                        this.refreshActivityTree();
-                        this.refreshNavigation();
-                        this.refreshObjectives();
-                        this.refreshSSP();
-                    }, 500); // Small delay to allow session creation
-                });
-                // Removed: console.log('SCORM Inspector: Course loaded listener registered');
+            if (typeof window.electronAPI.onCourseLoaded === 'function') {
+                try {
+                    window.electronAPI.onCourseLoaded(() => {
+                        // Removed: console.log('SCORM Inspector: Course loaded, refreshing data');
+                        // Refresh all inspector data when a new course is loaded
+                        setTimeout(() => {
+                            this.refreshData();
+                            this.refreshActivityTree();
+                            this.refreshNavigation();
+                            this.refreshObjectives();
+                            this.refreshSSP();
+                        }, 500); // Small delay to allow session creation
+                    });
+                    // Removed: console.log('SCORM Inspector: Course loaded listener registered');
+                } catch (error) {
+                    safeLogger.error('SCORM Inspector: Failed to register course loaded listener:', error);
+                }
+            } else {
+                safeLogger.warn('SCORM Inspector: onCourseLoaded method not available');
             }
  
             // Listen for session state changes
-            if (window.electronAPI.onSessionStateChanged) {
-                window.electronAPI.onSessionStateChanged(() => {
-                    // Removed: console.log('SCORM Inspector: Session state changed, refreshing data');
-                    // Refresh inspector data when session state changes
-                    setTimeout(() => {
-                        this.refreshData();
-                    }, 100);
-                });
-                // Removed: console.log('SCORM Inspector: Session state change listener registered');
+            if (typeof window.electronAPI.onSessionStateChanged === 'function') {
+                try {
+                    window.electronAPI.onSessionStateChanged(() => {
+                        // Removed: console.log('SCORM Inspector: Session state changed, refreshing data');
+                        // Refresh inspector data when session state changes
+                        setTimeout(() => {
+                            this.refreshData();
+                        }, 100);
+                    });
+                    // Removed: console.log('SCORM Inspector: Session state change listener registered');
+                } catch (error) {
+                    safeLogger.error('SCORM Inspector: Failed to register session state change listener:', error);
+                }
+            } else {
+                safeLogger.warn('SCORM Inspector: onSessionStateChanged method not available');
             }
         } catch (error) {
-            rendererLogger.error('SCORM Inspector: Failed to setup course event listeners:', error);
+            safeLogger.error('SCORM Inspector: Failed to setup course event listeners:', error);
         }
     }
 
@@ -199,10 +327,9 @@ class ScormInspectorWindow {
             this.setLoading(true);
             
             // Wait for electronAPI to be available
-            await this.waitForElectronAPI();
-            
-            if (!window.electronAPI?.getScormInspectorHistory) {
-                rendererLogger.error('SCORM Inspector: getScormInspectorHistory method not available');
+            const apiAvailable = await this.waitForElectronAPI();
+            if (!apiAvailable || !window.electronAPI?.getScormInspectorHistory) {
+                safeLogger.error('SCORM Inspector: getScormInspectorHistory method not available');
                 return;
             }
  
@@ -213,7 +340,7 @@ class ScormInspectorWindow {
                 response = await window.electronAPI.getScormInspectorHistory();
                 // Removed: console.log('SCORM Inspector: getScormInspectorHistory response:', JSON.stringify(response, null, 2));
             } catch (error) {
-                rendererLogger.error('SCORM Inspector: getScormInspectorHistory failed:', error);
+                safeLogger.error('SCORM Inspector: getScormInspectorHistory failed:', error);
                 this.setLoading(false);
                 return;
             }
@@ -252,7 +379,7 @@ class ScormInspectorWindow {
                 // Removed: console.warn('SCORM Inspector: Failed to load history', response.error);
             }
         } catch (error) {
-            rendererLogger.error('SCORM Inspector: Error loading initial history', error);
+            safeLogger.error('SCORM Inspector: Error loading initial history', error);
         } finally {
             this.setLoading(false);
         }
@@ -261,7 +388,11 @@ class ScormInspectorWindow {
     async loadEnhancedInspectorData() {
         try {
             // Wait for electronAPI to be available
-            await this.waitForElectronAPI();
+            const apiAvailable = await this.waitForElectronAPI();
+            if (!apiAvailable) {
+                safeLogger.warn('SCORM Inspector: Enhanced inspector features will not be available (electronAPI timeout)');
+                return;
+            }
 
             // Load activity tree data
             this.refreshActivityTree();
@@ -272,7 +403,7 @@ class ScormInspectorWindow {
             this.refreshSSP();
 
         } catch (error) {
-            rendererLogger.error('SCORM Inspector: Error loading enhanced inspector data', error);
+            safeLogger.error('SCORM Inspector: Error loading enhanced inspector data', error);
         }
     }
  
@@ -281,21 +412,28 @@ class ScormInspectorWindow {
         
         while (!window.electronAPI) {
             if (Date.now() - startTime > timeout) {
-                throw new Error('Timeout waiting for electronAPI to be available');
+                safeLogger.error('SCORM Inspector: Timeout waiting for electronAPI to be available');
+                // Return false instead of throwing to allow graceful degradation
+                return false;
             }
             await new Promise(resolve => setTimeout(resolve, 50));
         }
         
         // Removed: console.log('SCORM Inspector: electronAPI is now available');
+        return true;
     }
  
     addApiCall(data) {
-        if (!data) return;
+        if (!data || this.isDestroyed) return;
 
-        // Add to history (maintain maximum size)
-        this.apiHistory.unshift(data);
+        // Add to history (maintain maximum size) - optimize memory usage
+        this.apiHistory.push(data);
         if (this.apiHistory.length > 2000) {
-            this.apiHistory = this.apiHistory.slice(0, 2000);
+            // Use shift() for better memory management than splice
+            const removeCount = this.apiHistory.length - 2000;
+            for (let i = 0; i < removeCount; i++) {
+                this.apiHistory.shift();
+            }
         }
 
         // Re-render timeline
@@ -308,12 +446,16 @@ class ScormInspectorWindow {
     }
 
     addError(errorData) {
-        if (!errorData) return;
+        if (!errorData || this.isDestroyed) return;
 
-        // Add to error list (maintain maximum size)
-        this.scormErrors.unshift(errorData);
+        // Add to error list (maintain maximum size) - optimize memory usage
+        this.scormErrors.push(errorData);
         if (this.scormErrors.length > 500) {
-            this.scormErrors = this.scormErrors.slice(0, 500);
+            // Use shift() for better memory management than splice
+            const removeCount = this.scormErrors.length - 500;
+            for (let i = 0; i < removeCount; i++) {
+                this.scormErrors.shift();
+            }
         }
 
         // Re-render error list
@@ -321,17 +463,50 @@ class ScormInspectorWindow {
     }
 
     renderApiTimeline() {
-        if (!this.apiTimelineElement) return;
+        if (!this.apiTimelineElement || this.isDestroyed || this.isRenderingTimeline) return;
 
-        if (this.apiHistory.length === 0) {
-            this.apiTimelineElement.innerHTML = `
-                <div class="no-data">No SCORM API calls recorded yet. Load a SCORM package to begin inspection.</div>
-            `;
-            return;
+        this.isRenderingTimeline = true;
+
+        try {
+            // Use animation frame for smooth rendering
+            if (this.animationFrame) {
+                cancelAnimationFrame(this.animationFrame);
+            }
+
+            this.animationFrame = requestAnimationFrame(() => {
+                try {
+                    // Reverse array for display (newest first) without mutating original
+                    const displayHistory = [...this.apiHistory].reverse();
+
+                    if (this.apiHistory.length === 0) {
+                        this.apiTimelineElement.innerHTML = `
+                            <div class="no-data">No SCORM API calls recorded yet. Load a SCORM package to begin inspection.</div>
+                        `;
+                        return;
+                    }
+
+                    // Limit rendered entries to prevent DOM overload
+                    const maxEntries = 1000;
+                    const limitedHistory = displayHistory.slice(0, maxEntries);
+                    const entriesHtml = limitedHistory.map(entry => this.createApiEntryHtml(entry)).join('');
+
+                    this.apiTimelineElement.innerHTML = entriesHtml;
+
+                    if (displayHistory.length > maxEntries) {
+                        const notice = document.createElement('div');
+                        notice.className = 'data-filter-stats';
+                        notice.textContent = `Showing ${maxEntries} of ${displayHistory.length} entries`;
+                        this.apiTimelineElement.insertBefore(notice, this.apiTimelineElement.firstChild);
+                    }
+                } finally {
+                    this.isRenderingTimeline = false;
+                    this.animationFrame = null;
+                }
+            });
+        } catch (error) {
+            safeLogger.error('Error rendering API timeline:', error);
+            this.isRenderingTimeline = false;
         }
-
-        const entriesHtml = this.apiHistory.map(entry => this.createApiEntryHtml(entry)).join('');
-        this.apiTimelineElement.innerHTML = entriesHtml;
     }
 
     createApiEntryHtml(entry) {
@@ -365,17 +540,45 @@ class ScormInspectorWindow {
     }
 
     renderErrorList() {
-        if (!this.errorListElement) return;
+        if (!this.errorListElement || this.isDestroyed || this.isRenderingErrors) return;
 
-        if (this.scormErrors.length === 0) {
-            this.errorListElement.innerHTML = `
-                <div class="no-data">No SCORM errors detected.</div>
-            `;
-            return;
+        this.isRenderingErrors = true;
+
+        try {
+            // Use requestAnimationFrame for smooth rendering
+            requestAnimationFrame(() => {
+                try {
+                    // Reverse array for display (newest first) without mutating original
+                    const displayErrors = [...this.scormErrors].reverse();
+
+                    if (this.scormErrors.length === 0) {
+                        this.errorListElement.innerHTML = `
+                            <div class="no-data">No SCORM errors detected.</div>
+                        `;
+                        return;
+                    }
+
+                    // Limit rendered errors to prevent DOM overload
+                    const maxErrors = 500;
+                    const limitedErrors = displayErrors.slice(0, maxErrors);
+                    const errorsHtml = limitedErrors.map(error => this.createErrorEntryHtml(error)).join('');
+
+                    this.errorListElement.innerHTML = errorsHtml;
+
+                    if (displayErrors.length > maxErrors) {
+                        const notice = document.createElement('div');
+                        notice.className = 'data-filter-stats';
+                        notice.textContent = `Showing ${maxErrors} of ${displayErrors.length} errors`;
+                        this.errorListElement.insertBefore(notice, this.errorListElement.firstChild);
+                    }
+                } finally {
+                    this.isRenderingErrors = false;
+                }
+            });
+        } catch (error) {
+            safeLogger.error('Error rendering error list:', error);
+            this.isRenderingErrors = false;
         }
-
-        const errorsHtml = this.scormErrors.map(error => this.createErrorEntryHtml(error)).join('');
-        this.errorListElement.innerHTML = errorsHtml;
     }
 
     createErrorEntryHtml(error) {
@@ -433,9 +636,23 @@ class ScormInspectorWindow {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (typeof text !== 'string') {
+            text = String(text);
+        }
+        
+        try {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        } catch (error) {
+            // Fallback for environments where DOM manipulation is restricted
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
     }
 
     // ==================== DATA MODEL FUNCTIONALITY ====================
@@ -443,15 +660,25 @@ class ScormInspectorWindow {
     updateDataModel(newDataModel) {
         if (!newDataModel) return;
 
-        // Prevent race conditions by debouncing rapid updates
+        // Prevent race conditions by debouncing rapid updates using a flag-based approach
         const now = Date.now();
-        if (this.isUpdatingDataModel || (now - this.lastDataModelUpdate) < 50) {
+        if (this.isUpdatingDataModel) {
+            // If already updating, store the latest data and return
+            this.pendingDataModel = newDataModel;
+            return;
+        }
+        
+        // If we received an update too recently, debounce it
+        if ((now - this.lastDataModelUpdate) < 50) {
             // Clear any pending update and schedule a new one
             if (this.dataModelUpdateTimeout) {
                 clearTimeout(this.dataModelUpdateTimeout);
             }
             this.dataModelUpdateTimeout = setTimeout(() => {
-                this.updateDataModel(newDataModel);
+                // Use the most recent pending data if available
+                const dataToUpdate = this.pendingDataModel || newDataModel;
+                this.pendingDataModel = null;
+                this.updateDataModel(dataToUpdate);
             }, 100);
             return;
         }
@@ -467,7 +694,7 @@ class ScormInspectorWindow {
              !newDataModel.commentsFromLms);
  
         if (hasExistingData && isNewDataEmpty) {
-            rendererLogger.warn('SCORM Inspector: Ignoring empty data model update to prevent overwriting existing data');
+            safeLogger.warn('SCORM Inspector: Ignoring empty data model update to prevent overwriting existing data');
             this.isUpdatingDataModel = false;
             return;
         }
@@ -476,8 +703,8 @@ class ScormInspectorWindow {
         const changedKeys = new Set();
 
         // For structured data, we'll do a simple deep comparison
-        const oldDataStr = JSON.stringify(this.dataModel);
-        const newDataStr = JSON.stringify(newDataModel);
+        const oldDataStr = safeJsonStringify(this.dataModel);
+        const newDataStr = safeJsonStringify(newDataModel);
 
         if (oldDataStr !== newDataStr) {
             // Mark as changed - we could implement more granular change tracking later
@@ -494,41 +721,63 @@ class ScormInspectorWindow {
         this.dataModel = newDataModel;
         this.renderDataModel(changedKeys);
         this.isUpdatingDataModel = false;
+        
+        // Process any pending update that arrived while we were processing
+        if (this.pendingDataModel) {
+            const pendingData = this.pendingDataModel;
+            this.pendingDataModel = null;
+            // Schedule the pending update to avoid immediate recursion
+            setTimeout(() => this.updateDataModel(pendingData), 10);
+        }
     }
 
     renderDataModel(changedKeys = new Set()) {
-        if (!this.dataModelElement) return;
+        if (!this.dataModelElement || this.isDestroyed || this.isRenderingDataModel) return;
 
-        // Check if data model is empty (handle both flat and structured formats)
-        const isEmpty = !this.dataModel || 
-            (Object.keys(this.dataModel).length === 0) ||
-            (!this.dataModel.coreData && !this.dataModel.interactions && 
-             !this.dataModel.objectives && !this.dataModel.commentsFromLearner && 
-             !this.dataModel.commentsFromLms);
-             
-        if (isEmpty) {
-            this.dataModelElement.innerHTML = `
-                <div class="no-data">No SCORM data available. Load a SCORM package to view data model values.</div>
-            `;
-            return;
+        this.isRenderingDataModel = true;
+
+        try {
+            // Use requestAnimationFrame for smooth rendering
+            requestAnimationFrame(() => {
+                try {
+                    // Check if data model is empty (handle both flat and structured formats)
+                    const isEmpty = !this.dataModel ||
+                        (Object.keys(this.dataModel).length === 0) ||
+                        (!this.dataModel.coreData && !this.dataModel.interactions &&
+                         !this.dataModel.objectives && !this.dataModel.commentsFromLearner &&
+                         !this.dataModel.commentsFromLms);
+
+                    if (isEmpty) {
+                        this.dataModelElement.innerHTML = `
+                            <div class="no-data">No SCORM data available. Load a SCORM package to view data model values.</div>
+                        `;
+                        return;
+                    }
+
+                    const categories = this.categorizeDataModel();
+                    const filteredCategories = this.applyFilter(categories);
+
+                    let html = '';
+                    if (this.filterText) {
+                        const totalItems = Object.values(categories).reduce((sum, cat) => sum + Object.keys(cat.items).length, 0);
+                        const filteredItems = Object.values(filteredCategories).reduce((sum, cat) => sum + Object.keys(cat.items).length, 0);
+                        html += `<div class="data-filter-stats">Showing ${filteredItems} of ${totalItems} data points</div>`;
+                    }
+
+                    html += Object.entries(filteredCategories)
+                        .map(([categoryName, category]) => this.renderCategory(categoryName, category, changedKeys))
+                        .join('');
+
+                    this.dataModelElement.innerHTML = html;
+                    this.bindCategoryEvents();
+                } finally {
+                    this.isRenderingDataModel = false;
+                }
+            });
+        } catch (error) {
+            safeLogger.error('Error rendering data model:', error);
+            this.isRenderingDataModel = false;
         }
-
-        const categories = this.categorizeDataModel();
-        const filteredCategories = this.applyFilter(categories);
-        
-        let html = '';
-        if (this.filterText) {
-            const totalItems = Object.values(categories).reduce((sum, cat) => sum + Object.keys(cat.items).length, 0);
-            const filteredItems = Object.values(filteredCategories).reduce((sum, cat) => sum + Object.keys(cat.items).length, 0);
-            html += `<div class="data-filter-stats">Showing ${filteredItems} of ${totalItems} data points</div>`;
-        }
-
-        html += Object.entries(filteredCategories)
-            .map(([categoryName, category]) => this.renderCategory(categoryName, category, changedKeys))
-            .join('');
-
-        this.dataModelElement.innerHTML = html;
-        this.bindCategoryEvents();
     }
 
     categorizeDataModel() {
@@ -607,9 +856,23 @@ class ScormInspectorWindow {
             if (this.dataModel.interactions && Array.isArray(this.dataModel.interactions)) {
                 this.dataModel.interactions.forEach((interaction, index) => {
                     if (interaction && typeof interaction === 'object') {
-                        for (const [key, value] of Object.entries(interaction)) {
-                            const fullKey = `interactions[${index}].${key}`;
-                            categories['Interactions'].items[fullKey] = value;
+                        try {
+                            for (const [key, value] of Object.entries(interaction)) {
+                                const fullKey = `interactions[${index}].${key}`;
+                                categories['Interactions'].items[fullKey] = value;
+                            }
+                        } catch (error) {
+                            safeLogger.error(`Failed to process interaction at index ${index}:`, error);
+                            // Add a placeholder entry for the failed interaction
+                            categories['Interactions'].items[`interactions[${index}]`] = '[Error processing interaction data]';
+                        }
+                    } else if (interaction !== null && interaction !== undefined) {
+                        // Handle non-object interaction data
+                        try {
+                            categories['Interactions'].items[`interactions[${index}]`] = interaction;
+                        } catch (error) {
+                            safeLogger.error(`Failed to process interaction value at index ${index}:`, error);
+                            categories['Interactions'].items[`interactions[${index}]`] = '[Error processing interaction value]';
                         }
                     }
                 });
@@ -619,9 +882,21 @@ class ScormInspectorWindow {
             if (this.dataModel.objectives && Array.isArray(this.dataModel.objectives)) {
                 this.dataModel.objectives.forEach((objective, index) => {
                     if (objective && typeof objective === 'object') {
-                        for (const [key, value] of Object.entries(objective)) {
-                            const fullKey = `objectives[${index}].${key}`;
-                            categories['Objectives'].items[fullKey] = value;
+                        try {
+                            for (const [key, value] of Object.entries(objective)) {
+                                const fullKey = `objectives[${index}].${key}`;
+                                categories['Objectives'].items[fullKey] = value;
+                            }
+                        } catch (error) {
+                            safeLogger.error(`Failed to process objective at index ${index}:`, error);
+                            categories['Objectives'].items[`objectives[${index}]`] = '[Error processing objective data]';
+                        }
+                    } else if (objective !== null && objective !== undefined) {
+                        try {
+                            categories['Objectives'].items[`objectives[${index}]`] = objective;
+                        } catch (error) {
+                            safeLogger.error(`Failed to process objective value at index ${index}:`, error);
+                            categories['Objectives'].items[`objectives[${index}]`] = '[Error processing objective value]';
                         }
                     }
                 });
@@ -631,10 +906,17 @@ class ScormInspectorWindow {
             if (this.dataModel.commentsFromLearner && Array.isArray(this.dataModel.commentsFromLearner)) {
                 this.dataModel.commentsFromLearner.forEach((comment, index) => {
                     if (comment && typeof comment === 'object') {
-                        for (const [key, value] of Object.entries(comment)) {
-                            const fullKey = `commentsFromLearner[${index}].${key}`;
-                            categories['Comments'].items[fullKey] = value;
+                        try {
+                            for (const [key, value] of Object.entries(comment)) {
+                                const fullKey = `commentsFromLearner[${index}].${key}`;
+                                categories['Comments'].items[fullKey] = value;
+                            }
+                        } catch (error) {
+                            safeLogger.error(`Failed to process learner comment at index ${index}:`, error);
+                            categories['Comments'].items[`commentsFromLearner[${index}]`] = '[Error processing comment data]';
                         }
+                    } else if (comment !== null && comment !== undefined) {
+                        categories['Comments'].items[`commentsFromLearner[${index}]`] = comment;
                     }
                 });
             }
@@ -643,17 +925,25 @@ class ScormInspectorWindow {
             if (this.dataModel.commentsFromLms && Array.isArray(this.dataModel.commentsFromLms)) {
                 this.dataModel.commentsFromLms.forEach((comment, index) => {
                     if (comment && typeof comment === 'object') {
-                        for (const [key, value] of Object.entries(comment)) {
-                            const fullKey = `commentsFromLms[${index}].${key}`;
-                            categories['Comments'].items[fullKey] = value;
+                        try {
+                            for (const [key, value] of Object.entries(comment)) {
+                                const fullKey = `commentsFromLms[${index}].${key}`;
+                                categories['Comments'].items[fullKey] = value;
+                            }
+                        } catch (error) {
+                            safeLogger.error(`Failed to process LMS comment at index ${index}:`, error);
+                            categories['Comments'].items[`commentsFromLms[${index}]`] = '[Error processing comment data]';
                         }
+                    } else if (comment !== null && comment !== undefined) {
+                        categories['Comments'].items[`commentsFromLms[${index}]`] = comment;
                     }
                 });
             }
         } else {
             // Fallback: handle flat data model format (backward compatibility)
-            for (const [key, value] of Object.entries(this.dataModel)) {
-                let category = 'System Data'; // Default category
+            try {
+                for (const [key, value] of Object.entries(this.dataModel)) {
+                    let category = 'System Data'; // Default category
 
                 if (key.includes('completion_status') || key.includes('success_status') || key.includes('credit')) {
                     category = 'Core Tracking';
@@ -673,7 +963,11 @@ class ScormInspectorWindow {
                     category = 'Comments';
                 }
 
-                categories[category].items[key] = value;
+                    categories[category].items[key] = value;
+                }
+            } catch (error) {
+                safeLogger.error('Failed to process flat data model format:', error);
+                categories['System Data'].items['[Error]'] = 'Failed to process data model';
             }
         }
 
@@ -764,7 +1058,7 @@ class ScormInspectorWindow {
     formatValue(value, valueType) {
         if (value === null || value === undefined) return 'null';
         if (valueType === 'string-value') return `"${this.escapeHtml(value)}"`;
-        if (valueType === 'object-value') return this.escapeHtml(JSON.stringify(value));
+        if (valueType === 'object-value') return this.escapeHtml(safeJsonStringify(value));
         return this.escapeHtml(String(value));
     }
 
@@ -789,11 +1083,27 @@ class ScormInspectorWindow {
     }
 
     getCategoryCollapsedState(categoryName) {
-        return localStorage.getItem(`scorm-inspector-category-${categoryName}`) === 'true';
+        try {
+            const key = `scorm-inspector-category-${categoryName}`;
+            const value = localStorage.getItem(key);
+            return value === 'true';
+        } catch (error) {
+            safeLogger.warn('Failed to read category state from localStorage:', error);
+            return false; // Default to expanded
+        }
     }
 
     setCategoryCollapsedState(categoryName, collapsed) {
-        localStorage.setItem(`scorm-inspector-category-${categoryName}`, collapsed.toString());
+        try {
+            const key = `scorm-inspector-category-${categoryName}`;
+            if (collapsed) {
+                localStorage.setItem(key, 'true');
+            } else {
+                localStorage.removeItem(key); // Save space by removing false values
+            }
+        } catch (error) {
+            safeLogger.warn('Failed to save category state to localStorage:', error);
+        }
     }
 
     filterDataModel(filterText) {
@@ -873,7 +1183,7 @@ class ScormInspectorWindow {
             }
         };
 
-        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataStr = safeJsonStringify(exportData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
         
@@ -900,7 +1210,7 @@ class ScormInspectorWindow {
                     this.renderActivityTree();
                 }
             }).catch(error => {
-                rendererLogger.error('Failed to refresh activity tree:', error);
+                safeLogger.error('Failed to refresh activity tree:', error);
             });
         }
     }
@@ -1050,11 +1360,26 @@ class ScormInspectorWindow {
     }
 
     getActivityNodeCollapsedState(activityId) {
-        return localStorage.getItem(`scorm-inspector-activity-${activityId}`) === 'true';
+        try {
+            const key = `scorm-inspector-activity-${activityId}`;
+            const value = localStorage.getItem(key);
+            return value === 'true';
+        } catch (error) {
+            return false; // Default to expanded
+        }
     }
 
     setActivityNodeCollapsedState(activityId, collapsed) {
-        localStorage.setItem(`scorm-inspector-activity-${activityId}`, collapsed.toString());
+        try {
+            const key = `scorm-inspector-activity-${activityId}`;
+            if (collapsed) {
+                localStorage.setItem(key, 'true');
+            } else {
+                localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // Ignore localStorage errors for UI state
+        }
     }
 
     expandAllActivities() {
@@ -1084,7 +1409,7 @@ class ScormInspectorWindow {
                     this.renderNavigationAnalysis();
                 }
             }).catch(error => {
-                rendererLogger.error('Failed to refresh navigation requests:', error);
+                safeLogger.error('Failed to refresh navigation requests:', error);
             });
         }
     }
@@ -1171,11 +1496,24 @@ class ScormInspectorWindow {
     }
 
     getNavigationRequestExpandedState(navId) {
-        return localStorage.getItem(`scorm-inspector-nav-${navId}`) === 'true';
+        try {
+            return localStorage.getItem(`scorm-inspector-nav-${navId}`) === 'true';
+        } catch (error) {
+            return false;
+        }
     }
 
     setNavigationRequestExpandedState(navId, expanded) {
-        localStorage.setItem(`scorm-inspector-nav-${navId}`, expanded.toString());
+        try {
+            const key = `scorm-inspector-nav-${navId}`;
+            if (expanded) {
+                localStorage.setItem(key, 'true');
+            } else {
+                localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // Ignore localStorage errors
+        }
     }
 
     expandAllNavigation() {
@@ -1205,7 +1543,7 @@ class ScormInspectorWindow {
                     this.renderGlobalObjectives();
                 }
             }).catch(error => {
-                rendererLogger.error('Failed to refresh global objectives:', error);
+                safeLogger.error('Failed to refresh global objectives:', error);
             });
         }
     }
@@ -1282,7 +1620,7 @@ class ScormInspectorWindow {
                     this.renderSSPBuckets();
                 }
             }).catch(error => {
-                rendererLogger.error('Failed to refresh SSP buckets:', error);
+                safeLogger.error('Failed to refresh SSP buckets:', error);
             });
         }
     }
@@ -1343,32 +1681,78 @@ class ScormInspectorWindow {
 
     // Enhanced Log Methods
     addEnhancedLogEntry(entry) {
-        if (!entry) return;
+        if (!entry || this.isDestroyed) return;
 
-        // Add to enhanced log (maintain maximum size)
-        this.enhancedLogEntries.unshift(entry);
+        // Add to enhanced log (maintain maximum size) - optimize memory usage
+        this.enhancedLogEntries.push(entry);
         if (this.enhancedLogEntries.length > 5000) {
-            this.enhancedLogEntries = this.enhancedLogEntries.slice(0, 5000);
+            // Use shift() for better memory management than splice
+            const removeCount = this.enhancedLogEntries.length - 5000;
+            for (let i = 0; i < removeCount; i++) {
+                this.enhancedLogEntries.shift();
+            }
         }
 
-        this.renderEnhancedLog();
+        // Throttle rendering to prevent UI thrashing with better control
+        if (this.logRenderTimeout) {
+            clearTimeout(this.logRenderTimeout);
+        }
+
+        this.logRenderTimeout = setTimeout(() => {
+            if (!this.isDestroyed) {
+                this.renderEnhancedLog();
+            }
+            this.logRenderTimeout = null;
+        }, 100);
     }
 
     renderEnhancedLog() {
-        if (!this.enhancedLogElement) return;
+        if (!this.enhancedLogElement || this.isDestroyed || this.isRenderingLog) return;
 
-        const filteredEntries = this.getFilteredLogEntries();
+        this.isRenderingLog = true;
 
-        if (filteredEntries.length === 0) {
-            this.enhancedLogElement.innerHTML = `
-                <div class="no-data">No log entries available. Load a SCORM package to view detailed logs.</div>
-            `;
-            return;
+        try {
+            // Clear the render timeout since we're rendering now
+            if (this.logRenderTimeout) {
+                clearTimeout(this.logRenderTimeout);
+                this.logRenderTimeout = null;
+            }
+
+            // Use requestAnimationFrame for smooth rendering
+            requestAnimationFrame(() => {
+                try {
+                    const filteredEntries = this.getFilteredLogEntries();
+
+                    if (filteredEntries.length === 0) {
+                        this.enhancedLogElement.innerHTML = `
+                            <div class="no-data">No log entries available. Load a SCORM package to view detailed logs.</div>
+                        `;
+                        return;
+                    }
+
+                    // Reverse for display (newest first) and limit to prevent DOM overload
+                    const maxEntries = 1000;
+                    const displayEntries = [...filteredEntries].reverse().slice(0, maxEntries);
+                    const html = displayEntries.map(entry => this.renderLogEntry(entry)).join('');
+
+                    this.enhancedLogElement.innerHTML = html;
+
+                    if (filteredEntries.length > maxEntries) {
+                        const notice = document.createElement('div');
+                        notice.className = 'data-filter-stats';
+                        notice.textContent = `Showing ${maxEntries} of ${filteredEntries.length} log entries`;
+                        this.enhancedLogElement.insertBefore(notice, this.enhancedLogElement.firstChild);
+                    }
+
+                    this.bindLogEvents();
+                } finally {
+                    this.isRenderingLog = false;
+                }
+            });
+        } catch (error) {
+            safeLogger.error('Error rendering enhanced log:', error);
+            this.isRenderingLog = false;
         }
-
-        const html = filteredEntries.map(entry => this.renderLogEntry(entry)).join('');
-        this.enhancedLogElement.innerHTML = html;
-        this.bindLogEvents();
     }
 
     renderLogEntry(entry) {
@@ -1387,7 +1771,7 @@ class ScormInspectorWindow {
                 </div>
                 ${entry.details ? `
                     <div class="log-entry-details">
-                        <pre>${this.escapeHtml(JSON.stringify(entry.details, null, 2))}</pre>
+                        <pre>${this.escapeHtml(safeJsonStringify(entry.details, null, 2))}</pre>
                     </div>
                 ` : ''}
             </div>
@@ -1433,11 +1817,24 @@ class ScormInspectorWindow {
     }
 
     getLogEntryExpandedState(logId) {
-        return localStorage.getItem(`scorm-inspector-log-${logId}`) === 'true';
+        try {
+            return localStorage.getItem(`scorm-inspector-log-${logId}`) === 'true';
+        } catch (error) {
+            return false;
+        }
     }
 
     setLogEntryExpandedState(logId, expanded) {
-        localStorage.setItem(`scorm-inspector-log-${logId}`, expanded.toString());
+        try {
+            const key = `scorm-inspector-log-${logId}`;
+            if (expanded) {
+                localStorage.setItem(key, 'true');
+            } else {
+                localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // Ignore localStorage errors
+        }
     }
 
     expandAllLog() {
@@ -1482,21 +1879,371 @@ class ScormInspectorWindow {
 
     // Utility method for downloading JSON
     downloadJSON(data, filenamePrefix) {
-        const dataStr = JSON.stringify(data, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        try {
+            const dataStr = safeJsonStringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            // Check if URL.createObjectURL is available (may fail in some contexts)
+            if (typeof URL === 'undefined' || !URL.createObjectURL) {
+                throw new Error('URL.createObjectURL not available');
+            }
+            
+            const url = URL.createObjectURL(dataBlob);
+            
+            // Ensure document.body exists
+            if (!document.body) {
+                throw new Error('document.body not available');
+            }
+            
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // Sanitize filename to remove invalid characters
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+            const sanitizedPrefix = filenamePrefix.replace(/[^a-zA-Z0-9-_]/g, '-');
+            link.download = `${sanitizedPrefix}-${timestamp}.json`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            safeLogger.error('Failed to download JSON:', error);
+            
+            // Fallback: try to copy to clipboard or show alert
+            try {
+                const dataStr = safeJsonStringify(data, null, 2);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(dataStr).then(() => {
+                        alert('Download failed, but data has been copied to clipboard.');
+                    }).catch(() => {
+                        alert('Download failed. Please check the console for the data.');
+                        console.log('Export data:', dataStr);
+                    });
+                } else {
+                    alert('Download failed. Please check the console for the data.');
+                    console.log('Export data:', dataStr);
+                }
+            } catch (fallbackError) {
+                safeLogger.error('Fallback export also failed:', fallbackError);
+                alert('Export failed completely. Please check the console for errors.');
+            }
+        }
+    }
+
+    setupCleanupHandlers() {
+        // Handle page unload/reload with proper cleanup
+        const beforeUnloadHandler = () => {
+            this.destroy();
+        };
+
+        const unloadHandler = () => {
+            this.destroy();
+        };
+
+        // Use addEventListenerSafe to ensure proper tracking
+        this.addEventListenerSafe(window, 'beforeunload', beforeUnloadHandler);
+        this.addEventListenerSafe(window, 'unload', unloadHandler);
+
+        // Also handle visibility change to pause/resume operations
+        const visibilityChangeHandler = () => {
+            if (document.hidden) {
+                // Pause any expensive operations when tab is hidden
+                this.pauseOperations();
+            } else {
+                // Resume operations when tab becomes visible
+                this.resumeOperations();
+            }
+        };
+
+        this.addEventListenerSafe(document, 'visibilitychange', visibilityChangeHandler);
+    }
+
+    pauseOperations() {
+        // Clear any pending timeouts to save resources
+        if (this.dataModelUpdateTimeout) {
+            clearTimeout(this.dataModelUpdateTimeout);
+            this.dataModelUpdateTimeout = null;
+        }
+
+        if (this.logRenderTimeout) {
+            clearTimeout(this.logRenderTimeout);
+            this.logRenderTimeout = null;
+        }
+    }
+
+    resumeOperations() {
+        // Resume operations if needed when tab becomes visible again
+        if (this.pendingDataModel && !this.isUpdatingDataModel) {
+            setTimeout(() => {
+                this.updateDataModel(this.pendingDataModel);
+            }, 100);
+        }
+    }
+
+    destroy() {
+        if (this.isDestroyed) return;
+
+        try {
+            // Clear all timeouts and intervals
+            if (this.dataModelUpdateTimeout) {
+                clearTimeout(this.dataModelUpdateTimeout);
+                this.dataModelUpdateTimeout = null;
+            }
+
+            if (this.logRenderTimeout) {
+                clearTimeout(this.logRenderTimeout);
+                this.logRenderTimeout = null;
+            }
+
+            // Clear any pending animation frames
+            if (this.animationFrame) {
+                cancelAnimationFrame(this.animationFrame);
+                this.animationFrame = null;
+            }
+
+            // Remove all event listeners including IPC listeners
+            this.removeAllEventListeners();
+
+            // Clear data structures and prevent memory leaks
+            this.clearDataStructures();
+
+            // Clean up DOM references
+            this.clearDomReferences();
+
+            // Clean up localStorage entries to prevent accumulation
+            this.cleanupLocalStorage();
+
+            // Mark as destroyed
+            this.isDestroyed = true;
+
+        } catch (error) {
+            safeLogger.error('Error during ScormInspectorWindow destruction:', error);
+        }
+    }
+
+    removeAllEventListeners() {
+        // Remove tracked event listeners
+        if (this.eventListeners) {
+            this.eventListeners.forEach(({ element, type, handler }) => {
+                try {
+                    element.removeEventListener(type, handler);
+                } catch (error) {
+                    safeLogger.warn('Failed to remove event listener:', error);
+                }
+            });
+            this.eventListeners = [];
+        }
+
+        // Remove IPC listeners if electronAPI is available
+        if (window.electronAPI) {
+            try {
+                // Remove all IPC listeners to prevent memory leaks
+                if (typeof window.electronAPI.removeAllListeners === 'function') {
+                    window.electronAPI.removeAllListeners();
+                }
+            } catch (error) {
+                safeLogger.warn('Failed to remove IPC listeners:', error);
+            }
+        }
+    }
+
+    clearDataStructures() {
+        // Clear arrays and maps
+        if (this.apiHistory) {
+            this.apiHistory.length = 0;
+            this.apiHistory = null;
+        }
+
+        if (this.scormErrors) {
+            this.scormErrors.length = 0;
+            this.scormErrors = null;
+        }
+
+        if (this.enhancedLogEntries) {
+            this.enhancedLogEntries.length = 0;
+            this.enhancedLogEntries = null;
+        }
+
+        if (this.navigationRequests) {
+            this.navigationRequests.length = 0;
+            this.navigationRequests = null;
+        }
+
+        if (this.globalObjectives) {
+            this.globalObjectives.length = 0;
+            this.globalObjectives = null;
+        }
+
+        if (this.sspBuckets) {
+            this.sspBuckets.length = 0;
+            this.sspBuckets = null;
+        }
+
+        // Clear objects and maps
+        this.dataModel = null;
+        this.activityTree = null;
+        this.pendingDataModel = null;
+
+        if (this.dataModelHistory) {
+            this.dataModelHistory.clear();
+            this.dataModelHistory = null;
+        }
+    }
+
+    clearDomReferences() {
+        // Clear DOM element references to prevent memory leaks
+        this.apiTimelineElement = null;
+        this.errorListElement = null;
+        this.dataModelElement = null;
+        this.clearHistoryBtn = null;
+        this.refreshBtn = null;
+        this.dataFilterInput = null;
+        this.clearFilterBtn = null;
+        this.expandAllDataBtn = null;
+        this.collapseAllDataBtn = null;
+        this.exportDataBtn = null;
+        this.activityTreeElement = null;
+        this.navigationAnalysisElement = null;
+        this.globalObjectivesElement = null;
+        this.sspBucketsElement = null;
+        this.enhancedLogElement = null;
+
+        // Clear enhanced inspector control references
+        this.refreshActivityTreeBtn = null;
+        this.expandAllActivitiesBtn = null;
+        this.collapseAllActivitiesBtn = null;
+        this.refreshNavigationBtn = null;
+        this.expandAllNavBtn = null;
+        this.collapseAllNavBtn = null;
+        this.refreshObjectivesBtn = null;
+        this.exportObjectivesBtn = null;
+        this.refreshSspBtn = null;
+        this.exportSspBtn = null;
+        this.clearEnhancedLogBtn = null;
+        this.exportEnhancedLogBtn = null;
+        this.expandAllLogBtn = null;
+
+        // Clear log filter references
+        this.logControlFilter = null;
+        this.logRuntimeFilter = null;
+        this.logSequencingFilter = null;
+        this.logPcodeFilter = null;
+    }
+
+    cleanupLocalStorage() {
+        try {
+            // Clean up category states
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('scorm-inspector-category-') ||
+                           key.startsWith('scorm-inspector-activity-') ||
+                           key.startsWith('scorm-inspector-nav-') ||
+                           key.startsWith('scorm-inspector-log-'))) {
+                    keysToRemove.push(key);
+                }
+            }
+
+            // Only keep the most recent 100 entries to prevent localStorage bloat
+            if (keysToRemove.length > 100) {
+                const toDelete = keysToRemove.slice(0, keysToRemove.length - 100);
+                toDelete.forEach(key => {
+                    try {
+                        localStorage.removeItem(key);
+                    } catch (error) {
+                        // Ignore individual removal errors
+                    }
+                });
+            }
+        } catch (error) {
+            safeLogger.warn('Failed to cleanup localStorage:', error);
+        }
+    }
+
+    // Performance memory cleanup method
+    performMemoryCleanup() {
+        try {
+            // Limit array sizes to prevent memory bloat
+            if (this.apiHistory && this.apiHistory.length > 1000) {
+                this.apiHistory.splice(0, this.apiHistory.length - 1000);
+            }
+
+            if (this.scormErrors && this.scormErrors.length > 250) {
+                this.scormErrors.splice(0, this.scormErrors.length - 250);
+            }
+
+            if (this.enhancedLogEntries && this.enhancedLogEntries.length > 2500) {
+                this.enhancedLogEntries.splice(0, this.enhancedLogEntries.length - 2500);
+            }
+
+            // Clear old data model history entries
+            if (this.dataModelHistory && this.dataModelHistory.size > 100) {
+                const entries = Array.from(this.dataModelHistory.entries());
+                const toKeep = entries.slice(-50); // Keep only the 50 most recent entries
+                this.dataModelHistory.clear();
+                toKeep.forEach(([key, value]) => this.dataModelHistory.set(key, value));
+            }
+
+            // Clean up localStorage to prevent accumulation
+            this.cleanupLocalStorage();
+
+            // Force garbage collection if available
+            if (window.gc && typeof window.gc === 'function') {
+                window.gc();
+            }
+
+            safeLogger.log('Memory cleanup completed');
+        } catch (error) {
+            safeLogger.error('Error during memory cleanup:', error);
+        }
+    }
+
+    // Method to safely add event listeners with automatic cleanup tracking
+    addEventListenerSafe(element, type, handler) {
+        if (this.isDestroyed || !element) return;
+
+        try {
+            // Create a wrapper handler that checks if component is destroyed
+            const safeHandler = (...args) => {
+                if (this.isDestroyed) return;
+                return handler(...args);
+            };
+
+            element.addEventListener(type, safeHandler);
+            this.eventListeners.push({ element, type, handler: safeHandler });
+        } catch (error) {
+            safeLogger.error(`Failed to add ${type} event listener:`, error);
+        }
     }
 }
 
-// Initialize when DOM is loaded
+// Initialize when DOM is loaded with memory leak prevention
 document.addEventListener('DOMContentLoaded', () => {
+    // Clean up any existing instance to prevent memory leaks
+    if (window.scormInspector && typeof window.scormInspector.destroy === 'function') {
+        window.scormInspector.destroy();
+    }
+
+    // Clear any existing references
+    window.scormInspector = null;
+
+    // Create new instance
     window.scormInspector = new ScormInspectorWindow();
+
+    // Set up memory monitoring
+    if (typeof window.performance !== 'undefined' && window.performance.memory) {
+        const checkMemory = () => {
+            const memory = window.performance.memory;
+            if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.9) {
+                console.warn('High memory usage detected, cleaning up...');
+                if (window.scormInspector && typeof window.scormInspector.performMemoryCleanup === 'function') {
+                    window.scormInspector.performMemoryCleanup();
+                }
+            }
+        };
+
+        // Check memory every 30 seconds
+        setInterval(checkMemory, 30000);
+    }
 });

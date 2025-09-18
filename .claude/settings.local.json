@@ -1,19 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/**)",
-      "Read(/Users/seth/Library/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)",
-      "Read(/Users/seth/Library/Application Support/scorm-tester/**)"
+      "mcp__ruv-swarm",
+      "mcp__claude-flow"
     ],
-    "deny": [],
-    "ask": []
+    "deny": []
   }
 }

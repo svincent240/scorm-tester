@@ -1,317 +1,352 @@
-# CLAUDE.md
+# Claude Code Configuration - SPARC Development Environment
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
+
+**ABSOLUTE RULES**:
+1. ALL operations MUST be concurrent/parallel in a single message
+2. **NEVER save working files, text/mds and tests to the root folder**
+3. ALWAYS organize files in appropriate subdirectories
+4. **USE CLAUDE CODE'S TASK TOOL** for spawning agents concurrently, not just MCP
+
+### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
+
+**MANDATORY PATTERNS:**
+- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
+- **Task tool (Claude Code)**: ALWAYS spawn ALL agents in ONE message with full instructions
+- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
+- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
+- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
+
+### 🎯 CRITICAL: Claude Code Task Tool for Agent Execution
+
+**Claude Code's Task tool is the PRIMARY way to spawn agents:**
+```javascript
+// ✅ CORRECT: Use Claude Code's Task tool for parallel agent execution
+[Single Message]:
+  Task("Research agent", "Analyze requirements and patterns...", "researcher")
+  Task("Coder agent", "Implement core features...", "coder")
+  Task("Tester agent", "Create comprehensive tests...", "tester")
+  Task("Reviewer agent", "Review code quality...", "reviewer")
+  Task("Architect agent", "Design system architecture...", "system-architect")
+```
+
+**MCP tools are ONLY for coordination setup:**
+- `mcp__claude-flow__swarm_init` - Initialize coordination topology
+- `mcp__claude-flow__agent_spawn` - Define agent types for coordination
+- `mcp__claude-flow__task_orchestrate` - Orchestrate high-level workflows
+
+### 📁 File Organization Rules
+
+**NEVER save to root folder. Use these directories:**
+- `/src` - Source code files
+- `/tests` - Test files
+- `/docs` - Documentation and markdown files
+- `/config` - Configuration files
+- `/scripts` - Utility scripts
+- `/examples` - Example code
 
 ## Project Overview
 
-This is a desktop application built with Electron for testing and previewing SCORM (Sharable Content Object Reference Model) courses with full LMS simulation capabilities. The application provides offline SCORM testing, real-time debugging, and compliance validation for multiple LMS environments including Litmos, Moodle, SCORM Cloud, and Generic LMS.
+This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
 
-**Status**: ✅ **PRODUCTION READY** - Complete SCORM 2004 4th Edition implementation with 100% compliance achieved.
+## SPARC Commands
 
-## Common Commands
+### Core Commands
+- `npx claude-flow sparc modes` - List available modes
+- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
+- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
+- `npx claude-flow sparc info <mode>` - Get mode details
 
-### Development
-- `npm run dev` - Start application in development mode
-- `npm run dev-debug` - Start with NODE_ENV=development for enhanced debugging
-- `npm run dev:remote-debug` - Start with remote debugging enabled for Playwright MCP interaction
-- `npm start` - Start application in production mode
+### Batchtools Commands
+- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
+- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
+- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
 
-### Testing and Quality
-- `npm test` - Run complete Jest test suite (37/37 tests passing)
-- `npm run test:unit` - Run unit tests only
-- `npm run test:integration` - Run integration tests only
-- `npm run test:renderer` - Run renderer component tests
-- `npm run test:phase6` - Run Phase 6 completion validation tests
-- `npm run lint` - Run ESLint code linting
+### Build Commands
+- `npm run build` - Build project
+- `npm run test` - Run tests
+- `npm run lint` - Linting
+- `npm run typecheck` - Type checking
 
-### Build and Distribution
-- `npm run build` - Build distributable packages with electron-builder
-- `npm run dist` - Build without publishing (for local testing)
+## SPARC Workflow Phases
 
-## Architecture
+1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
+2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
+3. **Architecture** - System design (`sparc run architect`)
+4. **Refinement** - TDD implementation (`sparc tdd`)
+5. **Completion** - Integration (`sparc run integration`)
 
-### Core Structure
-The application follows a modular, service-oriented architecture with complete SCORM 2004 4th Edition support:
+## Code Style & Best Practices
 
-#### **Main Process** (`src/main/`)
-- **SCORM Services**: Complete RTE, CAM, and SN implementation
-  - `services/scorm/rte/` - Run-Time Environment (API, data model, error handling)
-  - `services/scorm/cam/` - Content Aggregation Model (manifest parsing, validation)
-  - `services/scorm/sn/` - Sequencing and Navigation (activity trees, sequencing rules)
+- **Modular Design**: Files under 500 lines
+- **Environment Safety**: Never hardcode secrets
+- **Test-First**: Write tests before implementation
+- **Clean Architecture**: Separate concerns
+- **Documentation**: Keep updated
 
-#### **Renderer Process** (`src/renderer/`)
-- **Component Architecture**: Modular UI components with event-driven communication
-  - `components/scorm/` - SCORM-specific UI components
-  - `services/` - Renderer services (event bus, state management, SCORM client)
+## 🚀 Available Agents (54 Total)
 
-#### **Shared Resources** (`src/shared/`)
-- **Constants**: Complete SCORM constants and error codes
-- **Types**: Comprehensive TypeScript definitions
-- **Utilities**: Cross-process utility functions
+### Core Development
+`coder`, `reviewer`, `tester`, `planner`, `researcher`
 
-#### **Styling** (`src/styles/`)
-- **Modular CSS**: Component-based styling with theme system
-- **Theme Support**: Light and dark themes with system preference detection
+### Swarm Coordination
+`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
 
-### SCORM Compliance Features
+### Consensus & Distributed
+`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
 
-#### **Complete SCORM 2004 4th Edition Support**
-- **100% API Compliance**: All 8 required SCORM API functions
-- **100% Data Model**: All 15 required SCORM data elements
-- **100% Error Handling**: All 26 required SCORM error codes
-- **100% Sequencing**: Complete sequencing and navigation engine
-- **100% CAM Support**: Full manifest parsing and content validation
+### Performance & Optimization
+`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
 
-#### **LMS Profile System**
-The application simulates different LMS environments with specific constraints:
-- **Litmos LMS**: 4KB suspend data limit, strict validation
-- **Moodle**: 64KB suspend data limit, relaxed validation  
-- **SCORM Cloud**: 64KB suspend data limit, strict validation
-- **Generic LMS**: 4KB suspend data limit, configurable settings
+### GitHub & Repository
+`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
 
-### Security Architecture
-- Context isolation enabled with secure IPC communication
-- Comprehensive input validation for all operations
-- HTML escaping for XSS prevention
-- Path security with directory traversal protection
-- Rate limiting to prevent API abuse
+### SPARC Methodology
+`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
 
-### Performance Features
-- Memory-safe session management with automatic cleanup
-- Local caching for immediate SCORM API responses
-- Background synchronization for data persistence
-- Resource management with temporary file cleanup
-- Performance tracking with configurable health thresholds
+### Specialized Development
+`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
 
-## Testing Framework
+### Testing & Validation
+`tdd-london-swarm`, `production-validator`
 
-### Comprehensive Test Coverage
-Uses Jest with comprehensive test coverage including:
-- **SCORM API compliance testing** (both 1.2 and 2004)
-- **Security validation** and XSS prevention
-- **Input validation** and error handling
-- **Memory management** and performance testing
-- **LMS profile-specific** constraint testing
-- **Renderer component testing** with integration validation
-- **End-to-end workflow testing** with real SCORM packages
+### Migration & Planning
+`migration-planner`, `swarm-init`
 
-### Test Results
-- ✅ **37/37 tests passing** (100% success rate)
-- ✅ **100% SCORM compliance** validated
-- ✅ **Performance targets exceeded** by 200-600x
-- ✅ **Memory management** optimized with proper cleanup
+## 🎯 Claude Code vs MCP Tools
 
-### Run Individual Test Suites
+### Claude Code Handles ALL EXECUTION:
+- **Task tool**: Spawn and run agents concurrently for actual work
+- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
+- Code generation and programming
+- Bash commands and system operations
+- Implementation work
+- Project navigation and analysis
+- TodoWrite and task management
+- Git operations
+- Package management
+- Testing and debugging
+
+### MCP Tools ONLY COORDINATE:
+- Swarm initialization (topology setup)
+- Agent type definitions (coordination patterns)
+- Task orchestration (high-level planning)
+- Memory management
+- Neural features
+- Performance tracking
+- GitHub integration
+
+**KEY**: MCP coordinates the strategy, Claude Code's Task tool executes with real agents.
+
+## 🚀 Quick Setup
+
 ```bash
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests only  
-npm run test:renderer      # Renderer component tests
-npm run test:phase6        # Phase 6 validation tests
-npm test -- --coverage    # With coverage report
+# Add MCP servers (Claude Flow required, others optional)
+claude mcp add claude-flow npx claude-flow@alpha mcp start
+claude mcp add ruv-swarm npx ruv-swarm mcp start  # Optional: Enhanced coordination
+claude mcp add flow-nexus npx flow-nexus@latest mcp start  # Optional: Cloud features
 ```
 
-## Development Patterns
+## MCP Tool Categories
 
-### SCORM API Implementation
-- Synchronous API behavior to maintain SCORM compliance
-- Local caching with background sync for performance
-- Multi-version support (SCORM 1.2 and 2004)
-- Proper SCORM error codes and recovery mechanisms
+### Coordination
+`swarm_init`, `agent_spawn`, `task_orchestrate`
 
-### Component Architecture
-- **Event-driven communication** through centralized event bus
-- **Service-oriented design** with clear separation of concerns
-- **Modular UI components** with standardized lifecycle management
-- **State management** with persistence and history
+### Monitoring
+`swarm_status`, `agent_list`, `agent_metrics`, `task_status`, `task_results`
 
-### Error Handling
-- Comprehensive error boundaries at all levels
-- SCORM-compliant error codes and messages
-- Automatic recovery mechanisms where possible
-- Detailed logging for debugging and monitoring
+### Memory & Neural
+`memory_usage`, `neural_status`, `neural_train`, `neural_patterns`
 
-### Resource Management
-- Automatic cleanup of extracted SCORM packages
-- Memory monitoring with configurable thresholds
-- Session isolation to prevent data contamination
-- Performance tracking and optimization
+### GitHub Integration
+`github_swarm`, `repo_analyze`, `pr_enhance`, `issue_triage`, `code_review`
 
-## Key Dependencies
+### System
+`benchmark_run`, `features_detect`, `swarm_monitor`
 
-- **Electron 28.0.0** - Desktop application framework
-- **node-stream-zip 1.15.0** - ZIP extraction for SCORM packages
-- **Jest 29.0.0** - Testing framework
-- **ESLint 8.0.0** - Code linting
-- **electron-builder 24.13.3** - Application packaging
+### Flow-Nexus MCP Tools (Optional Advanced Features)
+Flow-Nexus extends MCP capabilities with 70+ cloud-based orchestration tools:
 
-## File Operations
+**Key MCP Tool Categories:**
+- **Swarm & Agents**: `swarm_init`, `swarm_scale`, `agent_spawn`, `task_orchestrate`
+- **Sandboxes**: `sandbox_create`, `sandbox_execute`, `sandbox_upload` (cloud execution)
+- **Templates**: `template_list`, `template_deploy` (pre-built project templates)
+- **Neural AI**: `neural_train`, `neural_patterns`, `seraphina_chat` (AI assistant)
+- **GitHub**: `github_repo_analyze`, `github_pr_manage` (repository management)
+- **Real-time**: `execution_stream_subscribe`, `realtime_subscribe` (live monitoring)
+- **Storage**: `storage_upload`, `storage_list` (cloud file management)
 
-SCORM packages can be loaded as:
-- ZIP files (automatically extracted to temp directory)
-- Directories (direct folder access)
-- Supports nested package structures and manifest parsing
+**Authentication Required:**
+- Register: `mcp__flow-nexus__user_register` or `npx flow-nexus@latest register`
+- Login: `mcp__flow-nexus__user_login` or `npx flow-nexus@latest login`
+- Access 70+ specialized MCP tools for advanced orchestration
 
-All file operations include path validation and security checks to prevent directory traversal attacks.
+## 🚀 Agent Execution Flow with Claude Code
 
-## Development Guidelines
+### The Correct Pattern:
 
-### Code Quality Standards
-1. **File Size Limit**: All files must be under 200 lines (except index.html under 300)
-2. **Modular Design**: Clear separation of concerns with focused modules
-3. **Type Safety**: Use TypeScript definitions for all interfaces
-4. **Test Coverage**: Maintain comprehensive test coverage for all changes
-5. **SCORM Compliance**: Validate against SCORM 2004 4th Edition specification
+1. **Optional**: Use MCP tools to set up coordination topology
+2. **REQUIRED**: Use Claude Code's Task tool to spawn agents that do actual work
+3. **REQUIRED**: Each agent runs hooks for coordination
+4. **REQUIRED**: Batch all operations in single messages
 
-### Architecture Principles
-- **Event-driven communication** between components
-- **Service-oriented design** with dependency injection
-- **Immutable state management** with proper persistence
-- **Component lifecycle management** with cleanup
-- **Error handling** with graceful degradation
+### Example Full-Stack Development:
 
-### Documentation Requirements
-- Update relevant documentation when making architectural changes
-- Maintain JSDoc comments for all public APIs
-- Keep TypeScript definitions synchronized with implementation
-- Update test documentation for new test scenarios
-
-## Interactive Testing with Playwright MCP
-
-### Remote Debugging Setup
-The application supports remote debugging for AI-powered testing and interaction through Playwright MCP:
-
-**1. Launch Application with Remote Debugging:**
-```bash
-npm run dev:remote-debug
+```javascript
+// Single message with all agent spawning via Claude Code's Task tool
+[Parallel Agent Execution]:
+  Task("Backend Developer", "Build REST API with Express. Use hooks for coordination.", "backend-dev")
+  Task("Frontend Developer", "Create React UI. Coordinate with backend via memory.", "coder")
+  Task("Database Architect", "Design PostgreSQL schema. Store schema in memory.", "code-analyzer")
+  Task("Test Engineer", "Write Jest tests. Check memory for API contracts.", "tester")
+  Task("DevOps Engineer", "Setup Docker and CI/CD. Document in memory.", "cicd-engineer")
+  Task("Security Auditor", "Review authentication. Report findings via hooks.", "reviewer")
+  
+  // All todos batched together
+  TodoWrite { todos: [...8-10 todos...] }
+  
+  // All file operations together
+  Write "backend/server.js"
+  Write "frontend/App.jsx"
+  Write "database/schema.sql"
 ```
-This command starts the Electron app with:
-- `--remote-debugging-port=9222` - Enables Chrome DevTools Protocol on port 9222
-- `--remote-allow-origins=*` - Allows connections from any origin
 
-**2. Connect via Playwright MCP:**
-- Navigate to `http://localhost:9222` to see available debugging targets
-- Click on "SCORM Tester" to access the application through DevTools
-- Use Playwright MCP browser tools to interact with the running application
+## 📋 Agent Coordination Protocol
 
-**3. Available Interactions:**
-- **UI Testing**: Click buttons, fill forms, navigate through the application
-- **Screenshot Capture**: Take screenshots of the current application state
-- **DOM Inspection**: Examine and interact with UI elements
-- **JavaScript Evaluation**: Execute custom scripts within the application context
-- **Event Simulation**: Simulate user interactions for testing workflows
+### Every Agent Spawned via Task Tool MUST:
 
-**4. Common Use Cases:**
-- **Automated Testing**: Test SCORM package loading and validation workflows
-- **UI Validation**: Verify interface elements and user experience
-- **Debugging**: Inspect application state during SCORM course execution
-- **Documentation**: Capture screenshots for documentation purposes
-- **Quality Assurance**: Validate application behavior with real user interactions
+**1️⃣ BEFORE Work:**
+```bash
+npx claude-flow@alpha hooks pre-task --description "[task]"
+npx claude-flow@alpha hooks session-restore --session-id "swarm-[id]"
+```
 
-**Note**: The remote debugging session remains active until the application is closed. Multiple debugging connections can be established simultaneously.
+**2️⃣ DURING Work:**
+```bash
+npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "swarm/[agent]/[step]"
+npx claude-flow@alpha hooks notify --message "[what was done]"
+```
 
-### Playwright MCP Best Practices - Token-Efficient Debugging
+**3️⃣ AFTER Work:**
+```bash
+npx claude-flow@alpha hooks post-task --task-id "[task]"
+npx claude-flow@alpha hooks session-end --export-metrics true
+```
 
-Based on extensive debugging experience, follow these guidelines to avoid token limit issues and maximize debugging efficiency:
+## 🎯 Concurrent Execution Examples
 
-#### **🚫 Avoid These Token-Heavy Operations:**
+### ✅ CORRECT WORKFLOW: MCP Coordinates, Claude Code Executes
 
-1. **Never use `browser_snapshot` on complex UIs**
-   - DevTools, admin interfaces, or rich applications generate 25k+ token responses
-   - Use only for simple pages or specific testing scenarios
+```javascript
+// Step 1: MCP tools set up coordination (optional, for complex tasks)
+[Single Message - Coordination Setup]:
+  mcp__claude-flow__swarm_init { topology: "mesh", maxAgents: 6 }
+  mcp__claude-flow__agent_spawn { type: "researcher" }
+  mcp__claude-flow__agent_spawn { type: "coder" }
+  mcp__claude-flow__agent_spawn { type: "tester" }
 
-2. **Avoid element-based interactions requiring refs**
-   - `browser_click` with `ref` parameters requires snapshots first
-   - Snapshots of complex apps exceed token limits
-   - Use direct JavaScript evaluation instead
+// Step 2: Claude Code Task tool spawns ACTUAL agents that do the work
+[Single Message - Parallel Agent Execution]:
+  // Claude Code's Task tool spawns real agents concurrently
+  Task("Research agent", "Analyze API requirements and best practices. Check memory for prior decisions.", "researcher")
+  Task("Coder agent", "Implement REST endpoints with authentication. Coordinate via hooks.", "coder")
+  Task("Database agent", "Design and implement database schema. Store decisions in memory.", "code-analyzer")
+  Task("Tester agent", "Create comprehensive test suite with 90% coverage.", "tester")
+  Task("Reviewer agent", "Review code quality and security. Document findings.", "reviewer")
+  
+  // Batch ALL todos in ONE call
+  TodoWrite { todos: [
+    {id: "1", content: "Research API patterns", status: "in_progress", priority: "high"},
+    {id: "2", content: "Design database schema", status: "in_progress", priority: "high"},
+    {id: "3", content: "Implement authentication", status: "pending", priority: "high"},
+    {id: "4", content: "Build REST endpoints", status: "pending", priority: "high"},
+    {id: "5", content: "Write unit tests", status: "pending", priority: "medium"},
+    {id: "6", content: "Integration tests", status: "pending", priority: "medium"},
+    {id: "7", content: "API documentation", status: "pending", priority: "low"},
+    {id: "8", content: "Performance optimization", status: "pending", priority: "low"}
+  ]}
+  
+  // Parallel file operations
+  Bash "mkdir -p app/{src,tests,docs,config}"
+  Write "app/package.json"
+  Write "app/src/server.js"
+  Write "app/tests/server.test.js"
+  Write "app/docs/API.md"
+```
 
-3. **Don't use `browser_evaluate` in DevTools context**
-   - Even minimal JavaScript returns massive responses when connected to DevTools
-   - DevTools DOM context is enormous and will hit token limits
+### ❌ WRONG (Multiple Messages):
+```javascript
+Message 1: mcp__claude-flow__swarm_init
+Message 2: Task("agent 1")
+Message 3: TodoWrite { todos: [single todo] }
+Message 4: Write "file.js"
+// This breaks parallel coordination!
+```
 
-4. **Avoid iterative DOM exploration**
-   - Don't try to "browse" through complex UIs step by step
-   - Plan specific targeted interactions instead of exploratory debugging
+## Performance Benefits
 
-#### **✅ Efficient Token-Saving Strategies:**
+- **84.8% SWE-Bench solve rate**
+- **32.3% token reduction**
+- **2.8-4.4x speed improvement**
+- **27+ neural models**
 
-1. **Use Screenshots Strategically**
-   - **Good**: Single verification screenshots (`browser_take_screenshot`)
-   - **Bad**: Screenshots for interaction or detailed inspection
-   - **Best**: Before/after comparison shots to verify changes
+## Hooks Integration
 
-2. **Direct Navigation Over Interaction**
-   - Use `browser_navigate` to specific URLs when possible
-   - Avoid clicking through complex navigation paths
+### Pre-Operation
+- Auto-assign agents by file type
+- Validate commands for safety
+- Prepare resources automatically
+- Optimize topology by complexity
+- Cache searches
 
-3. **Minimal JavaScript Evaluation**
-   - Return only essential data (booleans, strings, small objects)
-   - Avoid returning DOM elements or large data structures
-   - Filter and summarize results before returning
+### Post-Operation
+- Auto-format code
+- Train neural patterns
+- Update memory
+- Analyze performance
+- Track token usage
 
-4. **Console Monitoring for Events**
-   - Use `browser_console_messages` for lightweight debugging
-   - Add targeted logging to application code instead of DOM inspection
-   - Monitor specific event patterns rather than full console output
+### Session Management
+- Generate summaries
+- Persist state
+- Track metrics
+- Restore context
+- Export workflows
 
-5. **Network Requests for State Verification**
-   - Use `browser_network_requests` to understand application behavior
-   - Often more informative than DOM inspection for state changes
+## Advanced Features (v2.0.0)
 
-#### **🎯 Recommended Debugging Workflow:**
+- 🚀 Automatic Topology Selection
+- ⚡ Parallel Execution (2.8-4.4x speed)
+- 🧠 Neural Training
+- 📊 Bottleneck Analysis
+- 🤖 Smart Auto-Spawning
+- 🛡️ Self-Healing Workflows
+- 💾 Cross-Session Memory
+- 🔗 GitHub Integration
 
-1. **Analyze code statically first** (using Read/Grep tools)
-2. **Make targeted fixes based on code analysis**
-3. **Use single screenshot for visual verification**
-4. **Use console/network monitoring for behavior verification**
-5. **Avoid interactive debugging through MCP for complex applications**
+## Integration Tips
 
-#### **📋 Application-Specific Considerations:**
+1. Start with basic swarm init
+2. Scale agents gradually
+3. Use memory for context
+4. Monitor progress regularly
+5. Train patterns from success
+6. Enable hooks automation
+7. Use GitHub tools first
 
-- **Electron Apps**: Custom protocols (`scorm-app://`) aren't directly accessible via browser navigation
-- **DevTools Connection**: Connecting to DevTools creates massive DOM contexts that exceed token limits
-- **Complex SPAs**: Better to test via API endpoints, logs, or unit tests than DOM manipulation
-- **Real-time Applications**: Use event monitoring rather than polling for state changes
+## Support
 
-#### **🔧 When MCP Isn't the Right Tool:**
+- Documentation: https://github.com/ruvnet/claude-flow
+- Issues: https://github.com/ruvnet/claude-flow/issues
+- Flow-Nexus Platform: https://flow-nexus.ruv.io (registration required for cloud features)
 
-- **Complex UI testing**: Use traditional testing frameworks (Jest, Cypress) instead
-- **Interactive debugging**: Use browser DevTools directly for detailed inspection
-- **Performance testing**: Use dedicated performance tools and profilers
-- **Deep DOM inspection**: Use browser inspector manually for complex element analysis
+---
 
-#### **💡 Token-Efficient Alternatives:**
+Remember: **Claude Flow coordinates, Claude Code creates!**
 
-- **Code Analysis**: Use file reading and grep tools to understand logic
-- **Static Testing**: Write unit tests for component behavior
-- **Log-Based Debugging**: Add console.log statements and monitor output
-- **API Testing**: Test backend endpoints directly rather than UI interactions
-- **Screenshot Verification**: Use visual confirmation rather than programmatic inspection
-
-This approach prioritizes **efficiency over comprehensive interaction** - use MCP for verification and targeted testing, not as a replacement for traditional debugging tools.
-
-## AI Development Context
-
-### Key Files to Reference
-- [`dev_docs/README.md`](dev_docs/README.md) - Complete development documentation
-- [`dev_docs/architecture/overview.md`](dev_docs/architecture/overview.md) - System architecture
-- [`dev_docs/architecture/scorm-compliance.md`](dev_docs/architecture/scorm-compliance.md) - SCORM compliance details
-- [`src/shared/types/scorm-types.d.ts`](src/shared/types/scorm-types.d.ts) - Complete type definitions
-- [`package.json`](package.json) - Dependencies and build configuration
-
-### Testing Requirements
-- All SCORM API functions must maintain compliance with SCORM 2004 4th Edition
-- Use the comprehensive test suites defined in the testing strategy
-- Validate performance requirements and memory management
-- Test error handling and recovery scenarios
-- Utilize Playwright MCP for interactive testing and UI validation
-
-### Current Status
-The application is **production-ready** with complete SCORM 2004 4th Edition compliance. All major refactoring phases have been completed:
-- ✅ Phase 1: RTE Foundation
-- ✅ Phase 2: CAM Implementation  
-- ✅ Phase 3: SN Implementation
-- ✅ Phase 4: Main Process Refactoring
-- ✅ Phase 5: Renderer Refactoring
-- ✅ Phase 6: Final Integration and Polish
-
-The codebase is now in maintenance mode with focus on bug fixes, performance optimization, and feature enhancements.
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+Never save working files, text/mds and tests to the root folder.
