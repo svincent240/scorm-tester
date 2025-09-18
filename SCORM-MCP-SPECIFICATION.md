@@ -1,53 +1,72 @@
-# SCORM MCP Tool Specification
+# SCORM MCP Tool Specification - AI Agent Testing & Validation Platform
 
 ## Overview
 
-The SCORM MCP (Model Context Protocol) Tool is a stdio MCP server that provides AI agents with comprehensive tools for developing, debugging, and optimizing SCORM (Sharable Content Object Reference Model) e-learning content. This specification defines a specialized toolset that enables AI agents to create, analyze, validate, and test SCORM packages through standardized MCP protocol interactions.
+The SCORM MCP Tool transforms your production-ready SCORM Tester into a validation and testing platform specifically designed for AI agents. AI agents write SCORM course files directly; the MCP tools validate, test, debug, and visually inspect those files by actually running them locally, enabling AI agents to see what their courses look like and how they work in real LMS environments.
+
+## Core Problem & Solution
+
+**THE PROBLEM:** AI agents can generate complete SCORM courses (HTML, CSS, JS, imsmanifest.xml) but cannot validate they actually work. Generated content may have:
+- Invalid or non-compliant manifest XML
+- Broken SCORM API integration code
+- Layout issues that break in LMS iframe constraints
+- Navigation and sequencing failures
+- Device compatibility problems
+
+**THE SOLUTION:** Enable AI agents to test and debug their generated SCORM content by:
+1. **Local Execution** - Run courses in controlled environment with your production-ready SCORM engine
+2. **Visual Validation** - Capture screenshots to show AI agents how their content actually renders
+3. **API Testing** - Execute and monitor SCORM API calls to detect integration bugs
+4. **Interactive Debugging** - Step through navigation and sequencing to identify issues
+5. **Specific Feedback** - Provide actionable error reports and fix suggestions
 
 ## Vision
 
-Transform the existing production-ready SCORM Tester into an MCP-first development tool that enables AI agents to efficiently create, debug, validate, and optimize SCORM content through intelligent automation and interactive development workflows.
+**"Your production-ready SCORM engine becomes the eyes and testing platform for AI-generated content."**
+
+AI agents do the creative work (writing course files), your tool provides the validation and testing capabilities that AI agents cannot do themselves - actually running the content and seeing how it works.
 
 ## Core Principles
 
-- **Development-First**: Purpose-built for SCORM course authoring and debugging workflows
-- **MCP Protocol Design**: Every tool optimized for AI agent interaction via MCP protocol
-- **Standards Compliance**: Full support for SCORM 2004 4th Edition (100% compliant engine)
-- **Hybrid Architecture**: MCP server + existing Electron GUI for interactive development
-- **Real-Time Debugging**: Advanced inspection and monitoring capabilities for developers
-- **AI Agent Coordination**: Multi-agent support for complex SCORM development tasks
-- **Developer Experience**: Leverage existing production-ready SCORM engine capabilities
+- **AI Agent Testing Platform**: Purpose-built for AI agents to test and debug their generated SCORM content
+- **Local Execution Environment**: Run SCORM courses locally using production-ready engine for validation
+- **Visual Validation**: AI agents can "see" their content through screenshots and visual feedback
+- **File-Centric Workflow**: AI agents write files directly, MCP tools test and validate them
+- **Standards Compliance**: 100% SCORM 2004 4th Edition compliance validation
+- **Real-Time Debugging**: Live API monitoring, sequencing tracing, and navigation testing
+- **Actionable Feedback**: Specific error reports with fix suggestions for AI agents
 
 ## Architecture
 
-### MCP-Enhanced Architecture
+### AI Agent Testing Architecture
 
-The SCORM MCP Tool builds upon the existing production-ready Electron-based SCORM Tester (100% SCORM 2004 4th Edition compliant) by adding a comprehensive MCP server interface. This design enables AI agents to leverage the sophisticated debugging and validation capabilities while maintaining the interactive development experience.
+The SCORM MCP Tool transforms your existing production-ready SCORM Tester into a testing and validation platform for AI agents. AI agents write SCORM files, the MCP server runs and tests them using your proven SCORM engine, then provides visual and diagnostic feedback.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
-│              SCORM MCP Development Tool                     │
+│            AI Agent SCORM Testing & Validation Platform    │
 ├─────────────────────────────────────────────────────────────┤
-│  MCP Server Layer      │  Interactive Development GUI       │
-│  ┌─────────────────┐   │  ┌─────────────────────────────────┐ │
-│  │ stdio Protocol  │   │  │ Content Viewer & Editor         │ │
-│  │ AI Tool Registry│   │  │ Advanced SCORM Inspector        │ │
-│  │ Request Router  │   │  │ Real-Time Debug Interface       │ │
-│  │ JSON Responses  │   │  │ Interactive Validation Tools    │ │
-│  └─────────────────┘   │  └─────────────────────────────────┘ │
+│  AI Agent (Claude, etc)   │  SCORM MCP Testing Tools        │
+│  ┌─────────────────────┐  │  ┌─────────────────────────────┐ │
+│  │ Writes Course Files │  │  │ Tests Generated Content     │ │
+│  │ - imsmanifest.xml   │  │  │ - Manifest Validation       │ │
+│  │ - SCO HTML/CSS/JS   │  │  │ - API Integration Testing   │ │
+│  │ - Media Assets      │  │  │ - Visual Screenshot Capture │ │
+│  │ - Sequencing Rules  │  │  │ - Navigation Flow Testing   │ │
+│  └─────────────────────┘  │  └─────────────────────────────┘ │
+│           │                │                │               │
+│           ▼                │                ▼               │
+│  ┌─────────────────────┐  │  ┌─────────────────────────────┐ │
+│  │ Fixes Based on      │  │  │ Detailed Error Reports      │ │
+│  │ Testing Feedback    │◄─┼──┤ Screenshot Evidence         │ │
+│  │                     │  │  │ Specific Fix Suggestions    │ │
+│  └─────────────────────┘  │  └─────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │        Production-Ready SCORM Engine (100% Compliant)      │
 │  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────┐ │
-│  │ CAM Processor   │   │ RTE Engine      │   │ SN Engine   │ │
+│  │ CAM Validator   │   │ RTE API Tester  │   │ SN Debugger │ │
 │  │ (Manifest)      │   │ (API & Data)    │   │ (Sequencing)│ │
 │  └─────────────────┘   └─────────────────┘   └─────────────┘ │
-├─────────────────────────────────────────────────────────────┤
-│  Development Tools     │  AI-Enhanced Workflows             │
-│  ┌─────────────────┐   │  ┌─────────────────────────────────┐ │
-│  │ Content Builder │   │  │ Auto-Fix Compliance Issues      │ │
-│  │ Debug Monitor   │   │  │ Intelligent Validation          │ │
-│  │ File Manager    │   │  │ Development-Time Optimization   │ │
-│  └─────────────────┘   │  └─────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,27 +75,33 @@ The SCORM MCP Tool builds upon the existing production-ready Electron-based SCOR
 The tool supports multiple deployment modes to serve different use cases:
 
 #### 1. Development Mode (Default)
+
 ```bash
 scorm-mcp-tool
 ```
+
 - **MCP server** for AI agents via stdio
 - **Interactive GUI** for real-time debugging and validation
 - **Advanced SCORM Inspector** for detailed package analysis
 - **Hybrid workflow** combining AI automation with visual development
 
 #### 2. CI/CD Mode
+
 ```bash
 scorm-mcp-tool --headless
 ```
+
 - **Pure stdio MCP server** for automated workflows
 - **No GUI overhead** - optimized for build pipelines
 - **Automated validation** and compliance checking
 - **Batch processing** capabilities for multiple packages
 
 #### 3. Interactive Mode
+
 ```bash
 scorm-mcp-tool --interactive
 ```
+
 - **Full desktop application** with MCP server background
 - **Real-time debugging** with API call monitoring
 - **Visual content development** with immediate feedback
@@ -84,112 +109,131 @@ scorm-mcp-tool --interactive
 
 ### Core Components
 
-## MCP Tool Categories
+## MCP Tool Categories - AI Agent Testing & Validation Focus
 
-### 1. Content Generation Tools
+### 1. File-Level Validation & Linting (Core V1 Tools)
 
-#### `scorm_generate_course`
-Generate complete SCORM packages from natural language descriptions.
+These tools validate AI-generated SCORM files without running them, providing immediate feedback on structure and compliance.
+
+#### `scorm_validate_workspace`
+Comprehensive validation of AI-generated SCORM course directory.
 
 **Parameters:**
-- `description` (string): Natural language course description
-- `learning_objectives` (array): List of learning objectives
-- `target_audience` (string): Intended learners
-- `duration` (string): Expected completion time
-- `difficulty_level` (enum): beginner|intermediate|advanced
-- `content_types` (array): text|video|interactive|assessment
-- `scorm_version` (enum): 1.2|2004_3rd|2004_4th
-- `style_preferences` (object): Basic styling and formatting preferences
+- `workspace_path` (string): Path to directory containing SCORM files
+- `validation_level` (enum): basic|strict|pedantic
+- `check_categories` (array): manifest|api_usage|sequencing|files|structure
 
 **Response:**
-- `package_path` (string): Path to generated SCORM package
-- `manifest_summary` (object): Key manifest details
-- `content_outline` (array): Generated content structure
-- `assets_created` (array): List of generated assets
-- `validation_results` (object): Initial compliance check
+```json
+{
+  "success": false,
+  "validation_results": {
+    "manifest": {
+      "valid": false,
+      "errors": ["Missing default organization", "Invalid resource href"],
+      "warnings": ["Metadata incomplete"]
+    },
+    "api_usage": {
+      "scanned_files": ["sco1.html", "assessment.js"],
+      "issues": [
+        {
+          "file": "sco1.html",
+          "line": 45,
+          "issue": "Missing Initialize() call before SetValue()",
+          "fix_suggestion": "Add API_1484_11.Initialize('') before setting values"
+        }
+      ]
+    }
+  },
+  "compliance_score": 65,
+  "actionable_fixes": [
+    "Add <organization> element with items to imsmanifest.xml"
+  ]
+}
+```
 
-#### `scorm_generate_assessment`
-Create sophisticated assessments with various question types.
+#### `scorm_lint_manifest`
+Focused validation of imsmanifest.xml against SCORM schemas.
 
 **Parameters:**
-- `topic` (string): Assessment topic
-- `question_types` (array): multiple_choice|true_false|fill_blank|essay|simulation
-- `difficulty_distribution` (object): Percentage per difficulty level
-- `adaptive_behavior` (boolean): Enable adaptive questioning
-- `time_limit` (number): Time limit in minutes
-- `passing_score` (number): Required score percentage
-- `feedback_level` (enum): none|basic|detailed|remedial
+- `workspace_path` (string): Course directory path
+- `scorm_version` (enum): auto|2004_3rd|2004_4th
+- `strict_mode` (boolean): Enforce stricter validation rules
 
-#### `scorm_generate_interaction`
-Create interactive learning elements with proper SCORM API integration.
+#### `scorm_lint_api_usage`
+Scan HTML/JS files for SCORM API integration problems.
 
 **Parameters:**
-- `interaction_type` (enum): simulation|assessment|navigation|data_collection
-- `scorm_integration` (object): API integration requirements
-- `data_model_usage` (array): Required cmi.* elements for tracking
-- `debug_mode` (boolean): Include debugging aids in generated code
-- `compliance_level` (enum): basic|full|pedantic
+- `workspace_path` (string): Course directory path
+- `scan_depth` (enum): surface|deep
+- `api_version` (enum): scorm_1_2|scorm_2004|both
 
-#### `scorm_fix_compliance_issues`
-Automatically identify and fix common SCORM compliance problems.
+### 2. Runtime Testing & Execution (Visual Validation)
+
+These tools actually run AI-generated SCORM content using your production-ready engine, enabling AI agents to see how their courses work.
+
+#### `scorm_test_api_integration`
+Execute course and test SCORM API interactions in controlled environment.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
-- `auto_fix` (boolean): Automatically apply fixes where possible
-- `fix_categories` (array): manifest|api_usage|sequencing|data_model
-- `backup_original` (boolean): Create backup before applying fixes
+- `workspace_path` (string): Course directory path
+- `test_scenario` (object): Sequence of actions to test
+- `capture_api_calls` (boolean): Record all API interactions
 
 **Response:**
-- `issues_found` (array): List of compliance issues detected
-- `fixes_applied` (array): Automatic fixes that were applied
-- `manual_fixes_needed` (array): Issues requiring manual intervention
-- `compliance_improvement` (object): Before/after compliance scores
-- `backup_path` (string): Path to original package backup if created
+```json
+{
+  "success": true,
+  "api_test_results": {
+    "initialize_success": true,
+    "api_calls_captured": [
+      {
+        "method": "Initialize",
+        "parameters": [""],
+        "result": "true",
+        "error_code": "0"
+      }
+    ],
+    "data_model_state": {
+      "cmi.core.lesson_status": "incomplete"
+    }
+  },
+  "detected_issues": []
+}
+```
 
-#### `scorm_generate_test_data`
-Generate realistic test data for SCORM development and debugging.
+#### `scorm_take_screenshot`
+Capture visual screenshots of SCORM content for AI agent validation.
 
 **Parameters:**
-- `data_type` (enum): learner_records|api_sequences|test_scenarios
-- `scenario_complexity` (enum): simple|realistic|stress_test
-- `include_edge_cases` (boolean): Include boundary conditions and error cases
-- `format` (enum): json|scorm_api_calls|runtime_data
+- `workspace_path` (string): Course directory path
+- `viewport` (object): Viewport settings (e.g., { device?: 'desktop|tablet|mobile', width?: number, height?: number, scale?: number })
+- `capture_options` (object): Screenshot configuration
 
 **Response:**
-- `test_data` (object): Generated test data in requested format
-- `usage_scenarios` (array): Suggested ways to use the generated data
-- `expected_behaviors` (object): Expected SCORM API responses
-- `edge_cases_included` (array): Boundary conditions included in test data
+```json
+{
+  "success": true,
+  "screenshot_data": "base64_encoded_image",
+  "layout_analysis": {
+    "responsive_issues": [
+      {
+        "type": "button_too_small",
+        "description": "Next button below minimum touch target size",
+        "fix_suggestion": "Increase button padding to minimum 44px height"
+      }
+    ]
+  }
+}
+```
 
-### 2. Content Analysis Tools
-
-#### `scorm_analyze_package`
-Perform deep analysis of existing SCORM packages.
-
-**Parameters:**
-- `package_path` (string): Path to SCORM package
-- `analysis_depth` (enum): basic|detailed|comprehensive
-- `include_content_analysis` (boolean): Analyze actual content
-- `extract_structure_data` (boolean): Extract detailed course structure information
-
-**Response:**
-- `package_info` (object): Basic package metadata
-- `content_structure` (object): Hierarchical content organization
-- `learning_objectives` (array): Extracted objectives
-- `assessment_analysis` (object): Assessment quality metrics
-- `accessibility_score` (number): WCAG compliance score
-- `mobile_readiness` (number): Mobile compatibility score
-- `estimated_completion_time` (string): Calculated duration
-- `complexity_metrics` (object): Content complexity analysis
-
-#### `scorm_extract_metadata`
-Extract comprehensive metadata from SCORM content.
+#### `scorm_test_navigation_flow`
+Test complete course navigation and sequencing behavior.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
-- `metadata_types` (array): dublin_core|lom|custom
-- `include_technical_data` (boolean): Include technical implementation details
-- `language_detection` (boolean): Detect content languages
+- `workspace_path` (string): Course directory path
+- `navigation_sequence` (array): Steps to execute (start, next, previous, choice)
+- `capture_each_step` (boolean): Screenshot each navigation step
 
 ### 3. Validation & Testing Tools
 
@@ -197,7 +241,7 @@ Extract comprehensive metadata from SCORM content.
 Comprehensive SCORM standard compliance checking.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `scorm_version` (enum): auto|1.2|2004_3rd|2004_4th
 - `validation_level` (enum): basic|strict|pedantic
 - `additional_checks` (array): Extra validation categories to include
@@ -215,7 +259,7 @@ Comprehensive SCORM standard compliance checking.
 Launch real-time debugging session with GUI integration.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `debug_mode` (enum): api_calls|data_model|sequencing|all
 - `enable_breakpoints` (boolean): Enable API call breakpoints
 - `auto_launch_gui` (boolean): Automatically open debug GUI
@@ -232,7 +276,7 @@ Launch real-time debugging session with GUI integration.
 Monitor and debug SCORM API interactions in real-time.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `monitoring_mode` (enum): real_time|batch|replay
 - `api_filters` (array): initialize|terminate|get_value|set_value|commit
 - `data_elements` (array): Specific cmi elements to monitor
@@ -251,7 +295,7 @@ Monitor and debug SCORM API interactions in real-time.
 Analyze and optimize SCORM content for development and debugging.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `optimization_targets` (array): performance|accessibility|debug_info|compliance
 - `preserve_functionality` (boolean): Maintain all current features
 - `add_debug_info` (boolean): Inject debugging aids for development
@@ -261,7 +305,7 @@ Analyze and optimize SCORM content for development and debugging.
 Interactive data model inspection and manipulation.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `inspection_mode` (enum): live|static|comparative
 - `enable_modification` (boolean): Allow data model changes for testing
 - `track_changes` (boolean): Log all data model modifications
@@ -276,7 +320,7 @@ Interactive data model inspection and manipulation.
 Real-time sequencing rule debugging and visualization.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `trace_level` (enum): basic|detailed|verbose
 - `enable_step_through` (boolean): Enable step-by-step sequencing
 - `visualize_tree` (boolean): Show activity tree visualization
@@ -287,28 +331,12 @@ Real-time sequencing rule debugging and visualization.
 - `visual_tree_url` (string): URL for activity tree visualization if enabled
 - `trace_log_url` (string): Real-time trace log interface URL
 
-#### `scorm_take_screenshot`
-Capture visual screenshots of SCORM content for validation and documentation.
-
-**Parameters:**
-- `package_path` (string): Path to SCORM package
-- `viewport_size` (object): Width and height for screenshot
-- `device_type` (enum): desktop|tablet|mobile
-- `capture_options` (object): Screenshot configuration options
-- `include_annotations` (boolean): Add visual annotations for issues
-
-**Response:**
-- `screenshot_data` (string): Base64 encoded screenshot image
-- `screenshot_path` (string): Path to saved screenshot file
-- `visual_analysis` (object): Automated visual issue detection
-- `layout_metrics` (object): Content layout measurements
-- `accessibility_issues` (array): Visual accessibility problems detected
 
 #### `scorm_interactive_develop`
 Launch interactive development session with advanced SCORM Inspector.
 
 **Parameters:**
-- `package_path` (string): Path to SCORM package
+- `workspace_path` (string): Path to SCORM package directory or extracted workspace
 - `development_mode` (enum): content_edit|debug_api|validate_live|sequence_test
 - `auto_validate` (boolean): Continuous validation during development
 - `enable_inspector` (boolean): Launch advanced SCORM Inspector
@@ -319,6 +347,50 @@ Launch interactive development session with advanced SCORM Inspector.
 - `live_validation` (boolean): Real-time validation status
 - `development_url` (string): Local development interface URL
 - `available_tools` (array): Available development tools in GUI
+
+
+### 5. Session Management Tools
+
+Stateful tools require an explicit session to isolate resources, enable progress reporting, and manage artifacts.
+#### Terminology: MCP session vs SCORM RTE session
+- MCP session: Resource container for a single package; manages workspace, artifacts, optional offscreen execution, and event streaming for tool calls.
+- SCORM RTE session: The runtime lifecycle inside the content attempt (Initialize → Terminate). A single MCP session may run multiple RTE sessions during testing.
+
+
+#### `scorm_session_open`
+Open a new session bound to a single SCORM package. Creates an isolated workspace and (optionally) an offscreen execution context.
+
+- Parameters:
+  - `package_path` (string, required): Absolute path to a .zip or folder
+  - `execution` (object, optional): `{ headless: true, allow_network: false }`
+  - `timeout_ms` (number, optional): Session idle timeout
+- Response:
+  - `session_id` (string)
+  - `workspace_path` (string)
+  - `headless_active` (boolean)
+
+#### `scorm_session_status`
+Return current session state and high-level metrics.
+
+- Parameters: `session_id` (string)
+- Response: `{ state: opening|ready|running|closing, started_at, last_activity_at, artifacts_count }`
+
+#### `scorm_session_events`
+Stream/poll structured events emitted during long-running operations.
+
+- Parameters:
+  - `session_id` (string)
+  - `since_event_id` (number, optional)
+  - `max_events` (number, optional)
+- Response: `{ events: [...], latest_event_id }`
+
+Event examples: `debug:api_call`, `trace:sequencing_step`, `validation:progress`, `navigation:completed`, `screenshot:capture_done`, `error`.
+
+#### `scorm_session_close`
+Shut down resources, close offscreen contexts, and finalize artifacts.
+
+- Parameters: `session_id` (string)
+- Response: `{ success: boolean, artifacts_manifest_path }`
 
 ## Data Formats & Integration
 
@@ -342,22 +414,75 @@ Launch interactive development session with advanced SCORM Inspector.
 - **Interactive Validation**: Visual compliance checking with auto-fix suggestions
 - **Content Development**: Integrated editing and testing environment
 
-## AI Agent Development Workflows
+## AI Agent Testing Workflow
 
-### SCORM Development Pipeline
-- **Content Analysis Agent**: Analyzes existing content and identifies improvement opportunities
-- **SCORM Structure Agent**: Designs optimal manifest structure and sequencing rules
-- **Content Generation Agent**: Creates or modifies SCORM content with proper API integration
-- **Validation Agent**: Performs comprehensive SCORM compliance checking
-- **Debug Agent**: Identifies and resolves API integration issues
-- **Optimization Agent**: Enhances performance and developer experience
+### Typical AI Agent Development Process
 
-### Development Quality Assurance
-- **Compliance Agent**: Ensures 100% SCORM 2004 4th Edition compliance
-- **Testing Agent**: Runs comprehensive validation and debugging tests
-- **Integration Agent**: Validates API interactions and data model usage
-- **Performance Agent**: Optimizes package structure and resource usage
-- **Documentation Agent**: Generates development documentation and API usage guides
+```javascript
+// 1. AI agent writes SCORM course files directly
+// Creates: imsmanifest.xml, sco1.html, styles.css, script.js, etc.
+
+// 2. Open validation session
+const session = await scorm_session_open({
+  workspace_path: "./my-generated-course",
+  execution: {headless: true}
+});
+
+// 3. Validate file structure and compliance
+const validation = await scorm_validate_workspace({
+  workspace_path: "./my-generated-course",
+  validation_level: "strict"
+});
+
+if (!validation.success) {
+  console.log("Issues found:", validation.validation_results);
+  // AI agent fixes files based on specific feedback
+}
+
+// 4. Test SCORM API integration by actually running the course
+const apiTest = await scorm_test_api_integration({
+  workspace_path: "./my-generated-course",
+  capture_api_calls: true
+});
+
+// 5. Visual validation - see how the course actually looks
+const screenshots = await scorm_take_screenshot({
+  workspace_path: "./my-generated-course",
+  viewport: { device: "mobile", width: 768, height: 1024 }
+});
+
+if (screenshots.layout_analysis.responsive_issues.length > 0) {
+  console.log("Layout issues detected:", screenshots.layout_analysis.responsive_issues);
+  // AI agent can see exactly what's wrong and fix CSS
+}
+
+// 6. Test navigation flow
+const navTest = await scorm_test_navigation_flow({
+  workspace_path: "./my-generated-course",
+  navigation_sequence: ["start", "next", "next", "complete"],
+  capture_each_step: true
+});
+
+// 7. AI agent iterates on files based on testing results
+// 8. Repeat until all tests pass
+
+await scorm_session_close({session_id: session.session_id});
+```
+
+### Value for AI Agents
+
+**Before MCP Tool:**
+- AI generates SCORM files blindly
+- No way to test if they actually work
+- Relies on manual testing by humans
+- High failure rate in real LMS environments
+
+**After MCP Tool:**
+- AI can validate generated files immediately
+- See visual evidence of layout issues
+- Test SCORM API integration automatically
+- Fix issues based on specific feedback
+- Confident deployment to LMS systems
 
 ## Configuration & Settings
 
@@ -454,6 +579,81 @@ Built-in validation configuration:
 - **Development Acceleration**: Streamlined workflows for rapid SCORM content creation
 - **Standards Adherence**: Strict compliance with SCORM 2004 4th Edition specifications
 - **Developer Productivity**: Enhanced development experience with advanced debugging tools
+
+
+## Implementation Foundations and MVP Scope (Updated)
+
+### Standard Response Envelope and Error Mapping
+All tools should return a uniform envelope:
+
+```json
+{
+  "success": true,
+  "error_code": null,
+  "message": "",
+  "data": { /* tool-specific */ },
+  "artifacts": [ { "type": "report|screenshot|trace|patch", "path": "sessions/<id>/..." } ],
+  "diagnostics": { "duration_ms": 0 }
+}
+```
+
+- Error codes map to existing ParserErrorCode where applicable: `MANIFEST_NOT_FOUND`, `CONTENT_FILE_MISSING`, `SECURITY_VIOLATION`, `PATH_RESOLUTION_ERROR`, `MANIFEST_VALIDATION_ERROR`.
+- Always prefer actionable `message` text; keep raw stacks only in logs.
+- Responses may also include `artifacts_manifest_path` referencing the session's artifacts.json manifest for the full list of generated artifacts.
+
+
+### Headless Execution Model (for CI and non-visual sessions)
+- Use an offscreen BrowserWindow/WebContents for any operation that needs RTE execution, API injection, sequencing evaluation with UI, or screenshots.
+- Recommended flags: `{ show: false, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false } }`.
+- Pure analysis/validation tools run truly headless without creating web contents.
+
+### Security & Path Policies
+- Enforce the Compatibility Requirements via PathUtils for all file operations:
+  - Manifest must be at package root; no recursive search
+  - All paths resolved relative to manifest root; block traversal (`..` outside workspace)
+  - Default to offline execution; `allow_network` must be explicitly opted-in per session
+- For mutation tools (e.g., compliance fixes):
+  - Operate on a copy in the session workspace, never in-place
+  - `backup_original: true` by default; produce a patch/diff artifact when changes are made
+
+### Artifacts & Session Directory Layout
+- Each session has its own workspace directory: `sessions/<session_id>/`
+- Maintain `artifacts.json` manifest listing artifacts with types, paths, and metadata
+- All tool responses include relative `artifacts[*].path` inside the session workspace
+
+### MVP (V1) Tool Surface
+Ship a small, high-value, file-centric set first:
+
+- Linting & Validation (pure headless)
+  - `scorm_validate_workspace` (runs a suite of checks across the working folder)
+  - `scorm_lint_manifest` (validate imsmanifest.xml vs schemas and rules)
+  - `scorm_lint_sequencing` (static SN rule checks and rule conflicts)
+  - `scorm_lint_api_usage` (scan HTML/JS for SCORM API anti-patterns)
+  - `scorm_validate_compliance` (end-to-end compliance assessment)
+
+- Runtime Debugging (offscreen execution)
+  - `scorm_debug_session_live` (start/status/events/stop via Session Tools)
+  - `scorm_trace_sequencing` (basic tracing)
+  - `scorm_debug_api_calls` (API call monitoring)
+  - `scorm_take_screenshot` (activity/content screenshots)
+
+- Reporting & Guidance
+  - `scorm_report` (HTML/JSON report aggregating findings, with remediation guidance)
+
+Defer to V2 (optional): generation tools and auto-fix tools that modify content directly. Prefer patch proposals by default.
+
+### Long-Running Operations
+- Return quickly with `session_id` and a `state: running` where applicable
+- Clients poll `scorm_session_events` and/or `scorm_session_status`
+- Provide `cancel` via `scorm_session_close`
+
+### Testing Strategy (CI-friendly)
+- Unit tests per tool: input validation, error mapping, envelope correctness
+- Session lifecycle tests: open → analyze/validate → close; assert cleanup and artifacts manifest
+- Headless smoke: minimal course load, API Initialize/Terminate observed, 1 screenshot captured
+- Non-regression: reuse existing validator/inspector fixtures and ensure event shapes remain stable
+
+These updates formalize sessions, standardize responses, ensure safe-by-default behavior, and define a pragmatic V1 scope aligned with the current architecture.
 
 ## Conclusion
 
