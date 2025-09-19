@@ -147,7 +147,16 @@ Example minimal MCP client config (conceptual):
 
 - Result shape:
   - On success: { "jsonrpc":"2.0", "id":N, "result": { data: { …tool specific… } } }
-  - On error:   { "jsonrpc":"2.0", "id":N, "error": { code, message, data?: { error_code } } }
+  - On error:   { "jsonrpc":"2-0", "id":N, "error": { code, message, data?: { error_code } } }
+
+
+### Architectural Anti-Patterns
+
+Clients integrating with the MCP tool **MUST NOT**:
+
+*   **Parse Non-JSON Output:** The `stdout` stream is guaranteed to contain only JSON-RPC 2.0 messages. Clients **MUST NOT** attempt to parse any other format or diagnostic text from `stdout`.
+*   **Rely on Fallbacks:** Clients **MUST** handle JSON-RPC errors (like `ELECTRON_REQUIRED`) and **MUST NOT** implement or expect fallback behaviors.
+*   **Use Legacy Protocols:** Clients **MUST** send well-formed JSON-RPC 2.0 messages. Plain NDJSON or other legacy message shapes are not supported and will result in a parse error.
 
 
 

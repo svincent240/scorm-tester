@@ -20,6 +20,9 @@ There **MUST NOT** be any fallback or "basic" modes of operation. If a required 
 ### 2.4. Strict, Structured Logging
 All logging **MUST** be directed through the centralized, shared logger (`src/shared/utils/logger.js`). Logs **MUST** be structured and provide context. Direct use of `console.*` is forbidden.
 
+### 2.5. Unidirectional Data Flow
+The main process **MUST** act as the authoritative source of state. It pushes state to consumers (like the GUI) but **MUST NOT** depend on or query state from a consumer. It is the master, not a peer.
+
 ## 3. System Architecture
 
 The main process is composed of two primary layers: **System Services** for application management and the **SCORM Engine** for all standards-based logic.
@@ -91,3 +94,5 @@ A systematic approach to error handling is mandatory.
     *   `info`: For significant, non-repetitive lifecycle events (e.g., `Service initialized`, `SCORM package loaded`, `IPC rate-limit engaged`).
     *   `debug`: For detailed diagnostic information useful for troubleshooting. **MUST** be used only when `LOG_LEVEL=debug`.
 *   **Context**: All log entries **MUST** include a structured context object to aid debugging. No sensitive information should be logged.
+assing IPC Handler:** Services attempting to communicate with the renderer process outside of the `IpcHandler`.
+*   **Renderer State Dependency:** The main process querying for or depending on state held within the renderer process.

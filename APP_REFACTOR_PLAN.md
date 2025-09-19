@@ -12,6 +12,7 @@ Our review has identified three significant architectural flaws that are the roo
 
 #### Flaw 1: Inconsistent Service Ownership & Interfacing
 - **Description**: The boundary between the main and renderer processes is blurred. Core services are sometimes initialized or controlled from the UI, and the communication layer (IPC) has two competing, inconsistent implementation patterns (a modern declarative one and a legacy one).
+- **Solution Principle**: Enforce a strict boundary by isolating the preload bridge to a single service (`ScormClient`) in the renderer.
 - **Evidence**: `BUG-028` (redundant service initialization), `BUG-032` (inconsistent IPC routing).
 - **Impact**: Unpredictable behavior, maintenance overhead, and developer confusion.
 
@@ -128,3 +129,4 @@ The plan is broken into four phases, starting with a foundational simplification
 ## 4. Expected Outcome
 
 Upon completion of this plan, the SCORM Tester application will have a stable and coherent architecture that is secure, maintainable, and free of its most significant structural flaws. The codebase will be fully aligned with the principles laid out in the `CORE_APP_SPEC.md` and `GUI_APP_SPEC.md`, providing a solid foundation for all future work.
+ solid foundation for all future work.
