@@ -77,35 +77,88 @@ The tool supports multiple deployment modes to serve different use cases:
 #### 1. Development Mode (Default)
 
 ```bash
-scorm-mcp-tool
+npm run mcp
 ```
 
-- **MCP server** for AI agents via stdio
-- **Interactive GUI** for real-time debugging and validation
+- **MCP stdio server** for AI agents (Claude Code, Kilo Code) started via a single command or JSON MCP config pointing to `npm run mcp`
+- **Runs inside Electron offscreen by default**; no flags or extra steps required
 - **Advanced SCORM Inspector** for detailed package analysis
 - **Hybrid workflow** combining AI automation with visual development
 
-#### 2. CI/CD Mode
+#### Single Execution Model
 
 ```bash
-scorm-mcp-tool --headless
+npm run mcp
 ```
 
-- **Pure stdio MCP server** for automated workflows
-- **No GUI overhead** - optimized for build pipelines
-- **Automated validation** and compliance checking
-- **Batch processing** capabilities for multiple packages
+- **Always real**: MCP stdio server runs inside Electron offscreen (no flags, no modes)
+- **Same behavior** in dev and CI; on headless Linux use: `xvfb-run -a npm run mcp`
+- **Agent-ready**: Works out of the box via JSON MCP config pointing to `npm run mcp`
+- Separate human GUI app remains available for interactive use, sharing the same core engine
 
-#### 3. Interactive Mode
+### Agent Integration Quick Start (MCP clients)
 
-```bash
-scorm-mcp-tool --interactive
+- Command: `npm run mcp`
+- Protocol: JSON-RPC 2.0 over stdio (one JSON-RPC message per line on stdout; no non-JSON output on stdout)
+- Headless CI (Linux): `xvfb-run -a npm run mcp`
+- Works out of the box for Claude Code / Kilo Code via JSON MCP config pointing to `npm run mcp`
+
+Example minimal MCP client config (conceptual):
+
+```json
+{
+  "command": "npm",
+  "args": ["run", "mcp"],
+  "env": {},
+  "transport": "stdio"
+}
 ```
 
-- **Full desktop application** with MCP server background
-- **Real-time debugging** with API call monitoring
-- **Visual content development** with immediate feedback
-- **Manual testing** integrated with automated workflows
+
+### JSON-RPC 2.0 Only (Enforced)
+
+- Transport: JSON-RPC 2.0 over stdio (one message per line)
+- Stdout: strictly JSON-RPC messages only; any diagnostics must go to stderr
+- Supported MCP methods:
+  - initialize
+  - tools/list
+  - tools/call
+- No legacy/plain NDJSON shapes are accepted. Clients must speak JSON-RPC 2.0.
+
+### Fail‑Fast, No Fallbacks, No Silent Errors (Critical)
+
+- This MCP strictly enforces fail‑fast behavior. If any prerequisite is missing (e.g., Electron runtime, SN bridge not initialized, session/runtime not open), the server MUST return a JSON‑RPC error; tools MUST NOT fallback to alternative behaviors or return partial "success".
+- No implicit retries, no alternative method name probing, and no silent degradations.
+- Error surfacing is part of the debugging experience: callers should see clear, actionable errors to fix compliance and runtime issues quickly.
+
+### Error Model (JSON‑RPC 2.0)
+
+- Protocol errors:
+  - -32700 Parse error (id: null)
+  - -32600 Invalid Request
+  - -32601 Method not found
+  - -32602 Invalid params
+  - -32000 Server/tool error
+- Tool errors use -32000 with data.error_code for precise classification. Common codes:
+  - MCP_INVALID_PARAMS, MCP_UNKNOWN_SESSION, RUNTIME_NOT_OPEN, ELECTRON_REQUIRED
+  - MANIFEST_NOT_FOUND, CONTENT_FILE_MISSING, MANIFEST_VALIDATION_ERROR
+  - SN_BRIDGE_UNAVAILABLE, SN_NOT_INITIALIZED, NAV_UNSUPPORTED_ACTION
+  - INVALID_SCORM_METHOD, SCORM_API_ERROR
+
+- Result shape:
+  - On success: { "jsonrpc":"2.0", "id":N, "result": { data: { …tool specific… } } }
+  - On error:   { "jsonrpc":"2.0", "id":N, "error": { code, message, data?: { error_code } } }
+
+
+
+### Implementation Status (V1 summary)
+- MCP core server, standard envelope, and tool router implemented
+- Session lifecycle implemented: open, status, events, close (per-session workspace + artifacts manifest)
+- Validation tools implemented: `scorm_lint_manifest`, `scorm_lint_api_usage`, `scorm_validate_workspace`
+- Runtime tools available under Electron offscreen: `scorm_test_api_integration`, `scorm_take_screenshot`
+- Offscreen BrowserWindows with real SCORM adapter via preload/IPC are used by default
+- Next: richer `scorm_session_events`, `scorm_trace_sequencing`, navigation flow testing, expanded validation rules
+
 
 ### Core Components
 
@@ -255,20 +308,6 @@ Comprehensive SCORM standard compliance checking.
 - `fixed_issues` (array): Issues automatically resolved
 - `validation_report` (string): Detailed HTML report
 
-#### `scorm_debug_session_live`
-Launch real-time debugging session with GUI integration.
-
-**Parameters:**
-- `workspace_path` (string): Path to SCORM package directory or extracted workspace
-- `debug_mode` (enum): api_calls|data_model|sequencing|all
-- `enable_breakpoints` (boolean): Enable API call breakpoints
-- `auto_launch_gui` (boolean): Automatically open debug GUI
-
-**Response:**
-- `session_id` (string): Debug session identifier
-- `gui_available` (boolean): Whether GUI debugging is active
-- `api_monitor_active` (boolean): Real-time API monitoring status
-- `debug_url` (string): Local debug interface URL if available
 
 ### 4. Debugging & Optimization Tools
 
@@ -291,30 +330,7 @@ Monitor and debug SCORM API interactions in real-time.
 - `recommendations` (array): Optimization suggestions
 - `gui_session_id` (string): GUI session identifier if visual debugging enabled
 
-#### `scorm_optimize_content`
-Analyze and optimize SCORM content for development and debugging.
 
-**Parameters:**
-- `workspace_path` (string): Path to SCORM package directory or extracted workspace
-- `optimization_targets` (array): performance|accessibility|debug_info|compliance
-- `preserve_functionality` (boolean): Maintain all current features
-- `add_debug_info` (boolean): Inject debugging aids for development
-- `compliance_auto_fix` (boolean): Automatically fix common compliance issues
-
-#### `scorm_inspect_data_model`
-Interactive data model inspection and manipulation.
-
-**Parameters:**
-- `workspace_path` (string): Path to SCORM package directory or extracted workspace
-- `inspection_mode` (enum): live|static|comparative
-- `enable_modification` (boolean): Allow data model changes for testing
-- `track_changes` (boolean): Log all data model modifications
-
-**Response:**
-- `inspection_session_id` (string): Session identifier
-- `data_model_snapshot` (object): Current data model state
-- `modification_log` (array): History of changes if tracking enabled
-- `compliance_status` (object): Data model compliance validation
 
 #### `scorm_trace_sequencing`
 Real-time sequencing rule debugging and visualization.
@@ -362,12 +378,133 @@ Open a new session bound to a single SCORM package. Creates an isolated workspac
 
 - Parameters:
   - `package_path` (string, required): Absolute path to a .zip or folder
-  - `execution` (object, optional): `{ headless: true, allow_network: false }`
+  - `execution` (object, optional): `{ allow_network: false }`
   - `timeout_ms` (number, optional): Session idle timeout
 - Response:
+
+## MCP Tool Schemas (as-implemented V1)
+
+Notes:
+- All methods are invoked via tools/call and follow JSON-RPC 2.0. On failure, the server returns a JSON-RPC error with code -32000 and data.error_code per Error Model above. No fallbacks and no silent errors.
+- All inputs are validated; missing/invalid parameters return -32602 with data.error_code MCP_INVALID_PARAMS.
+
+### Session lifecycle
+
+- scorm_session_open
+  - params: { package_path: string, execution?: { allow_network?: boolean }, timeout_ms?: number }
+  - result.data: { session_id: string, workspace_path: string }
+  - errors: MANIFEST_NOT_FOUND, PATH_RESOLUTION_ERROR
+
+- scorm_session_status
+  - params: { session_id: string }
+  - result.data: { state: "opening"|"ready"|"running"|"closing", started_at: number, last_activity_at: number, artifacts_count: number }
+  - errors: MCP_UNKNOWN_SESSION
+
+- scorm_session_events
+  - params: { session_id: string, since_event_id?: number, max_events?: number }
+  - result.data: { events: Array<{ id:number,type:string,payload?:object,time:number }>, latest_event_id: number }
+  - errors: MCP_UNKNOWN_SESSION
+
+- scorm_session_close
+  - params: { session_id: string }
+  - result.data: { success: boolean, artifacts_manifest_path?: string }
+  - errors: MCP_UNKNOWN_SESSION
+
+### Persistent runtime (per session)
+
+- scorm_runtime_open
+  - params: { session_id: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number } }
+  - result.data: { runtime_id: string, entry_found: boolean, viewport: object }
+  - errors: MCP_UNKNOWN_SESSION, ELECTRON_REQUIRED, MANIFEST_NOT_FOUND, MANIFEST_LAUNCH_NOT_FOUND
+
+- scorm_runtime_status
+  - params: { session_id: string }
+  - result.data: { open: boolean, url?: string, initialize_state?: "none"|"initialized"|"terminated", last_api_method?: string|null, last_api_ts?: number|null }
+  - errors: none (unknown session returns open:false or MCP_UNKNOWN_SESSION if session missing)
+
+- scorm_runtime_close
+  - params: { session_id: string }
+  - result.data: { success: boolean }
+  - errors: none
+
+### Attempt lifecycle and API
+
+- scorm_attempt_initialize
+  - params: { session_id: string }
+  - result.data: { result: "true"|"false" }
+  - errors: RUNTIME_NOT_OPEN, SCORM_API_ERROR
+
+- scorm_attempt_terminate
+  - params: { session_id: string }
+  - result.data: { result: "true"|"false" }
+  - errors: RUNTIME_NOT_OPEN, SCORM_API_ERROR
+
+- scorm_api_call
+  - params: { session_id: string, method: string, args?: any[] }
+  - result.data: { result: string }
+  - errors: RUNTIME_NOT_OPEN, INVALID_SCORM_METHOD, SCORM_API_ERROR
+
+### Sequencing & Navigation (SN)
+
+- scorm_nav_get_state
+  - params: { session_id: string }
+  - result.data: { ...status }
+  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, SN_NOT_INITIALIZED
+
+- scorm_nav_next
+  - params: { session_id: string }
+  - result.data: { success: boolean }
+  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+
+- scorm_nav_previous
+  - params: { session_id: string }
+  - result.data: { success: boolean }
+  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+
+- scorm_nav_choice
+  - params: { session_id: string, targetId: string }
+  - result.data: { success: boolean }
+  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+
+- scorm_sn_init
+  - params: { session_id: string }
+  - result.data: { success: boolean }
+  - errors: MCP_UNKNOWN_SESSION, RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, SN_INIT_FAILED
+
+- scorm_sn_reset
+  - params: { session_id: string }
+  - result.data: { success: boolean }
+  - errors: MCP_UNKNOWN_SESSION, RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, SN_RESET_FAILED
+
+
+### Runtime-bound screenshot
+
+- scorm_capture_screenshot
+  - params: { session_id: string, capture_options?: { wait_for_selector?: string, wait_timeout_ms?: number, delay_ms?: number } }
+  - result.data: { artifact_path?: string, screenshot_data?: string }
+  - errors: RUNTIME_NOT_OPEN, ELECTRON_REQUIRED, CAPTURE_FAILED
+
+### File-centric validation & debugging (stateless)
+
+- scorm_validate_workspace
+  - params: { workspace_path: string, validation_level?: "basic"|"strict"|"pedantic", check_categories?: string[] }
+  - result.data: { success: boolean, validation_results: object, compliance_score?: number, actionable_fixes?: string[] }
+  - errors: MANIFEST_NOT_FOUND, MANIFEST_VALIDATION_ERROR
+
+- scorm_lint_manifest
+  - params: { workspace_path: string, scorm_version?: "auto"|"2004_3rd"|"2004_4th", strict_mode?: boolean }
+  - result.data: { valid: boolean, errors?: string[], warnings?: string[] }
+  - errors: MANIFEST_NOT_FOUND, MANIFEST_VALIDATION_ERROR
+
+- scorm_lint_api_usage
+  - params: { workspace_path: string, scan_depth?: "surface"|"deep", api_version?: "scorm_1_2"|"scorm_2004"|"both" }
+  - result.data: { scanned_files: string[], issues: Array<{file:string,line:number,issue:string,fix_suggestion?:string}> }
+  - errors: CONTENT_FILE_MISSING
+
+
+
   - `session_id` (string)
   - `workspace_path` (string)
-  - `headless_active` (boolean)
 
 #### `scorm_session_status`
 Return current session state and high-level metrics.
@@ -388,6 +525,29 @@ Event examples: `debug:api_call`, `trace:sequencing_step`, `validation:progress`
 
 #### `scorm_session_close`
 Shut down resources, close offscreen contexts, and finalize artifacts.
+
+
+### Runtime test utilities (stateless)
+
+- scorm_test_api_integration
+  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, capture_api_calls?: boolean, test_scenario?: object }
+  - result.data: { api_test_results: { initialize_success: boolean, data_model_state: object, api_calls_captured?: any[] }, manifest_ok: boolean, scorm_version: string|null, scenario_ack: boolean }
+  - errors: ELECTRON_REQUIRED
+
+- scorm_test_navigation_flow
+  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, capture_each_step?: boolean, navigation_sequence?: string[] }
+  - result.data: { supported: true, entry_found: true, steps_executed: number, artifacts: string[] }
+  - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, NAV_FLOW_ERROR
+
+- scorm_debug_api_calls
+  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, filter_methods?: string[] }
+  - result.data: { supported: true, entry_found: true, calls: any[], metrics: { total_calls: number, by_method: Record<string, number>, first_ts: number|null, last_ts: number|null, duration_ms: number, methods: string[] } }
+  - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, DEBUG_API_ERROR
+
+- scorm_trace_sequencing
+  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, trace_level?: "basic"|"detailed"|"verbose" }
+  - result.data: { supported: true, entry_found: true, trace: any[], trace_level: "basic"|"detailed"|"verbose", sequencing_active: boolean }
+  - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, TRACE_SEQUENCING_ERROR
 
 - Parameters: `session_id` (string)
 - Response: `{ success: boolean, artifacts_manifest_path }`
@@ -424,8 +584,7 @@ Shut down resources, close offscreen contexts, and finalize artifacts.
 
 // 2. Open validation session
 const session = await scorm_session_open({
-  workspace_path: "./my-generated-course",
-  execution: {headless: true}
+  workspace_path: "./my-generated-course"
 });
 
 // 3. Validate file structure and compliance
@@ -602,10 +761,25 @@ All tools should return a uniform envelope:
 - Responses may also include `artifacts_manifest_path` referencing the session's artifacts.json manifest for the full list of generated artifacts.
 
 
-### Headless Execution Model (for CI and non-visual sessions)
-- Use an offscreen BrowserWindow/WebContents for any operation that needs RTE execution, API injection, sequencing evaluation with UI, or screenshots.
-- Recommended flags: `{ show: false, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false } }`.
-- Pure analysis/validation tools run truly headless without creating web contents.
+### Execution Model (Always Real, Offscreen Electron)
+- All runtime tools use an offscreen BrowserWindow/WebContents for RTE execution, API injection, sequencing evaluation with UI, and screenshots.
+- WebPreferences are fixed: `{ offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false }`.
+- Validation-only tools do not create web contents.
+
+### Real Adapter + SN IPC (Always On)
+- Electron preload (src/mcp/preload/scorm-preload.js) exposes bridges:
+  - SCORM_MCP.apiInvoke(method, args) → routes to ipc 'scorm-mcp:api'
+  - SCORM_MCP.snInvoke(action, payload) → routes to ipc 'scorm-mcp:sn'
+- Runtime adapter (src/mcp/runtime-adapter.js) registers:
+  - ipcMain.handle('scorm-mcp:api', { method, args }) → delegates to ScormApiHandler instance per window
+  - ipcMain.handle('scorm-mcp:sn', { action, payload }):
+    - Actions:
+      - init({ manifestPath, folderPath }) → parse manifest and initialize SN service for the window
+      - status() → return SN status snapshot (implementation-defined shape)
+      - reset() → reset SN service state for the window
+- scorm_trace_sequencing integration:
+  - Continues to emit manifest-derived entries (sn_summary, sn_activity_titles)
+  - When bridge available and flag enabled, initializes SN engine and emits 'sn_engine_init' and 'sn_engine_status' trace entries
 
 ### Security & Path Policies
 - Enforce the Compatibility Requirements via PathUtils for all file operations:
@@ -624,7 +798,7 @@ All tools should return a uniform envelope:
 ### MVP (V1) Tool Surface
 Ship a small, high-value, file-centric set first:
 
-- Linting & Validation (pure headless)
+- Linting & Validation (no runtime window required)
   - `scorm_validate_workspace` (runs a suite of checks across the working folder)
   - `scorm_lint_manifest` (validate imsmanifest.xml vs schemas and rules)
   - `scorm_lint_sequencing` (static SN rule checks and rule conflicts)
@@ -632,7 +806,6 @@ Ship a small, high-value, file-centric set first:
   - `scorm_validate_compliance` (end-to-end compliance assessment)
 
 - Runtime Debugging (offscreen execution)
-  - `scorm_debug_session_live` (start/status/events/stop via Session Tools)
   - `scorm_trace_sequencing` (basic tracing)
   - `scorm_debug_api_calls` (API call monitoring)
   - `scorm_take_screenshot` (activity/content screenshots)
@@ -642,6 +815,42 @@ Ship a small, high-value, file-centric set first:
 
 Defer to V2 (optional): generation tools and auto-fix tools that modify content directly. Prefer patch proposals by default.
 
+
+### Implementation Progress (V1) — Updated
+
+Status of the MVP tool surface and related architecture based on current code and tests:
+
+- Linting & Validation
+  - scorm_validate_workspace — Implemented ✅
+  - scorm_lint_manifest — Implemented ✅
+  - scorm_lint_api_usage — Implemented ✅ (basic line-number hints added)
+  - scorm_lint_sequencing — Implemented ✅ (flags leaf items missing identifierref)
+  - scorm_validate_compliance — Implemented ✅ (basic aggregate scoring + JSON report)
+
+- Runtime Debugging / Execution
+  - scorm_test_api_integration — Implemented (Electron-aware; structured fallback when Electron unavailable) ✅
+  - scorm_take_screenshot — Implemented ✅
+    - Viewport presets (desktop/tablet/mobile) ✅
+    - capture_options: wait_for_selector, wait_timeout_ms, delay_ms ✅
+  - scorm_test_navigation_flow — Implemented ✅ (optional per-step screenshots + artifacts)
+  - scorm_debug_api_calls — Implemented ✅ (capture + filter_methods + metrics)
+  - scorm_trace_sequencing — Implemented ✅ (trace levels basic/detailed/verbose + event streaming)
+
+- Reporting & Guidance
+  - scorm_report — Implemented ✅ (JSON + HTML; HTML writes artifact when session_id provided)
+
+- Sessions & Artifacts
+  - scorm_session_open/status/events/close — Implemented ✅
+  - Per-session workspace + artifacts manifest — Implemented ✅
+  - Event streaming during runtime ops — Implemented ✅
+
+- Runtime Entry Resolution
+  - CAM-based default-organization/item launch resolution — Implemented ✅
+
+- Testing
+  - Jest unit tests for MCP tools — Implemented; current run: 21 suites, 30 tests, all passing ✅
+
+
 ### Long-Running Operations
 - Return quickly with `session_id` and a `state: running` where applicable
 - Clients poll `scorm_session_events` and/or `scorm_session_status`
@@ -650,7 +859,7 @@ Defer to V2 (optional): generation tools and auto-fix tools that modify content 
 ### Testing Strategy (CI-friendly)
 - Unit tests per tool: input validation, error mapping, envelope correctness
 - Session lifecycle tests: open → analyze/validate → close; assert cleanup and artifacts manifest
-- Headless smoke: minimal course load, API Initialize/Terminate observed, 1 screenshot captured
+- Runtime smoke: minimal course load, API Initialize/Terminate observed, 1 screenshot captured
 - Non-regression: reuse existing validator/inspector fixtures and ensure event shapes remain stable
 
 These updates formalize sessions, standardize responses, ensure safe-by-default behavior, and define a pragmatic V1 scope aligned with the current architecture.
