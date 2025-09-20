@@ -15,13 +15,22 @@ module.exports = {
   rules: {
     'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
     'prefer-const': 'error',
-    'no-var': 'error'
+    'no-var': 'error',
+    // Enforce global logging standard: no direct console usage in source code
+    'no-console': 'error'
   },
   overrides: [
     {
-      files: ['src/renderer/**/*.js'],
+      // Allow console only in our logger implementation and Node test/scripts files
+      files: [
+        'src/shared/utils/logger.js',
+        'tests/**/*',
+        'scripts/**/*',
+        '*.config.*',
+        'playwright.config.*'
+      ],
       rules: {
-        'no-console': 'error'
+        'no-console': 'off'
       }
     }
   ],

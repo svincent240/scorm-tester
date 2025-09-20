@@ -44,12 +44,23 @@ module.exports = [
     }
   },
   {
+    channel: 'scorm-set-values-batch',
+    handlerName: 'handleScormSetValuesBatch',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
     channel: 'scorm-commit',
     handlerName: 'handleScormCommit',
     options: {
       rateLimitProfile: 'default',
       useIpcResult: true,
-      validateArgs: true
+      validateArgs: true,
+      debounceMs: 250,
+      singleFlight: true
     }
   },
   {
@@ -180,6 +191,33 @@ module.exports = [
   {
     channel: 'get-session-data',
     handlerName: 'handleGetSessionData',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'scorm-get-progress-snapshot',
+    handlerName: 'handleScormGetProgressSnapshot',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'ui-settings:get',
+    handlerName: 'handleUIGetSettings',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: false
+    }
+  },
+  {
+    channel: 'ui-settings:set',
+    handlerName: 'handleUISetSettings',
     options: {
       rateLimitProfile: 'default',
       useIpcResult: true,
@@ -384,6 +422,34 @@ module.exports = [
       useIpcResult: true
     }
   },
+  // Course Outline validation route (missing previously)
+  {
+    channel: 'course-outline-validate-choice',
+    handlerName: 'handleCourseOutlineValidateChoice',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  // Course Outline available navigation route (missing previously)
+  {
+    channel: 'course-outline-get-available-navigation',
+    handlerName: 'handleCourseOutlineGetAvailableNavigation',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  // App control: quit
+  {
+    channel: 'quit-app',
+    handlerName: 'handleQuitApp',
+    options: {
+      rateLimitProfile: 'uiSparse'
+    }
+  },
+
   {
     channel: 'scorm-inspector-get-ssp-buckets',
     handlerName: 'handleScormInspectorGetSSPBuckets',
@@ -392,4 +458,45 @@ module.exports = [
       useIpcResult: true
     }
   },
+,
+  {
+    channel: 'validate-scorm-compliance',
+    handlerName: 'handleValidateScormCompliance',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'analyze-scorm-content',
+    handlerName: 'handleAnalyzeScormContent',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'sn:handleActivityExit',
+    handlerName: 'handleSNActivityExit',
+    options: {
+      rateLimitProfile: 'snBypass'
+    }
+  },
+  {
+    channel: 'sn:updateActivityLocation',
+    handlerName: 'handleSNUpdateActivityLocation',
+    options: {
+      rateLimitProfile: 'snBypass'
+    }
+  },
+  {
+    channel: 'get-app-root',
+    handlerName: 'handleGetAppRoot',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  }
 ];

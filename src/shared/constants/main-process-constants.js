@@ -210,6 +210,7 @@ const SECURITY_CONFIG = {
       'scorm-initialize',
       'scorm-get-value',
       'scorm-set-value',
+      'scorm-set-values-batch',
       'scorm-commit',
       'scorm-terminate',
       'select-scorm-package',

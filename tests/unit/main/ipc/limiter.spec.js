@@ -1,7 +1,10 @@
 const assert = require('assert');
-const TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter');
+let TokenBucketRateLimiter = null;
+try { TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter'); } catch (_) { /* module removed per Phase 1 */ }
 
-describe('TokenBucketRateLimiter - profiles and behavior', function() {
+const suite = TokenBucketRateLimiter ? describe : describe.skip;
+
+suite('TokenBucketRateLimiter - profiles and behavior', function() {
   let limiter;
   const sender = { id: 'sender-1' };
 

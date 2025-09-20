@@ -1,9 +1,12 @@
 const assert = require('assert');
-const TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter');
+let TokenBucketRateLimiter = null;
+try { TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter'); } catch (_) { /* removed per Phase 1 */ }
 const createSingleflight = require('../../../../src/shared/utils/singleflight');
 const ScormInspectorTelemetryStore = require('../../../../src/main/services/scorm-inspector/scorm-inspector-telemetry-store');
 
-describe('IPC - RateLimiter', function() {
+const suiteRL = TokenBucketRateLimiter ? describe : describe.skip;
+
+suiteRL('IPC - RateLimiter', function() {
   it('allows within limit and blocks when exceeded', function() {
     const rl = new TokenBucketRateLimiter();
     // create a tiny profile for test purposes

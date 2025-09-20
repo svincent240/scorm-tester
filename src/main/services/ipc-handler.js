@@ -1,20 +1,20 @@
 /**
  * IPC Handler Service
- * 
+ *
  * Centralizes all Inter-Process Communication handling between main and renderer
  * processes. Provides message routing, validation, security enforcement, and
  * error handling for all IPC operations.
- * 
+ *
  * @fileoverview IPC communication service for SCORM Tester main process
  */
 
 const { ipcMain, shell } = require('electron'); // Added shell for handleOpenExternal
 const path = require('path'); // Added path for path utils
 const BaseService = require('./base-service');
-const { 
+const {
   SERVICE_DEFAULTS,
   SECURITY_CONFIG,
-  SERVICE_EVENTS 
+  SERVICE_EVENTS
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 const PathUtils = require('../../shared/utils/path-utils'); // Added PathUtils
@@ -34,18 +34,18 @@ const IPC_RESULT = require('../../shared/utils/ipc-result');
 
 /**
  * IPC Handler Service Class
- * 
+ *
  * Manages all IPC communication between main and renderer processes with
  * security validation, message routing, and comprehensive error handling.
  */
 class IpcHandler extends BaseService {
   constructor(errorHandler, logger, options = {}) {
     super('IpcHandler', errorHandler, logger, options);
-    
+
     this.config = { ...SERVICE_DEFAULTS.IPC_HANDLER, ...options };
     // IPC refactor feature flag (Phase 0)
     this.ipcRefactorEnabled = !!(this.config && this.config.IPC_REFACTOR_ENABLED);
-    
+
     // Telemetry store, rate limiter, and SN snapshot service will be wired via dependencies (main)
     this.telemetryStore = null;
     this.rateLimiter = null;
@@ -57,11 +57,11 @@ class IpcHandler extends BaseService {
     this.securityConfig = SECURITY_CONFIG.IPC;
     // Removed this.handlerMethods = new IpcHandlers(this);
     this.rateLimitCleanupInterval = null;
- 
+
     // No local telemetry buffer: telemetry is delegated to ScormInspectorTelemetryStore (constructed in main)
     this.maxHistorySize = 5000;
     this.sessionId = null; // Track current session for clearing
-    
+
 
     // SNSnapshotService is owned and managed outside this handler (wired from main); no internal SN cache here
   }
@@ -73,22 +73,22 @@ class IpcHandler extends BaseService {
     const fileManager = this.getDependency('fileManager');
     const scormService = this.getDependency('scormService');
     const windowManager = this.getDependency('windowManager');
-    
+
     if (!fileManager) {
       this.logger?.error('IpcHandler: FileManager dependency missing');
       return false;
     }
-    
+
     if (!scormService) {
       this.logger?.error('IpcHandler: ScormService dependency missing');
       return false;
     }
-    
+
     if (!windowManager) {
       this.logger?.error('IpcHandler: WindowManager dependency missing');
       return false;
     }
-    
+
     return true;
   }
 
@@ -106,8 +106,8 @@ class IpcHandler extends BaseService {
         try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (_) {}
       }
     } catch (_) {}
-    
-    
+
+
     // Subscribe to scorm-api-call-logged events from ScormService
     try {
       const scormService = this.getDependency('scormService');
@@ -156,18 +156,13 @@ class IpcHandler extends BaseService {
       if (snSnapshot) this.snSnapshotService = snSnapshot;
     } catch (_) {}
 
-    // Ensure a rate limiter exists (fallback to local if not provided)
-    if (!this.rateLimiter) {
-      try {
-        const RateLimiter = require('./ipc/rate-limiter');
-        this.rateLimiter = new RateLimiter({ rateLimitWindow: this.config?.rateLimitWindow, rateLimitMax: this.config?.rateLimitMax });
-      } catch (e) {
-        this.rateLimiter = null;
-      }
-    }
+    // Phase 1: Disable server-side IPC rate limiting (moved to client-side shaping)
+    this.rateLimiter = null;
 
     this.registerHandlers();
-    this.setupRateLimitCleanup();
+    if (this.rateLimiter) {
+      this.setupRateLimitCleanup();
+    }
 
     // SNSnapshotService is preferred and owned by main; fetch SN status on-demand when not present.
     if (this.snSnapshotService && typeof this.snSnapshotService.startPolling === 'function') {
@@ -214,24 +209,24 @@ class IpcHandler extends BaseService {
    */
   _registerCriticalHandlers() {
     const { ipcMain } = require('electron');
-    
+
     // Register logging handlers directly to bypass any potential issues
     try {
-      ipcMain.handle('renderer-log-info', async (_event, ...args) => { 
-        try { this.logger?.info(...args); } catch (e) {} 
-        return { success: true }; 
+      ipcMain.handle('renderer-log-info', async (_event, ...args) => {
+        try { this.logger?.info(...args); } catch (e) {}
+        return { success: true };
       });
-      ipcMain.handle('renderer-log-warn', async (_event, ...args) => { 
-        try { this.logger?.warn(...args); } catch (e) {} 
-        return { success: true }; 
+      ipcMain.handle('renderer-log-warn', async (_event, ...args) => {
+        try { this.logger?.warn(...args); } catch (e) {}
+        return { success: true };
       });
-      ipcMain.handle('renderer-log-error', async (_event, ...args) => { 
-        try { this.logger?.error(...args); } catch (e) {} 
-        return { success: true }; 
+      ipcMain.handle('renderer-log-error', async (_event, ...args) => {
+        try { this.logger?.error(...args); } catch (e) {}
+        return { success: true };
       });
-      ipcMain.handle('renderer-log-debug', async (_event, ...args) => { 
-        try { this.logger?.debug(...args); } catch (e) {} 
-        return { success: true }; 
+      ipcMain.handle('renderer-log-debug', async (_event, ...args) => {
+        try { this.logger?.debug(...args); } catch (e) {}
+        return { success: true };
       });
     } catch (e) {
       // Even if this fails, continue with other handlers
@@ -251,15 +246,19 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-initialize', this.handleScormInitialize.bind(this));
       this.registerHandler('scorm-get-value', this.handleScormGetValue.bind(this));
       this.registerHandler('scorm-set-value', this.handleScormSetValue.bind(this));
+      this.registerHandler('scorm-set-values-batch', this.handleScormSetValuesBatch.bind(this));
       this.registerHandler('scorm-commit', this.handleScormCommit.bind(this));
       this.registerHandler('scorm-terminate', this.handleScormTerminate.bind(this));
+      this.registerHandler('scorm-get-progress-snapshot', this.handleScormGetProgressSnapshot.bind(this));
+      this.registerHandler('ui-settings:get', this.handleUIGetSettings.bind(this));
+      this.registerHandler('ui-settings:set', this.handleUISetSettings.bind(this));
 
       // Browse Mode handlers
       this.registerHandler('browse-mode-enable', this.handleBrowseModeEnable.bind(this));
       this.registerHandler('browse-mode-disable', this.handleBrowseModeDisable.bind(this));
       this.registerHandler('browse-mode-status', this.handleBrowseModeStatus.bind(this));
       this.registerHandler('browse-mode-create-session', this.handleBrowseModeCreateSession.bind(this));
-      
+
       // File operation handlers
       this.registerHandler('select-scorm-package', this.handleSelectScormPackage.bind(this));
       this.registerHandler('select-scorm-folder', this.handleSelectScormFolder.bind(this));
@@ -269,7 +268,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('find-scorm-entry', this.handleFindScormEntry.bind(this));
       this.registerHandler('get-course-info', this.handleGetCourseInfo.bind(this));
       this.registerHandler('get-course-manifest', this.handleGetCourseManifest.bind(this));
-      
+
       // Recent Courses handlers
       this.registerHandler('recent:get', this.handleRecentGet.bind(this));
       this.registerHandler('recent:addOrUpdate', this.handleRecentAddOrUpdate.bind(this));
@@ -282,10 +281,10 @@ class IpcHandler extends BaseService {
       this.registerHandler('get-session-data', this.handleGetSessionData.bind(this));
       this.registerHandler('reset-session', this.handleResetSession.bind(this));
       this.registerHandler('get-all-sessions', this.handleGetAllSessions.bind(this));
-      
+
       // SCORM CAM processing handler (new)
       this.registerHandler('process-scorm-manifest', this.handleProcessScormManifest.bind(this));
-      
+
       // SN Service handlers
       this.registerHandler('sn:getStatus', this.handleSNGetStatus.bind(this));
       this.registerHandler('sn:getSequencingState', this.handleSNGetSequencingState.bind(this));
@@ -295,12 +294,12 @@ class IpcHandler extends BaseService {
       this.registerHandler('sn:reset', this.handleSNReset.bind(this));
       this.registerHandler('sn:handleActivityExit', this.handleSNActivityExit.bind(this));
       this.registerHandler('sn:updateActivityLocation', this.handleSNUpdateActivityLocation.bind(this));
-      
+
       // LMS and testing handlers
       this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
       this.registerHandler('get-lms-profiles', this.handleGetLmsProfiles.bind(this));
       this.registerHandler('run-test-scenario', this.handleRunTestScenario.bind(this));
-      
+
       // Utility handlers
       this.registerHandler('open-external', this.handleOpenExternal.bind(this));
       this.registerHandler('path-to-file-url', this.handlePathUtilsToFileUrl.bind(this));
@@ -309,10 +308,10 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // SCORM Inspector window management
       this.registerHandler('open-scorm-inspector-window', this.handleOpenScormInspectorWindow.bind(this));
-      
+
       // SCORM Inspector history fetch - returns newest-first entries with optional filters
       this.registerHandler('scorm-inspector-get-history', this.handleScormInspectorGetHistory.bind(this));
-      
+
       // Enhanced SCORM Inspector data retrieval handlers
       this.registerHandler('scorm-inspector-get-activity-tree', this.handleScormInspectorGetActivityTree.bind(this));
       this.registerHandler('scorm-inspector-get-navigation-requests', this.handleScormInspectorGetNavigationRequests.bind(this));
@@ -331,16 +330,16 @@ class IpcHandler extends BaseService {
       this.registerHandler('quit-app', this.handleQuitApp.bind(this));
 
       // Direct renderer logging channels already registered in _registerCriticalHandlers()
-      
+
       this.recordOperation('registerHandlers', true);
-      
+
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.IPC_CHANNEL_REGISTRATION_FAILED,
         `IPC handler registration failed: ${error.message}`,
         'IpcHandler.registerHandlers'
       );
-      
+
       this.logger?.error('IpcHandler: Handler registration failed:', error);
       this.recordOperation('registerHandlers', false);
       throw error;
@@ -349,38 +348,36 @@ class IpcHandler extends BaseService {
 
   /**
    * Register individual IPC handler
+   * Enforce declarative routing only. Legacy/fallback registration is forbidden.
    */
   registerHandler(channel, handler) {
-    // Try declarative routing first
     try {
       const routes = IPC_ROUTES || [];
       const route = routes.find(r => r.channel === channel);
-      if (route) {
-        const wrapped = require('./ipc/wrapper-factory').createWrappedHandler(route, this);
-        if (!wrapped) {
-          this.logger?.error(`IpcHandler: Failed to create wrapped handler for ${channel}, falling back to legacy`);
-          throw new Error(`Failed to create wrapped handler for ${channel}`);
-        }
-        ipcMain.handle(channel, wrapped);
-        this.handlers.set(channel, wrapped);
-        return;
+      if (!route) {
+        const err = new Error(`Declarative IPC route not found for channel: ${channel}`);
+        this.logger?.error(`IpcHandler: ${err.message}`);
+        throw err;
       }
-    } catch (e) {
-      this.logger?.error(`IpcHandler: Declarative route registration failed for ${channel}:`, e?.message || e);
-      // Fall back to legacy routing on error
-    }
 
-    if (!this.securityConfig?.allowedChannels?.includes(channel)) {
-      this.logger?.error(`IpcHandler: Channel ${channel} not in allowed channels list`);
-      throw new Error(`Channel ${channel} not in allowed channels list`);
-    }
+      const wrapped = require('./ipc/wrapper-factory').createWrappedHandler(route, this);
+      if (!wrapped) {
+        const err = new Error(`Failed to create wrapped handler for ${channel}`);
+        this.logger?.error(`IpcHandler: ${err.message}`);
+        throw err;
+      }
 
-    try {
-      const wrappedHandler = this.wrapHandler(channel, handler);
-      ipcMain.handle(channel, wrappedHandler);
-      this.handlers.set(channel, wrappedHandler);
+      ipcMain.handle(channel, wrapped);
+      this.handlers.set(channel, wrapped);
+
     } catch (error) {
-      this.logger?.error(`IpcHandler: Failed to register handler for ${channel}:`, error);
+      this.errorHandler?.setError(
+        MAIN_PROCESS_ERRORS.IPC_CHANNEL_REGISTRATION_FAILED,
+        `IPC handler registration failed for ${channel}: ${error.message}`,
+        'IpcHandler.registerHandler'
+      );
+      this.logger?.error('IpcHandler: Handler registration failed:', error);
+      this.recordOperation('registerHandlers', false);
       throw error;
     }
   }
@@ -411,80 +408,19 @@ class IpcHandler extends BaseService {
   }
 
   /**
-   * Wrap handler with security and validation
+   * Wrap handler with security and validation (no server-side rate limiting)
    */
   wrapHandler(channel, handler) {
-    // Open-debug-window coalescing/debounce handled by the declarative routes + wrapper-factory.
-    // Legacy in-handler guards removed to centralize behavior.
     return async (event, ...args) => {
       const requestId = ++this.requestCounter;
       const startTime = Date.now();
- 
+
       try {
         if (!this.validateRequest(event, channel, args)) {
           throw new Error('Request validation failed');
         }
 
-        // Do NOT apply generic rate limiting to core SN channels; let handlers/SN enforce correctness.
-        // Exempted SN channels:
-        //   - sn:getStatus (cache-only, already simplified)
-        //   - sn:processNavigation (sequenced by SN)
-        //   - sn:initialize (one-time init)
-        //   - sn:updateActivityProgress (driven by content runtime)
-        //   - sn:reset (admin/reset)
-        const snBypass = (
-          channel === 'sn:getStatus' ||
-          channel === 'sn:processNavigation' ||
-          channel === 'sn:initialize' ||
-          channel === 'sn:updateActivityProgress' ||
-          channel === 'sn:reset'
-        );
-        if (!snBypass) {
-          // Rate limit check with channel policies (pass channel for SCORM-aware exemptions)
-          const rateAllowed = this.checkRateLimit(event.sender, channel);
-          if (!rateAllowed) {
-            // Initialize per-channel suppression map once
-            if (!this._rateLimitLogState) this._rateLimitLogState = new Map();
-            const markSuppressed = (ch) => {
-              let st = this._rateLimitLogState.get(ch);
-              if (!st) {
-                st = { firstSeenAt: Date.now(), notified: false, suppressed: false };
-                this._rateLimitLogState.set(ch, st);
-              }
-              if (!st.notified) {
-                st.notified = true;
-                st.suppressed = true;
-                this.logger?.info(`IpcHandler: rate-limit engaged on ${ch}; further rate-limit logs suppressed for this session`);
-              }
-            };
-
-          const isRendererLogChannel =
-            channel === 'renderer-log-debug' ||
-            channel === 'renderer-log-info' ||
-            channel === 'renderer-log-warn' ||
-            channel === 'renderer-log-error';
-
-          const isScormChannel =
-            channel === 'scorm-set-value' ||
-            channel === 'scorm-commit' ||
-            channel === 'scorm-terminate';
-
-          if (isRendererLogChannel || isScormChannel) {
-            markSuppressed(channel);
-            this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
-            return { success: true, rateLimited: true };
-          }
-
-          
-
-          // Otherwise, enforce
-          throw new Error('Rate limit exceeded');
-        }
-        } // end non-SN bypass branch
-
         this.activeRequests.set(requestId, { channel, startTime, event });
-
-        
 
         this.logger?.debug(`IpcHandler: Processing ${channel} request ${requestId}`);
         this.emit(SERVICE_EVENTS.IPC_MESSAGE_RECEIVED, { channel, requestId });
@@ -492,7 +428,6 @@ class IpcHandler extends BaseService {
         const result = await handler(event, ...args);
 
         const duration = Date.now() - startTime;
-        // IPC envelope log
         this.logger?.info(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'success' }`);
         this.recordOperation(`${channel}:success`, true);
         this.logger?.debug(`IpcHandler: ${channel} request ${requestId} completed in ${duration}ms`);
@@ -501,20 +436,8 @@ class IpcHandler extends BaseService {
 
       } catch (error) {
         const duration = Date.now() - startTime;
-        // IPC envelope log for error case
         this.logger?.error(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'error', error: ${error && error.message ? error.message : 'unknown'} }`);
- 
-        const isRateLimit = (error && typeof error.message === 'string' && error.message.includes('Rate limit exceeded'));
-        const isScormChannel = (channel === 'scorm-set-value' || channel === 'scorm-commit' || channel === 'scorm-terminate');
 
-        if (isRateLimit && isScormChannel) {
-          this.recordOperation(`${channel}:rate_limited_soft_ok`, true);
-          return { success: true, rateLimited: true };
-        }
-
-        
-
-        // Default error path
         this.recordOperation(`${channel}:error`, false);
 
         this.errorHandler?.setError(
@@ -529,7 +452,6 @@ class IpcHandler extends BaseService {
         throw error;
 
       } finally {
-        
         this.activeRequests.delete(requestId);
       }
     };
@@ -544,10 +466,10 @@ class IpcHandler extends BaseService {
         if (!this.validateRequest(event, channel, args)) {
           return;
         }
-        
+
         handler(event, ...args);
         this.recordOperation(`${channel}:sync`, true);
-        
+
       } catch (error) {
         this.recordOperation(`${channel}:sync`, false);
         this.logger?.error(`IpcHandler: Sync ${channel} handler failed:`, error);
@@ -565,43 +487,15 @@ class IpcHandler extends BaseService {
         this.logger?.warn(`IpcHandler: Message size ${messageSize} exceeds limit ${this.securityConfig.maxMessageSize}`);
         return false;
       }
-      
+
       return true;
-      
+
     } catch (error) {
       this.logger?.error('IpcHandler: Request validation failed:', error);
       return false;
     }
   }
 
-  /**
-   * Check rate limiting for sender
-   */
-  /**
-   * Check rate limiting for sender with SCORM-aware exemptions.
-   * We allow a brief burst grace period for SCORM API calls immediately after Initialize,
-   * and we never rate-limit scorm-get-value during that grace window.
-   */
-  checkRateLimit(sender, channel = null) {
-  if (!this.config.enableRateLimiting) {
-    return true;
-  }
-
-  // Route through rate limiter (Phase 2)
-  try {
-    const scormService = this.getDependency('scormService');
-    const allowed = this.rateLimiter ? this.rateLimiter.allow(sender, channel, { scormService }) : true;
-    if (!allowed) {
-      this.logger?.info(`IpcHandler: rate limit hit on channel ${channel} for sender ${sender?.id}`);
-      return false;
-    }
-  } catch (_) {
-    // If limiter fails, fall back to allowing (to avoid hard failures)
-  }
-
-  // Rate limiter handles SCORM grace window and SN exemptions internally
-  return true;
-}
 
   /**
    * Set up rate limit cleanup interval
@@ -610,10 +504,10 @@ class IpcHandler extends BaseService {
     this.rateLimitCleanupInterval = setInterval(() => {
       const now = Date.now();
       const windowStart = now - this.config.rateLimitWindow;
-      
+
       for (const [senderId, entry] of this.rateLimitMap) {
         entry.requests = entry.requests.filter(time => time > windowStart);
-        
+
         if (entry.requests.length === 0) {
           this.rateLimitMap.delete(senderId);
         }
@@ -631,7 +525,7 @@ class IpcHandler extends BaseService {
       ipcMain.removeHandler(channel);
       this.logger?.debug(`IpcHandler: Unregistered handler for channel: ${channel}`);
     }
-    
+
     this.handlers.clear();
     this.logger?.info('IpcHandler: All handlers unregistered');
   }
@@ -654,10 +548,109 @@ class IpcHandler extends BaseService {
     return await scormService.setValue(sessionId, element, value);
   }
 
+  async handleScormGetProgressSnapshot(event, sessionId) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return { success: false, error: 'SCORM Service not available' };
+      }
+
+      const elements = [
+        'cmi.completion_status',
+        'cmi.success_status',
+        'cmi.score.scaled',
+        'cmi.score.raw',
+        'cmi.progress_measure',
+        'cmi.session_time',
+        'cmi.total_time',
+        'cmi.location',
+        'cmi.suspend_data'
+      ];
+
+      const results = {};
+      for (const el of elements) {
+        try {
+          const r = await scormService.getValue(sessionId, el);
+          results[el] = (r && typeof r.value === 'string') ? r.value : '';
+        } catch (_) {
+          results[el] = '';
+        }
+      }
+
+      const data = {
+        completionStatus: results['cmi.completion_status'] || '',
+        successStatus: results['cmi.success_status'] || '',
+        scoreScaled: results['cmi.score.scaled'] || '',
+        scoreRaw: results['cmi.score.raw'] || '',
+        progressMeasure: results['cmi.progress_measure'] || '',
+        sessionTime: results['cmi.session_time'] || '',
+        totalTime: results['cmi.total_time'] || '',
+        location: results['cmi.location'] || '',
+        suspendData: results['cmi.suspend_data'] || ''
+      };
+
+      return { success: true, data };
+    } catch (error) {
+      this.logger?.error('IpcHandler: handleScormGetProgressSnapshot failed:', error);
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
   async handleScormCommit(event, sessionId) {
     const scormService = this.getDependency('scormService');
     return await scormService.commit(sessionId);
   }
+
+
+  // UI Settings (AppState) handlers
+  async handleUIGetSettings(event) {
+    const appState = this.getDependency('appState');
+    if (!appState) {
+      return { success: false, error: 'app_state_unavailable' };
+    }
+    return appState.getSettings();
+  }
+
+  async handleUISetSettings(event, settings) {
+    const appState = this.getDependency('appState');
+    if (!appState) {
+      return { success: false, error: 'app_state_unavailable' };
+    }
+    return appState.setSettings(settings);
+  }
+
+
+  /**
+   * Batch SetValue handler: applies an array of element/value pairs atomically per session
+   * @param {*} event
+   * @param {string} sessionId
+   * @param {Array<{element: string, value: string}>} ops
+   */
+  async handleScormSetValuesBatch(event, sessionId, ops) {
+    try {
+      if (!Array.isArray(ops)) {
+        return { success: false, error: 'Invalid ops array' };
+      }
+      const scormService = this.getDependency('scormService');
+      const results = [];
+      for (const item of ops) {
+        if (!item || typeof item.element !== 'string') {
+          results.push({ success: false, error: 'Invalid element' });
+          continue;
+        }
+        try {
+          const r = await scormService.setValue(sessionId, item.element, String(item.value ?? ''));
+          results.push(r);
+        } catch (e) {
+          results.push({ success: false, error: e?.message || String(e) });
+        }
+      }
+      return { success: true, results };
+    } catch (e) {
+      return { success: false, error: e?.message || String(e) };
+    }
+  }
+
 
   // Browse Mode handlers
   async handleBrowseModeEnable(event, options = {}) {
@@ -841,8 +834,8 @@ class IpcHandler extends BaseService {
   async handleResetSession(event, sessionId) {
     const scormService = this.getDependency('scormService');
     const result = await scormService.resetSession(sessionId);
-    
-    
+
+
     return result;
   }
 
@@ -928,36 +921,36 @@ class IpcHandler extends BaseService {
       };
     }
   }
- 
+
   async handlePathUtilsToFileUrl(event, filePath) {
     try {
       const appRoot = PathUtils.normalize(path.resolve(__dirname, '../../../'));
       const tempRoot = PathUtils.normalize(require('os').tmpdir());
       const canonicalTempRoot = PathUtils.normalize(path.join(tempRoot, 'scorm-tester'));
-      
+
       const normalizedPath = PathUtils.normalize(filePath);
-      
+
       // Check if path is within app root
       if (normalizedPath.startsWith(appRoot)) {
         const url = PathUtils.toScormProtocolUrl(filePath, appRoot);
         return { success: true, url };
       }
-      
+
       // Check if path is within canonical temp root
       if (normalizedPath.startsWith(canonicalTempRoot)) {
         const url = PathUtils.toScormProtocolUrl(filePath, canonicalTempRoot);
         return { success: true, url };
       }
-      
+
       // Path is not within allowed roots
-      return { 
-        success: false, 
-        error: `Path outside allowed roots (app: ${appRoot}, temp: ${canonicalTempRoot}): ${normalizedPath}` 
+      return {
+        success: false,
+        error: `Path outside allowed roots (app: ${appRoot}, temp: ${canonicalTempRoot}): ${normalizedPath}`
       };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.message || String(error) 
+      return {
+        success: false,
+        error: error.message || String(error)
       };
     }
   }
@@ -979,16 +972,16 @@ class IpcHandler extends BaseService {
     this.logger?.log(level, `[Renderer] ${message}`, ...args);
   }
 
-  
+
 
   async handleScormInspectorGetHistory(event, { limit, offset, sinceTs, methodFilter } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetHistory called with limit: ${limit}, offset: ${offset}, sinceTs: ${sinceTs}, methodFilter: ${methodFilter}`);
-    
+
     if (this.telemetryStore && typeof this.telemetryStore.getHistory === 'function') {
       try {
         const historyResponse = this.telemetryStore.getHistory({ limit, offset, sinceTs, methodFilter });
         const errorsResponse = this.telemetryStore.getErrors ? this.telemetryStore.getErrors() : { errors: [] };
-        
+
         // Get current data model from active SCORM session
         let dataModel = {};
         const scormService = this.getDependency('scormService');
@@ -1002,20 +995,20 @@ class IpcHandler extends BaseService {
         } else {
           this.logger?.warn('IpcHandler: SCORM service or getCurrentDataModel method not available');
         }
-        
+
         const responseData = {
           history: historyResponse.history || [],
           errors: errorsResponse.errors || [],
           dataModel: dataModel
         };
-        
+
         return { success: true, data: responseData };
       } catch (error) {
         this.logger?.error(`IpcHandler: handleScormInspectorGetHistory failed: ${error.message}`);
         return { success: false, error: error.message, data: { history: [], errors: [], dataModel: {} } };
       }
     }
-    
+
     // Fallback when telemetry store not available
     return { success: true, data: { history: [], errors: [], dataModel: {} } };
   }
@@ -1252,7 +1245,7 @@ class IpcHandler extends BaseService {
     }
   }
 
-  
+
 
   async handleOpenScormInspectorWindow(event) {
     const windowManager = this.getDependency('windowManager');
@@ -1334,16 +1327,16 @@ class IpcHandler extends BaseService {
 
       // Get available navigation from navigation handler
       const availableNavigation = snService.navigationHandler.getAvailableNavigation() || [];
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         data: availableNavigation
       };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleCourseOutlineGetAvailableNavigation failed: ${error.message}`);
-      return { 
-        success: false, 
-        error: error.message, 
+      return {
+        success: false,
+        error: error.message,
         data: []
       };
     }
@@ -1378,9 +1371,9 @@ class IpcHandler extends BaseService {
       };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleCourseOutlineValidateChoice failed: ${error.message}`);
-      return { 
-        success: false, 
-        error: error.message, 
+      return {
+        success: false,
+        error: error.message,
         allowed: false,
         reason: 'Validation error occurred'
       };
@@ -1465,7 +1458,7 @@ class IpcHandler extends BaseService {
    */
   async handleScormInspectorGetNavigationRequests(event, { sessionId } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetNavigationRequests called with sessionId: ${sessionId}`);
-    
+
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -1480,7 +1473,7 @@ class IpcHandler extends BaseService {
 
       // Get navigation request analysis
       const navigationData = this.extractNavigationRequests(snService.navigationHandler);
-      
+
       return { success: true, data: navigationData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetNavigationRequests failed: ${error.message}`);
@@ -1493,7 +1486,7 @@ class IpcHandler extends BaseService {
    */
   async handleScormInspectorGetGlobalObjectives(event, { sessionId } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetGlobalObjectives called with sessionId: ${sessionId}`);
-    
+
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -1508,7 +1501,7 @@ class IpcHandler extends BaseService {
 
       // Extract global objectives
       const objectivesData = this.extractGlobalObjectives(snService.activityTree);
-      
+
       return { success: true, data: objectivesData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetGlobalObjectives failed: ${error.message}`);
@@ -1521,7 +1514,7 @@ class IpcHandler extends BaseService {
    */
   async handleScormInspectorGetSSPBuckets(event, { sessionId } = {}) {
     this.logger?.debug(`IpcHandler: handleScormInspectorGetSSPBuckets called with sessionId: ${sessionId}`);
-    
+
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -1536,7 +1529,7 @@ class IpcHandler extends BaseService {
 
       // Extract SSP buckets from all active sessions
       const sspData = this.extractSSPBuckets(rteInstances);
-      
+
       return { success: true, data: sspData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetSSPBuckets failed: ${error.message}`);
@@ -1551,7 +1544,7 @@ class IpcHandler extends BaseService {
    */
   serializeActivityTree(activityTreeManager, options = {}) {
     const { mode = 'inspector', sequencingEngine = null } = options;
-    
+
     if (!activityTreeManager || !activityTreeManager.root) {
       return {};
     }
@@ -1567,7 +1560,7 @@ class IpcHandler extends BaseService {
       if (mode === 'inspector') {
         // Inspector mode: basic status and details
         serialized.status = this.getActivityCompletionStatus(node);
-        
+
         if (node.activityState || node.attemptState || node.attemptCount > 0) {
           serialized.details = {
             completionStatus: this.mapActivityState(node.activityState),

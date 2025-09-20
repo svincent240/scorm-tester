@@ -1,15 +1,17 @@
 /**
  * Course Outline Component
- * 
+ *
  * Displays hierarchical course structure with navigation,
  * progress indicators, and expandable tree view.
- * 
+ *
  * @fileoverview SCORM course outline component
  */
 
 import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { rendererLogger } from '../../utils/renderer-logger.js';
+import { escapeHTML } from '../../utils/escape.js';
+
 
 /**
  * Course Outline Class
@@ -109,7 +111,7 @@ class CourseOutline extends BaseComponent {
               <button class="outline-btn outline-btn--collapse" title="Collapse All">⊟</button>
             </div>
           </div>
-          
+
           <div class="course-outline__content">
             <div class="course-outline__empty">
               <div class="empty-state">
@@ -122,11 +124,11 @@ class CourseOutline extends BaseComponent {
         </div>
       `;
     }
-    
+
     this.contentArea = this.element.querySelector('.course-outline__content');
     this.expandAllBtn = this.element.querySelector('.outline-btn--expand');
     this.collapseAllBtn = this.element.querySelector('.outline-btn--collapse');
-    
+
     try { rendererLogger.info('CourseOutline: HTML structure created successfully'); } catch (_) {}
   }
 
@@ -188,16 +190,12 @@ class CourseOutline extends BaseComponent {
       this.handleNavigationStateUpdate(stateData);
     });
 
-    // Listen for browse mode changes (CRITICAL FIX: Event name mismatch)
-    this.subscribe('browse-mode-enabled', (data) => {
-      rendererLogger.info('CourseOutline: Browse mode enabled event received', data);
-      this.handleBrowseModeChanged({ enabled: true, ...data });
+    // Listen for browse mode changes (unified event naming)
+    this.subscribe('browseMode:changed', (data) => {
+      rendererLogger.info('CourseOutline: Browse mode changed event received', data);
+      this.handleBrowseModeChanged({ enabled: !!data?.enabled, ...data });
     });
 
-    this.subscribe('browse-mode-disabled', (data) => {
-      rendererLogger.info('CourseOutline: Browse mode disabled event received', data);
-      this.handleBrowseModeChanged({ enabled: false, ...data });
-    });
 
     // Listen for SN service initialization to fetch SCORM states
     this.subscribe('sn:initialized', () => {
@@ -239,7 +237,7 @@ class CourseOutline extends BaseComponent {
         element.includes('progress_measure')
       )) {
         rendererLogger.debug('CourseOutline: Key SCORM data changed, refreshing states', element);
-        
+
         // For completion/success status changes, refresh immediately without debounce
         if (element.includes('completion_status') || element.includes('success_status')) {
           rendererLogger.info('CourseOutline: Activity status changed, immediate refresh', element);
@@ -309,12 +307,12 @@ class CourseOutline extends BaseComponent {
       rendererLogger.warn('CourseOutline: Content area not available for rendering');
       return;
     }
-    
+
     // Prefer normalized 'items', but guard for legacy 'children'
     const items = Array.isArray(this.courseStructure?.items) && this.courseStructure.items.length > 0
       ? this.courseStructure.items
       : (Array.isArray(this.courseStructure?.children) ? this.courseStructure.children : []);
-    
+
     if (!this.courseStructure || !items || items.length === 0) {
       rendererLogger.info('CourseOutline.renderCourseStructure: empty state condition met', {
         hasStructure: !!this.courseStructure,
@@ -324,22 +322,22 @@ class CourseOutline extends BaseComponent {
       this.showEmptyState();
       return;
     }
-    
+
     const html = `
       <div class="course-outline__tree">
         ${this.renderItems(items)}
       </div>
     `;
-    
+
     this.contentArea.innerHTML = html;
     this.bindItemEvents();
-    
+
     rendererLogger.info('CourseOutline: Course structure rendered successfully', { itemCount: items.length });
   }
 
   renderItems(items, depth = 0) {
     if (!items || items.length === 0) return '';
-    
+
     return `
       <ul class="outline-list outline-list--depth-${depth}">
         ${items.map(item => this.renderItem(item, depth)).join('')}
@@ -373,8 +371,8 @@ class CourseOutline extends BaseComponent {
      // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
      // But don't hide items that are just disabled due to sequencing rules
      const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
-     // CRITICAL FIX: Only apply disabled styling if SCORM states are loaded AND validation fails AND browse mode is disabled
-     const isDisabled = this.scormStatesLoaded && !validation.allowed && !this.browseModeEnabled;
+     // Authoritative gating: items are disabled until SCORM states are loaded; after that, disable only when validation fails and not in browse mode
+     const isDisabled = (!this.scormStatesLoaded) || (!validation.allowed && !this.browseModeEnabled);
      const isSuspended = scormState && scormState.suspended;
      const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
 
@@ -451,7 +449,7 @@ class CourseOutline extends BaseComponent {
           ` : ''}
 
           <span class="outline-item__title" data-item-id="${item.identifier}" ${isDisabled ? 'style="cursor: not-allowed;"' : ''}>
-            ${item.title || item.identifier}
+            ${escapeHTML(item.title || item.identifier)}
           </span>
 
           ${this.renderScormIndicators(scormState)}
@@ -497,20 +495,20 @@ class CourseOutline extends BaseComponent {
     }
 
     const info = [];
-    
+
     // Activity state information
     if (scormState.attemptCount > 0) {
       const limit = scormState.attemptLimit ? `/${scormState.attemptLimit}` : '';
       info.push(`Attempts: ${scormState.attemptCount}${limit}`);
     }
-    
+
     if (scormState.activityState) {
       info.push(`State: ${scormState.activityState}`);
     }
 
     // Restrictions
     const restrictions = [];
-    
+
     if (!scormState.isVisible) {
       restrictions.push('Hidden from choice');
     }
@@ -598,7 +596,7 @@ class CourseOutline extends BaseComponent {
 
   getProgressIndicator(progress) {
     if (!progress.completionStatus && !progress.successStatus) return '';
-    
+
     // Check for passed/failed status first
     if (progress.successStatus === 'passed') {
       return '<span class="progress-indicator progress-indicator--passed">✓</span>';
@@ -606,14 +604,14 @@ class CourseOutline extends BaseComponent {
     if (progress.successStatus === 'failed') {
       return '<span class="progress-indicator progress-indicator--failed">✗</span>';
     }
-    
+
     // Fall back to completion status
     const statusMap = {
       'completed': '<span class="progress-indicator progress-indicator--completed">✓</span>',
       'incomplete': '<span class="progress-indicator progress-indicator--incomplete">○</span>',
       'not attempted': '<span class="progress-indicator progress-indicator--not-attempted">○</span>'
     };
-    
+
     return statusMap[progress.completionStatus] || '<span class="progress-indicator progress-indicator--not-attempted">○</span>';
   }
 
@@ -682,6 +680,12 @@ class CourseOutline extends BaseComponent {
       rendererLogger.warn('CourseOutline: Navigation disabled by options', { itemId });
       return;
     }
+    // Authoritative gating: do not navigate until SCORM states are loaded
+    if (!this.scormStatesLoaded) {
+      rendererLogger.warn('CourseOutline: Navigation blocked until authoritative state is loaded', { itemId });
+      return;
+    }
+
 
     // Always delegate validation to SN service - no local validation
     rendererLogger.info('CourseOutline: Requesting navigation to item', {
@@ -703,18 +707,42 @@ class CourseOutline extends BaseComponent {
 
     this.setCurrentItem(itemId);
 
+    // Validate via authoritative SN service before emitting navigation intent
+    let allowed = true;
+    let reason = 'Validation not performed';
+    try {
+      if (window.electronAPI?.validateCourseOutlineChoice) {
+        const res = await window.electronAPI.validateCourseOutlineChoice(itemId);
+        allowed = !!(res && res.success && res.allowed);
+        reason = res?.reason || reason;
+        rendererLogger.info('CourseOutline: Choice validation result', { itemId, allowed, reason });
+      } else {
+        rendererLogger.warn('CourseOutline: validateCourseOutlineChoice API not available; proceeding without validation');
+      }
+    } catch (validationError) {
+      allowed = false;
+      reason = validationError?.message || 'Validation error';
+      rendererLogger.error('CourseOutline: Choice validation threw', { itemId, error: reason });
+    }
+
+    if (!allowed) {
+      // Do not emit navigation intent when validation fails
+      try { this.emit('navigationDenied', { itemId, reason }); } catch (_) {}
+      return;
+    }
+
     // Emit centralized choice intent for AppManager orchestration
     try {
       const { eventBus } = await import('../../services/event-bus.js');
       // SCORM SN uses "choice" requests with target activity
-      rendererLogger.info('CourseOutline: Emitting navigationRequest event', {
+      rendererLogger.info('CourseOutline: Emitting navigation:request event', {
         requestType: 'choice',
         activityId: itemId,
         source: 'course-outline'
       });
-      eventBus.emit('navigationRequest', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
+      eventBus.emit('navigation:request', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
     } catch (error) {
-      rendererLogger.error('CourseOutline: Failed to emit navigationRequest', {
+      rendererLogger.error('CourseOutline: Failed to emit navigation:request', {
         itemId,
         error: error?.message || error
       });
@@ -728,18 +756,18 @@ class CourseOutline extends BaseComponent {
     if (this.currentItem === itemId) {
       return;
     }
-    
+
     this.currentItem = itemId;
-    
+
     // Update UI to show current item
     this.findAll('.outline-item').forEach(el => {
       el.classList.toggle('outline-item--current', el.dataset.itemId === itemId);
     });
-    
+
     // Emit event with flag to prevent recursive updates
-    this.emit('currentItemChanged', { 
-      itemId, 
-      _fromCourseOutline: true 
+    this.emit('currentItemChanged', {
+      itemId,
+      _fromCourseOutline: true
     });
   }
 
@@ -903,9 +931,9 @@ class CourseOutline extends BaseComponent {
     if (data._fromCourseOutline) {
       return;
     }
-    
+
     const navData = data.data || data;
-    
+
     // Only update if current item actually changed
     if (navData.currentItem && navData.currentItem !== this.currentItem) {
       this.setCurrentItem(navData.currentItem);
@@ -1048,7 +1076,7 @@ class CourseOutline extends BaseComponent {
    */
   updateWithCourse(courseData) {
     try { rendererLogger.info('CourseOutline: updateWithCourse called with:', !!courseData ? '[object]' : 'null'); } catch (_) {}
-    
+
     try {
       // Ensure base HTML exists before rendering items
       if (!this.element.querySelector('.course-outline__container')) {
@@ -1082,7 +1110,7 @@ class CourseOutline extends BaseComponent {
         try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) {}
         this.showEmptyState();
       }
-      
+
     } catch (error) {
       try { rendererLogger.error('CourseOutline: Error updating with course data:', error?.message || error); } catch (_) {}
     }
@@ -1255,10 +1283,10 @@ class CourseOutline extends BaseComponent {
       availableNavigation: this.availableNavigation
     });
 
-    // CRITICAL FIX: If SCORM states haven't been loaded yet, allow navigation to prevent premature disabling
+    // Authoritative gating: If SCORM states haven't been loaded yet, disallow navigation
     if (!this.scormStatesLoaded) {
-      rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- allowing navigation');
-      return { allowed: true, reason: 'SCORM states not yet loaded' };
+      rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- disallowing navigation until authoritative state arrives');
+      return { allowed: false, reason: 'Authoritative state not yet loaded' };
     }
 
     // CRITICAL FIX: Allow navigation to the current activity even if choice navigation is disabled
@@ -1350,12 +1378,13 @@ class CourseOutline extends BaseComponent {
     // Create a temporary notification element
     const notification = document.createElement('div');
     notification.className = 'course-outline__notification course-outline__notification--error';
+    const safeReason = escapeHTML(String(reason || ''));
     notification.innerHTML = `
       <div class="notification__content">
         <div class="notification__icon">⚠️</div>
         <div class="notification__message">
           <strong>Navigation Blocked</strong><br>
-          ${reason}
+          ${safeReason}
         </div>
         <button class="notification__close">×</button>
       </div>

@@ -302,8 +302,8 @@ class NavigationControls extends BaseComponent {
     // This enables navigation buttons after activity completion
     this.subscribe('navigation:availability:updated', this.handleNavigationAvailabilityUpdated);
 
-    // Reflect sidebar visibility updates for button state
-    this.subscribe('menuVisibilityChanged', (payload) => {
+    // Reflect sidebar visibility updates for button state (unified only)
+    this.subscribe('ui:menu:visibility-changed', (payload) => {
       try {
         const isVisible = !!(payload && payload.visible);
         this.navigationState.menuVisible = isVisible;
@@ -369,13 +369,14 @@ class NavigationControls extends BaseComponent {
     // Always delegate to SN service for proper SCORM validation
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigationRequest', {
+      // Unified namespaced event only
+      eventBus.emit('navigation:request', {
         activityId: null,
         activityObject: null,
         requestType: 'previous',
         source: 'NavigationControls'
       });
-      this.logger?.info('NavigationControls: Emitted navigationRequest event for previous');
+      this.logger?.info('NavigationControls: Emitted navigation:request event for previous');
     } catch (error) {
       this.logger?.error('NavigationControls: Failed to emit navigation request', error);
       this.showNavigationError('Navigation request failed');
@@ -393,13 +394,14 @@ class NavigationControls extends BaseComponent {
     // Always delegate to SN service for proper SCORM validation
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('navigationRequest', {
+      // Unified namespaced event only
+      eventBus.emit('navigation:request', {
         activityId: null,
         activityObject: null,
         requestType: 'continue',
         source: 'NavigationControls'
       });
-      this.logger?.info('NavigationControls: Emitted navigationRequest event for continue');
+      this.logger?.info('NavigationControls: Emitted navigation:request event for continue');
     } catch (error) {
       this.logger?.error('NavigationControls: Failed to emit navigation request', error);
       this.showNavigationError('Navigation request failed');
@@ -433,7 +435,8 @@ class NavigationControls extends BaseComponent {
       const nextVisible = !isVisible;
       // Emit centralized toggle; AppManager will apply classes and broadcast visibility change
       import('../../services/event-bus.js').then(({ eventBus }) => {
-        eventBus.emit('menuToggled', { visible: nextVisible });
+        // Unified namespaced event only
+        eventBus.emit('ui:sidebar:toggle-request', { visible: nextVisible });
       }).catch(() => {});
     } catch (error) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
@@ -556,12 +559,12 @@ class NavigationControls extends BaseComponent {
     if (result.targetActivity && result.action === 'launch') {
       this.logger?.info('NavigationControls: Launching activity', result.targetActivity);
 
-      // BUG-002 FIX: Use unified navigationRequest event instead of activityLaunchRequested
+      // BUG-002 FIX: Use unified navigation:request event instead of activityLaunchRequested
       try {
         const { eventBus } = await import('../../services/event-bus.js');
         
-        // Emit unified navigationRequest with standardized payload
-        eventBus.emit('navigationRequest', {
+        // Emit unified navigation:request with standardized payload
+        eventBus.emit('navigation:request', {
           activityId: result.targetActivity?.identifier || result.targetActivity?.id,
           activityObject: result.targetActivity,
           requestType: 'activityLaunch',
@@ -960,10 +963,10 @@ class NavigationControls extends BaseComponent {
     this.updateNavigationState({ menuVisible: visible });
     this.emit('menuVisibilityChanged', { visible });
     
-    // Also emit to global eventBus for app-manager
+    // Also emit to global eventBus for app-manager (unified only)
     try {
       const { eventBus } = await import('../../services/event-bus.js');
-      eventBus.emit('menuVisibilityChanged', { visible });
+      eventBus.emit('ui:menu:visibility-changed', { visible });
     } catch (_) {
       // Fallback - continue with component-level event
     }
@@ -1310,13 +1313,6 @@ class NavigationControls extends BaseComponent {
    * This is called when activities complete and navigation options change
    */
   handleNavigationAvailabilityUpdated(data) {
-    console.log('NavigationControls: handleNavigationAvailabilityUpdated CALLED - DIRECT CONSOLE LOG', {
-      data,
-      availableNavigation: data?.availableNavigation,
-      activityId: data?.activityId,
-      trigger: data?.trigger,
-      hasAvailableNavigation: Array.isArray(data?.availableNavigation)
-    });
 
     try {
       this.logger?.info('NavigationControls: handleNavigationAvailabilityUpdated CALLED', {
@@ -1330,12 +1326,6 @@ class NavigationControls extends BaseComponent {
       const { availableNavigation, activityId, trigger } = data || {};
 
       if (Array.isArray(availableNavigation)) {
-        console.log('NavigationControls: Processing navigation availability update - DIRECT CONSOLE LOG', {
-          availableNavigation,
-          activityId,
-          trigger,
-          currentNavigationState: this.navigationState
-        });
 
         this.logger?.info('NavigationControls: Processing navigation availability update', {
           availableNavigation,
@@ -1350,11 +1340,6 @@ class NavigationControls extends BaseComponent {
 
         // Update UI state for other components
         const normalized = this.normalizeAvailableNavigation(availableNavigation);
-        console.log('NavigationControls: Normalized navigation data - DIRECT CONSOLE LOG', {
-          normalized,
-          canNavigateNext: normalized.canNavigateNext,
-          canNavigatePrevious: normalized.canNavigatePrevious
-        });
 
         this.logger?.debug('NavigationControls: Normalized navigation data', {
           normalized,
@@ -1372,15 +1357,6 @@ class NavigationControls extends BaseComponent {
           this.logger?.warn('NavigationControls: Failed to update UIState with new availability', e?.message || e);
         }
 
-        console.log('NavigationControls: Navigation availability update completed - DIRECT CONSOLE LOG', {
-          newNavigationState: this.navigationState,
-          buttonStates: {
-            nextDisabled: this.nextBtn?.disabled,
-            previousDisabled: this.previousBtn?.disabled,
-            nextTitle: this.nextBtn?.title,
-            previousTitle: this.previousBtn?.title
-          }
-        });
 
         this.logger?.info('NavigationControls: Navigation availability update completed', {
           newNavigationState: this.navigationState,
@@ -1392,10 +1368,6 @@ class NavigationControls extends BaseComponent {
           }
         });
       } else {
-        console.log('NavigationControls: Invalid navigation availability data - DIRECT CONSOLE LOG', {
-          data,
-          availableNavigationType: typeof availableNavigation
-        });
 
         this.logger?.warn('NavigationControls: Invalid navigation availability data', {
           data,
@@ -1403,11 +1375,6 @@ class NavigationControls extends BaseComponent {
         });
       }
     } catch (error) {
-      console.error('NavigationControls: Error handling navigation availability update - DIRECT CONSOLE LOG', {
-        error: error.message,
-        stack: error.stack,
-        data
-      });
 
       this.logger?.error('NavigationControls: Error handling navigation availability update', {
         error: error.message,

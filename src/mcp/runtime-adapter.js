@@ -38,12 +38,14 @@ function ensureIpcHandlers() {
       const method = String(payload?.method || "");
       const args = Array.isArray(payload?.args) ? payload.args : [];
       if (!handler || !method || typeof handler[method] !== "function") {
+        try { mcpLogger.error(`MCP API: handler missing or method not found`, { id, method }); } catch (_) {}
         return "false";
       }
       // SCORM methods return strings per spec
       const res = await handler[method].apply(handler, args);
       return typeof res === "string" ? res : String(res);
-    } catch (_) {
+    } catch (e) {
+      try { mcpLogger.error(`MCP API: error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) {}
       return "false";
     }
   });
@@ -79,6 +81,7 @@ function ensureIpcHandlers() {
       }
       return { success: false, error: 'UNKNOWN_ACTION' };
     } catch (e) {
+      try { mcpLogger.error(`MCP SN: error handling action ${action}`, e && e.message ? e.message : String(e)); } catch (_) {}
       return { success: false, error: e?.message || String(e) };
     }
   });
@@ -107,7 +110,8 @@ function installRealAdapterForWindow(win, options = {}) {
       try { handlerByWC.delete(win.webContents.id); } catch (_) {}
     });
     return true;
-  } catch (_) {
+  } catch (e) {
+    try { mcpLogger.error('MCP adapter install failed', e && e.message ? e.message : String(e)); } catch (_) {}
     return false;
   }
 }

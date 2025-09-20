@@ -121,17 +121,16 @@ async function scorm_take_screenshot(params = {}) {
     throw e;
   }
 
-  // Try to locate an entry HTML from manifest
-  const entryPath = await resolveEntryPathFromManifest(workspace);
-
-
-  if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
-
   if (!RuntimeManager.isSupported) {
     const e = new Error("Electron runtime is required for screenshots");
     e.code = "ELECTRON_REQUIRED";
     throw e;
   }
+
+  // Try to locate an entry HTML from manifest
+  const entryPath = await resolveEntryPathFromManifest(workspace);
+
+  if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
 
   let win = null;
   try {

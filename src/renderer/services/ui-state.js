@@ -512,14 +512,8 @@ class UIStateManager {
    */
   persistState() {
     try {
-      // Only persist UI preferences
-      const uiSlice = {
-        theme: this.state.ui.theme,
-        debugPanelVisible: this.state.ui.debugPanelVisible,
-        sidebarCollapsed: this.state.ui.sidebarCollapsed,
-        sidebarVisible: this.state.ui.sidebarVisible,
-        devModeEnabled: this.state.ui.devModeEnabled
-      };
+      // Centralized in main AppState: do not persist centralized UI prefs here
+      const uiSlice = {}; // Reserved for non-centralized UI items if needed later
       this.helpers.safePersistState(this.persistenceKey, uiSlice);
     } catch (_e) {
       // swallow to avoid console noise in renderer

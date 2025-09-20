@@ -12,12 +12,11 @@
  */
 
 import { eventBus } from './event-bus.js';
-import { uiState as uiStatePromise } from './ui-state.js';
 import { sanitizeParam } from '../utils/payload-sanitizer.js';
 
 /**
  * SCORM Client Class
- * 
+ *
  * Implements full SCORM 2004 4th Edition API with asynchronous IPC
  * communication and synchronous interface through local caching.
  */
@@ -39,6 +38,15 @@ class ScormClient {
     this._SESSION_TIME_MIN_MS = 3000;   // min interval between session_time updates
     this._lastIpcRateLimitAt = 0;       // skip immediate retries after rate limit
     this._IPC_BACKOFF_MS = 1200;
+
+    // Client-side IPC shaping
+    this._pendingSetBatch = [];
+    this._batchTimer = null;
+    this._BATCH_MAX_DELAY_MS = 20;
+    this._BATCH_MAX_SIZE = 25;
+    this._commitTimer = null;
+    this._COMMIT_DEBOUNCE_MS = 250;
+
     // API telemetry sequencing for debug timeline
     this._apiSeq = 0; // monotonic sequence within this renderer session
 
@@ -54,7 +62,7 @@ class ScormClient {
     try {
       // Dynamic import of ES6 renderer validator
       const validatorModule = await import(`${window.electronAPI.rendererBaseUrl}utils/scorm-validator.js`);
-      
+
       this.validator = {
         isValidElement: validatorModule.isValidElement,
         isValidValue: validatorModule.isValidValue
@@ -236,8 +244,8 @@ class ScormClient {
     // Update UI state for key elements
     this.updateUIFromElement(element, value);
 
-    // Asynchronously send to main process
-    this.asyncSetValue(element, value);
+    // Queue for batched send to main process
+    this._enqueueSetValue(element, value);
 
     this.logApiCall('SetValue', `${element} = ${value}`, 'true');
     // Emit UI-scoped event to notify UI components without leaking SCORM inspection data onto EventBus
@@ -264,8 +272,8 @@ class ScormClient {
 
     this.lastError = '0';
 
-    // Asynchronously commit to main process
-    this.asyncCommit();
+    // Debounced commit to main process
+    this._scheduleCommit();
 
     this.logApiCall('Commit', parameter, 'true');
     eventBus.emit('ui:scorm:committed', { sessionId: this.sessionId });
@@ -338,6 +346,24 @@ class ScormClient {
       if (result.success) {
         // Pre-populate cache with common elements
         await this.preloadCommonElements();
+
+        // Fetch a centralized progress snapshot from main and update UI state
+        try {
+          const snap = await window.electronAPI.scormGetProgressSnapshot(sessionId);
+          if (snap && snap.success && snap.data) {
+            const d = snap.data;
+            this.uiState.updateProgress({
+              completionStatus: d.completionStatus || this.localCache.get('cmi.completion_status') || '',
+              successStatus: d.successStatus || this.localCache.get('cmi.success_status') || '',
+              scoreRaw: (d.scoreRaw != null && d.scoreRaw !== '') ? (parseFloat(d.scoreRaw) || null) : (parseFloat(this.localCache.get('cmi.score.raw')) || null),
+              progressMeasure: (d.progressMeasure != null && d.progressMeasure !== '') ? (parseFloat(d.progressMeasure) || 0) : (parseFloat(this.localCache.get('cmi.progress_measure')) || 0),
+              sessionTime: d.sessionTime || '',
+              totalTime: d.totalTime || this.localCache.get('cmi.total_time') || '',
+              location: d.location || this.localCache.get('cmi.location') || '',
+              suspendData: d.suspendData || this.localCache.get('cmi.suspend_data') || ''
+            });
+          }
+        } catch (_) { /* non-fatal */ }
       } else {
         try {
           const { rendererLogger } = await import('../utils/renderer-logger.js');
@@ -410,15 +436,62 @@ class ScormClient {
         // Silent failure path; renderer cache already updated
       }
     } catch (error) {
-      // Silent backoff on rate limit; swallow other errors to keep shutdown quiet
+      // Silent backoff on rate limit; swallow other errors to keep UI smooth
       const msg = (error && error.message) ? error.message : String(error);
       if (msg.includes('Rate limit exceeded')) {
         this._lastIpcRateLimitAt = Date.now();
         return;
       }
-      return;
     }
   }
+
+
+  /**
+   * Enqueue SetValue for batching
+   */
+  _enqueueSetValue(element, value) {
+    try {
+      this._pendingSetBatch.push({ element, value: String(value ?? '') });
+      if (this._pendingSetBatch.length >= this._BATCH_MAX_SIZE) {
+        this._flushSetBatch();
+        return;
+      }
+      if (!this._batchTimer) {
+        this._batchTimer = setTimeout(() => {
+          this._batchTimer = null;
+          this._flushSetBatch();
+        }, this._BATCH_MAX_DELAY_MS);
+      }
+    } catch (_) { /* no-op */ }
+  }
+
+  /**
+   * Flush batched SetValue calls to main via batch IPC
+   */
+  async _flushSetBatch() {
+    const batch = this._pendingSetBatch.splice(0, this._pendingSetBatch.length);
+    if (!batch.length || !this.sessionId) return;
+    try {
+      // best-effort; renderer cache already updated
+      await window.electronAPI.scormSetValuesBatch(this.sessionId, batch);
+    } catch (e) {
+      // swallow to keep UI smooth
+    }
+  }
+
+  /**
+   * Schedule debounced Commit to avoid bursts
+   */
+  _scheduleCommit() {
+    if (this._commitTimer) {
+      clearTimeout(this._commitTimer);
+    }
+    this._commitTimer = setTimeout(() => {
+      this._commitTimer = null;
+      this.asyncCommit();
+    }, this._COMMIT_DEBOUNCE_MS);
+  }
+
 
   /**
    * Asynchronously commit to main process
@@ -586,7 +659,7 @@ class ScormClient {
 
     // Keep lightweight per-window UI state (existing code path)
     try { this.uiState.addApiCall(apiCall); } catch (_) {}
-    
+
     // Emit a UI-scoped API call event (allowed). The SCORM Inspector receives data via IPC from main process.
     try { eventBus.emit('ui:api:call', { data: apiCall }); } catch (_) {}
 
@@ -698,13 +771,13 @@ class ScormClient {
    if (this.isInitialized) {
      this.Terminate('');
    }
-   
+
    // Clear the session timer
    if (this.sessionTimer) {
      clearInterval(this.sessionTimer);
      this.sessionTimer = null;
    }
-   
+
    this.clearCache();
    // UI-scoped destroy notification
    eventBus.emit('ui:scorm:destroyed');

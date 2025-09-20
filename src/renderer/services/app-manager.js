@@ -1,16 +1,16 @@
 /**
  * Application Manager
- * 
+ *
  * Main application orchestrator that manages services, components, and lifecycle.
  * Provides clean separation of concerns and centralized application management.
- * 
+ *
  * @fileoverview Main application management service
  */
 
 
 /**
  * Application Manager Class
- * 
+ *
  * Orchestrates the entire application lifecycle and component interactions.
  */
 class AppManager {
@@ -75,7 +75,7 @@ class AppManager {
       // Dynamically import eventBus first as it's a core dependency
       const { eventBus } = await import('./event-bus.js');
       this.services.set('eventBus', eventBus); // Set it early
-      
+
       // Dynamically import uiStatePromise
       const { uiState: uiStatePromise } = await import('./ui-state.js');
       // Ensure logger is available (no-op fallback already set in constructor)
@@ -86,15 +86,19 @@ class AppManager {
 
       // Step 1: Initialize services
       await this.initializeServices();
-      
+
       // Step 2: Initialize components
       await this.initializeComponents();
-      
+
       // Step 3: Setup event listeners
       this.setupEventHandlers();
-      
+
       // Step 4: Setup UI event listeners
       this.setupUIEventListeners();
+
+      // Initialize UI settings from main AppState (theme, sidebar, etc.)
+      try { await this.initializeUiFromMain(); } catch (_) {}
+
 
       // Step 5: Setup centralized SN status polling
       this.setupSnPollingController();
@@ -108,6 +112,9 @@ class AppManager {
       this.hideLoading();
       try { this.logger.debug('AppManager - setLoading(false)'); } catch (_) {}
       this.uiState.setLoading(false); // Use the resolved instance
+
+      // Start syncing centralized UI settings to main AppState
+      try { this.setupUiSettingsSync(); } catch (_) {}
 
       // Configure EventBus debug mode based on UIState (Step 8)
       try {
@@ -133,7 +140,7 @@ class AppManager {
 
       // Emit initialization complete event
       eventBus.emit('app:initialized');
-      
+
     } catch (error) {
       try { this.logger.error('AppManager: Failed to initialize application', error?.message || error); } catch (_) {}
       this.handleInitializationError(error);
@@ -146,7 +153,7 @@ class AppManager {
    */
   async initializeServices() {
     // console.log('AppManager: Initializing services...'); // Removed debug log
-    
+
     // Dynamically import services (eventBus already imported at top of initialize)
     const { scormClient } = await import('./scorm-client.js');
     const { scormAPIBridge } = await import('./scorm-api-bridge.js');
@@ -158,14 +165,14 @@ class AppManager {
     this.services.set('scormClient', scormClient);
     this.services.set('scormAPIBridge', scormAPIBridge);
     this.services.set('courseLoader', courseLoader);
-    
+
     // Initialize SCORM client if needed
     if (!scormClient.getInitialized()) {
       // Note: ScormClient doesn't have an initialize() method - it initializes via Initialize()
       // We'll skip this for now as SCORM initialization happens when content is loaded
       // console.log('AppManager: SCORM client not initialized, will initialize when content loads'); // Removed debug log
     }
-    
+
     // console.log('AppManager: Services initialized'); // Removed debug log
   }
 
@@ -270,7 +277,7 @@ class AppManager {
      this.logger.error('AppManager: eventBus not found in services. Cannot set up event handlers.');
      return;
    }
-   
+
 
     eventBus.on('course:loadError', (errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
@@ -300,7 +307,7 @@ class AppManager {
       // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
 
-    eventBus.on('scorm:error', (errorData) => {
+    eventBus.on('ui:scorm:error', (errorData) => {
       try {
         const safeMsg = (errorData && (errorData.message || errorData.error)) || 'Unknown SCORM error';
         this.logger.error('AppManager: SCORM error', safeMsg);
@@ -312,14 +319,14 @@ class AppManager {
       } catch (_) {}
     });
 
-   
 
-   
+
+
 
     // BUG-003 FIX: Unified navigation pipeline with state machine
     this.setupUnifiedNavigationPipeline(eventBus);
 
-    // BUG-020 FIX: Removed legacy navigation:request support - all events now use standardized navigationRequest
+    // BUG-020 FIX: Removed legacy navigationRequest support - all events now use standardized navigation:request
 
     // Optional: reflect navigation launch to components that rely on centralized signal
     eventBus.on('navigation:launch', (data) => {
@@ -327,10 +334,14 @@ class AppManager {
         this.logger.info('AppManager: navigation:launch propagated', { activityId: data?.activity?.id || data?.activity?.identifier || null, source: data?.source });
       } catch (_) {}
     });
- 
-    // Menu button toggle event handlers
-    eventBus.on('menuToggled', this.handleMenuToggle.bind(this));
-    eventBus.on('menuVisibilityChanged', this.handleMenuVisibilityChanged.bind(this));
+
+    // Unified sidebar events (namespaced only)
+    eventBus.on('ui:sidebar:toggle-request', this.handleMenuToggle.bind(this));
+    eventBus.on('ui:menu:visibility-changed', this.handleMenuVisibilityChanged.bind(this));
+
+    // Unified header intent events (namespaced only)
+    eventBus.on('ui:inspector:toggle-request', () => this.openScormInspector());
+    eventBus.on('ui:theme:toggle-request', () => this.toggleTheme());
 
     // Menu action handlers
     if (window.electronAPI && window.electronAPI.onMenuEvent) {
@@ -413,14 +424,14 @@ class AppManager {
     const tick = async () => {
       // If deactivated, skip
       if (!this._snPollingActive) return;
-  
+
       // Enforce min spacing
       const now = Date.now();
       if (now - this._snLastTickAt < this._SN_MIN_INTERVAL_MS) {
         scheduleNext(this._SN_MIN_INTERVAL_MS - (now - this._snLastTickAt));
         return;
       }
-  
+
       // Lifecycle gates
       if (!canPoll()) {
         // If cannot poll, reschedule with min interval (or backoff if present)
@@ -429,17 +440,17 @@ class AppManager {
         return;
       }
 
-  
+
       this._snLastTickAt = now;
       try { this.logger.debug('AppManager: SN polling tick'); } catch (_) {}
-  
+
       // Use scormAPIBridge if available, else scormClient as fallback
       let status = null;
       try {
         // Resolve from the service registry to avoid referencing out-of-scope globals
         const scormAPIBridge = this.services.get('scormAPIBridge');
         const scormClient = this.services.get('scormClient');
-  
+
         if (scormAPIBridge && typeof scormAPIBridge.getStatus === 'function') {
           status = await scormAPIBridge.getStatus();
         } else if (scormClient && typeof scormClient.getStatus === 'function') {
@@ -459,10 +470,10 @@ class AppManager {
         scheduleNext(this._snBackoffMs);
         return;
       }
-  
+
       // Successful status retrieval
       resetBackoff();
-  
+
       // Reflect available navigation into UIState if present
       try {
         const available = status && (status.availableNavigation || status.available || []);
@@ -471,7 +482,7 @@ class AppManager {
       } catch (e) {
         try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) {}
       }
-  
+
       // Schedule next
       scheduleNext(this._SN_MIN_INTERVAL_MS);
     };
@@ -529,7 +540,7 @@ class AppManager {
     });
 
     // 2) Navigation in-flight gating
-    eventBus.on('navigationRequest', () => {
+    eventBus.on('navigation:request', () => {
       this._snNavInFlight = true;
       this._snLastNavigationAt = Date.now(); // Set timestamp for cooldown
       this.pauseSnPolling('navigation');
@@ -556,11 +567,9 @@ class AppManager {
       scheduleNext(this._snBackoffMs);
     });
 
-    // 4) Commit/Terminate gating (if emitted by scormAPIBridge)
-    eventBus.on('scorm:commit:start', () => this.pauseSnPolling('commit'));
-    eventBus.on('scorm:commit:done', () => this.resumeSnPolling());
-    eventBus.on('scorm:terminate:start', () => this.pauseSnPolling('terminate'));
-    eventBus.on('scorm:terminate:done', () => this.stopSnPolling());
+    // 4) Commit/Terminate gating (UI-scoped events from scormClient)
+    eventBus.on('ui:scorm:committed', () => this.resumeSnPolling());
+    eventBus.on('ui:scorm:terminated', () => this.stopSnPolling());
 
     // CRITICAL FIX: Handle navigation availability updates from main process
     // This propagates navigation changes when activities complete
@@ -643,7 +652,7 @@ class AppManager {
    */
   async setupUIEventListeners() {
     // console.log('AppManager: Setting up UI event listeners...'); // Removed debug log
-    
+
     // Course load button (Open ZIP)
     const courseLoader = this.services.get('courseLoader');
     if (!courseLoader) {
@@ -681,7 +690,7 @@ class AppManager {
         });
       });
     }
- 
+
     // Welcome page buttons (fallback wiring for legacy inline handlers)
     const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
     welcomeButtons.forEach((btn, index) => {
@@ -696,30 +705,33 @@ class AppManager {
 
     // Render Recent Courses list if container exists
     await this.renderRecentCourses();
- 
-    
+
+
 
     // SCORM Inspector toggle
     const scormInspectorToggleBtn = document.getElementById('scorm-inspector-toggle');
     if (scormInspectorToggleBtn) {
-      scormInspectorToggleBtn.addEventListener('click', () => {
-        this.openScormInspector();
+      scormInspectorToggleBtn.addEventListener('click', async () => {
+        const { eventBus } = await import('../services/event-bus.js');
+        eventBus.emit('ui:inspector:toggle-request');
       });
     }
 
     // Theme toggle
     const themeToggleBtn = document.getElementById('theme-toggle');
     if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', () => {
-        this.toggleTheme();
+      themeToggleBtn.addEventListener('click', async () => {
+        const { eventBus } = await import('../services/event-bus.js');
+        eventBus.emit('ui:theme:toggle-request');
       });
     }
 
     // Sidebar toggle for mobile
     const sidebarToggleBtn = document.getElementById('sidebar-toggle');
     if (sidebarToggleBtn) {
-      sidebarToggleBtn.addEventListener('click', () => {
-        this.toggleSidebar();
+      sidebarToggleBtn.addEventListener('click', async () => {
+        const { eventBus } = await import('../services/event-bus.js');
+        eventBus.emit('ui:sidebar:toggle-request');
       });
     }
 
@@ -868,7 +880,7 @@ class AppManager {
       } catch (_) {}
     });
 
-    // Unhandled promise rejection handler  
+    // Unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
       try { this.logger.error('AppManager: Unhandled promise rejection', event?.reason?.message || event?.reason || 'unknown'); } catch (_) {}
     });
@@ -999,7 +1011,7 @@ class AppManager {
     return this.components.get(name);
   }
 
-  
+
 
   /**
    * Open SCORM Inspector window
@@ -1009,12 +1021,12 @@ class AppManager {
       if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
         try { this.logger.debug('AppManager: Requesting SCORM Inspector window...'); } catch (_) {}
         const result = await window.electronAPI.openScormInspectorWindow();
-        
+
         if (result && result.success) {
           try { this.logger.info('AppManager: SCORM Inspector opened successfully'); } catch (_) {}
           return;
         }
-        
+
         // Handle failure cases
         if (!result) {
           try { this.logger.error('AppManager: Failed to open SCORM Inspector: No response from main process'); } catch (_) {}
@@ -1026,24 +1038,96 @@ class AppManager {
       }
     } catch (error) {
       try { this.logger.error('AppManager: Error opening SCORM Inspector:', error.message || error); } catch (_) {}
+      }
     }
+
+  /**
+   * Apply theme to document root
+   */
+  applyTheme(theme) {
+    try {
+      const t = (theme === 'dark' || theme === 'system' || theme === 'default') ? theme : 'default';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.className = document.documentElement.className.replace(/theme-\w+/, `theme-${t}`);
+    } catch (_) {}
+  }
+
+  /**
+   * Initialize UI from main AppState (theme, sidebar visibility, and more)
+   */
+  async initializeUiFromMain() {
+    try {
+      if (window.electronAPI && window.electronAPI.ui && window.electronAPI.ui.getSettings) {
+        const res = await window.electronAPI.ui.getSettings();
+        const ui = res && res.settings ? (res.settings.ui || {}) : {};
+        if (ui.theme) this.applyTheme(ui.theme || 'default');
+        if (typeof ui.sidebarVisible === 'boolean') {
+          await this.handleMenuToggle({ visible: ui.sidebarVisible });
+        }
+        if (typeof ui.devModeEnabled === 'boolean') {
+          this.uiState?.setState('ui.devModeEnabled', ui.devModeEnabled, true);
+        }
+        if (typeof ui.sidebarCollapsed === 'boolean') {
+          this.uiState?.setState('ui.sidebarCollapsed', ui.sidebarCollapsed, true);
+        }
+        if (typeof ui.debugPanelVisible === 'boolean') {
+          this.uiState?.setState('ui.debugPanelVisible', ui.debugPanelVisible, true);
+        }
+      }
+    } catch (error) {
+      try { this.logger.warn('AppManager: Failed to initialize UI from main', error?.message || error); } catch (_) {}
+    }
+  }
+
+  /**
+   * Keep main AppState in sync with renderer UI changes for centralized keys
+   */
+  setupUiSettingsSync() {
+    try {
+      if (!this.uiState || typeof this.uiState.subscribe !== 'function') return;
+      const CENTRAL_KEYS = ['theme','sidebarVisible','sidebarCollapsed','debugPanelVisible','devModeEnabled'];
+      let last = {};
+      const getCurrent = () => {
+        const ui = (this.uiState && this.uiState.getState && this.uiState.getState('ui')) || (this.uiState?.state?.ui) || {};
+        const pick = {};
+        for (const k of CENTRAL_KEYS) pick[k] = ui[k];
+        return pick;
+      };
+      last = getCurrent();
+
+      this.uiState.subscribe(async (newState) => {
+        try {
+          const ui = newState && newState.ui ? newState.ui : {};
+          const delta = {};
+          let changed = false;
+          for (const k of CENTRAL_KEYS) {
+            if (ui[k] !== last[k]) { delta[k] = ui[k]; changed = true; }
+          }
+          if (changed && window.electronAPI?.ui?.setSettings) {
+            await window.electronAPI.ui.setSettings({ ui: delta });
+            last = { ...last, ...delta };
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
   }
 
   /**
    * Toggle application theme
    */
-  toggleTheme() {
+  async toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'default';
     const newTheme = currentTheme === 'dark' ? 'default' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    document.documentElement.className = document.documentElement.className.replace(/theme-\w+/, `theme-${newTheme}`);
-    
-    // Save theme preference
+
+    this.applyTheme(newTheme);
+
+    // Persist to main AppState
     try {
-      localStorage.setItem('scorm-tester-theme', newTheme);
+      if (window.electronAPI && window.electronAPI.ui && window.electronAPI.ui.setSettings) {
+        await window.electronAPI.ui.setSettings({ ui: { theme: newTheme } });
+      }
     } catch (error) {
-      try { this.logger.warn('Failed to save theme preference', error?.message || error); } catch (_) {}
+      try { this.logger.warn('Failed to persist theme to main AppState', error?.message || error); } catch (_) {}
     }
   }
 
@@ -1056,7 +1140,7 @@ class AppManager {
       // Use the responsive mobile open class that matches CSS
       sidebar.classList.toggle('app-sidebar--open');
     }
-    
+
     const overlay = document.querySelector('.sidebar-overlay');
     if (overlay) {
       overlay.classList.toggle('active');
@@ -1064,7 +1148,11 @@ class AppManager {
       // Create overlay if it doesn't exist
       const newOverlay = document.createElement('div');
       newOverlay.className = 'sidebar-overlay active';
-      newOverlay.addEventListener('click', () => this.toggleSidebar());
+      // Use intent-based flow to close sidebar via overlay
+      newOverlay.addEventListener('click', async () => {
+        const { eventBus } = await import('../services/event-bus.js');
+        eventBus.emit('ui:sidebar:toggle-request', { visible: false });
+      });
       document.body.appendChild(newOverlay);
     }
   }
@@ -1072,26 +1160,41 @@ class AppManager {
   /**
    * Handle menu toggle event from navigation controls
    */
-  handleMenuToggle(data) {
+  async handleMenuToggle(data) {
     const sidebar = document.getElementById('app-sidebar');
-    const isVisible = data.visible;
     const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-    
+
+    let targetVisible = true;
+
     if (sidebar) {
+      // Determine current visibility from DOM, then compute target
+      let currentVisible = true;
+      if (isMobile) {
+        currentVisible = sidebar.classList.contains('app-sidebar--open');
+      } else {
+        currentVisible = !sidebar.classList.contains('app-sidebar--hidden');
+      }
+      targetVisible = (typeof data?.visible === 'boolean') ? data.visible : !currentVisible;
+
       if (isMobile) {
         // Mobile uses slide-in panel
-        sidebar.classList.toggle('app-sidebar--open', isVisible);
+        sidebar.classList.toggle('app-sidebar--open', targetVisible);
 
         // Manage overlay on mobile
         let overlay = document.querySelector('.sidebar-overlay');
-        if (!overlay && isVisible) {
+        if (!overlay && targetVisible) {
           overlay = document.createElement('div');
           overlay.className = 'sidebar-overlay active';
-          overlay.addEventListener('click', () => this.handleMenuToggle({ visible: false }));
+          // Use intent-based flow for closing via overlay
+          import('../services/event-bus.js').then(({ eventBus }) => {
+            overlay.addEventListener('click', () => { eventBus.emit('ui:sidebar:toggle-request', { visible: false }); });
+          }).catch(() => {
+            overlay.addEventListener('click', () => this.handleMenuToggle({ visible: false }));
+          });
           document.body.appendChild(overlay);
         } else if (overlay) {
-          overlay.classList.toggle('active', isVisible);
-          if (!isVisible) {
+          overlay.classList.toggle('active', targetVisible);
+          if (!targetVisible) {
             // Allow CSS transition, then remove
             setTimeout(() => {
               if (overlay && !overlay.classList.contains('active')) {
@@ -1102,28 +1205,33 @@ class AppManager {
         }
       } else {
         // Desktop: toggle hidden class and expand content area
-        sidebar.classList.toggle('app-sidebar--hidden', !isVisible);
+        sidebar.classList.toggle('app-sidebar--hidden', !targetVisible);
 
         const appContent = document.querySelector('.app-content');
         if (appContent) {
-          appContent.classList.toggle('app-content--full-width', !isVisible);
+          appContent.classList.toggle('app-content--full-width', !targetVisible);
         }
       }
-      
-      // Update UI state
+
+      // Update UI state and persist centrally to main AppState
       if (this.uiState) {
-        this.uiState.setState('ui.sidebarVisible', isVisible, true); // silent update to avoid loops
+        this.uiState.setState('ui.sidebarVisible', targetVisible, true); // silent update to avoid loops
       }
+      try {
+        if (window.electronAPI?.ui?.setSettings) {
+          await window.electronAPI.ui.setSettings({ ui: { sidebarVisible: targetVisible } });
+        }
+      } catch (_) {}
     }
-    
+
     try {
-      this.logger.debug('AppManager: Menu toggled', { visible: isVisible });
+      this.logger.debug('AppManager: Menu toggled', { visible: targetVisible });
     } catch (_) {}
 
     // Broadcast visibility change for other components (e.g., NavigationControls) to react
     try {
       const eventBus = this.services.get('eventBus');
-      eventBus?.emit('menuVisibilityChanged', { visible: isVisible });
+      eventBus?.emit('ui:menu:visibility-changed', { visible: targetVisible });
     } catch (_) {}
   }
 
@@ -1134,7 +1242,7 @@ class AppManager {
     const sidebar = document.getElementById('app-sidebar');
     const isVisible = data.visible;
     const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-    
+
     if (sidebar) {
       if (isMobile) {
         sidebar.classList.toggle('app-sidebar--open', isVisible);
@@ -1163,7 +1271,7 @@ class AppManager {
         }
       }
     }
-    
+
     try {
       this.logger.info('AppManager: Menu visibility changed', { visible: isVisible });
     } catch (_) {}
@@ -1181,7 +1289,7 @@ class AppManager {
    */
   async shutdown() {
     // console.log('AppManager: Shutting down application...'); // Removed debug log
-    
+
     try {
       // Stop polling before tearing down
       if (typeof this.stopSnPolling === 'function') {
@@ -1194,14 +1302,14 @@ class AppManager {
           await component.destroy();
         }
       }
-      
+
       // Cleanup services
       const { eventBus } = await import('./event-bus.js');
       eventBus.destroy();
-      
+
       this.initialized = false;
       // console.log('AppManager: Application shutdown complete'); // Removed debug log
-      
+
     } catch (error) {
       try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) {}
     }
@@ -1238,16 +1346,16 @@ class AppManager {
             session: status.session,
             config: status.config || {}
           };
-          
+
           // Update UI state to reflect browse mode
           this.uiState.setState('browseMode', this.browseMode);
-          
+
           // Broadcast browse mode change
           const eventBus = this.services.get('eventBus');
           if (eventBus) {
             eventBus.emit('browseMode:changed', this.browseMode);
           }
-          
+
           this.logger.info('AppManager: Browse mode initialized from main process', this.browseMode);
         }
       }
@@ -1329,7 +1437,7 @@ class AppManager {
 
     } catch (error) {
       this.logger.error('AppManager: Failed to set browse mode', error);
-      
+
       // Revert state on error
       this.browseMode = { enabled: false, session: null, config: {} };
       this.uiState.setState('browseMode', this.browseMode);
@@ -1366,7 +1474,7 @@ class AppManager {
     try {
       const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
       const snBridge = snBridgeModule.snBridge;
-      
+
       const state = await snBridge.getSequencingState();
       if (state && state.success && Array.isArray(state.availableNavigation)) {
         const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
@@ -1381,8 +1489,8 @@ class AppManager {
    * BUG-003 FIX: Setup unified navigation pipeline with state machine
    */
   setupUnifiedNavigationPipeline(eventBus) {
-    // Listen for unified navigationRequest events
-    eventBus.on('navigationRequest', async (payload) => {
+    // Listen for unified navigation:request events (namespaced only)
+    eventBus.on('navigation:request', async (payload) => {
       await this.processNavigationRequest(payload);
     });
   }
@@ -1440,11 +1548,11 @@ class AppManager {
         // Handle successful navigation result
         if (result && result.success) {
           await this.handleSuccessfulNavigation(result, payload);
-          
+
           // BUG-004 FIX: Update activity location after successful navigation
           if (activityId && activityId !== this.currentActivity?.id) {
             await this.updateActivityLocation(activityId, window.location.href);
-            
+
             // Update current activity tracking
             this.currentActivity = {
               id: activityId,
@@ -1467,17 +1575,17 @@ class AppManager {
     } catch (error) {
       this.logger.error('AppManager: Error processing navigation request', error);
       this.setNavigationState('IDLE');
-      
+
       // BUG-024 FIX: Emit navigation error event for error handling
       const eventBus = this.services.get('eventBus');
       if (eventBus) {
-        eventBus.emit('navigationError', {
+        eventBus.emit('navigation:error', {
           error: error.message,
           source: 'AppManager',
           originalRequest: payload
         });
       }
-      
+
       return { success: false, reason: error.message, error };
     }
   }
@@ -1525,10 +1633,10 @@ class AppManager {
       // Get SN bridge
       const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
       const snBridge = snBridgeModule.snBridge;
-      
+
       // Initialize if needed
       const init = await snBridge.initialize().catch(() => ({ success: false }));
-      
+
       if (!init || !init.success) {
         this.logger.warn('AppManager: SN service unavailable, trying fallback');
         this.showFallbackNotification();
@@ -1537,7 +1645,7 @@ class AppManager {
 
       // Process through SN service
       const result = await snBridge.processNavigation(requestType, activityId);
-      
+
       if (result && result.success) {
         return result;
       } else {
@@ -1590,8 +1698,13 @@ class AppManager {
           source: 'AppManager',
           context: 'processDirectNavigation'
         });
+        eventBus.emit('navigation:error', {
+          error: error.message,
+          source: 'AppManager',
+          context: 'processDirectNavigation'
+        });
       }
-      
+
       return {
         success: false,
         reason: 'Direct navigation error',
@@ -1610,7 +1723,7 @@ class AppManager {
         // Try to find activity in course structure
         const structure = this.uiState.getState('courseStructure');
         const target = this._findItemById(structure, activityId);
-        
+
         if (target && target.launchUrl) {
           return {
             success: true,
@@ -1621,7 +1734,7 @@ class AppManager {
           };
         }
       }
-      
+
       return {
         success: false,
         reason: `Fallback navigation not available for ${requestType}`,
@@ -1631,13 +1744,13 @@ class AppManager {
       // BUG-024 FIX: Emit navigation error event
       const eventBus = this.services.get('eventBus');
       if (eventBus) {
-        eventBus.emit('navigationError', {
+        eventBus.emit('navigation:error', {
           error: error.message,
           source: 'AppManager',
           context: 'processFallbackNavigation'
         });
       }
-      
+
       return {
         success: false,
         reason: 'Fallback navigation error',
@@ -1790,7 +1903,7 @@ class AppManager {
     const canNavigateNext = a.includes('continue');
     return { canNavigatePrevious, canNavigateNext };
   }
-  
+
   /**
    * Render Recent Courses on welcome screen if container exists.
    * Expects a container with id 'recent-courses'.
@@ -1802,7 +1915,7 @@ class AppManager {
       try { this.logger.debug('AppManager: recent-courses container not found; skipping render'); } catch (_) {}
       return;
     }
-  
+
     // Lazy-load store to avoid circular deps
     const { recentCoursesStore } = await import(`${window.electronAPI.rendererBaseUrl}services/recent-courses.js`);
     // Ensure the store has loaded its data from the main process
@@ -1818,7 +1931,7 @@ class AppManager {
       container.appendChild(empty);
       return;
     }
-  
+
       const list = document.createElement('ul');
       list.className = 'recent-list';
       items.forEach((rc) => {
@@ -1826,13 +1939,13 @@ class AppManager {
         li.className = 'recent-item';
         li.dataset.type = rc.type;
         li.dataset.path = rc.path;
-  
+
         const title = rc.meta?.title || rc.displayName || rc.path.split(/[\\/]/).pop();
         const kind = rc.type === 'zip' ? 'ZIP' : 'Folder';
-  
+
         li.textContent = `${title} (${kind})`;
         li.title = rc.path;
-  
+
         li.addEventListener('click', async () => {
           try {
             const courseLoader = this.services.get('courseLoader');
@@ -1848,10 +1961,10 @@ class AppManager {
             try { this.logger.error('AppManager: recent course load failed', e?.message || e); } catch (_) {}
           }
         });
-  
+
         list.appendChild(li);
       });
-  
+
       container.appendChild(list);
   }
 
@@ -1955,7 +2068,7 @@ class AppManager {
         // Load from file (ZIP)
         await courseLoader.loadCourseFromPath(coursePath);
       }
-      
+
       return { success: true, message: 'Course loading initiated' };
     } catch (error) {
       return { success: false, error: error.message || String(error) };
@@ -1971,7 +2084,7 @@ import { rendererLogger } from '../utils/renderer-logger.js';
 
 if (typeof window !== 'undefined') {
   window.appManager = appManager;
-  
+
   // Add global test helper function
   window.testLoadCourse = async (coursePath, type = 'zip') => {
     const result = await appManager.testLoadCourse(coursePath, type);

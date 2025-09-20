@@ -74,9 +74,9 @@ class RuntimeManager {
   }
 
   static async openPage({ entryPath, viewport = { width: 1024, height: 768 }, adapterOptions = {} }) {
-    if (!this.isSupported) throw new Error("Electron not available");
+    if (!this.isSupported) { const e = new Error("Electron runtime is required"); e.code = "ELECTRON_REQUIRED"; throw e; }
     const ok = await this.ensureAppReady();
-    if (!ok) throw new Error("Electron app not ready");
+    if (!ok) { const e = new Error("Electron app not ready"); e.code = "ELECTRON_REQUIRED"; throw e; }
     const { BrowserWindow } = electron;
     const wp = { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false };
     try { wp.preload = getPreloadPath(); } catch (_) {}
@@ -90,7 +90,7 @@ class RuntimeManager {
   }
 
   static async openPersistent({ session_id, entryPath, viewport = { width: 1024, height: 768 }, adapterOptions = {} }) {
-    if (!this.isSupported) throw new Error("Electron not available");
+    if (!this.isSupported) { const e = new Error("Electron runtime is required"); e.code = "ELECTRON_REQUIRED"; throw e; }
     if (!session_id) throw new Error("session_id required");
     // Close any existing window first
     await this.closePersistent(session_id);

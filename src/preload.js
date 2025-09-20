@@ -18,7 +18,7 @@ try {
     __ipc.invoke('renderer-log-debug', 'ipcRenderer exists:', typeof require('electron').ipcRenderer !== 'undefined');
   } else {
     // Fallback minimal console only if IPC is absent (should not happen in Electron)
-    console.log('CRITICAL DEBUG: preload.js script is loading (no IPC)');
+    // IPC not available: skip logging to honor no-console policy
   }
 } catch (_) {
   // Final fallback
@@ -31,7 +31,7 @@ let isShuttingDown = false;
 
 // Listen for app quit to set shutdown flag
 ipcRenderer.on('app-quit', () => {
-  console.log('[PRELOAD] App quit signal received, setting shutdown flag');
+  ipcRenderer.invoke('renderer-log-info', '[PRELOAD] App quit signal received, setting shutdown flag');
   isShuttingDown = true;
 });
 
@@ -63,7 +63,7 @@ const safeSend = (channel, ...args) => {
   try {
     ipcRenderer.send(channel, ...args);
   } catch (error) {
-    console.error(`IPC send failed for channel '${channel}':`, error);
+    ipcRenderer.invoke('renderer-log-error', `IPC send failed for channel '${channel}':`, error?.message || String(error));
   }
 };
 
@@ -76,18 +76,18 @@ const safeOn = (channel, callback) => {
       try {
         callback(...args);
       } catch (error) {
-        console.error(`Event callback error for channel '${channel}':`, error);
+        ipcRenderer.invoke('renderer-log-error', `Event callback error for channel '${channel}':`, error?.message || String(error));
       }
     };
-    
+
     ipcRenderer.on(channel, wrappedCallback);
-    
+
     // Return cleanup function
     return () => {
       ipcRenderer.removeListener(channel, wrappedCallback);
     };
   } catch (error) {
-    console.error(`Failed to set up event listener for channel '${channel}':`, error);
+    ipcRenderer.invoke('renderer-log-error', `Failed to set up event listener for channel '${channel}':`, error?.message || String(error));
     return () => {}; // Return no-op cleanup function
   }
 };
@@ -114,7 +114,9 @@ const electronAPI = {
   scormTerminate: (sessionId) => safeInvoke('scorm-terminate', sessionId),
   scormGetValue: (sessionId, element) => safeInvoke('scorm-get-value', sessionId, element),
   scormSetValue: (sessionId, element, value) => safeInvoke('scorm-set-value', sessionId, element, value),
+  scormSetValuesBatch: (sessionId, ops) => safeInvoke('scorm-set-values-batch', sessionId, ops),
   scormCommit: (sessionId) => safeInvoke('scorm-commit', sessionId),
+  scormGetProgressSnapshot: (sessionId) => safeInvoke('scorm-get-progress-snapshot', sessionId),
   scormGetLastError: (sessionId) => safeInvoke('scorm-get-last-error', sessionId),
   scormGetErrorString: (sessionId, errorCode) => safeInvoke('scorm-get-error-string', sessionId, errorCode),
   scormGetDiagnostic: (sessionId, errorCode) => safeInvoke('scorm-get-diagnostic', sessionId, errorCode),
@@ -133,6 +135,13 @@ const electronAPI = {
     remove: (type, path) => safeInvoke('recent:remove', type, path),
     clear: () => safeInvoke('recent:clear')
   },
+
+  // UI Settings (centralized in main)
+  ui: {
+    getSettings: () => safeInvoke('ui-settings:get'),
+    setSettings: (settings) => safeInvoke('ui-settings:set', settings)
+  },
+
 
   // Navigation
   scormNavigationRequest: (sessionId, request) => safeInvoke('scorm-navigation-request', sessionId, request),
@@ -263,15 +272,15 @@ electronAPI.testConnection = () => {
 
 // Expose the API to the renderer process
 try {
-  console.log('[PRELOAD] Attempting to expose electronAPI via contextBridge...');
+  ipcRenderer.invoke('renderer-log-info', '[PRELOAD] Attempting to expose electronAPI via contextBridge...');
   contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-  console.log('[PRELOAD] electronAPI successfully exposed via contextBridge');
+  ipcRenderer.invoke('renderer-log-info', '[PRELOAD] electronAPI successfully exposed via contextBridge');
 
   // Set up a global flag to indicate API is ready
   contextBridge.exposeInMainWorld('electronAPIIsReady', true);
 
 } catch (error) {
-  console.error('[PRELOAD] Failed to expose electronAPI via contextBridge:', error);
+  ipcRenderer.invoke('renderer-log-error', '[PRELOAD] Failed to expose electronAPI via contextBridge', error?.message || String(error));
 }
 
 // NOTE: Event forwarding and API initialization polling has been moved to the renderer process

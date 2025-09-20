@@ -1,9 +1,9 @@
 /**
  * SCORM Tester Main Process Entry Point
- * 
+ *
  * Refactored main process that orchestrates all Phase 4 services with
  * dependency injection, lifecycle management, and error handling.
- * 
+ *
  * @fileoverview Simplified main process entry point for SCORM Tester
  */
 
@@ -15,6 +15,8 @@ const IpcHandler = require('./services/ipc-handler');
 const FileManager = require('./services/file-manager');
 const ScormService = require('./services/scorm-service');
 const RecentCoursesService = require('./services/recent-courses-service');
+
+const AppStateService = require('./services/app-state');
 
 // Shared utilities
 const ScormErrorHandler = require('./services/scorm/rte/error-handler');
@@ -39,19 +41,21 @@ class MainProcess {
    */
   async initialize() {
     try {
-      (this.logger || console).info('SCORM Tester: Starting main process initialization');
-      
+      // Ensure a safe logger is available before core dependency init
+      this.logger = this.logger || { info: () => {}, warn: () => {}, error: () => {}, debug: () => {}, logFile: 'unknown', logLevel: 'info' };
+      this.logger.info('SCORM Tester: Starting main process initialization');
+
       await this.initializeCoreDependencies();
       await this.initializeServices();
       this.setupApplicationEvents();
       await this.createMainWindow();
-      
+
       this.isInitialized = true;
       this.logger?.info('SCORM Tester: Main process initialization completed successfully');
-      
+
     } catch (error) {
       (this.logger || console).error('SCORM Tester: Main process initialization failed:', error);
-      
+
       if (this.errorHandler) {
         this.errorHandler.setError(
           MAIN_PROCESS_ERRORS.SERVICE_INITIALIZATION_FAILED,
@@ -59,7 +63,7 @@ class MainProcess {
           'MainProcess.initialize'
         );
       }
-      
+
       await this.shutdown();
       app.quit();
     }
@@ -74,24 +78,27 @@ class MainProcess {
       // Use singleton logger getter with explicit first-init directory
       this.logger = getLogger(logDir);
       const logFilePath = this.logger && this.logger.logFile ? this.logger.logFile : 'unknown';
-      (this.logger || console).info(`SCORM Tester: Log file path: ${logFilePath}`);
-      (this.logger || console).info(`SCORM Tester: process.env.LOG_LEVEL: ${process.env.LOG_LEVEL}`);
-      (this.logger || console).info(`SCORM Tester: Logger logLevel: ${this.logger?.logLevel}`);
+      this.logger.info(`SCORM Tester: Log file path: ${logFilePath}`);
+      this.logger.info(`SCORM Tester: process.env.LOG_LEVEL: ${process.env.LOG_LEVEL}`);
+      this.logger.info(`SCORM Tester: Logger logLevel: ${this.logger?.logLevel}`);
 
-      // Also output to console for visibility during development
-      console.log(`\n🔍 SCORM Tester Log File: ${logFilePath}\n`);
-      console.log(`📝 Check this file for detailed debugging information\n`);
-      
+      // Development visibility: mirror to logger
+      this.logger?.info(`SCORM Tester Log File: ${logFilePath}`);
+      this.logger?.info(`Check this file for detailed debugging information`);
+
       this.errorHandler = new ScormErrorHandler(this.logger);
       this.logger?.info('SCORM Tester: Core dependencies initialized');
     } catch (error) {
-      (this.logger || console).error('SCORM Tester: Failed to initialize core dependencies:', error);
-      // Continue without logger if it fails
+      this.logger.error('SCORM Tester: Failed to initialize core dependencies:', error);
+      // Continue with a minimal no-op logger if initialization fails
+      const noop = () => {};
       this.logger = {
-        info: console.log,
-        warn: console.warn,
-        error: console.error,
-        debug: console.debug
+        info: noop,
+        warn: noop,
+        error: noop,
+        debug: noop,
+        logFile: 'unknown',
+        logLevel: 'info'
       };
       this.errorHandler = new ScormErrorHandler(this.logger);
     }
@@ -102,37 +109,37 @@ class MainProcess {
    */
   async initializeServices() {
     this.logger?.info('SCORM Tester: Initializing services');
-    
+
     // Create and initialize services in dependency order
     const windowManager = new WindowManager(this.errorHandler, this.logger);
     if (!await windowManager.initialize(new Map())) {
       throw new Error('WindowManager initialization failed');
     }
     this.services.set('windowManager', windowManager);
-    
+
     const fileManager = new FileManager(this.errorHandler, this.logger);
     if (!await fileManager.initialize(new Map())) {
       throw new Error('FileManager initialization failed');
     }
     this.services.set('fileManager', fileManager);
- 
+
     // Core shared services: SCORM Inspector telemetry store and SN snapshot service
     const ScormInspectorTelemetryStore = require('./services/scorm-inspector/scorm-inspector-telemetry-store');
     const SNSnapshotService = require('./services/scorm/sn/snapshot-service');
- 
+
     // Pass the main logger into shared services so logs are consistent
     // Create SCORM Inspector store with enhanced capabilities for package analysis
-    const telemetryStore = new ScormInspectorTelemetryStore({ 
+    const telemetryStore = new ScormInspectorTelemetryStore({
       maxHistorySize: 2000,
       enableBroadcast: true,
-      logger: this.logger 
+      logger: this.logger
     });
     // Wire the telemetry store and window manager together for broadcasting
     windowManager.setTelemetryStore(telemetryStore); // For legacy compatibility
     telemetryStore.setWindowManager(windowManager); // For new broadcasting capabilities
     // Create SNSnapshotService without scormService initially to avoid ordering issues; we'll wire scormService after it's created
     const snSnapshotService = new SNSnapshotService(null, { logger: this.logger });
- 
+
     // Initialize ScormService after core shared services are available so it can publish telemetry
     const scormService = new ScormService(this.errorHandler, this.logger);
     // Pass windowManager and telemetryStore/snSnapshotService via dependency map for initialization
@@ -157,13 +164,20 @@ class MainProcess {
     } catch (e) {
       this.logger?.warn && this.logger?.warn('SCORM Tester: Failed to wire SNSnapshotService to ScormService', e?.message || e);
     }
- 
+
     const recentCoursesService = new RecentCoursesService(this.errorHandler, this.logger);
     if (!await recentCoursesService.initialize(new Map())) {
       throw new Error('RecentCoursesService initialization failed');
     }
     this.services.set('recentCoursesService', recentCoursesService);
- 
+
+    // AppState service (centralized UI settings, etc.)
+    const appState = new AppStateService(this.errorHandler, this.logger);
+    if (!await appState.initialize(new Map())) {
+      throw new Error('AppStateService initialization failed');
+    }
+    this.services.set('appState', appState);
+
     // IPC handler (depends on many services including telemetry and SN snapshot)
     const ipcHandler = new IpcHandler(this.errorHandler, this.logger, { IPC_REFACTOR_ENABLED: true });
     const ipcDependencies = new Map([
@@ -173,24 +187,25 @@ class MainProcess {
       ['recentCoursesService', recentCoursesService],
       ['telemetryStore', telemetryStore],
       ['snSnapshotService', snSnapshotService],
+      ['appState', appState],
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');
     }
     this.services.set('ipcHandler', ipcHandler);
- 
+
     // Provide ipcHandler to SNSnapshotService now that it's available (some implementations expect it)
     if (typeof snSnapshotService.setIpcHandler === 'function') {
       snSnapshotService.setIpcHandler(ipcHandler);
     } else {
       snSnapshotService.ipcHandler = ipcHandler;
     }
- 
+
     // Do NOT re-initialize WindowManager with IpcHandler; WindowManager was initialized once above.
     this.logger?.info(`SCORM Tester: ${this.services.size} services initialized successfully`);
   }
 
-  
+
 
   /**
    * Set up application-level event handlers
@@ -226,12 +241,12 @@ class MainProcess {
       service.on(SERVICE_EVENTS.ERROR, (data) => {
         this.logger?.error(`Service error in ${serviceName}:`, data);
       });
-      
+
       service.on('stateChanged', (data) => {
         this.logger?.debug(`Service ${serviceName} state changed:`, data);
       });
     }
-    
+
     this.logger?.debug('SCORM Tester: Application event handlers set up');
   }
 
@@ -243,12 +258,12 @@ class MainProcess {
     if (!windowManager) {
       throw new Error('WindowManager service not available');
     }
-    
+
     try {
       const mainWindow = await windowManager.createMainWindow();
       this.logger?.info(`SCORM Tester: Main window created (ID: ${mainWindow.id})`);
       return mainWindow;
-      
+
     } catch (error) {
       this.logger?.error('SCORM Tester: Failed to create main window:', error);
       throw error;
@@ -307,11 +322,11 @@ class MainProcess {
       isShuttingDown: this.isShuttingDown,
       services: {}
     };
-    
+
     for (const [serviceName, service] of this.services) {
       status.services[serviceName] = service.getStatus();
     }
-    
+
     return status;
   }
 
@@ -341,8 +356,6 @@ app.whenReady().then(async () => {
   } catch (error) {
     if (mainProcess && mainProcess.logger && typeof mainProcess.logger.error === 'function') {
       mainProcess.logger.error('SCORM Tester: Failed to start application:', error);
-    } else {
-      console.error('SCORM Tester: Failed to start application:', error);
     }
     app.quit();
   }
@@ -362,7 +375,7 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 app.on('web-contents-created', (event, contents) => {
   contents.on('new-window', (event, navigationUrl) => {
     event.preventDefault();
-    
+
     if (mainProcess) {
       const logger = mainProcess.logger;
       logger?.warn(`SCORM Tester: Blocked new window creation: ${navigationUrl}`);

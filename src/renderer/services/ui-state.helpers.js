@@ -125,7 +125,16 @@ export function safeLoadPersistedUI(persistenceKey) {
     const persisted = localStorage.getItem(persistenceKey);
     if (!persisted) return null;
     const parsed = JSON.parse(persisted);
-    if (parsed && parsed.ui) return { ui: parsed.ui };
+    if (parsed && parsed.ui) {
+      // Filter out centrally-managed keys; main AppState is the source of truth
+      const filtered = { ...parsed.ui };
+      for (const k of ['theme','debugPanelVisible','sidebarCollapsed','sidebarVisible','devModeEnabled']) {
+        if (k in filtered) delete filtered[k];
+      }
+      // Return only if any non-central keys remain
+      if (Object.keys(filtered).length > 0) return { ui: filtered };
+      return null;
+    }
     return null;
   } catch (_e) {
     // Swallow but log parse/load issues to renderer logger if available

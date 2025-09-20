@@ -146,13 +146,13 @@ class ContentViewer extends BaseComponent {
     // Listen for UI state changes
     this.subscribe('ui:updated', this.handleUIUpdate);
 
-    // Listen for SCORM events
-    this.subscribe('scorm:initialized', this.handleScormInitialized);
-    this.subscribe('scorm:error', this.handleScormError);
+    // Listen for SCORM events (UI-scoped)
+    this.subscribe('ui:scorm:initialized', this.handleScormInitialized);
+    this.subscribe('ui:scorm:error', this.handleScormError);
 
     // BUG-007 FIX: Subscribe to unified navigation events
-    // BUG-020 FIX: Use only standardized navigationRequest event
-    this.subscribe('navigationRequest', this.handleNavigationRequest);
+    // BUG-020 FIX: Use only standardized navigation:request event
+    this.subscribe('navigation:request', this.handleNavigationRequest);
 
     // Listen for navigation launch events (CRITICAL for browse mode navigation)
     this.subscribe('navigation:launch', this.handleNavigationLaunch);
@@ -929,7 +929,7 @@ class ContentViewer extends BaseComponent {
         activityId: eventData?.activityId
       });
 
-      const { activityObject, requestType, source, url, scormData } = eventData || {};
+      const { activityObject, requestType, url, scormData } = eventData || {};
 
       switch (requestType) {
         case 'activityLaunch':
@@ -968,7 +968,8 @@ class ContentViewer extends BaseComponent {
       // Emit error back to event bus for centralized error handling
       try {
         const { eventBus } = await import('../../services/event-bus.js');
-        eventBus.emit('navigationError', {
+        // Unified namespaced event only
+        eventBus.emit('navigation:error', {
           error: error.message || String(error),
           source: 'ContentViewer',
           originalRequest: eventData

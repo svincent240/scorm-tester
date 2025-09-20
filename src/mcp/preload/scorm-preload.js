@@ -11,6 +11,7 @@
           const res = await ipcRenderer.invoke('scorm-mcp:api', { method, args: Array.isArray(args) ? args : [] });
           return typeof res === 'string' ? res : String(res);
         } catch (e) {
+          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] apiInvoke failed', e && e.message ? e.message : String(e)); } catch (_) {}
           return 'false';
         }
       },
@@ -19,6 +20,7 @@
           const res = await ipcRenderer.invoke('scorm-mcp:sn', { action, payload: payload || {} });
           return res;
         } catch (e) {
+          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] snInvoke failed', e && e.message ? e.message : String(e)); } catch (_) {}
           return null;
         }
       }
@@ -61,7 +63,12 @@
       GetDiagnostic: wrap('GetDiagnostic')
     });
   } catch (e) {
-    // Preload failed; do nothing (runtime will fall back)
+    try {
+      const r = (typeof globalThis !== 'undefined' && globalThis.ipcRenderer) ? globalThis.ipcRenderer : null;
+      if (r) {
+        r.invoke('renderer-log-error', '[MCP preload] Failed to initialize SCORM_MCP bridge', e && e.message ? e.message : String(e));
+      }
+    } catch (_) {}
   }
 })();
 

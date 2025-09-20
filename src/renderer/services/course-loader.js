@@ -31,7 +31,8 @@ class CourseLoader {
         this.logger?.info && this.logger.info('CourseLoader: Logger initialized');
       })
       .catch((error) => {
-        console.warn('CourseLoader: Failed to load renderer logger:', error);
+        // Fallback to a no-op logger to satisfy no-console policy
+        try { window.electronAPI?.logger?.warn?.('CourseLoader: Failed to load renderer logger', error?.message || String(error)); } catch (_) {}
         this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} };
       });
   }

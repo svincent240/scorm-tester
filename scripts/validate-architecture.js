@@ -41,6 +41,7 @@ class ArchitectureValidator {
       await this.validateServiceLayer();
       await this.validateTypeDefinitions();
       await this.validateCSSArchitecture();
+      await this.validateIpcRouteCoverage();
 
       this.printResults();
 
@@ -97,7 +98,7 @@ class ArchitectureValidator {
       { path: 'src/renderer/components/scorm/content-viewer.js' },
       { path: 'src/renderer/components/scorm/navigation-controls.js' },
       { path: 'src/renderer/components/scorm/progress-tracking.js' },
-      
+
       { path: 'src/renderer/components/scorm/course-outline.js' },
       { path: 'src/shared/types/scorm-types.d.ts' },
       { path: 'src/renderer/types/component-types.d.ts' },
@@ -155,7 +156,7 @@ class ArchitectureValidator {
       'src/renderer/components/scorm/content-viewer.js',
       'src/renderer/components/scorm/navigation-controls.js',
       'src/renderer/components/scorm/progress-tracking.js',
-      
+
       'src/renderer/components/scorm/course-outline.js'
     ];
 
@@ -366,6 +367,69 @@ class ArchitectureValidator {
       }
     }
   }
+  /**
+   * Validate IPC route coverage: ensure all registered channels are declared in routes.js
+   */
+  async validateIpcRouteCoverage() {
+    console.log('\n🔗 Validating IPC route coverage...');
+
+    const routesPath = path.join(process.cwd(), 'src/main/services/ipc/routes.js');
+    const handlerPath = path.join(process.cwd(), 'src/main/services/ipc-handler.js');
+
+    if (!fs.existsSync(routesPath)) {
+      this.errors.push('Missing IPC routes file: src/main/services/ipc/routes.js');
+      return;
+    }
+    if (!fs.existsSync(handlerPath)) {
+      this.errors.push('Missing IPC handler file: src/main/services/ipc-handler.js');
+      return;
+    }
+
+    // Load routes and gather declared channels
+    const declared = new Set();
+    try {
+      const routes = require(routesPath);
+      if (Array.isArray(routes)) {
+        for (const r of routes) {
+          if (r && typeof r.channel === 'string') declared.add(r.channel);
+        }
+      }
+    } catch (e) {
+      this.errors.push(`Failed to load routes.js: ${e.message}`);
+      return;
+    }
+
+    // Scan ipc-handler.js for registerHandler('channel', ...) usages
+    const content = fs.readFileSync(handlerPath, 'utf8');
+    const registerRe = /registerHandler\(\s*['"]([^'"]+)['"]/g;
+    const registered = new Set();
+    let m;
+    while ((m = registerRe.exec(content)) !== null) {
+      registered.add(m[1]);
+    }
+
+    // Whitelist channels that are intentionally registered outside routes
+    const whitelist = new Set([
+      'renderer-log-info',
+      'renderer-log-warn',
+      'renderer-log-error',
+      'renderer-log-debug',
+    ]);
+
+    // Find any registered channels missing from routes
+    const missing = [];
+    for (const ch of registered) {
+      if (whitelist.has(ch)) continue;
+      if (!declared.has(ch)) missing.push(ch);
+    }
+
+    if (missing.length > 0) {
+      this.errors.push(`IPC route drift: ${missing.length} channel(s) registered in ipc-handler.js but not declared in routes.js -> ${missing.join(', ')}`);
+    } else {
+      console.log('  ✅ IPC route coverage: all registered channels are declared');
+    }
+  }
+
 
   /**
    * Print validation results
