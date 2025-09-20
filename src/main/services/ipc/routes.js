@@ -458,7 +458,7 @@ module.exports = [
       useIpcResult: true
     }
   },
-,
+
   {
     channel: 'validate-scorm-compliance',
     handlerName: 'handleValidateScormCompliance',
@@ -491,6 +491,24 @@ module.exports = [
       rateLimitProfile: 'snBypass'
     }
   },
+  {
+    channel: 'get-app-version',
+    handlerName: 'handleGetAppVersion',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'get-app-path',
+    handlerName: 'handleGetAppPath',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: false
+    }
+  },
+
   {
     channel: 'get-app-root',
     handlerName: 'handleGetAppRoot',

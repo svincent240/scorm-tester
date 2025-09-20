@@ -118,7 +118,7 @@ class WindowManager extends BaseService {
 
       try {
         // Use custom protocol to avoid Windows file:// issues
-        await mainWindow.loadURL('scorm-app://index.html');
+        await mainWindow.loadURL('scorm-app://app/index.html');
 
         this.menuBuilder.createApplicationMenu(mainWindow);
 
@@ -197,7 +197,7 @@ class WindowManager extends BaseService {
       try { this.applySecurityHandlers(inspectorWindow); } catch (_) {}
 
       // Load SCORM Inspector window content using simple protocol format
-      await inspectorWindow.loadURL('scorm-app://scorm-inspector.html');
+      await inspectorWindow.loadURL('scorm-app://app/scorm-inspector.html');
 
       inspectorWindow.show();
       this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.READY);
@@ -462,9 +462,27 @@ class WindowManager extends BaseService {
         ses.webRequest.onHeadersReceived((details, callback) => {
           try {
             const isDev = process.env.NODE_ENV === 'development';
-            const csp = isDev
-              ? "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' 'unsafe-eval' scorm-app:; connect-src 'self' scorm-app:"
-              : "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' scorm-app:; connect-src 'self' scorm-app:";
+            const url = String(details?.url || '');
+
+            // Determine whether the requested resource resolves under appRoot or tempRoot
+            let usedBase = 'appRoot';
+            try {
+              const appRoot = PathUtils.getAppRoot(__dirname);
+              const resolution = PathUtils.handleProtocolRequest(url, appRoot);
+              if (resolution && resolution.success && resolution.usedBase) {
+                usedBase = resolution.usedBase; // 'appRoot' | 'tempRoot'
+              }
+            } catch (_) {}
+
+            // Strict CSP for UI (no inline scripts)
+            const uiCsp = "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' scorm-app:; connect-src 'self' scorm-app:";
+
+            // Relaxed CSP for SCORM content (allow inline scripts; eval only in dev)
+            const contentCsp = isDev
+              ? "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' 'unsafe-inline' 'unsafe-eval' scorm-app:; connect-src 'self' scorm-app: data:"
+              : "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' 'unsafe-inline' 'unsafe-eval' scorm-app:; connect-src 'self' scorm-app: data:";
+
+            const csp = usedBase === 'appRoot' ? uiCsp : contentCsp;
             const headers = { ...details.responseHeaders, 'Content-Security-Policy': [csp] };
             callback({ responseHeaders: headers });
           } catch (err) {

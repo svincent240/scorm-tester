@@ -8,7 +8,7 @@
  * @fileoverview IPC communication service for SCORM Tester main process
  */
 
-const { ipcMain, shell } = require('electron'); // Added shell for handleOpenExternal
+const { ipcMain, shell, app, BrowserWindow } = require('electron'); // Added shell for handleOpenExternal + app/BrowserWindow for utility listeners
 const path = require('path'); // Added path for path utils
 const BaseService = require('./base-service');
 const {
@@ -208,7 +208,7 @@ class IpcHandler extends BaseService {
    * Register critical IPC handlers that must always be available
    */
   _registerCriticalHandlers() {
-    const { ipcMain } = require('electron');
+    const { ipcMain, BrowserWindow } = require('electron');
 
     // Register logging handlers directly to bypass any potential issues
     try {
@@ -228,6 +228,34 @@ class IpcHandler extends BaseService {
         try { this.logger?.debug(...args); } catch (e) {}
         return { success: true };
       });
+
+      // Utility, fire-and-forget renderer controls
+      ipcMain.on('open-dev-tools', (event) => {
+        try {
+          const win = BrowserWindow.fromWebContents(event?.sender);
+          if (win?.webContents && !win.webContents.isDevToolsOpened()) {
+            win.webContents.openDevTools({ mode: 'detach' });
+          }
+        } catch (e) {
+          try { this.logger?.warn('Failed to open dev tools', e?.message || String(e)); } catch (_) {}
+        }
+      });
+
+      ipcMain.on('reload-window', (event) => {
+        try {
+          const win = BrowserWindow.fromWebContents(event?.sender);
+          if (win?.webContents) {
+            if (typeof win.webContents.reloadIgnoringCache === 'function') {
+              win.webContents.reloadIgnoringCache();
+            } else {
+              win.reload();
+            }
+          }
+        } catch (e) {
+          try { this.logger?.warn('Failed to reload window', e?.message || String(e)); } catch (_) {}
+        }
+      });
+
     } catch (e) {
       // Even if this fails, continue with other handlers
     }
@@ -278,6 +306,9 @@ class IpcHandler extends BaseService {
       // Validation and session handlers
       this.registerHandler('validate-scorm-compliance', this.handleValidateScormCompliance.bind(this));
       this.registerHandler('analyze-scorm-content', this.handleAnalyzeScormContent.bind(this));
+      this.registerHandler('get-app-version', this.handleGetAppVersion.bind(this));
+      this.registerHandler('get-app-path', this.handleGetAppPath.bind(this));
+
       this.registerHandler('get-session-data', this.handleGetSessionData.bind(this));
       this.registerHandler('reset-session', this.handleResetSession.bind(this));
       this.registerHandler('get-all-sessions', this.handleGetAllSessions.bind(this));
@@ -936,6 +967,8 @@ class IpcHandler extends BaseService {
         return { success: true, url };
       }
 
+
+
       // Check if path is within canonical temp root
       if (normalizedPath.startsWith(canonicalTempRoot)) {
         const url = PathUtils.toScormProtocolUrl(filePath, canonicalTempRoot);
@@ -970,7 +1003,27 @@ class IpcHandler extends BaseService {
   // Logging handler
   handleLogMessage(event, { level, message, args }) {
     this.logger?.log(level, `[Renderer] ${message}`, ...args);
+
+
   }
+
+  async handleGetAppVersion(_event) {
+    try {
+      return { success: true, version: app.getVersion() };
+    } catch (error) {
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async handleGetAppPath(_event, name) {
+    try {
+      const val = typeof name === 'string' ? app.getPath(name) : app.getAppPath();
+      return { success: true, path: val };
+    } catch (error) {
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
 
 
 
@@ -987,6 +1040,7 @@ class IpcHandler extends BaseService {
         const scormService = this.getDependency('scormService');
         if (scormService && typeof scormService.getCurrentDataModel === 'function') {
           try {
+
             dataModel = scormService.getCurrentDataModel() || {};
             this.logger?.debug(`IpcHandler: getCurrentDataModel returned object with keys: ${Object.keys(dataModel)}`);
           } catch (e) {

@@ -13,43 +13,8 @@
   <!-- Main stylesheet -->
   <link rel="stylesheet" href="scorm-app://app/src/styles/main.css">
   
-  <!-- Theme management -->
-  <script>
-    // Apply saved theme or system preference before page load
-    (function() {
-      let savedTheme = null;
-      try {
-        // DIAGNOSTIC: Log security context information
-        console.log('THEME INIT: Current URL:', window.location.href);
-        console.log('THEME INIT: Protocol:', window.location.protocol);
-        console.log('THEME INIT: Origin:', window.location.origin);
-        console.log('THEME INIT: localStorage available:', typeof localStorage !== 'undefined');
-        
-        // Only attempt localStorage when running under a storage-capable origin.
-        // Pages loaded via scorm-app:// are opaque origins and accessing localStorage
-        // can throw a SecurityError. Skip attempting access under that protocol.
-        if (window.location && window.location.protocol !== 'scorm-app:' && typeof localStorage !== 'undefined') {
-          try {
-            savedTheme = localStorage.getItem('scorm-tester-theme');
-            console.log('THEME INIT: Successfully accessed localStorage, saved theme:', savedTheme);
-          } catch (err) {
-            // localStorage access threw (e.g., storage disabled) - log safely
-            console.warn('THEME INIT: localStorage access threw:', err && err.message);
-          }
-        } else {
-          console.log('THEME INIT: Skipping localStorage access due to protocol or unavailable storage');
-        }
-      } catch (error) {
-        console.warn('THEME INIT: localStorage access failed:', error.message);
-        console.warn('THEME INIT: Error details:', error);
-      }
-      
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
-      const theme = savedTheme || systemTheme;
-      document.documentElement.setAttribute('data-theme', theme);
-      document.documentElement.classList.add(`theme-${theme}`);
-    })();
-  </script>
+  <!-- Theme management (moved to external script to satisfy CSP) -->
+  <script src="scorm-app://app/src/renderer/boot/theme-init.js"></script>
 </head>
 <body class="scorm-tester-app">
   <!-- Application Container -->
@@ -125,7 +90,7 @@
             <div id="course-outline" class="course-outline">
               <div class="course-outline__empty">
                 <p>No course loaded</p>
-                <button class="btn btn--outline btn--sm" onclick="document.getElementById('course-load-btn').click()">
+                <button class="btn btn--outline btn--sm" id="outline-load-zip-btn">
                   Load Course
                 </button>
               </div>
@@ -151,14 +116,14 @@
                 <p>Professional SCORM 2004 4th Edition compliance testing tool</p>
                 
                 <div class="welcome-actions">
-                  <button class="btn btn--primary btn--lg" onclick="document.getElementById('course-load-btn').click()">
+                  <button class="btn btn--primary btn--lg" id="welcome-load-zip-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
                     </svg>
                     Load ZIP
                   </button>
 
-                  <button class="btn btn--outline btn--lg" id="welcome-folder-btn" onclick="document.getElementById('course-folder-btn').click()">
+                  <button class="btn btn--outline btn--lg" id="welcome-folder-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4H10Z"/>
                     </svg>
@@ -271,51 +236,11 @@
   <!-- File Input (Hidden) -->
   <input type="file" id="file-input" accept=".zip,.scorm" style="display: none;">
   
-  <!-- Scripts -->
-  <script>
-    // Layout initialization to prevent startup issues
-    (function() {
-      console.log('CRITICAL DEBUG: Layout initialization starting');
-      
-      // Ensure app layout is properly initialized
-      const appElement = document.getElementById('app');
-      if (appElement) {
-        // Mark as not initialized to use safe startup styles
-        appElement.classList.remove('initialized');
-        
-        // Set proper initial state
-        document.body.style.overflow = 'hidden';
-        document.documentElement.style.overflow = 'hidden';
-        
-        console.log('CRITICAL DEBUG: Layout prepared for initialization');
-      }
-    })();
-    
-    // Inline script to test if JavaScript is working
-    console.log('CRITICAL DEBUG: Inline script executing');
-    console.log('CRITICAL DEBUG: DOM ready state:', document.readyState);
-    console.log('CRITICAL DEBUG: electronAPI available:', typeof window.electronAPI !== 'undefined');
-    
-    // Load the main app script as a regular script (uses dynamic imports internally)
-    const script = document.createElement('script');
-    script.src = 'scorm-app://app/src/renderer/app.js';  // Use custom protocol with fixed host for same-origin
-    // No type="module" needed - using dynamic imports instead of static imports
-    script.onload = () => {
-      console.log('CRITICAL DEBUG: app.js loaded successfully');
-      
-      // Mark layout as initialized after app loads
-      setTimeout(() => {
-        const appElement = document.getElementById('app');
-        if (appElement) {
-          appElement.classList.add('initialized');
-          console.log('CRITICAL DEBUG: Layout marked as initialized');
-        }
-      }, 100);
-    };
-    script.onerror = (error) => console.error('CRITICAL DEBUG: app.js failed to load:', error);
-    document.head.appendChild(script);
-  </script>
-  
+  <!-- Scripts moved to external files to satisfy CSP -->
+  <script src="scorm-app://app/src/renderer/boot/layout-init.js"></script>
+  <script src="scorm-app://app/src/renderer/boot/click-forwarders.js"></script>
+  <script src="scorm-app://app/src/renderer/app.js"></script>
+
   <!-- Service Worker removed - not beneficial in Electron context -->
 </body>
 </html>
