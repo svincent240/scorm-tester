@@ -3,43 +3,14 @@
 // SCORM Inspector Window JavaScript
 // Handles the display and management of SCORM package inspection data
 
-// Note: Using console.error instead of rendererLogger to avoid import issues in browser context
+import { rendererLogger } from 'scorm-app://app/src/renderer/utils/renderer-logger.js';
+import { escapeHTML } from 'scorm-app://app/src/renderer/utils/escape.js';
 
-// Safe logger that falls back to console if rendererLogger is not available
+// Centralized logger adapter (no console fallbacks)
 const safeLogger = {
-    error: (...args) => {
-        try {
-            if (typeof rendererLogger !== 'undefined' && rendererLogger?.error) {
-                rendererLogger.error(...args);
-            } else {
-                console.error(...args);
-            }
-        } catch (e) {
-            console.error(...args);
-        }
-    },
-    warn: (...args) => {
-        try {
-            if (typeof rendererLogger !== 'undefined' && rendererLogger?.warn) {
-                rendererLogger.warn(...args);
-            } else {
-                console.warn(...args);
-            }
-        } catch (e) {
-            console.warn(...args);
-        }
-    },
-    log: (...args) => {
-        try {
-            if (typeof rendererLogger !== 'undefined' && rendererLogger?.log) {
-                rendererLogger.log(...args);
-            } else {
-                console.log(...args);
-            }
-        } catch (e) {
-            console.log(...args);
-        }
-    }
+  error: (...args) => { try { rendererLogger.error(...args); } catch (_) {} },
+  warn:  (...args) => { try { rendererLogger.warn(...args); } catch (_) {} },
+  log:   (...args) => { try { rendererLogger.info(...args); } catch (_) {} },
 };
 
 // Utility function for safe JSON stringification (prevents circular references)
@@ -636,10 +607,14 @@ class ScormInspectorWindow {
     }
 
     escapeHtml(text) {
+        // Delegate to shared utility
+        return escapeHTML(text);
+    }
+
+    /* Removed legacy body:
         if (typeof text !== 'string') {
             text = String(text);
         }
-        
         try {
             const div = document.createElement('div');
             div.textContent = text;
@@ -1917,12 +1892,12 @@ class ScormInspectorWindow {
                     navigator.clipboard.writeText(dataStr).then(() => {
                         alert('Download failed, but data has been copied to clipboard.');
                     }).catch(() => {
-                        alert('Download failed. Please check the console for the data.');
-                        console.log('Export data:', dataStr);
+                        alert('Download failed. Export data will be truncated in logs.');
+                        try { rendererLogger.info('Export data (truncated):', dataStr.slice(0, 2048)); } catch (_) {}
                     });
                 } else {
-                    alert('Download failed. Please check the console for the data.');
-                    console.log('Export data:', dataStr);
+                    alert('Download failed. Export data will be truncated in logs.');
+                    try { rendererLogger.info('Export data (truncated):', dataStr.slice(0, 2048)); } catch (_) {}
                 }
             } catch (fallbackError) {
                 safeLogger.error('Fallback export also failed:', fallbackError);
@@ -2236,7 +2211,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkMemory = () => {
             const memory = window.performance.memory;
             if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.9) {
-                console.warn('High memory usage detected, cleaning up...');
+                safeLogger.warn('High memory usage detected, cleaning up...');
                 if (window.scormInspector && typeof window.scormInspector.performMemoryCleanup === 'function') {
                     window.scormInspector.performMemoryCleanup();
                 }

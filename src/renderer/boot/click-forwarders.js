@@ -1,17 +1,15 @@
 (function(){
   try {
-    const forward = (srcId, targetId) => {
-      const src = document.getElementById(srcId);
-      const tgt = document.getElementById(targetId);
-      if (src && tgt) {
-        src.addEventListener('click', () => tgt.click());
-      }
-    };
+    const toolbarZip = () => document.getElementById('course-load-btn');
+    const toolbarFolder = () => document.getElementById('course-folder-btn');
 
-    // Forwarders for welcome/outline shortcuts → primary toolbar buttons
-    forward('outline-load-zip-btn', 'course-load-btn');
-    forward('welcome-load-zip-btn', 'course-load-btn');
-    forward('welcome-folder-btn', 'course-folder-btn');
+    document.addEventListener('click', (e) => {
+      const zipBtn = e.target.closest('.js-load-zip');
+      if (zipBtn) { const t = toolbarZip(); if (t) t.click(); return; }
+
+      const folderBtn = e.target.closest('.js-load-folder');
+      if (folderBtn) { const t = toolbarFolder(); if (t) t.click(); }
+    });
   } catch (_) {}
 })();
 

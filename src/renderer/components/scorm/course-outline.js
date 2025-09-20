@@ -354,57 +354,30 @@ class CourseOutline extends BaseComponent {
     const progress = this.progressData.get(item.identifier) || {};
     const scormState = this.scormStates.get(item.identifier);
 
-    // Determine SCORM-based visual states for UI display
-    const validation = this.validateActivityNavigationLocal(item.identifier);
+    // Determine SCORM-based visual states for UI display (authoritative state only)
+    // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
+    const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
+    // Items are disabled until SCORM states are loaded; after that, disable only when sequencing disallows choice and not in browse mode
+    const sequencingDisallowsChoice = !this.availableNavigation || !this.availableNavigation.includes('choice');
+    const blockedByRules = !!(scormState && (scormState.preConditionResult?.action === 'disabled' || scormState.attemptLimitExceeded));
+    const isDisabled = (!this.scormStatesLoaded) || (!this.browseModeEnabled && (sequencingDisallowsChoice || blockedByRules));
+    const isSuspended = scormState && scormState.suspended;
+    const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
 
-    // Log initial render state for debugging
-    rendererLogger.info('CourseOutline: renderItem called for', item.identifier, {
+    // Log render state for debugging
+    rendererLogger.info('CourseOutline: renderItem', item.identifier, {
       renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',
       scormStatesLoaded: this.scormStatesLoaded,
       hasScormState: !!scormState,
-      validationAllowed: validation.allowed,
-      validationReason: validation.reason,
       browseModeEnabled: this.browseModeEnabled,
       itemType: item.type,
-      hasChildren: hasChildren
+      hasChildren: hasChildren,
+      isVisible: scormState?.isVisible,
+      isHidden,
+      isDisabled,
+      isSuspended,
+      attemptLimitReached
     });
-     // Only show as hidden if SCORM states are loaded AND the activity is actually hidden
-     // But don't hide items that are just disabled due to sequencing rules
-     const isHidden = this.scormStatesLoaded && scormState && !scormState.isVisible && scormState.isVisible !== undefined;
-     // Authoritative gating: items are disabled until SCORM states are loaded; after that, disable only when validation fails and not in browse mode
-     const isDisabled = (!this.scormStatesLoaded) || (!validation.allowed && !this.browseModeEnabled);
-     const isSuspended = scormState && scormState.suspended;
-     const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
-
-     // Debug logging for visual state determination
-     rendererLogger.debug('CourseOutline: Visual state determination for', item.identifier, {
-       scormStatesLoaded: this.scormStatesLoaded,
-       validationAllowed: validation.allowed,
-       validationReason: validation.reason,
-       browseModeEnabled: this.browseModeEnabled,
-       hasScormState: !!scormState,
-       isVisible: scormState?.isVisible,
-       isHidden,
-       isDisabled,
-       isSuspended,
-       attemptLimitReached,
-       willHaveStrikethrough: isHidden || isDisabled
-     });
-
-     // Debug logging for all items to track visibility issues
-     rendererLogger.debug('CourseOutline: Rendering item', {
-       itemId: item.identifier,
-       scormStatesLoaded: this.scormStatesLoaded,
-       hasScormState: !!scormState,
-       isVisible: scormState?.isVisible,
-       validationAllowed: validation.allowed,
-       validationReason: validation.reason,
-       isHidden,
-       isDisabled,
-       browseModeEnabled: this.browseModeEnabled,
-       hasChildren: hasChildren,
-       depth
-     });
 
     // Debug logging for SCORM state changes
     if (scormState) {
@@ -696,14 +669,7 @@ class CourseOutline extends BaseComponent {
       availableNavigation: this.availableNavigation
     });
 
-    // Get validation result for logging
-    const validation = this.validateActivityNavigationLocal(itemId);
-    rendererLogger.info('CourseOutline: Pre-navigation validation result', {
-      itemId,
-      validationAllowed: validation.allowed,
-      validationReason: validation.reason,
-      scormStatesLoaded: this.scormStatesLoaded
-    });
+
 
     this.setCurrentItem(itemId);
 
@@ -1270,106 +1236,7 @@ class CourseOutline extends BaseComponent {
     }
   }
 
-  /**
-   * Get visual validation state for rendering (non-blocking)
-   */
-  validateActivityNavigationLocal(activityId) {
-    rendererLogger.debug('CourseOutline: validateActivityNavigationLocal called', {
-      activityId,
-      currentItem: this.currentItem,
-      scormStatesLoaded: this.scormStatesLoaded,
-      browseModeEnabled: this.browseModeEnabled,
-      hasScormState: this.scormStates.has(activityId),
-      availableNavigation: this.availableNavigation
-    });
 
-    // Authoritative gating: If SCORM states haven't been loaded yet, disallow navigation
-    if (!this.scormStatesLoaded) {
-      rendererLogger.debug('CourseOutline: SCORM states not loaded yet for', activityId, '- disallowing navigation until authoritative state arrives');
-      return { allowed: false, reason: 'Authoritative state not yet loaded' };
-    }
-
-    // CRITICAL FIX: Allow navigation to the current activity even if choice navigation is disabled
-    if (activityId === this.currentItem) {
-      rendererLogger.debug('CourseOutline: Allowing navigation to current activity', {
-        activityId,
-        currentItem: this.currentItem
-      });
-      return { allowed: true, reason: 'Current activity - navigation allowed' };
-    }
-
-    // CRITICAL FIX: Check if choice navigation is available in sequencing rules FIRST
-    if (!this.availableNavigation || !this.availableNavigation.includes('choice')) {
-      rendererLogger.debug('CourseOutline: Choice navigation not available in sequencing rules', {
-        activityId,
-        availableNavigation: this.availableNavigation
-      });
-      return { allowed: false, reason: 'Choice navigation disabled by sequencing rules' };
-    }
-
-    const scormState = this.scormStates.get(activityId);
-
-    // CRITICAL FIX: If no SCORM state is available for this specific activity, allow navigation
-    // This prevents items from being incorrectly disabled when using fallback data
-    if (!scormState) {
-      rendererLogger.debug('CourseOutline: No SCORM state available for', activityId, '- allowing navigation');
-      return { allowed: true, reason: 'No SCORM state available for activity' };
-    }
-
-    // CRITICAL FIX: Check if this is fallback data (indicated by preConditionResult reason)
-    const isFallbackData = scormState.preConditionResult?.reason &&
-      (scormState.preConditionResult.reason.includes('not available') ||
-        scormState.preConditionResult.reason.includes('not initialized') ||
-        scormState.preConditionResult.reason.includes('No course loaded') ||
-        scormState.preConditionResult.reason.includes('SCORM service unavailable') ||
-        scormState.preConditionResult.reason.includes('SN service not') ||
-        scormState.preConditionResult.reason.includes('Activity tree manager not') ||
-        scormState.preConditionResult.reason.includes('Error:'));
-
-    if (isFallbackData) {
-      rendererLogger.debug('CourseOutline: Fallback data detected for', activityId, {
-        reason: scormState.preConditionResult.reason,
-        isFallback: true
-      });
-      return { allowed: true, reason: 'Using fallback data - navigation allowed' };
-    }
-
-    // Check basic visibility and restrictions for UI display only
-    if (!scormState.isVisible) {
-      rendererLogger.debug('CourseOutline: Activity hidden from choice', {
-        activityId,
-        isVisible: scormState.isVisible,
-        preConditionAction: scormState.preConditionResult?.action
-      });
-      return { allowed: false, reason: 'Activity is hidden from choice' };
-    }
-
-    if (scormState.attemptLimitExceeded) {
-      rendererLogger.debug('CourseOutline: Activity blocked by attempt limit', {
-        activityId,
-        attemptLimitExceeded: scormState.attemptLimitExceeded
-      });
-      return { allowed: false, reason: 'Attempt limit exceeded' };
-    }
-
-    if (scormState.preConditionResult?.action === 'disabled') {
-      rendererLogger.debug('CourseOutline: Activity blocked by prerequisite', {
-        activityId,
-        action: scormState.preConditionResult.action,
-        reason: scormState.preConditionResult.reason
-      });
-      return { allowed: false, reason: scormState.preConditionResult.reason || 'Pre-condition rule blocks navigation' };
-    }
-
-    // Browse mode always shows as allowed for UI
-    if (this.browseModeEnabled) {
-      rendererLogger.debug('CourseOutline: Browse mode enabled for', activityId, '- allowing navigation');
-      return { allowed: true, reason: 'Browse mode enabled' };
-    }
-
-    rendererLogger.debug('CourseOutline: Navigation validation passed for', activityId);
-    return { allowed: true, reason: 'Navigation appears available' };
-  }
 
   /**
    * Show navigation blocked message to user

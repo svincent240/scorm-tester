@@ -319,12 +319,17 @@ class ContentViewer extends BaseComponent {
       
       // Setup SCORM APIs BEFORE iframe loads
       this.setupScormAPIs();
-      
+
+      // Pre-inject APIs into the iframe's current window synchronously (about:blank)
+      if (this.iframe && this._syncInjectApiIntoWindow) {
+        try { this._syncInjectApiIntoWindow(this.iframe.contentWindow); } catch (_) {}
+      }
+
       // Load content directly in iframe
       if (this.iframe) {
         this.iframe.src = processedUrl;
       }
-      
+
       this.emit('contentLoadStarted', { url, options });
       
     } catch (error) {
@@ -497,6 +502,10 @@ class ContentViewer extends BaseComponent {
       const api12 = createDirectAPI('1.2');
       const api2004 = createDirectAPI('2004');
 
+      // Persist on instance for synchronous injection
+      this._api12 = api12;
+      this._api2004 = api2004;
+
       // Inject into main window
       window.API = api12;
       window.API_1484_11 = api2004;
@@ -513,31 +522,27 @@ class ContentViewer extends BaseComponent {
         }
       }
 
-      // Set up a mechanism to inject API into iframe when it loads
+      // Helper to inject APIs into any target window synchronously
+      this._syncInjectApiIntoWindow = (win) => {
+        if (!win) return;
+        try {
+          win.API = this._api12;
+          win.API_1484_11 = this._api2004;
+          if (win.parent && win.parent !== win) {
+            win.parent.API = this._api12;
+            win.parent.API_1484_11 = this._api2004;
+          }
+          if (win.opener) {
+            win.opener.API = this._api12;
+            win.opener.API_1484_11 = this._api2004;
+          }
+        } catch (_) { /* ignore cross-origin */ }
+      };
+
+      // Set up a mechanism to inject API into iframe when it loads (fallback)
       this._injectApiIntoIframe = (iframe) => {
         if (!iframe || !iframe.contentWindow) return;
-
-        try {
-          const contentWindow = iframe.contentWindow;
-
-          // Inject API directly into iframe's window
-          contentWindow.API = api12;
-          contentWindow.API_1484_11 = api2004;
-
-          // Also inject into iframe's parent for SCO discovery
-          if (contentWindow.parent && contentWindow.parent !== contentWindow) {
-            contentWindow.parent.API = api12;
-            contentWindow.parent.API_1484_11 = api2004;
-          }
-
-          // Inject into opener if it exists
-          if (contentWindow.opener) {
-            contentWindow.opener.API = api12;
-            contentWindow.opener.API_1484_11 = api2004;
-          }
-        } catch (error) {
-          // Ignore cross-origin errors - SCO will handle API discovery
-        }
+        this._syncInjectApiIntoWindow(iframe.contentWindow);
       };
 
     } catch (error) {

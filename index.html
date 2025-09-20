@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob: file: scorm-app:; script-src 'self' 'unsafe-inline' scorm-app: file:; style-src 'self' 'unsafe-inline' scorm-app: file:; connect-src 'self' scorm-app: data: file:; frame-src 'self' scorm-app: data: blob: file:; img-src 'self' scorm-app: data: blob: file:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file: scorm-app:; script-src 'self' scorm-app: file:; style-src 'self' 'unsafe-inline' scorm-app: file:; connect-src 'self' scorm-app: data: file:; frame-src 'self' scorm-app: data: blob: file:; img-src 'self' scorm-app: data: blob: file:;">
   <meta name="description" content="SCORM Tester - Professional SCORM 2004 4th Edition compliance testing tool">
   <meta name="author" content="SCORM Tester Team">
   <meta name="keywords" content="SCORM, e-learning, LMS, testing, compliance, SCORM 2004">
@@ -32,13 +32,13 @@
         </div>
         
         <nav class="header__nav">
-           <button id="course-load-btn" class="btn btn--primary" title="Load SCORM Course (ZIP)">
+           <button id="course-load-btn" class="btn btn--primary js-load-zip" title="Load SCORM Course (ZIP)">
              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
              </svg>
              Load ZIP
            </button>
-           <button id="course-folder-btn" class="btn btn--secondary" title="Load SCORM Course Folder">
+           <button id="course-folder-btn" class="btn btn--secondary js-load-folder" title="Load SCORM Course Folder">
              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                <path d="M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4H10Z"/>
              </svg>
@@ -90,7 +90,7 @@
             <div id="course-outline" class="course-outline">
               <div class="course-outline__empty">
                 <p>No course loaded</p>
-                <button class="btn btn--outline btn--sm" id="outline-load-zip-btn">
+                <button class="btn btn--outline btn--sm js-load-zip" id="outline-load-zip-btn">
                   Load Course
                 </button>
               </div>
@@ -116,14 +116,14 @@
                 <p>Professional SCORM 2004 4th Edition compliance testing tool</p>
                 
                 <div class="welcome-actions">
-                  <button class="btn btn--primary btn--lg" id="welcome-load-zip-btn">
+                  <button class="btn btn--primary btn--lg js-load-zip" id="welcome-load-zip-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
                     </svg>
                     Load ZIP
                   </button>
 
-                  <button class="btn btn--outline btn--lg" id="welcome-folder-btn">
+                  <button class="btn btn--outline btn--lg js-load-folder" id="welcome-folder-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4H10Z"/>
                     </svg>
