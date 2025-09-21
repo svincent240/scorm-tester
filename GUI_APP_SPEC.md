@@ -12,7 +12,7 @@ All GUI code (components, services, etc.) **MUST** adhere to these non-negotiabl
 The GUI **MUST NOT** contain its own business logic or source-of-truth state for core concepts like SCORM data or navigation availability. It is a "dumb" renderer of state provided by the main process. The `UIState` service is the only local cache of state, and it is read-only for components.
 
 ### 2.2. Event-Driven and Intent-Based
-Components **MUST** be loosely coupled. They **MUST NOT** call methods on each other directly. 
+Components **MUST** be loosely coupled. They **MUST NOT** call methods on each other directly.
 - **Communication**: All interactions **MUST** happen via the `EventBus` service.
 - **User Actions**: User interactions (e.g., button clicks) **MUST** be published as "intent" events (e.g., `navigationRequest`). They describe *what* the user wants to do, not *how* to do it.
 
@@ -49,7 +49,7 @@ Renderer Process
 ### 3.1. Services
 *   **`AppManager`**: The central orchestrator for the renderer. It wires services and components together on initialization. It is the primary handler for complex event sequences.
 *   **`UIState`**: A read-only cache of the application's state (e.g., `navigationState`, `courseLoaded`). Components subscribe to `UIState` for updates but **MUST NOT** modify it directly. State is updated by services in response to events from the main process.
-*   **`EventBus`**: The channel for all intra-renderer communication. 
+*   **`EventBus`**: The channel for all intra-renderer communication.
 *   **`ScormClient`**: A wrapper around the Electron `preload` API that handles all IPC communication with the main process.
 
 ### 3.2. Components
@@ -96,6 +96,16 @@ Components are self-contained UI elements that follow a consistent lifecycle.
 *   **Mandatory Utility**: All logging **MUST** use the `renderer-logger.js` utility.
 *   **Prohibited**: `console.log`, `console.warn`, `console.error`, etc., are forbidden. The linter enforces this.
 *   **Purpose**: This ensures all diagnostic information, including from the renderer, is captured in the single `app.log` file for unified debugging.
+
+
+### 6.1 Logging for AI agents — where to get renderer logs
+
+- The renderer never logs to the console; it uses `renderer-logger.js` which forwards to the main logger.
+- Find logs in the same directory as the Core/Main logs, with files:
+  - `app.log` (human‑readable), `app.ndjson` (structured), `errors.ndjson` (errors only)
+- Location (default Core/GUI app): Electron userData directory (macOS: `~/Library/Application Support/scorm-tester/`). If `SCORM_TESTER_LOG_DIR` is set at launch, logs go there.
+- Suppression/backoff is visible in NDJSON via events like `RENDERER_BACKOFF_ENTER`, `RENDERER_BACKOFF_ACTIVE`, `RENDERER_COALESCED_DUPLICATES`, and `RENDERER_DEBUG_RATE_LIMIT` (with summaries per window).
+- Logs are cleared on app startup and truncated at a size limit (default 8MB) with single‑file retention.
 
 ## 7. Architectural Anti-Patterns
 

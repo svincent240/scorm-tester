@@ -94,5 +94,21 @@ A systematic approach to error handling is mandatory.
     *   `info`: For significant, non-repetitive lifecycle events (e.g., `Service initialized`, `SCORM package loaded`, `IPC rate-limit engaged`).
     *   `debug`: For detailed diagnostic information useful for troubleshooting. **MUST** be used only when `LOG_LEVEL=debug`.
 *   **Context**: All log entries **MUST** include a structured context object to aid debugging. No sensitive information should be logged.
+
+### 6.1 Logging for AI agents — locations and usage
+
+- All Core/Main logging goes through `src/shared/utils/logger.js` and is written to exactly three files in the same directory:
+  - `app.log` — human‑readable
+  - `app.ndjson` — machine‑parsable NDJSON (one JSON object per line)
+  - `errors.ndjson` — NDJSON containing only error‑level entries
+- Where to find them (Core/GUI app): by default the Electron userData directory.
+  - macOS example: `~/Library/Application Support/scorm-tester/`
+  - If `SCORM_TESTER_LOG_DIR` is set at launch, logs are written there instead.
+- Behavior: logs are cleared at startup and truncated when they exceed `SCORM_TESTER_MAX_LOG_BYTES` (default 8MB). Only a single file of each type is retained (no rotations).
+- Renderer logs are forwarded into the same files via IPC. In `app.ndjson`, look for renderer events like `RENDERER_BACKOFF_ENTER`, `RENDERER_BACKOFF_ACTIVE`, `RENDERER_COALESCED_DUPLICATES`, and `RENDERER_DEBUG_RATE_LIMIT`.
+- Quick usage (examples):
+  - Tail errors only: `tail -f "~/Library/Application Support/scorm-tester/errors.ndjson"`
+  - Parse NDJSON: `jq -c . "~/Library/Application Support/scorm-tester/app.ndjson" | head`
+
 assing IPC Handler:** Services attempting to communicate with the renderer process outside of the `IpcHandler`.
 *   **Renderer State Dependency:** The main process querying for or depending on state held within the renderer process.

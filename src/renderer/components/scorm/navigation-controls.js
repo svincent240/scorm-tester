@@ -93,27 +93,18 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Initialize browse mode status
+   * Initialize browse mode status (renderer-only; no direct IPC)
    */
   async initializeBrowseModeStatus() {
     try {
-      // Check current browse mode status
-      const status = await window.electronAPI.invoke('browse-mode-status');
+      const bm = this.uiState?.getState('browseMode');
+      const enabled = !!(bm && bm.enabled);
 
-      if (status && status.enabled) {
-        // Update UI state
-        if (this.uiState) {
-          this.uiState.setState('browseMode', {
-            enabled: true,
-            session: status.session,
-            config: status.config || {}
-          });
-        }
-
+      if (enabled) {
         // Update UI to reflect browse mode
         this.updateModeToggle(true);
         this.updateNavigationForBrowseMode(true);
-        
+
         // Ensure navigation is available in browse mode
         if (!this.navigationState.availableNavigation.includes('previous')) {
           this.navigationState.availableNavigation.push('previous');
@@ -123,10 +114,10 @@ class NavigationControls extends BaseComponent {
         }
         this.updateButtonStates();
 
-        this.logger?.info('NavigationControls: Browse mode already enabled', status);
+        this.logger?.info('NavigationControls: Browse mode restored from UIState', bm);
       }
     } catch (error) {
-      this.logger?.warn('NavigationControls: Failed to initialize browse mode status', error);
+      this.logger?.warn('NavigationControls: Failed to initialize browse mode status (UIState)', error?.message || error);
     }
   }
 
@@ -411,31 +402,13 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Simple menu toggle - just works
+   * Simple menu toggle - do not read DOM; rely on UIState
    */
   toggleMenu() {
     try {
-      const sidebar = document.getElementById('app-sidebar');
-      if (!sidebar) {
-        import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-          rendererLogger?.error('NavigationControls: Sidebar element not found during menu toggle');
-        }).catch(() => {});
-        return;
-      }
-
-      const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-      // Read current visibility from DOM
-      let isVisible = true;
-      if (isMobile) {
-        isVisible = sidebar.classList.contains('app-sidebar--open');
-      } else {
-        isVisible = !sidebar.classList.contains('app-sidebar--hidden');
-      }
-
-      const nextVisible = !isVisible;
-      // Emit centralized toggle; AppManager will apply classes and broadcast visibility change
+      const currentVisible = !!this.navigationState.menuVisible;
+      const nextVisible = !currentVisible;
       import('../../services/event-bus.js').then(({ eventBus }) => {
-        // Unified namespaced event only
         eventBus.emit('ui:sidebar:toggle-request', { visible: nextVisible });
       }).catch(() => {});
     } catch (error) {
