@@ -1,3 +1,5 @@
+// @ts-check
+
 import { BaseComponent } from '../base-component.js';
 
 class FooterStatusDisplay extends BaseComponent {
@@ -51,7 +53,7 @@ class FooterStatusDisplay extends BaseComponent {
         rendererLogger.warn('FooterStatusDisplay: #footer-status not found in DOM');
       }).catch(() => {});
     }
-    
+
     const footerScore = this.element.querySelector('#footer-score');
     if (footerScore) {
       footerScore.textContent = this.formatScore(progressData.scoreRaw);
@@ -60,7 +62,7 @@ class FooterStatusDisplay extends BaseComponent {
         rendererLogger.warn('FooterStatusDisplay: #footer-score not found in DOM');
       }).catch(() => {});
     }
-    
+
     const footerTime = this.element.querySelector('#footer-time');
     if (footerTime) {
       footerTime.textContent = progressData.sessionTime || '00:00:00';

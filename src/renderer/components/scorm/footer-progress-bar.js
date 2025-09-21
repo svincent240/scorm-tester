@@ -1,3 +1,5 @@
+// @ts-check
+
 import { BaseComponent } from '../base-component.js';
 
 class FooterProgressBar extends BaseComponent {
@@ -32,7 +34,7 @@ class FooterProgressBar extends BaseComponent {
 
   setupEventSubscriptions() {
     this.subscribe('progress:updated', this.handleProgressUpdated);
-    
+
     // BUG-022 FIX: Subscribe to navigation state updates
     this.subscribe('navigation:state:updated', this.handleNavigationStateUpdate);
   }
@@ -56,7 +58,7 @@ class FooterProgressBar extends BaseComponent {
         rendererLogger.warn('FooterProgressBar: #footer-progress-fill not found in DOM');
       }).catch(() => {});
     }
-    
+
     const footerProgressPercentage = this.element.querySelector('#footer-progress-percentage');
     if (footerProgressPercentage) {
       footerProgressPercentage.textContent = `${percentage}%`;
@@ -73,14 +75,14 @@ class FooterProgressBar extends BaseComponent {
   handleNavigationStateUpdate(stateData) {
     try {
       const { state } = stateData || {};
-      
+
       // Update progress bar visual state based on navigation state
       if (state === 'PROCESSING') {
         this.element.classList.add('footer-progress-bar--loading');
       } else {
         this.element.classList.remove('footer-progress-bar--loading');
       }
-      
+
     } catch (error) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.error('FooterProgressBar: Error handling navigation state update', error);

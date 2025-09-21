@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Payload sanitizer for debug telemetry
  * - Truncates long strings

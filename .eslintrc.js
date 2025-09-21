@@ -42,7 +42,7 @@ module.exports = {
       rules: {
         // Ban direct DOM access via document.* in components
         'no-restricted-properties': [
-          'error,
+          'error',
           {
             object: 'document',
             property: 'getElementById',

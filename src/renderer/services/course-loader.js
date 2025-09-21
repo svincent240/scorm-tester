@@ -1,9 +1,11 @@
+// @ts-check
+
 /**
  * Course Loading Service
- * 
+ *
  * Handles SCORM course file selection, extraction, processing, and validation.
  * Provides clean separation of course loading logic from UI components.
- * 
+ *
  * @fileoverview Course loading and processing service
  */
 
@@ -13,7 +15,7 @@ import { rendererLogger } from '../utils/renderer-logger.js';
 
 /**
  * Course Loader Class
- * 
+ *
  * Manages the complete course loading workflow from file selection to UI updates.
  */
 class CourseLoader {
@@ -206,7 +208,7 @@ class CourseLoader {
         throw new Error(`Failed to prepare course source: ${prepResult.error}`);
       }
       const unifiedPath = prepResult.unifiedPath;
-  
+
       // Validate manifest presence and read it from the unified path
       const manifestContentResult = await window.electronAPI.getCourseManifest(unifiedPath);
       if (!manifestContentResult.success) {
@@ -214,14 +216,14 @@ class CourseLoader {
       }
       const manifestContent = manifestContentResult.manifestContent;
       const manifestPath = manifestContentResult.manifestPath;
-  
+
       // Process manifest via CAM in main using canonical path
       const processManifestResult = await window.electronAPI.processScormManifest(unifiedPath, manifestContent);
       if (!processManifestResult.success) {
         throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
       }
       const { manifest, validation, analysis } = processManifestResult;
-  
+
       // Determine entry point from CAM analysis (CAM now returns final scorm-app:// URL)
       const firstLaunchUrl = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
         ? analysis.launchSequence[0].href
@@ -276,7 +278,7 @@ class CourseLoader {
         validation,
         analysis
       };
-  
+
       this.currentCourse = courseData;
       const uiState = await uiStatePromise;
       uiState.updateCourse(courseData);
@@ -330,11 +332,11 @@ class CourseLoader {
       }
       const extractedPath = prepResult.unifiedPath;
       this.logger?.info && this.logger.info('CourseLoader: Extracted path:', extractedPath);
-  
+
       if (!extractedPath) {
         throw new Error('PrepareCourseSource did not return a valid unifiedPath');
       }
-      
+
       // Step 2: Get manifest content (FileManager now only returns content, not parsed structure)
       this.logger?.info && this.logger.info('CourseLoader: Step 2 - Getting course manifest content from:', extractedPath);
       const manifestContentResult = await window.electronAPI.getCourseManifest(extractedPath);
@@ -602,21 +604,21 @@ class CourseLoader {
    */
   async loadCourse(file) {
     // console.log('CourseLoader: loadCourse called with file:', file.name); // Removed debug log
-    
+
     try {
       this.setLoadingState(true);
       eventBus.emit('course:loadStart', { fileName: file.name });
-      
+
       if (typeof window.electronAPI === 'undefined') {
         throw new Error('Electron API not available');
       }
-      
+
       // Create temporary path for the file
       const tempPath = await this.createTempFileFromBlob(file);
-      
+
       // Process the course file
       await this.processCourseFile(tempPath);
-      
+
     } catch (error) {
       this.logger?.error && this.logger.error('CourseLoader: Error in loadCourse:', error);
       eventBus.emit('course:loadError', { error: error.message });
@@ -693,21 +695,21 @@ class CourseLoader {
   validateCourse(courseData) {
     // Basic client-side check, full validation is done by CAM service
     const errors = [];
-    
+
     if (!courseData || !courseData.validation || !courseData.analysis) {
       errors.push('Course data, validation, or analysis is missing from CAM service result.');
       return errors;
     }
-    
+
     if (!courseData.validation.valid) {
       errors.push('Course failed SCORM compliance validation.');
       errors.push(...courseData.validation.errors);
     }
-    
+
     if (!courseData.launchUrl) {
       errors.push('Course launch URL not found after CAM processing.');
     }
-    
+
     return errors;
   }
 }

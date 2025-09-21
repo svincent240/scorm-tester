@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * UI State Helpers
  * Pure utility functions extracted from ui-state.js to satisfy architecture limits.

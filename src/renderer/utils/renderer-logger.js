@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Renderer Logger Adapter with adaptive backoff + coalescing
  *

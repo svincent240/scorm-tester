@@ -4,7 +4,9 @@
  * Listens to UI intent events and exposes simple show/hide/toggle methods.
  */
 
+// @ts-check
 import { BaseComponent } from '../base-component.js';
+import { snBridge } from '../../services/sn-bridge.js';
 
 class InspectorPanel extends BaseComponent {
   constructor(elementId, options = {}) {
@@ -116,7 +118,7 @@ class InspectorPanel extends BaseComponent {
     try {
       switch (this.activeTab) {
         case 'api': {
-          const hist = await (window.electronAPI?.getScormInspectorHistory?.() || {});
+          const hist = await snBridge.getScormInspectorHistory();
           if (hist?.success && hist.data) {
             this.state.history = hist.data.history || [];
             this.state.errors = hist.data.errors || [];
@@ -125,17 +127,17 @@ class InspectorPanel extends BaseComponent {
           break;
         }
         case 'tree': {
-          const tree = await (window.electronAPI?.getActivityTree?.() || {});
+          const tree = await snBridge.getActivityTree();
           if (tree?.success) this.state.activityTree = tree.data || {};
           break;
         }
         case 'objectives': {
-          const obj = await (window.electronAPI?.getGlobalObjectives?.() || {});
+          const obj = await snBridge.getGlobalObjectives();
           if (obj?.success) this.state.objectives = obj.data || [];
           break;
         }
         case 'ssp': {
-          const ssp = await (window.electronAPI?.getSSPBuckets?.() || {});
+          const ssp = await snBridge.getSSPBuckets();
           if (ssp?.success) this.state.ssp = ssp.data || [];
           break;
         }
@@ -313,8 +315,8 @@ class InspectorPanel extends BaseComponent {
 
     // Subscribe to main-pushed inspector updates
     try {
-      if (window.electronAPI?.onScormInspectorDataUpdated) {
-        const off = window.electronAPI.onScormInspectorDataUpdated((payload) => {
+      const off = snBridge.onScormInspectorDataUpdated((payload) => {
+        
           try {
             if (payload?.history) this.state.history = payload.history;
             if (payload?.errors) this.state.errors = payload.errors;
@@ -324,7 +326,6 @@ class InspectorPanel extends BaseComponent {
           } catch (_) {}
         });
         this._unsubs.push(off);
-      }
     } catch (_) {}
   }
 
@@ -349,11 +350,11 @@ class InspectorPanel extends BaseComponent {
   async loadInitialData() {
     try {
       const [hist, tree, nav, obj, ssp] = await Promise.all([
-        window.electronAPI?.getScormInspectorHistory?.() || {},
-        window.electronAPI?.getActivityTree?.() || {},
-        window.electronAPI?.getNavigationRequests?.() || {},
-        window.electronAPI?.getGlobalObjectives?.() || {},
-        window.electronAPI?.getSSPBuckets?.() || {}
+        snBridge.getScormInspectorHistory(),
+        snBridge.getActivityTree(),
+        snBridge.getNavigationRequests(),
+        snBridge.getGlobalObjectives(),
+        snBridge.getSSPBuckets()
       ]);
 
       if (hist?.success && hist.data) {

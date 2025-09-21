@@ -1,6 +1,8 @@
+// @ts-check
+
 /**
  * SCORM API Bridge Service
- * 
+ *
  * Handles SCORM API injection and communication between iframe content and the main application.
  *
  * @fileoverview SCORM API bridge for iframe communication
@@ -8,7 +10,7 @@
 
 /**
  * SCORM API Bridge Class
- * 
+ *
  * Manages SCORM API communication between iframe content and the renderer process.
  */
 class ScormAPIBridge {
@@ -32,7 +34,7 @@ class ScormAPIBridge {
     if (!this._scormClient) {
       return '101';
     }
-    
+
     try {
       switch (method) {
         case 'Initialize':

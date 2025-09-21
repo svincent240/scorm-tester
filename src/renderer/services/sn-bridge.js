@@ -1,16 +1,16 @@
 /**
  * Sequencing and Navigation Bridge Service
- * 
+ *
  * Provides a bridge between the renderer process and the main process
  * SCORM SN (Sequencing and Navigation) service. This ensures proper
  * SCORM compliance by delegating navigation logic to the main process.
- * 
+ *
  * @fileoverview SN service IPC bridge
  */
 
 /**
  * SN Bridge Class
- * 
+ *
  * Handles communication with the main process SN service via IPC
  */
 class SNBridge {
@@ -211,6 +211,122 @@ class SNBridge {
   getSessionId() {
     return this.sessionId;
   }
+  /**
+   * Get course outline activity tree (renderer-safe wrapper)
+   */
+  async getCourseOutlineActivityTree() {
+    try {
+      if (window.electronAPI?.getCourseOutlineActivityTree) {
+        return await window.electronAPI.getCourseOutlineActivityTree();
+      }
+      return { success: false, error: 'getCourseOutlineActivityTree not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getCourseOutlineActivityTree failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
+   * Get available navigation options (renderer-safe wrapper)
+   */
+  async getCourseOutlineAvailableNavigation() {
+    try {
+      if (window.electronAPI?.getCourseOutlineAvailableNavigation) {
+        return await window.electronAPI.getCourseOutlineAvailableNavigation();
+      }
+      return { success: false, error: 'getCourseOutlineAvailableNavigation not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getCourseOutlineAvailableNavigation failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  /**
+   * Validate choice navigation for a given activity id
+   */
+  async validateCourseOutlineChoice(activityId) {
+    try {
+      if (window.electronAPI?.validateCourseOutlineChoice) {
+        return await window.electronAPI.validateCourseOutlineChoice(activityId);
+      }
+      return { success: false, allowed: false, reason: 'validateCourseOutlineChoice not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: validateCourseOutlineChoice failed', error?.message || error); } catch (_) {}
+      return { success: false, allowed: false, reason: error?.message || String(error) };
+    }
+  }
+
+  /** Inspector data getters (renderer-safe wrappers) */
+  async getScormInspectorHistory() {
+    try {
+      if (window.electronAPI?.getScormInspectorHistory) {
+        return await window.electronAPI.getScormInspectorHistory();
+      }
+      return { success: false, error: 'getScormInspectorHistory not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getActivityTree() {
+    try {
+      if (window.electronAPI?.getActivityTree) {
+        return await window.electronAPI.getActivityTree();
+      }
+      return { success: false, error: 'getActivityTree not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getActivityTree failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getNavigationRequests() {
+    try {
+      if (window.electronAPI?.getNavigationRequests) {
+        return await window.electronAPI.getNavigationRequests();
+      }
+      return { success: false, error: 'getNavigationRequests not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getNavigationRequests failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getGlobalObjectives() {
+    try {
+      if (window.electronAPI?.getGlobalObjectives) {
+        return await window.electronAPI.getGlobalObjectives();
+      }
+      return { success: false, error: 'getGlobalObjectives not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getGlobalObjectives failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getSSPBuckets() {
+    try {
+      if (window.electronAPI?.getSSPBuckets) {
+        return await window.electronAPI.getSSPBuckets();
+      }
+      return { success: false, error: 'getSSPBuckets not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getSSPBuckets failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  /** Subscribe to main-pushed inspector updates */
+  onScormInspectorDataUpdated(handler) {
+    try {
+      if (window.electronAPI?.onScormInspectorDataUpdated && typeof handler === 'function') {
+        return window.electronAPI.onScormInspectorDataUpdated(handler);
+      }
+    } catch (_) {}
+    return () => {};
+  }
+
 }
 
 // Create and export singleton instance

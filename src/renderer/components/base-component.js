@@ -1,16 +1,18 @@
+// @ts-check
+
 /**
  * Base Component Class
- * 
+ *
  * Provides common functionality for all UI components including
  * event handling, lifecycle management, and DOM utilities.
- * 
+ *
  * @fileoverview Base class for all renderer components
  */
 
 
 /**
  * Base Component Class
- * 
+ *
  * Abstract base class that provides common functionality for all UI components.
  */
 class BaseComponent {
@@ -27,7 +29,7 @@ class BaseComponent {
     this.eventListeners = new Map();
     this.childComponents = new Map();
     this.unsubscribeFunctions = [];
-    
+
     // Provide a safe rendererBaseUrl fallback for test environments where preload may not be present.
     // In production the preload sets window.electronAPI.rendererBaseUrl; tests can run with './' base.
     this.rendererBaseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
@@ -67,34 +69,34 @@ class BaseComponent {
 
     try {
       this.log('debug', 'Starting component initialization');
-      
+
       // Find or create element
       this.element = this.findOrCreateElement();
-      
+
       // Load dependencies dynamically
       await this.loadDependencies();
 
       // Setup component with error boundary
       await this.safeSetup();
-      
+
       // Render if auto-render is enabled
       if (this.options.autoRender) {
         this.safeRender();
       }
-      
+
       // Bind events with error boundary
       this.safeBindEvents();
-      
+
       // Setup event bus subscriptions with error boundary
       this.safeSetupEventSubscriptions();
-      
+
       this.isInitialized = true;
       this.log('debug', 'Component initialization completed');
       this.emit('initialized');
-      
+
     } catch (error) {
       this.log('error', 'Component initialization failed:', error);
-      
+
       // Cleanup partial initialization
       try {
         this.destroy();
@@ -107,7 +109,7 @@ class BaseComponent {
           // no-op
         }
       }
-      
+
       throw error;
     }
   }
@@ -174,7 +176,7 @@ class BaseComponent {
 
     // Render content
     this.renderContent();
-    
+
     this.emit('rendered');
   }
 
@@ -296,7 +298,7 @@ class BaseComponent {
 
     const boundHandler = handler.bind(this);
     this.element.addEventListener(event, boundHandler, options);
-    
+
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
     }
@@ -313,12 +315,12 @@ class BaseComponent {
 
     const listeners = this.eventListeners.get(event);
     const index = listeners.findIndex(l => l.handler === handler);
-    
+
     if (index !== -1) {
       const listener = listeners[index];
       this.element.removeEventListener(event, listener.boundHandler, listener.options);
       listeners.splice(index, 1);
-      
+
       if (listeners.length === 0) {
         this.eventListeners.delete(event);
       }
@@ -346,7 +348,7 @@ class BaseComponent {
       elementId: this.elementId,
       data
     };
-    
+
     // Emit only a namespaced event to avoid ABAB cycles between generic and namespaced events.
     // Global/generic emissions should be explicit at the service level if needed.
     this.eventBus.emit(`${this.constructor.name.toLowerCase()}:${event}`, eventData);
@@ -376,7 +378,7 @@ class BaseComponent {
     if (!(component instanceof BaseComponent)) {
       throw new Error('Child must be an instance of BaseComponent');
     }
-    
+
     this.childComponents.set(name, component);
     this.emit('childAdded', { name, component });
   }
@@ -476,7 +478,7 @@ class BaseComponent {
       // IMPORTANT: Null element only after all element operations complete
       this.eventBus = null;
       this.options = null;
-      
+
     } finally {
       // Always mark as destroyed, even if cleanup failed
       this.isDestroyed = true;
@@ -494,20 +496,20 @@ class BaseComponent {
    */
   findOrCreateElement() {
     let element = document.getElementById(this.elementId);
-    
+
     if (!element) {
       // Only create element if explicitly requested
       if (this.options.createIfNotFound !== false) {
         element = document.createElement('div');
         element.id = this.elementId;
-        
+
         // Add to document if no parent specified
-        const parent = this.options.parent 
+        const parent = this.options.parent
           ? (typeof this.options.parent === 'string'
               ? document.getElementById(this.options.parent)
               : this.options.parent)
           : document.body;
-        
+
         if (parent) {
           parent.appendChild(element);
         } else {
@@ -517,7 +519,7 @@ class BaseComponent {
         throw new Error(`Required element with id '${this.elementId}' not found in DOM`);
       }
     }
-    
+
     return element;
   }
 
@@ -531,7 +533,7 @@ class BaseComponent {
       'handleUpdate', 'show', 'hide', 'toggle', 'enable', 'disable',
       'destroy', 'setupEventSubscriptions', 'renderContent'
     ];
-    
+
     methodsToBind.forEach(method => {
       if (typeof this[method] === 'function') {
         this[method] = this[method].bind(this);
@@ -626,14 +628,14 @@ class BaseComponent {
       subscriptionCount: this.unsubscribeFunctions.length
     };
   }
-  
+
   /**
    * Set logger for the component
    */
   setLogger(logger) {
     this.logger = logger;
   }
-  
+
   /**
    * Log component events (if logger is available)
    */
@@ -648,7 +650,7 @@ class BaseComponent {
    */
   showErrorState(title, message) {
     if (!this.element) return;
-    
+
     if (this.uiState) {
       this.uiState.showNotification({
         message: `${title}: ${message}`,

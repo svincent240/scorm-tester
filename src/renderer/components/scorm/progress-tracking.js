@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Progress Tracking Component
  *

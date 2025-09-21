@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Initial UI State - extracted from ui-state.js to reduce file size.
  * Pure data factory with no side effects.

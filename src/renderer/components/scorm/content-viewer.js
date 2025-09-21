@@ -1,10 +1,12 @@
+// @ts-check
+
 /**
  * SCORM Content Viewer Component
- * 
+ *
  * Displays SCORM content in a secure iframe with loading states,
  * error handling, and fullscreen support. Manages content lifecycle
  * and coordinates with SCORM API.
- * 
+ *
  * @fileoverview SCORM content viewer component
  */
 
@@ -16,7 +18,7 @@ import { rendererLogger } from '../../utils/renderer-logger.js';
 
 /**
  * SCORM Content Viewer Class
- * 
+ *
  * Manages SCORM content display with secure iframe, loading states,
  * and integration with SCORM API.
  */
@@ -26,7 +28,7 @@ class ContentViewer extends BaseComponent {
 
     // Initialize logger immediately
     this.logger = rendererLogger;
-    
+
     this.iframe = null;
     this.currentUrl = null;
     this.loadingTimeout = null;
@@ -62,7 +64,7 @@ class ContentViewer extends BaseComponent {
     this.createLoadingIndicator();
     this.createErrorDisplay();
     this.createNoContentDisplay();
-    
+
     if (this.options.enableFullscreen) {
       this.createFullscreenControls();
     }
@@ -74,7 +76,7 @@ class ContentViewer extends BaseComponent {
   renderContent() {
     // Find existing iframe first to preserve existing HTML
     this.iframe = this.find('.content-viewer__frame') || this.find('#content-frame');
-    
+
     // If no iframe exists, create minimal structure
     if (!this.iframe) {
       // NOTE: Per dev_docs, avoid console.* in renderer. Route via UI notification only if needed.
@@ -87,21 +89,21 @@ class ContentViewer extends BaseComponent {
               <div class="welcome-screen__message">Load a SCORM course to begin</div>
             </div>
           </div>
-          
+
           <iframe
             id="content-frame"
             class="content-viewer__frame hidden"
             sandbox="${this.options.sandbox}"
             style="width: 100%; height: 100%; border: none;"
           ></iframe>
-          
+
           <div class="content-viewer__loading hidden">
             <div class="loading-spinner">
               <div class="spinner"></div>
               <div class="loading-message">Loading course content...</div>
             </div>
           </div>
-          
+
           <div class="content-viewer__error hidden">
             <div class="error-display">
               <div class="error-icon">⚠️</div>
@@ -110,24 +112,24 @@ class ContentViewer extends BaseComponent {
               <button class="error-retry-btn">Retry</button>
             </div>
           </div>
-          
+
           <div class="content-viewer__no-content hidden">
             <div class="no-content-display">
               <div class="no-content-icon">📄</div>
               <div class="no-content-message">No content available</div>
             </div>
           </div>
-          
+
           ${this.options.enableFullscreen ? `
             <button class="content-viewer__fullscreen-btn" title="Fullscreen">⛶</button>
           ` : ''}
         </div>
       `;
-      
+
       // Update references after creating structure
       this.iframe = this.find('#content-frame');
     }
-    
+
     // Get references to elements (existing or newly created)
     this.loadingElement = this.find('.content-viewer__loading');
     this.errorElement = this.find('.content-viewer__error');
@@ -286,7 +288,7 @@ class ContentViewer extends BaseComponent {
     let processedUrl;
     try {
       processedUrl = ContentViewer.normalizeURL(url);
-      
+
       if (processedUrl !== url) {
         this.logger?.info('ContentViewer: Normalized URL', {
           originalPath: url,
@@ -303,20 +305,20 @@ class ContentViewer extends BaseComponent {
 
     this.currentUrl = processedUrl;
     this.loadStartTime = Date.now();
-    
+
     try {
       this.showLoading();
       this.clearError();
-      
+
       // Set loading timeout
       if (this.loadingTimeout) {
         clearTimeout(this.loadingTimeout);
       }
-      
+
       this.loadingTimeout = setTimeout(() => {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
-      
+
       // Setup SCORM APIs BEFORE iframe loads
       this.setupScormAPIs();
 
@@ -331,7 +333,7 @@ class ContentViewer extends BaseComponent {
       }
 
       this.emit('contentLoadStarted', { url, options });
-      
+
     } catch (error) {
       this.showError('Failed to load content', error?.message || String(error));
       this.emit('contentLoadError', { url, error });
@@ -448,7 +450,7 @@ class ContentViewer extends BaseComponent {
       clearTimeout(this.loadingTimeout);
       this.loadingTimeout = null;
     }
-    
+
     this.showError('Failed to load content', 'The course content could not be loaded. Please check the file and try again.');
     this.emit('contentLoadError', { url: this.currentUrl });
   }
@@ -564,11 +566,11 @@ class ContentViewer extends BaseComponent {
     this.hideContent();
     this.hideError();
     this.hideNoContent();
-    
+
     if (this.loadingElement) {
       this.loadingElement.style.display = 'flex';
     }
-    
+
     this.uiState.setLoading(true, 'Loading SCORM course...');
   }
 
@@ -579,7 +581,7 @@ class ContentViewer extends BaseComponent {
     if (this.loadingElement) {
       this.loadingElement.style.display = 'none';
     }
-    
+
     this.uiState.setLoading(false);
   }
 
@@ -590,19 +592,19 @@ class ContentViewer extends BaseComponent {
     this.hideNoContent();
     this.hideError();
     this.hideLoading();
-    
+
     // Hide the welcome screen
-    const welcomeElement = document.querySelector('.content-viewer__welcome');
+    const welcomeElement = this.find('.content-viewer__welcome');
     if (welcomeElement) {
       welcomeElement.style.display = 'none';
     }
-    
+
     // Show the iframe
     if (this.iframe) {
       this.iframe.style.display = 'block';
       this.iframe.classList.remove('hidden');
     }
-    
+
     if (this.fullscreenBtn) {
       this.fullscreenBtn.style.display = 'block';
     }
@@ -616,7 +618,7 @@ class ContentViewer extends BaseComponent {
     // SCORM standard compliance: Do not modify content presentation
     // Content authors design their content for specific dimensions and layouts
     // The LMS should not alter the visual presentation
-    
+
     try {
       // Only ensure the iframe is properly sized to contain the content
       // without modifying the content itself
@@ -639,7 +641,7 @@ class ContentViewer extends BaseComponent {
     if (this.iframe) {
       this.iframe.style.display = 'none';
     }
-    
+
     if (this.fullscreenBtn) {
       this.fullscreenBtn.style.display = 'none';
     }
@@ -652,19 +654,19 @@ class ContentViewer extends BaseComponent {
     this.hideLoading();
     this.hideContent();
     this.hideNoContent();
-    
+
     this.uiState.showNotification({
       message: message,
       type: 'error',
       details: details,
       duration: 0 // Persistent until dismissed
     });
-    
+
     // Hide the internal error display as uiState will handle it
     if (this.errorElement) {
       this.errorElement.style.display = 'none';
     }
-    
+
     this.uiState.setError(message); // Keep this for internal state tracking
     this.emit('errorShown', { message, details });
   }
@@ -693,7 +695,7 @@ class ContentViewer extends BaseComponent {
     this.hideLoading();
     this.hideContent();
     this.hideError();
-    
+
     if (this.noContentElement) {
       this.noContentElement.style.display = 'flex';
     }
@@ -726,7 +728,7 @@ class ContentViewer extends BaseComponent {
    */
   handleLoadTimeout() {
     this.showError(
-      'Content Load Timeout', 
+      'Content Load Timeout',
       'The course took too long to load. This may be due to network issues or large content files.',
       {
         showRetry: true,
@@ -743,7 +745,7 @@ class ContentViewer extends BaseComponent {
     this.hideLoading();
     this.hideContent();
     this.hideNoContent();
-    
+
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'error',
@@ -766,12 +768,12 @@ class ContentViewer extends BaseComponent {
         </details>
       ` : null
     });
-    
+
     // Hide the internal error display as uiState will handle it
     if (this.errorElement) {
       this.errorElement.style.display = 'none';
     }
-    
+
     this.uiState.setError(title + ': ' + message); // Keep this for internal state tracking
     this.emit('errorShown', { title, message, options });
   }
@@ -783,15 +785,15 @@ class ContentViewer extends BaseComponent {
     const retryBtn = this.errorElement?.querySelector('.error-retry-btn');
     const reloadBtn = this.errorElement?.querySelector('.error-reload-btn');
     const resetBtn = this.errorElement?.querySelector('.error-reset-btn');
-    
+
     if (retryBtn) {
       retryBtn.addEventListener('click', () => this.retryLoad());
     }
-    
+
     if (reloadBtn) {
       reloadBtn.addEventListener('click', () => location.reload());
     }
-    
+
     if (resetBtn) {
       resetBtn.addEventListener('click', () => this.resetContent());
     }
@@ -823,9 +825,9 @@ class ContentViewer extends BaseComponent {
    */
   enterFullscreen() {
     if (!this.iframe) return;
-    
+
     const element = this.iframe;
-    
+
     if (element.requestFullscreen) {
       element.requestFullscreen();
     } else if (element.webkitRequestFullscreen) {
@@ -862,12 +864,12 @@ class ContentViewer extends BaseComponent {
       document.mozFullScreenElement ||
       document.msFullscreenElement
     );
-    
+
     if (this.fullscreenBtn) {
       this.fullscreenBtn.textContent = this.isFullscreen ? '⛶' : '⛶';
       this.fullscreenBtn.title = this.isFullscreen ? 'Exit Fullscreen' : 'Fullscreen';
     }
-    
+
     this.emit('fullscreenChanged', { isFullscreen: this.isFullscreen });
   }
 
@@ -969,7 +971,7 @@ class ContentViewer extends BaseComponent {
 
     } catch (error) {
       this.logger?.error('ContentViewer: Error handling navigation request', error);
-      
+
       // Emit error back to event bus for centralized error handling
       try {
         const { eventBus } = await import('../../services/event-bus.js');
@@ -1010,19 +1012,19 @@ class ContentViewer extends BaseComponent {
     try {
       const { enabled } = eventData || {};
       this.logger?.info('ContentViewer: Browse mode changed', { enabled });
-      
+
       // Update content viewer behavior for browse mode
       if (this.element) {
         this.element.classList.toggle('content-viewer--browse-mode', enabled);
       }
-      
+
       // In browse mode, we might want to show additional indicators
       if (enabled) {
         this.showBrowseModeIndicator();
       } else {
         this.hideBrowseModeIndicator();
       }
-      
+
     } catch (error) {
       this.logger?.error('ContentViewer: Error handling browse mode change', error);
     }
@@ -1049,12 +1051,12 @@ class ContentViewer extends BaseComponent {
         z-index: 1000;
         pointer-events: none;
       `;
-      
+
       if (this.element) {
         this.element.appendChild(this.browseModeIndicator);
       }
     }
-    
+
     if (this.browseModeIndicator) {
       this.browseModeIndicator.style.display = 'block';
     }
@@ -1241,19 +1243,19 @@ class ContentViewer extends BaseComponent {
    */
   clearContent() {
     // No scaling cleanup needed - we respect content as-is
-    
+
     this.currentUrl = null;
     this.contentWindow = null;
-    
+
     if (this.iframe) {
       this.iframe.src = 'about:blank';
     }
-    
+
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
       this.loadingTimeout = null;
     }
-    
+
     this.showNoContent();
     this.emit('contentCleared');
   }
@@ -1319,7 +1321,7 @@ class ContentViewer extends BaseComponent {
         // Force reflow by accessing layout-triggering properties
         const height = this.element.offsetHeight;
         const width = this.element.offsetWidth;
-        
+
         // Dispatch a resize event to trigger layout recalculation
         if (window.ResizeObserver) {
           // If ResizeObserver is available, manually trigger observers
@@ -1335,10 +1337,10 @@ class ContentViewer extends BaseComponent {
           window.dispatchEvent(new Event('resize'));
         }
       }
-      
+
       // Fix nested iframe sizing issues in SCORM content
       this.fixNestedIframeSizing();
-      
+
     } catch (error) {
       // Silent fail - layout refresh is best effort
     }
@@ -1354,7 +1356,7 @@ class ContentViewer extends BaseComponent {
       }
 
       const contentWindow = this.contentWindow;
-      
+
       // Try to trigger the course's own resize logic if it exists
       if (typeof contentWindow.setIframeHeight === 'function') {
         // Call the course's own resize function with proper parameters
@@ -1363,12 +1365,12 @@ class ContentViewer extends BaseComponent {
         // Some courses might have SetupIFrame function
         contentWindow.SetupIFrame();
       }
-      
+
       // Also dispatch a resize event to trigger any window.onresize handlers
       if (contentWindow.dispatchEvent) {
         contentWindow.dispatchEvent(new Event('resize'));
       }
-      
+
     } catch (error) {
       // Silent fail - resize trigger is best effort
     }
@@ -1415,13 +1417,13 @@ class ContentViewer extends BaseComponent {
 
     // Stop observers/listeners
     this.stopResizeObserver();
-    
+
     // Clean up mutation observer
     if (this._mutationObserver) {
       this._mutationObserver.disconnect();
       this._mutationObserver = null;
     }
-    
+
     if (this._apiCheckTimeout) {
       clearTimeout(this._apiCheckTimeout);
       this._apiCheckTimeout = null;
@@ -1489,7 +1491,7 @@ class ContentViewer extends BaseComponent {
     if (url.startsWith('scorm-app://') || url.startsWith('http')) {
       return url;
     }
-    
+
     try {
       // Simple path conversion for Windows and Unix paths
       if (url.includes('\\')) {
@@ -1497,10 +1499,10 @@ class ContentViewer extends BaseComponent {
         const normalizedPath = url.replace(/\\/g, '/');
         return 'file:///' + normalizedPath;
       }
-      
+
       // Unix-style paths
       return url.startsWith('/') ? 'file://' + url : 'file:///' + url;
-      
+
     } catch (error) {
       throw new Error(`Failed to normalize URL "${url}": ${error.message}`);
     }

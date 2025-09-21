@@ -1,15 +1,17 @@
+// @ts-check
+
 /**
  * Event Bus Service
- * 
+ *
  * Provides centralized event communication between renderer components.
  * Enables loose coupling and clean separation of concerns.
- * 
+ *
  * @fileoverview Event bus for inter-component communication
  */
 
 /**
  * Event Bus Class
- * 
+ *
  * Manages event subscriptions, emissions, and cleanup for renderer components.
  */
 class EventBus {
@@ -73,10 +75,10 @@ class EventBus {
 
     const eventListeners = this.listeners.get(event);
     const index = eventListeners.findIndex(sub => sub.handler === handler);
-    
+
     if (index !== -1) {
       eventListeners.splice(index, 1);
-      
+
       if (eventListeners.length === 0) {
         this.listeners.delete(event);
       }
@@ -196,7 +198,7 @@ class EventBus {
     try {
       if (this.listeners.has(event)) {
         const eventListeners = [...this.listeners.get(event)]; // Copy to avoid modification during iteration
-        
+
         for (const subscription of eventListeners) {
           try {
             if (subscription.context) {
@@ -283,15 +285,15 @@ class EventBus {
    */
   getHistory(event = null, limit = null) {
     let history = [...this.history];
-    
+
     if (event) {
       history = history.filter(item => item.event === event);
     }
-    
+
     if (limit && limit > 0) {
       history = history.slice(-limit);
     }
-    
+
     return history;
   }
 
@@ -304,7 +306,7 @@ class EventBus {
     if (event) {
       return this.listeners.has(event) ? this.listeners.get(event).length : 0;
     }
-    
+
     let total = 0;
     for (const listeners of this.listeners.values()) {
       total += listeners.length;
@@ -362,7 +364,7 @@ class EventBus {
 
 // Create and export singleton instance
 const eventBus = new EventBus();
- 
+
 // Provide lightweight debug selectors for diagnostics panels
 eventBus.getDebugSnapshot = (limit = 200) => {
   try {

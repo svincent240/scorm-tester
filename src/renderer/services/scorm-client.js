@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * SCORM Client Service
  *

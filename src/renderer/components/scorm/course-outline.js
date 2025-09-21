@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Course Outline Component
  *
@@ -10,6 +12,7 @@
 import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { rendererLogger } from '../../utils/renderer-logger.js';
+import { snBridge } from '../../services/sn-bridge.js';
 import { escapeHTML } from '../../utils/escape.js';
 
 
@@ -677,13 +680,13 @@ class CourseOutline extends BaseComponent {
     let allowed = true;
     let reason = 'Validation not performed';
     try {
-      if (window.electronAPI?.validateCourseOutlineChoice) {
-        const res = await window.electronAPI.validateCourseOutlineChoice(itemId);
+      if (snBridge && typeof snBridge.validateCourseOutlineChoice === 'function') {
+        const res = await snBridge.validateCourseOutlineChoice(itemId);
         allowed = !!(res && res.success && res.allowed);
         reason = res?.reason || reason;
         rendererLogger.info('CourseOutline: Choice validation result', { itemId, allowed, reason });
       } else {
-        rendererLogger.warn('CourseOutline: validateCourseOutlineChoice API not available; proceeding without validation');
+        rendererLogger.warn('CourseOutline: validateCourseOutlineChoice not available via snBridge; proceeding without validation');
       }
     } catch (validationError) {
       allowed = false;
@@ -1091,21 +1094,18 @@ class CourseOutline extends BaseComponent {
         currentScormStatesCount: this.scormStates.size,
         scormStatesLoaded: this.scormStatesLoaded,
         browseModeEnabled: this.browseModeEnabled,
-        hasElectronAPI: !!window.electronAPI,
-        hasGetCourseOutlineActivityTree: !!window.electronAPI?.getCourseOutlineActivityTree
+        hasElectronAPI: (typeof window !== 'undefined') && ('electronAPI' in window),
+        hasGetCourseOutlineActivityTree: !!(snBridge && typeof snBridge.getCourseOutlineActivityTree === 'function')
       });
 
-      if (!window.electronAPI?.getCourseOutlineActivityTree) {
-        rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available', {
-          hasElectronAPI: !!window.electronAPI,
-          electronAPIKeys: window.electronAPI ? Object.keys(window.electronAPI) : 'none'
-        });
+      if (!snBridge || typeof snBridge.getCourseOutlineActivityTree !== 'function') {
+        rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available via snBridge');
         this.scormStatesLoaded = false;
         return null;
       }
 
-      rendererLogger.info('CourseOutline: Calling getCourseOutlineActivityTree IPC');
-      const result = await window.electronAPI.getCourseOutlineActivityTree();
+      rendererLogger.info('CourseOutline: Calling SNBridge.getCourseOutlineActivityTree');
+      const result = await snBridge.getCourseOutlineActivityTree();
       rendererLogger.debug('CourseOutline: fetchScormStates IPC result received', {
         success: result?.success,
         hasData: !!result?.data,
@@ -1188,12 +1188,12 @@ class CourseOutline extends BaseComponent {
    */
   async fetchAvailableNavigation() {
     try {
-      if (!window.electronAPI?.getCourseOutlineAvailableNavigation) {
-        rendererLogger.warn('CourseOutline: getCourseOutlineAvailableNavigation not available');
+      if (!snBridge || typeof snBridge.getCourseOutlineAvailableNavigation !== 'function') {
+        rendererLogger.warn('CourseOutline: getCourseOutlineAvailableNavigation not available via snBridge');
         return [];
       }
 
-      const result = await window.electronAPI.getCourseOutlineAvailableNavigation();
+      const result = await snBridge.getCourseOutlineAvailableNavigation();
       if (result.success && Array.isArray(result.data)) {
         this.availableNavigation = result.data;
         rendererLogger.info('CourseOutline: Available navigation fetched successfully', this.availableNavigation.length);

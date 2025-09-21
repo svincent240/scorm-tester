@@ -1,9 +1,11 @@
+// @ts-check
+
 /**
  * UI State Manager Service
- * 
+ *
  * Manages application state, component coordination, and persistence
  * of UI preferences. Provides centralized state management for the renderer.
- * 
+ *
  * @fileoverview UI state management service
  */
 
@@ -72,7 +74,7 @@ class UIStateManager {
     if (!path) {
       return { ...this.state };
     }
-    
+
     return this.helpers.getNestedValue(this.state, path);
   }
 
@@ -84,7 +86,7 @@ class UIStateManager {
    */
   setState(updates, value = undefined, silent = false) {
     const previousState = { ...this.state };
-    
+
     if (typeof updates === 'string') {
       // Single value update using path notation
       this.helpers.setNestedValue(this.state, updates, value);
@@ -94,7 +96,7 @@ class UIStateManager {
     } else {
       throw new Error('Invalid state update parameters');
     }
-    
+
     if (!silent) {
       this.notifyStateChange(previousState, this.state);
       this.debouncedPersist();
@@ -111,10 +113,10 @@ class UIStateManager {
     if (typeof callback !== 'function') {
       throw new Error('Callback must be a function');
     }
-    
+
     const id = Date.now() + Math.random();
     this.subscribers.set(id, { callback, path });
-    
+
     return () => this.subscribers.delete(id);
   }
 
@@ -128,7 +130,7 @@ class UIStateManager {
       sessionStartTime: sessionData.startTime || Date.now(),
       isConnected: sessionData.connected !== false
     });
-    
+
     this.eventBus?.emit('session:updated', sessionData);
   }
 
@@ -143,7 +145,7 @@ class UIStateManager {
       currentCoursePath: courseData.path,
       entryPoint: courseData.entryPoint
     });
-    
+
     this.eventBus?.emit('course:loaded', courseData);
   }
 
@@ -159,17 +161,17 @@ class UIStateManager {
         obj[key] = navData[key];
         return obj;
       }, {});
-    
+
     // Check if the navigation state actually changed
     const currentNav = this.state.navigationState;
     const hasChanged = Object.keys(cleanNavData).some(key =>
       JSON.stringify(currentNav[key]) !== JSON.stringify(cleanNavData[key])
     );
-    
+
     if (!hasChanged) {
       return; // No change, skip update
     }
-    
+
     // Update state silently to prevent event loop
     this.setState({
       navigationState: {
@@ -177,7 +179,7 @@ class UIStateManager {
         ...cleanNavData
       }
     }, null, true); // silent = true
-    
+
     // Emit event only if not coming from a component update
     if (!navData._fromComponent) {
       this.eventBus?.emit('navigation:updated', cleanNavData);
@@ -252,11 +254,11 @@ class UIStateManager {
     // but we guard ABAB cycles by not emitting a separate ui:updated when no consumers require it.
     // Instead, emit ui:updated only when there is a meaningful change and mark it as originating from UI to prevent loops.
     this.setState({ ui: mergedUI }, undefined, true); // silent
-    
+
     // Emit generic UI update with correlation and origin flag to help EventBus cycle guard
     const uiUpdatedPayload = { ...mergedUI, _origin: 'ui-state', _corr: `ui:updated:${Date.now()}` };
     this.eventBus?.emit('ui:updated', uiUpdatedPayload);
-    
+
     // Emit specific dev mode change to keep EventBus in sync (Step 8)
     const nextDev = !!mergedUI.devModeEnabled;
     if (nextDev !== prevDev) {
@@ -268,7 +270,7 @@ class UIStateManager {
       // Also emit a lightweight debug:update signal for panels listening
       this.eventBus?.emit('debug:update', { mode: nextDev, _origin: 'ui-state', _corr: uiUpdatedPayload._corr });
     }
-    
+
     // Persist after UI update (debounced) without causing another state:changed emit
     this.debouncedPersist();
   }
@@ -322,7 +324,7 @@ class UIStateManager {
    * @param {string} [message] - Loading message
    */
   setLoading(loading, message = null) {
-    this.updateUI({ 
+    this.updateUI({
       loading,
       loadingMessage: message
     });
@@ -334,7 +336,7 @@ class UIStateManager {
    */
   setError(error) {
     let errorData = null;
-    
+
     if (error) {
       errorData = {
         message: error.message || String(error),
@@ -342,9 +344,9 @@ class UIStateManager {
         stack: error.stack || null
       };
     }
-    
+
     this.updateUI({ error: errorData });
-    
+
     if (error) {
       // Mirror to diagnostics buffer for Debug Window
       try {
@@ -368,11 +370,11 @@ class UIStateManager {
     initialState.ui.debugPanelVisible = this.state.ui.debugPanelVisible;
     initialState.ui.sidebarCollapsed = this.state.ui.sidebarCollapsed;
     initialState.ui.sidebarVisible = this.state.ui.sidebarVisible;
-    
+
     this.state = initialState;
     this.notifyStateChange({}, this.state);
     this.debouncedPersist();
-    
+
     this.eventBus?.emit('state:reset');
   }
 
@@ -397,7 +399,7 @@ class UIStateManager {
         }
       } catch (_) { /* no-op */ }
     });
-    
+
     // Listen for beforeunload to persist state
     window.addEventListener('beforeunload', () => {
       try { this.persistState(); } catch (_) { /* no-op */ }
@@ -419,7 +421,7 @@ class UIStateManager {
     this.eventBus.on('state:changed', (data) => {
       // kept for consistency
     });
- 
+
     // Debug mirroring removed - SCORM Inspector handles content analysis separately
     // EventBus debug mode can still be toggled via devModeEnabled UI state
   }
@@ -435,7 +437,7 @@ class UIStateManager {
           // Use imported helper instead of nonexistent instance method to avoid 'this' binding errors
           const prevValue = this.helpers.getNestedValue(previousState, subscriber.path);
           const newValue = this.helpers.getNestedValue(newState, subscriber.path);
-          
+
           if (prevValue !== newValue) {
             subscriber.callback(newValue, prevValue, subscriber.path);
           }
@@ -500,7 +502,7 @@ class UIStateManager {
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout);
     }
-    
+
     this.debounceTimeout = setTimeout(() => {
       this.persistState();
     }, 1000);
@@ -531,11 +533,11 @@ class UIStateManager {
   destroy() {
     this.persistState();
     this.subscribers.clear();
-    
+
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout);
     }
-    
+
     this.eventBus?.emit('state:destroyed');
   }
 }
@@ -573,7 +575,7 @@ class UIStateSingleton {
         getInitialUIState, showNotification, removeNotification,
         rendererLogger // Pass rendererLogger as a helper
       });
-      
+
       // Load EventBus synchronously to avoid timing issues
       const eventBusModule = await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`);
       this.instance.eventBus = eventBusModule.eventBus;
@@ -582,7 +584,7 @@ class UIStateSingleton {
       this.instance._initializeState();
       // Debug mirroring removed - SCORM Inspector handles content analysis
       // UI debugging still available via renderer-logger.js and app.log
-      
+
       return this.instance;
     } catch (error) {
       let localRendererLogger = { error: () => {}, info: () => {}, debug: () => {}, warn: () => {} }; // Default no-op logger

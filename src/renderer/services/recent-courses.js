@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Recent Courses MRU Store
  *
@@ -102,7 +104,7 @@ class RecentCoursesStore {
     if (this._items.length > MAX_ITEMS) {
       this._items.length = MAX_ITEMS;
     }
- 
+
      await this._save();
      try { this._logger.info('RecentCoursesStore: addOrUpdate', { type, path }); } catch (_) {}
    }

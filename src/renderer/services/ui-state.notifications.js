@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * UI State - Notifications module
  * Extracted to reduce ui-state.js size and isolate notification behavior.

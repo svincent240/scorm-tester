@@ -1,10 +1,12 @@
+// @ts-check
+
 /**
  * SCORM Data Model Validator for Renderer Process
- * 
+ *
  * Lightweight ES6 module that provides the same interface as the shared validator
  * but works in the renderer process. Real validation happens in the main process
  * via IPC calls, so this provides basic validation to avoid blocking the UI.
- * 
+ *
  * @fileoverview Renderer-compatible SCORM validation
  */
 
@@ -36,7 +38,7 @@ function isValidElement(element) {
 
   // Check against basic patterns
   const matchesPattern = ELEMENT_PATTERNS.some(pattern => pattern.test(element));
-  
+
   // Be permissive in renderer - let main process handle detailed validation
   return matchesPattern || element.startsWith('cmi.');
 }

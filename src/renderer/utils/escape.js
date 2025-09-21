@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * Simple HTML escape utility for renderer components
  * Escapes &, <, >, ", and '
