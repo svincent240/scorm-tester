@@ -13,6 +13,8 @@ import { eventBus } from './event-bus.js';
 import { uiState as uiStatePromise } from './ui-state.js';
 import { rendererLogger } from '../utils/renderer-logger.js';
 
+import { ipcClient } from './ipc-client.js';
+
 /**
  * Course Loader Class
  *
@@ -53,25 +55,11 @@ class CourseLoader {
     } catch (_) {}
 
     if (electronAPIAvailable) {
-      const methods = Object.getOwnPropertyNames(window.electronAPI);
-      try { rendererLogger.info('CourseLoader: Available Electron API methods:', methods); } catch (_) {}
-
-      // Check specific methods we need
-      const requiredMethods = [
-        'selectScormPackage',
-        'selectScormFolder',
-        'getCourseManifest',
-        'processScormManifest',
-        'pathUtils'
-      ];
-
-      const missingMethods = requiredMethods.filter(method => {
-        if (method === 'pathUtils') {
-          // pathUtils is exposed as an object containing multiple methods
-          return typeof window.electronAPI.pathUtils !== 'object';
-        }
-        return typeof window.electronAPI[method] !== 'function';
-      });
+      try { rendererLogger.info('CourseLoader: Using IpcClient for file selection and prep'); } catch (_) {}
+      // IPC surface verification removed in rewrite; fail-fast happens inside IpcClient
+      const requiredMethods = [];
+      const missingMethods = [];
+    }
       if (missingMethods.length > 0) {
         try { rendererLogger.error('CourseLoader: Missing required Electron API methods:', missingMethods); } catch (_) {}
       } else {
@@ -110,21 +98,10 @@ class CourseLoader {
     try {
       this.logger?.info && this.logger.info('CourseLoader: handleCourseLoad called');
 
-      // Check Electron API availability
-      if (typeof window.electronAPI === 'undefined') {
-        this.logger?.error && this.logger.error('CourseLoader: Electron API not available');
-        throw new Error('Electron API not available');
-      }
-      this.logger?.info && this.logger.info('CourseLoader: Electron API available');
+      // Select SCORM package via IPC client
+      this.logger?.info && this.logger.info('CourseLoader: Using IpcClient.selectScormPackage');
 
-      // Check if selectScormPackage method exists
-      if (typeof window.electronAPI.selectScormPackage !== 'function') {
-        this.logger?.error && this.logger.error('CourseLoader: selectScormPackage method not available');
-        throw new Error('selectScormPackage method not available');
-      }
-      this.logger?.info && this.logger.info('CourseLoader: selectScormPackage method available');
-
-      const result = await window.electronAPI.selectScormPackage();
+      const result = await ipcClient.selectScormPackage();
       this.logger?.info && this.logger.info('CourseLoader: File selection result:', result);
 
       if (!result.success) {
@@ -148,11 +125,9 @@ class CourseLoader {
    */
   async handleFolderLoad() {
     try {
-      if (typeof window.electronAPI === 'undefined') {
-        throw new Error('Electron API not available');
-      }
 
-      const result = await window.electronAPI.selectScormFolder();
+
+      const result = await ipcClient.selectScormFolder();
       if (!result || !result.success) {
         return; // cancelled or failed; errors already logged in main
       }
@@ -198,19 +173,15 @@ class CourseLoader {
       this.setLoadingState(true);
       eventBus.emit('course:loadStart', { folderPath });
 
-      if (typeof window.electronAPI === 'undefined') {
-        throw new Error('Electron API not available');
-      }
-
       // Prepare canonical working directory for the selected folder and operate from it
-      const prepResult = await window.electronAPI.pathUtils.prepareCourseSource({ type: 'folder', path: folderPath });
+      const prepResult = await ipcClient.prepareCourseSource({ type: 'folder', path: folderPath });
       if (!prepResult.success) {
         throw new Error(`Failed to prepare course source: ${prepResult.error}`);
       }
       const unifiedPath = prepResult.unifiedPath;
 
       // Validate manifest presence and read it from the unified path
-      const manifestContentResult = await window.electronAPI.getCourseManifest(unifiedPath);
+      const manifestContentResult = await ipcClient.getCourseManifest(unifiedPath);
       if (!manifestContentResult.success) {
         throw new Error(`Failed to get course manifest content: ${manifestContentResult.error}`);
       }
@@ -218,7 +189,7 @@ class CourseLoader {
       const manifestPath = manifestContentResult.manifestPath;
 
       // Process manifest via CAM in main using canonical path
-      const processManifestResult = await window.electronAPI.processScormManifest(unifiedPath, manifestContent);
+      const processManifestResult = await ipcClient.processScormManifest(unifiedPath, manifestContent);
       if (!processManifestResult.success) {
         throw new Error(`Failed to process SCORM manifest: ${processManifestResult.reason || processManifestResult.error}`);
       }
@@ -323,7 +294,7 @@ class CourseLoader {
     try {
       // Step 1: Prepare canonical working directory for the SCORM source (zip/temp)
       this.logger?.info && this.logger.info('CourseLoader: Step 1 - Preparing course source');
-      const prepResult = await window.electronAPI.pathUtils.prepareCourseSource({ type: 'zip', path: filePath });
+      const prepResult = await ipcClient.prepareCourseSource({ type: 'zip', path: filePath });
       this.logger?.info && this.logger.info('CourseLoader: prepareCourseSource result:', prepResult);
 
       if (!prepResult.success) {
@@ -339,7 +310,7 @@ class CourseLoader {
 
       // Step 2: Get manifest content (FileManager now only returns content, not parsed structure)
       this.logger?.info && this.logger.info('CourseLoader: Step 2 - Getting course manifest content from:', extractedPath);
-      const manifestContentResult = await window.electronAPI.getCourseManifest(extractedPath);
+      const manifestContentResult = await ipcClient.getCourseManifest(extractedPath);
       this.logger?.info && this.logger.info('CourseLoader: getCourseManifest result:', manifestContentResult);
 
       if (!manifestContentResult.success) {
@@ -354,7 +325,7 @@ class CourseLoader {
 
       // Step 3: Process manifest using ScormCAMService (via IPC)
       this.logger?.info && this.logger.info('CourseLoader: Step 3 - Processing manifest with CAM service');
-      const processManifestResult = await window.electronAPI.processScormManifest(extractedPath, manifestContent);
+      const processManifestResult = await ipcClient.processScormManifest(extractedPath, manifestContent);
       this.logger?.info && this.logger.info('CourseLoader: processScormManifest result success:', processManifestResult.success);
 
       if (!processManifestResult.success) {
@@ -609,9 +580,7 @@ class CourseLoader {
       this.setLoadingState(true);
       eventBus.emit('course:loadStart', { fileName: file.name });
 
-      if (typeof window.electronAPI === 'undefined') {
-        throw new Error('Electron API not available');
-      }
+
 
       // Create temporary path for the file
       const tempPath = await this.createTempFileFromBlob(file);
@@ -644,7 +613,7 @@ class CourseLoader {
       // Convert ArrayBuffer to Base64 string (browser-safe helper)
       const base64Data = this.arrayBufferToBase64(arrayBuffer);
 
-      const result = await window.electronAPI.saveTemporaryFile(file.name, base64Data);
+      const result = await ipcClient.saveTemporaryFile(file.name, base64Data);
 
       if (!result.success) {
         throw new Error(`Failed to save temporary file: ${result.error}`);

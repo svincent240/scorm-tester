@@ -179,7 +179,6 @@ const electronAPI = {
   reloadWindow: () => safeSend('reload-window'),
 
   // SCORM Inspector
-  openScormInspectorWindow: () => safeInvoke('open-scorm-inspector-window'),
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
 
   // Enhanced SCORM Inspector data retrieval

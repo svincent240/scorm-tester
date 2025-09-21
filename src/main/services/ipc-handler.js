@@ -338,7 +338,6 @@ class IpcHandler extends BaseService {
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // SCORM Inspector window management
-      this.registerHandler('open-scorm-inspector-window', this.handleOpenScormInspectorWindow.bind(this));
 
       // SCORM Inspector history fetch - returns newest-first entries with optional filters
       this.registerHandler('scorm-inspector-get-history', this.handleScormInspectorGetHistory.bind(this));
@@ -1301,18 +1300,6 @@ class IpcHandler extends BaseService {
 
 
 
-  // Disabled during GUI rewrite: SCORM Inspector runs as integrated panel
-  async handleOpenScormInspectorWindow(event) {
-    this.logger?.warn('IpcHandler: SCORM Inspector window is disabled during GUI rewrite');
-    this.recordOperation('open-scorm-inspector-window:disabled', false);
-    return {
-      success: false,
-      error: {
-        code: 'SCORM_INSPECTOR_DISABLED',
-        message: 'SCORM Inspector window is disabled during GUI rewrite. Use the integrated Inspector panel.'
-      }
-    };
-  }
 
   // Enhanced SCORM Inspector data retrieval methods
 

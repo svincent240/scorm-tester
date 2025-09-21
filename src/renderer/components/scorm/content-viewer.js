@@ -152,15 +152,8 @@ class ContentViewer extends BaseComponent {
     this.subscribe('ui:scorm:initialized', this.handleScormInitialized);
     this.subscribe('ui:scorm:error', this.handleScormError);
 
-    // BUG-007 FIX: Subscribe to unified navigation events
-    // BUG-020 FIX: Use only standardized navigation:request event
-    this.subscribe('navigation:request', this.handleNavigationRequest);
-
-    // Listen for navigation launch events (CRITICAL for browse mode navigation)
+    // Listen for navigation launch events (results only; requests handled centrally by AppManager)
     this.subscribe('navigation:launch', this.handleNavigationLaunch);
-
-    // Listen for content load events
-    this.subscribe('content:load:request', this.handleContentLoadRequest);
 
     // Listen for browse mode changes
     this.subscribe('browseMode:changed', this.handleBrowseModeChanged);
@@ -239,16 +232,13 @@ class ContentViewer extends BaseComponent {
         throw new Error('Activity missing required identifier');
       }
 
-      // Extract and resolve identifierref to resource URL if needed
-      let launchUrl = activityData.launchUrl;
-      if (!launchUrl && activityObject.identifierref) {
-        // This would typically require manifest resolution, but we'll pass through
-        // as the main process should have already resolved this
-        launchUrl = activityObject.identifierref;
-      }
-
+      // Determine launch URL (must be provided by main as scorm-app://)
+      const launchUrl = activityData.launchUrl || (activityObject && activityObject.identifierref) || null;
       if (!launchUrl) {
-        throw new Error('Activity missing launch URL or identifierref');
+        throw new Error('Activity missing launch URL');
+      }
+      if (!String(launchUrl).startsWith('scorm-app://')) {
+        throw new Error('Launch URL must be a scorm-app:// URL resolved by main process');
       }
 
       // Store activity data for SCORM API access
@@ -284,23 +274,21 @@ class ContentViewer extends BaseComponent {
       return;
     }
 
-    // BUG-021 FIX: Use simplified URL processing with better error messages
+    // Enforce scorm-app:// URLs only (resolved by main process)
     let processedUrl;
     try {
       processedUrl = ContentViewer.normalizeURL(url);
-
-      if (processedUrl !== url) {
-        this.logger?.info('ContentViewer: Normalized URL', {
-          originalPath: url,
-          normalizedUrl: processedUrl
-        });
-      }
     } catch (error) {
-      this.logger?.error('ContentViewer: URL normalization failed', {
+      this.logger?.error('ContentViewer: URL validation failed', {
         originalPath: url,
         error: error.message
       });
-      throw new Error(`Content loading failed: ${error.message}`);
+      this.showError('Content loading failed', error.message);
+      // Emit global error for AppManager gating
+      import('../../services/event-bus.js').then(({ eventBus }) => {
+        eventBus.emit('content:load:error', { url, error: error.message });
+      }).catch(() => {});
+      return;
     }
 
     this.currentUrl = processedUrl;
@@ -309,6 +297,11 @@ class ContentViewer extends BaseComponent {
     try {
       this.showLoading();
       this.clearError();
+
+      // Notify AppManager that content load is starting
+      import('../../services/event-bus.js').then(({ eventBus }) => {
+        eventBus.emit('content:load:start', { url: processedUrl, options });
+      }).catch(() => {});
 
       // Set loading timeout
       if (this.loadingTimeout) {
@@ -337,6 +330,9 @@ class ContentViewer extends BaseComponent {
     } catch (error) {
       this.showError('Failed to load content', error?.message || String(error));
       this.emit('contentLoadError', { url, error });
+      import('../../services/event-bus.js').then(({ eventBus }) => {
+        eventBus.emit('content:load:error', { url: processedUrl, error: error?.message || String(error) });
+      }).catch(() => {});
     }
   }
 
@@ -369,6 +365,11 @@ class ContentViewer extends BaseComponent {
       this.refreshLayout();
       this.fixNestedIframeSizing();
 
+      // Notify AppManager that content is ready
+      import('../../services/event-bus.js').then(({ eventBus }) => {
+        eventBus.emit('content:load:ready', { url: this.currentUrl });
+      }).catch(() => {});
+
       this.emit('contentLoaded', {
         url: this.currentUrl,
         contentWindow: this.contentWindow
@@ -376,6 +377,9 @@ class ContentViewer extends BaseComponent {
 
     } catch (error) {
       this.showError('Content initialization failed', error?.message || String(error));
+      import('../../services/event-bus.js').then(({ eventBus }) => {
+        eventBus.emit('content:load:error', { url: this.currentUrl, error: error?.message || String(error) });
+      }).catch(() => {});
     }
   }
 
@@ -453,6 +457,9 @@ class ContentViewer extends BaseComponent {
 
     this.showError('Failed to load content', 'The course content could not be loaded. Please check the file and try again.');
     this.emit('contentLoadError', { url: this.currentUrl });
+    import('../../services/event-bus.js').then(({ eventBus }) => {
+      eventBus.emit('content:load:error', { url: this.currentUrl, error: 'iframe error' });
+    }).catch(() => {});
   }
 
 
@@ -877,12 +884,16 @@ class ContentViewer extends BaseComponent {
    * Handle course loaded event
    */
   handleCourseLoaded(data) {
-    if (data.launchUrl) {
-      this.loadContent(data.launchUrl);
-    } else if (data.entryPoint) {
-      // Fallback to entryPoint if launchUrl not available
-      this.loadContent(data.entryPoint);
+    const launchUrl = data && data.launchUrl;
+    if (!launchUrl) {
+      this.showError('Course load error', 'No launch URL provided by main process');
+      return;
     }
+    if (!String(launchUrl).startsWith('scorm-app://')) {
+      this.showError('Course load error', 'Launch URL must be a scorm-app:// URL resolved by main process');
+      return;
+    }
+    this.loadContent(launchUrl);
   }
 
   /**
@@ -1487,25 +1498,12 @@ class ContentViewer extends BaseComponent {
       throw new Error('Invalid URL: URL must be a non-empty string');
     }
 
-    // Return URLs with protocols as-is
-    if (url.startsWith('scorm-app://') || url.startsWith('http')) {
-      return url;
+    // Strict enforcement: Only allow scorm-app:// URLs resolved by main process
+    if (!url.startsWith('scorm-app://')) {
+      throw new Error('Invalid URL scheme: renderer only accepts scorm-app:// URLs');
     }
 
-    try {
-      // Simple path conversion for Windows and Unix paths
-      if (url.includes('\\')) {
-        // Windows path - normalize separators
-        const normalizedPath = url.replace(/\\/g, '/');
-        return 'file:///' + normalizedPath;
-      }
-
-      // Unix-style paths
-      return url.startsWith('/') ? 'file://' + url : 'file:///' + url;
-
-    } catch (error) {
-      throw new Error(`Failed to normalize URL "${url}": ${error.message}`);
-    }
+    return url;
   }
 }
 

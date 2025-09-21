@@ -92,6 +92,9 @@ class InspectorPanel extends BaseComponent {
     this.filters = this.filters || { method: 'all', errorsOnly: false, page: 1, pageSize: 100 };
 
     // Initial tab render
+    try { this.setActiveTab(this.activeTab || 'api'); } catch (_) {}
+
+    // Initial tab render
 
   setActiveTab(tab) {
     const allowed = ['api','tree','objectives','ssp'];
@@ -316,7 +319,7 @@ class InspectorPanel extends BaseComponent {
     // Subscribe to main-pushed inspector updates
     try {
       const off = snBridge.onScormInspectorDataUpdated((payload) => {
-        
+
           try {
             if (payload?.history) this.state.history = payload.history;
             if (payload?.errors) this.state.errors = payload.errors;
@@ -333,12 +336,16 @@ class InspectorPanel extends BaseComponent {
     this.visible = true;
     if (this.container) this.container.style.display = 'block';
     if (!this.loaded) this.loadInitialData();
+    try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) {}
+    try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) {}
     this.emit('visibilityChanged', { visible: true });
   }
 
   hide() {
     this.visible = false;
     if (this.container) this.container.style.display = 'none';
+    try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) {}
+    try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) {}
     this.emit('visibilityChanged', { visible: false });
   }
 

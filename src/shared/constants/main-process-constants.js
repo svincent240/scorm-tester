@@ -97,23 +97,6 @@ const SERVICE_DEFAULTS = {
       useContentSize: false,
       show: false // Will be shown after proper sizing
     },
-    
-    scormInspectorWindow: {
-      width: 1000,     // Wider for inspection details
-      height: 800,     // Taller for API timeline and error lists
-      minWidth: 800,   // Minimum width for proper SCORM Inspector UI
-      minHeight: 600,  // Minimum height for content visibility
-      parent: null,    // Will be set to main window
-      // Security configuration - same as main window for preload script compatibility
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      center: true,
-      maximizable: true,
-      resizable: true,
-      show: false      // Will be shown after loading content
-    }
   },
   
   IPC_HANDLER: {
@@ -262,7 +245,6 @@ const SECURITY_CONFIG = {
       'recent:remove',
       'recent:clear',
       // SCORM Inspector channels
-      'open-scorm-inspector-window',
       'scorm-inspector-get-history',
       'scorm-inspector-get-activity-tree',
       'scorm-inspector-get-navigation-requests',

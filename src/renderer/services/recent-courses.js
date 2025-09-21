@@ -11,6 +11,8 @@
  * - No browser console logs; use renderer-logger if available
  */
 
+import { ipcClient } from './ipc-client.js';
+
 const MAX_ITEMS = 5; // User-defined limit
 
 /**
@@ -33,7 +35,7 @@ class RecentCoursesStore {
       .then(({ rendererLogger }) => { if (rendererLogger) this._logger = rendererLogger; })
       .catch(() => { /* keep no-op */ });
 
-    this._load();
+    this._loadedPromise = this._load();
   }
 
   /**
@@ -41,12 +43,8 @@ class RecentCoursesStore {
    */
   async _load() {
     try {
-      if (typeof window.electronAPI === 'undefined' || !window.electronAPI.recentCourses) {
-        this._logger.warn('RecentCoursesStore: Electron API not available, cannot load recents.');
-        this._items = [];
-        return;
-      }
-      const result = await window.electronAPI.recentCourses.get();
+
+      const result = await ipcClient.recentCoursesGet();
       if (result.success && Array.isArray(result.recents)) {
         this._items = result.recents;
         this._logger.info(`RecentCoursesStore: Loaded ${this._items.length} recent courses from main process.`);
@@ -64,6 +62,17 @@ class RecentCoursesStore {
    * Get a snapshot of all items (most-recent first)
    * @returns {RecentItem[]}
    */
+
+  /**
+   * Ensure the initial async load has completed
+   */
+  async ensureLoaded() {
+    try {
+      if (!this._loadedPromise) this._loadedPromise = this._load();
+      await this._loadedPromise;
+    } catch (_) { /* swallow */ }
+  }
+
   getAll() {
     return [...this._items];
   }
@@ -165,16 +174,13 @@ class RecentCoursesStore {
    */
   async _save() {
     try {
-      if (typeof window.electronAPI === 'undefined' || !window.electronAPI.recentCourses) {
-        this._logger.warn('RecentCoursesStore: Electron API not available, cannot save recents.');
-        return;
-      }
+
       // The main process service manages the actual list, so we just tell it to add/update
       // the current state of the item that was just modified.
       // For simplicity, we'll re-add all current items to ensure the main process has the correct order and cap.
       // A more optimized approach would be to send only the changed item and let the main process manage the list.
       // However, given the small size of the MRU list, this is acceptable.
-      const result = await window.electronAPI.recentCourses.addOrUpdate(this._items[0]); // Send the most recent item
+      const result = await ipcClient.recentCoursesAddOrUpdate(this._items[0]); // Send the most recent item
       if (!result.success) {
         this._logger.error('RecentCoursesStore: Failed to save recents to main process', result.error);
       }

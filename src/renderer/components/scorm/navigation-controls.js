@@ -562,11 +562,8 @@ class NavigationControls extends BaseComponent {
       } catch (error) {
         this.logger?.error('NavigationControls: Failed to emit navigation events', error);
         
-        // Fallback to component-level event if global event bus fails
-        this.emit('activityLaunchRequested', {
-          activity: result.targetActivity,
-          sequencing: result.sequencing
-        });
+        // No fallback emission; fail-fast per GUI rewrite plan (single source of truth via AppManager)
+        // Components do not emit legacy activityLaunchRequested events.
       }
     } else {
       this.logger?.warn('NavigationControls: No target activity to launch', { result });

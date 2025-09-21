@@ -8,6 +8,8 @@
  *
  * @fileoverview Main application management service
  */
+import { ipcClient } from './ipc-client.js';
+
 
 
 /**
@@ -203,11 +205,7 @@ class AppManager {
                 <div id="navigation-controls"></div>
               </div>
               <div class="header__actions">
-                <button id="course-load-btn" title="Open SCORM Zip">Open ZIP</button>
-                <button id="course-folder-btn" title="Open Folder">Open Folder</button>
-                <button id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
-                <button id="scorm-inspector-toggle" title="Toggle Inspector">Inspector</button>
-                <button id="theme-toggle" title="Toggle Theme">Theme</button>
+                <div id="header-controls"></div>
               </div>
             </div>
           </header>
@@ -259,6 +257,8 @@ class AppManager {
     const FooterStatusDisplay = _modFooterSD.FooterStatusDisplay;
     const _modInspector = await import('../components/inspector/inspector-panel.js');
     const InspectorPanel = _modInspector.InspectorPanel;
+    const _modHeader = await import('../components/header-controls.js');
+    const HeaderControls = _modHeader.HeaderControls;
 
     // Optional components (lazy/conditional import)
     let ProgressTracking = null;
@@ -277,6 +277,7 @@ class AppManager {
       }
     }
     const componentConfigs = [
+      { name: 'headerControls', class: HeaderControls, elementId: 'header-controls', required: true },
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
       { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'footer-progress', required: true },
@@ -433,21 +434,34 @@ class AppManager {
     eventBus.on('ui:inspector:toggle-request', () => this.openScormInspector());
     eventBus.on('ui:theme:toggle-request', () => this.toggleTheme());
 
-    // Menu action handlers
-    if (window.electronAPI && window.electronAPI.onMenuEvent) {
-      window.electronAPI.onMenuEvent((menuData) => {
-        try { this.logger.info('AppManager: Menu event received', menuData); } catch (_) {}
-        if (menuData && menuData.action === 'exit') {
-          try { this.logger.info('AppManager: Handling menu exit action'); } catch (_) {}
-          // Trigger app quit
-          if (window.electronAPI && window.electronAPI.invoke) {
-            window.electronAPI.invoke('quit-app').catch((error) => {
-              try { this.logger.error('AppManager: Failed to quit app via IPC', error); } catch (_) {}
-            });
-          }
-        }
+    // HeaderControls -> intent events (rewrite): course load/reload
+    eventBus.on('course:open-zip:request', () => {
+      const courseLoader = this.services.get('courseLoader');
+      if (!courseLoader) {
+        try { this.logger.error('AppManager: courseLoader service not available for open-zip'); } catch (_) {}
+        return;
+      }
+      courseLoader.handleCourseLoad().catch(error => {
+        try { this.logger.error('AppManager: Course load error (open-zip)', error?.message || error); } catch (_) {}
       });
-    }
+    });
+
+    eventBus.on('course:open-folder:request', () => {
+      const courseLoader = this.services.get('courseLoader');
+      if (!courseLoader) {
+        try { this.logger.error('AppManager: courseLoader service not available for open-folder'); } catch (_) {}
+        return;
+      }
+      courseLoader.handleFolderLoad().catch(error => {
+        try { this.logger.error('AppManager: Folder load error (open-folder)', error?.message || error); } catch (_) {}
+      });
+    });
+
+    eventBus.on('course:reload:request', () => {
+      this.handleCourseReload().catch(error => {
+        try { this.logger.error('AppManager: Course reload error (header intent)', error?.message || error); } catch (_) {}
+      });
+    });
 
     // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
@@ -690,33 +704,16 @@ class AppManager {
               _fromNavigationAvailabilityUpdate: true
             });
 
-            // CRITICAL FIX: Directly notify navigation-controls component to ensure button states update
-            // This bypasses the silent UI state update issue that was preventing button state changes
-            const navigationControls = this.components.get('navigationControls');
-            this.logger.debug('AppManager: Checking navigation-controls component', {
-              componentExists: !!navigationControls,
-              hasMethod: typeof navigationControls?.handleNavigationAvailabilityUpdated === 'function',
-              componentType: typeof navigationControls
-            });
-
-            if (navigationControls && typeof navigationControls.handleNavigationAvailabilityUpdated === 'function') {
-              this.logger.info('AppManager: Calling handleNavigationAvailabilityUpdated on navigation-controls');
-              navigationControls.handleNavigationAvailabilityUpdated(data);
-              this.logger.info('AppManager: Successfully notified navigation-controls component', {
-                availableNavigation,
-                normalized
-              });
-            } else {
-              this.logger.error('AppManager: Navigation-controls component not available for direct notification', {
-                componentExists: !!navigationControls,
-                hasMethod: typeof navigationControls?.handleNavigationAvailabilityUpdated === 'function'
-              });
-            }
+            // Rewrite: Broadcast availability update via EventBus for decoupled components
+            const eventBus = this.services.get('eventBus');
+            try {
+              eventBus?.emit('navigation:availability:updated', data);
+            } catch (_) {}
 
             this.logger.info('AppManager: Navigation availability update processing complete', {
               availableNavigation,
               normalized,
-              directNotification: !!navigationControls
+              directNotification: false
             });
           } else {
             this.logger.warn('AppManager: Invalid availableNavigation data received', {
@@ -741,91 +738,9 @@ class AppManager {
    * Setup UI event listeners
    */
   async setupUIEventListeners() {
-    // console.log('AppManager: Setting up UI event listeners...'); // Removed debug log
-
-    // Course load button (Open ZIP)
-    const courseLoader = this.services.get('courseLoader');
-    if (!courseLoader) {
-      this.logger.error('AppManager: courseLoader not found in services. Cannot set up UI event listeners for course loading.');
-      return;
-    }
-
-    // Course load button (Open ZIP)
-    const courseLoadBtn = document.getElementById('course-load-btn');
-    if (courseLoadBtn) {
-      courseLoadBtn.addEventListener('click', () => {
-        courseLoader.handleCourseLoad().catch(error => {
-          try { this.logger.error('AppManager: Course load error', error?.message || error); } catch (_) {}
-        });
-      });
-      // console.log('AppManager: Course load button listener attached'); // Removed debug log
-    }
-
-    // New: Open Folder button
-    const openFolderBtn = document.getElementById('course-folder-btn');
-    if (openFolderBtn) {
-      openFolderBtn.addEventListener('click', () => {
-        courseLoader.handleFolderLoad().catch(error => {
-          try { this.logger.error('AppManager: Folder load error', error?.message || error); } catch (_) {}
-        });
-      });
-    }
-
-    // Reload Course button
-    const reloadBtn = document.getElementById('course-reload-btn');
-    if (reloadBtn) {
-      reloadBtn.addEventListener('click', () => {
-        this.handleCourseReload().catch(error => {
-          try { this.logger.error('AppManager: Course reload error', error?.message || error); } catch (_) {}
-        });
-      });
-    }
-
-    // Welcome page buttons (fallback wiring for legacy inline handlers)
-    const welcomeButtons = document.querySelectorAll('button[onclick*="course-load-btn"]');
-    welcomeButtons.forEach((btn, index) => {
-      btn.onclick = null; // Remove inline onclick
-      btn.addEventListener('click', () => {
-        courseLoader.handleCourseLoad().catch(error => {
-          try { this.logger.error('AppManager: Course load error from welcome button', error?.message || error); } catch (_) {}
-        });
-      });
-      // console.log(`AppManager: Welcome button ${index + 1} listener attached`); // Removed debug log
-    });
-
-    // Render Recent Courses list if container exists
-    await this.renderRecentCourses();
-
-
-
-    // SCORM Inspector toggle
-    const scormInspectorToggleBtn = document.getElementById('scorm-inspector-toggle');
-    if (scormInspectorToggleBtn) {
-      scormInspectorToggleBtn.addEventListener('click', async () => {
-        const { eventBus } = await import('../services/event-bus.js');
-        eventBus.emit('ui:inspector:toggle-request');
-      });
-    }
-
-    // Theme toggle
-    const themeToggleBtn = document.getElementById('theme-toggle');
-    if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', async () => {
-        const { eventBus } = await import('../services/event-bus.js');
-        eventBus.emit('ui:theme:toggle-request');
-      });
-    }
-
-    // Sidebar toggle for mobile
-    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
-    if (sidebarToggleBtn) {
-      sidebarToggleBtn.addEventListener('click', async () => {
-        const { eventBus } = await import('../services/event-bus.js');
-        eventBus.emit('ui:sidebar:toggle-request');
-      });
-    }
-
-    // console.log('AppManager: UI event listeners setup complete'); // Removed debug log
+    // Deprecated in rewrite: Header actions are rendered and handled by HeaderControls component via EventBus
+    // Kept as a no-op to preserve initialization flow.
+    return;
   }
 
   /**
@@ -1119,36 +1034,8 @@ class AppManager {
         return;
       }
 
-      // Fallback to main process (will return disabled error during rewrite)
-      if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
-        const result = await window.electronAPI.openScormInspectorWindow();
-        if (result?.success) return;
-        if (result?.error?.code === 'SCORM_INSPECTOR_DISABLED') {
-          this.uiState?.showNotification({
-            type: 'info',
-            message: 'SCORM Inspector is disabled during GUI rewrite',
-            details: 'Use the integrated Inspector panel in the main window.'
-          });
-          return;
-        }
-        this.uiState?.showNotification({
-          type: 'error',
-          message: 'Failed to open SCORM Inspector',
-          details: (result && (result.error?.message || result.error)) || 'Unknown error'
-        });
-      } else {
-        this.uiState?.showNotification({
-          type: 'info',
-          message: 'SCORM Inspector is disabled during GUI rewrite',
-          details: 'Use the integrated Inspector panel in the main window.'
-        });
-      }
-    } catch (error) {
-      this.uiState?.showNotification({
-        type: 'error',
-        message: 'Error opening SCORM Inspector',
-        details: error?.message || String(error)
-      });
+    } catch (_) {
+      // No legacy window fallback; integrated panel is the only inspector UI.
     }
   }
 
@@ -1168,22 +1055,20 @@ class AppManager {
    */
   async initializeUiFromMain() {
     try {
-      if (window.electronAPI && window.electronAPI.ui && window.electronAPI.ui.getSettings) {
-        const res = await window.electronAPI.ui.getSettings();
-        const ui = res && res.settings ? (res.settings.ui || {}) : {};
-        if (ui.theme) this.applyTheme(ui.theme || 'default');
-        if (typeof ui.sidebarVisible === 'boolean') {
-          await this.handleMenuToggle({ visible: ui.sidebarVisible });
-        }
-        if (typeof ui.devModeEnabled === 'boolean') {
-          this.uiState?.setState('ui.devModeEnabled', ui.devModeEnabled, true);
-        }
-        if (typeof ui.sidebarCollapsed === 'boolean') {
-          this.uiState?.setState('ui.sidebarCollapsed', ui.sidebarCollapsed, true);
-        }
-        if (typeof ui.debugPanelVisible === 'boolean') {
-          this.uiState?.setState('ui.debugPanelVisible', ui.debugPanelVisible, true);
-        }
+      const res = await ipcClient.uiGetSettings();
+      const ui = res && res.settings ? (res.settings.ui || {}) : {};
+      if (ui.theme) this.applyTheme(ui.theme || 'default');
+      if (typeof ui.sidebarVisible === 'boolean') {
+        await this.handleMenuToggle({ visible: ui.sidebarVisible });
+      }
+      if (typeof ui.devModeEnabled === 'boolean') {
+        this.uiState?.setState('ui.devModeEnabled', ui.devModeEnabled, true);
+      }
+      if (typeof ui.sidebarCollapsed === 'boolean') {
+        this.uiState?.setState('ui.sidebarCollapsed', ui.sidebarCollapsed, true);
+      }
+      if (typeof ui.debugPanelVisible === 'boolean') {
+        this.uiState?.setState('ui.debugPanelVisible', ui.debugPanelVisible, true);
       }
     } catch (error) {
       try { this.logger.warn('AppManager: Failed to initialize UI from main', error?.message || error); } catch (_) {}
@@ -1214,8 +1099,8 @@ class AppManager {
           for (const k of CENTRAL_KEYS) {
             if (ui[k] !== last[k]) { delta[k] = ui[k]; changed = true; }
           }
-          if (changed && window.electronAPI?.ui?.setSettings) {
-            await window.electronAPI.ui.setSettings({ ui: delta });
+          if (changed) {
+            await ipcClient.uiSetSettings({ ui: delta });
             last = { ...last, ...delta };
           }
         } catch (_) {}
@@ -1234,9 +1119,7 @@ class AppManager {
 
     // Persist to main AppState
     try {
-      if (window.electronAPI && window.electronAPI.ui && window.electronAPI.ui.setSettings) {
-        await window.electronAPI.ui.setSettings({ ui: { theme: newTheme } });
-      }
+      await ipcClient.uiSetSettings({ ui: { theme: newTheme } });
     } catch (error) {
       try { this.logger.warn('Failed to persist theme to main AppState', error?.message || error); } catch (_) {}
     }
@@ -1329,9 +1212,7 @@ class AppManager {
         this.uiState.setState('ui.sidebarVisible', targetVisible, true); // silent update to avoid loops
       }
       try {
-        if (window.electronAPI?.ui?.setSettings) {
-          await window.electronAPI.ui.setSettings({ ui: { sidebarVisible: targetVisible } });
-        }
+        await ipcClient.uiSetSettings({ ui: { sidebarVisible: targetVisible } });
       } catch (_) {}
     }
 
@@ -1449,26 +1330,24 @@ class AppManager {
    */
   async initializeBrowseModeFromMain() {
     try {
-      if (window.electronAPI && window.electronAPI.invoke) {
-        const status = await window.electronAPI.invoke('browse-mode-status');
-        if (status && status.enabled) {
-          this.browseMode = {
-            enabled: status.enabled,
-            session: status.session,
-            config: status.config || {}
-          };
+      const status = await ipcClient.invoke('browse-mode-status');
+      if (status && status.enabled) {
+        this.browseMode = {
+          enabled: status.enabled,
+          session: status.session,
+          config: status.config || {}
+        };
 
-          // Update UI state to reflect browse mode
-          this.uiState.setState('browseMode', this.browseMode);
+        // Update UI state to reflect browse mode
+        this.uiState.setState('browseMode', this.browseMode);
 
-          // Broadcast browse mode change
-          const eventBus = this.services.get('eventBus');
-          if (eventBus) {
-            eventBus.emit('browseMode:changed', this.browseMode);
-          }
-
-          this.logger.info('AppManager: Browse mode initialized from main process', this.browseMode);
+        // Broadcast browse mode change
+        const eventBus = this.services.get('eventBus');
+        if (eventBus) {
+          eventBus.emit('browseMode:changed', this.browseMode);
         }
+
+        this.logger.info('AppManager: Browse mode initialized from main process', this.browseMode);
       }
     } catch (error) {
       this.logger.warn('AppManager: Failed to initialize browse mode from main process', error);
@@ -2030,7 +1909,7 @@ class AppManager {
     // Lazy-load store to avoid circular deps
     const { recentCoursesStore } = await import(`${window.electronAPI.rendererBaseUrl}services/recent-courses.js`);
     // Ensure the store has loaded its data from the main process
-    await recentCoursesStore._load(); // Explicitly await the load operation
+    await recentCoursesStore.ensureLoaded(); // Await initial load via public API
 
     const items = recentCoursesStore.getAll();
     // Clear

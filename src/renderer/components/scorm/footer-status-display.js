@@ -33,6 +33,8 @@ class FooterStatusDisplay extends BaseComponent {
 
   setupEventSubscriptions() {
     this.subscribe('progress:updated', this.handleProgressUpdated);
+    // Also react to session updates for elapsed time display
+    this.subscribe('session:updated', this.handleSessionUpdated);
   }
 
   handleProgressUpdated(data) {
@@ -70,6 +72,15 @@ class FooterStatusDisplay extends BaseComponent {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterStatusDisplay: #footer-time not found in DOM');
       }).catch(() => {});
+    }
+  }
+
+  handleSessionUpdated(data) {
+    const session = data?.data || data;
+    if (!this.element) return;
+    const footerTime = this.element.querySelector('#footer-time');
+    if (footerTime && session && (session.sessionTime || session.elapsedTime)) {
+      footerTime.textContent = session.sessionTime || session.elapsedTime;
     }
   }
 

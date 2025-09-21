@@ -158,22 +158,6 @@ class WindowManager extends BaseService {
   }
 
   /**
-   * Create SCORM Inspector window (disabled during GUI rewrite)
-   */
-  async createScormInspectorWindow() {
-    this.logger?.warn('WindowManager: SCORM Inspector window is disabled during GUI rewrite');
-    this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CLOSED);
-    this.errorHandler?.setError(
-      MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
-      'SCORM Inspector window is disabled during GUI rewrite',
-      'WindowManager.createScormInspectorWindow'
-    );
-    const err = new Error('SCORM Inspector window disabled during GUI rewrite');
-    err.code = 'SCORM_INSPECTOR_DISABLED';
-    throw err;
-  }
-
-  /**
    * Get window instance by type
    */
   getWindow(windowType) {

@@ -229,45 +229,6 @@ describe('Window Management Integration Tests', () => {
     });
   });
 
-  describe('Multi-Window Scenarios', () => {
-    beforeEach(async () => {
-      await windowManager.initialize(new Map());
-      await windowManager.createMainWindow();
-    });
-
-    test('should create SCORM Inspector window', async () => {
-      const inspectorWindow = await windowManager.createScormInspectorWindow();
-
-      expect(inspectorWindow).toBeDefined();
-      expect(inspectorWindow.loadURL).toHaveBeenCalledWith('scorm-app://scorm-inspector.html');
-      expect(inspectorWindow.show).toHaveBeenCalled();
-      expect(windowManager.getWindow(WINDOW_TYPES.SCORM_INSPECTOR)).toBe(inspectorWindow);
-      expect(windowManager.windowStates.get(WINDOW_TYPES.SCORM_INSPECTOR)).toBe(WINDOW_STATES.READY);
-    });
-
-    test('should focus existing SCORM Inspector window instead of creating new one', async () => {
-      const firstWindow = await windowManager.createScormInspectorWindow();
-      const secondWindow = await windowManager.createScormInspectorWindow();
-
-      expect(secondWindow).toBe(firstWindow);
-      expect(firstWindow.focus).toHaveBeenCalledTimes(1);
-      expect(mockBrowserWindowInstances.filter(w =>
-        w.options.title === 'SCORM Inspector'
-      )).toHaveLength(1);
-    });
-
-    test('should handle multiple window broadcasting', async () => {
-      await windowManager.createScormInspectorWindow();
-
-      const sentCount = windowManager.broadcastToAllWindows('test-channel', { test: 'data' });
-
-      expect(sentCount).toBe(2); // Main + Inspector
-      mockBrowserWindowInstances.forEach(window => {
-        expect(window.webContents.send).toHaveBeenCalledWith('test-channel', { test: 'data' });
-      });
-    });
-  });
-
   describe('Protocol Registration and Recovery', () => {
     test('should handle protocol request correctly', async () => {
       await windowManager.initialize(new Map());
