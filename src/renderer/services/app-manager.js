@@ -142,7 +142,10 @@ class AppManager {
       eventBus.emit('app:initialized');
 
     } catch (error) {
-      try { this.logger.error('AppManager: Failed to initialize application', error?.message || error); } catch (_) {}
+      try {
+        this.logger.error('AppManager: Failed to initialize application', (error && (error.message || error)));
+        if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
+      } catch (_) {}
       this.handleInitializationError(error);
       throw error;
     }
@@ -177,32 +180,117 @@ class AppManager {
   }
 
   /**
+   * Ensure minimal DOM skeleton exists after index.html cleanup
+   * Builds the structured application layout (header/main/sidebar/content/footer)
+   * with component mount points so components can render themselves.
+   */
+  ensureDomSkeleton() {
+    try {
+      const root = document.getElementById('app-root');
+      if (!root) return;
+
+      // If we've already built the layout once, do nothing
+      if (root.querySelector('.app-layout')) return;
+
+      // Build structured layout using existing CSS classes
+      root.innerHTML = `
+        <div class="app-layout initialized">
+          <header class="app-header">
+            <div class="header">
+              <div class="header__nav">
+                <div id="navigation-controls"></div>
+              </div>
+              <div class="header__actions">
+                <button id="course-load-btn" title="Open SCORM Zip">Open ZIP</button>
+                <button id="course-folder-btn" title="Open Folder">Open Folder</button>
+                <button id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
+                <button id="scorm-inspector-toggle" title="Toggle Inspector">Inspector</button>
+                <button id="theme-toggle" title="Toggle Theme">Theme</button>
+              </div>
+            </div>
+          </header>
+          <main class="app-main">
+            <aside id="app-sidebar" class="app-sidebar">
+              <div class="sidebar">
+                <div class="sidebar__content">
+                  <div id="course-outline"></div>
+                </div>
+              </div>
+            </aside>
+            <section class="app-content">
+              <div id="content-viewer"></div>
+              <div id="inspector-panel"></div>
+            </section>
+          </main>
+          <footer class="app-footer" id="app-footer">
+            <div id="footer-progress"></div>
+            <div id="footer-status"></div>
+          </footer>
+        </div>
+      `;
+    } catch (_) {
+      // best-effort, non-fatal
+    }
+  }
+
+
+  /**
    * Initialize all components
    */
   async initializeComponents() {
     try { this.logger.info('AppManager: Initializing components...'); } catch (_) {}
+    // Ensure DOM skeleton exists for component mount points
+    this.ensureDomSkeleton();
 
-    // Dynamically import component classes
-    const { BaseComponent } = await import('../components/base-component.js');
-    const { ContentViewer } = await import('../components/scorm/content-viewer.js');
-    const { NavigationControls } = await import('../components/scorm/navigation-controls.js');
-    const { ProgressTracking } = await import('../components/scorm/progress-tracking.js');
-    const { CourseOutline } = await import('../components/scorm/course-outline.js');
-    const { FooterProgressBar } = await import('../components/scorm/footer-progress-bar.js');
-    const { FooterStatusDisplay } = await import('../components/scorm/footer-status-display.js');
+    // Dynamically import required component classes (avoid destructuring for parser compatibility)
+    const _modBase = await import('../components/base-component.js');
+    const BaseComponent = _modBase.BaseComponent;
+    const _modCV = await import('../components/scorm/content-viewer.js');
+    const ContentViewer = _modCV.ContentViewer;
+    const _modNav = await import('../components/scorm/navigation-controls.js');
+    const NavigationControls = _modNav.NavigationControls;
+    const _modOutline = await import('../components/scorm/course-outline.js');
+    const CourseOutline = _modOutline.CourseOutline;
+    const _modFooterPB = await import('../components/scorm/footer-progress-bar.js');
+    const FooterProgressBar = _modFooterPB.FooterProgressBar;
+    const _modFooterSD = await import('../components/scorm/footer-status-display.js');
+    const FooterStatusDisplay = _modFooterSD.FooterStatusDisplay;
+    const _modInspector = await import('../components/inspector/inspector-panel.js');
+    const InspectorPanel = _modInspector.InspectorPanel;
+
+    // Optional components (lazy/conditional import)
+    let ProgressTracking = null;
+    try {
+      if (document.getElementById('progress-tracking')) {
+        const _modPT = await import('../components/scorm/progress-tracking.js');
+        ProgressTracking = _modPT.ProgressTracking;
+      } else {
+        if (this && this.logger && typeof this.logger.debug === 'function') {
+          this.logger.debug('AppManager: progress-tracking mount point not found; skipping component import');
+        }
+      }
+    } catch (e) {
+      if (this && this.logger && typeof this.logger.warn === 'function') {
+        this.logger.warn('AppManager: Optional component import failed (progress-tracking). Continuing without it.', (e && (e.message || e)));
+      }
+    }
     const componentConfigs = [
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
-      // ProgressTracking is a full widget not used in the footer; load only if its container exists elsewhere
-      { name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: false },
-      { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'app-footer', required: true },
-      { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'app-footer', required: true },
+      { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'footer-progress', required: true },
+      { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'footer-status', required: true },
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true },
+      { name: 'inspectorPanel', class: InspectorPanel, elementId: 'inspector-panel', required: false },
     ];
+
+    // Add optional component configs conditionally
+    if (ProgressTracking) {
+      componentConfigs.push({ name: 'progressTracking', class: ProgressTracking, elementId: 'progress-tracking', required: false });
+    }
 
     // DIAGNOSTIC: verify DOM mount points exist before instantiation
     try {
-      ['content-viewer','navigation-controls','app-footer','course-outline'].forEach(id => {
+      ['content-viewer','navigation-controls','footer-progress','footer-status','course-outline'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) {
           this.logger.error(`AppManager: Missing DOM element '${id}' prior to component init`);
@@ -894,7 +982,10 @@ class AppManager {
     if (this._handlingInitError) return;
     this._handlingInitError = true;
 
-    try { this.logger.error('AppManager: Initialization error', error?.message || error); } catch (_) {}
+    try {
+      this.logger.error('AppManager: Initialization error', (error && (error.message || error)));
+      if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
+    } catch (_) {}
 
     // Centralized UI handling via UIState notification (no inline HTML)
     try {
@@ -1018,28 +1109,46 @@ class AppManager {
    */
   async openScormInspector() {
     try {
-      if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
-        try { this.logger.debug('AppManager: Requesting SCORM Inspector window...'); } catch (_) {}
-        const result = await window.electronAPI.openScormInspectorWindow();
+      // Prefer integrated panel if present
+      const inspector = this.components?.get('inspectorPanel');
+      if (inspector && typeof inspector.toggleVisibility === 'function') {
+        inspector.toggleVisibility();
+        try { this.logger.info('AppManager: Toggled integrated Inspector panel'); } catch (_) {}
+        return;
+      }
 
-        if (result && result.success) {
-          try { this.logger.info('AppManager: SCORM Inspector opened successfully'); } catch (_) {}
+      // Fallback to main process (will return disabled error during rewrite)
+      if (window.electronAPI && window.electronAPI.openScormInspectorWindow) {
+        const result = await window.electronAPI.openScormInspectorWindow();
+        if (result?.success) return;
+        if (result?.error?.code === 'SCORM_INSPECTOR_DISABLED') {
+          this.uiState?.showNotification({
+            type: 'info',
+            message: 'SCORM Inspector is disabled during GUI rewrite',
+            details: 'Use the integrated Inspector panel in the main window.'
+          });
           return;
         }
-
-        // Handle failure cases
-        if (!result) {
-          try { this.logger.error('AppManager: Failed to open SCORM Inspector: No response from main process'); } catch (_) {}
-        } else if (!result.success) {
-          try { this.logger.error('AppManager: Failed to open SCORM Inspector:', result.error || 'Unknown error'); } catch (_) {}
-        }
+        this.uiState?.showNotification({
+          type: 'error',
+          message: 'Failed to open SCORM Inspector',
+          details: (result && (result.error?.message || result.error)) || 'Unknown error'
+        });
       } else {
-        try { this.logger.warn('AppManager: SCORM Inspector API not available'); } catch (_) {}
+        this.uiState?.showNotification({
+          type: 'info',
+          message: 'SCORM Inspector is disabled during GUI rewrite',
+          details: 'Use the integrated Inspector panel in the main window.'
+        });
       }
     } catch (error) {
-      try { this.logger.error('AppManager: Error opening SCORM Inspector:', error.message || error); } catch (_) {}
-      }
+      this.uiState?.showNotification({
+        type: 'error',
+        message: 'Error opening SCORM Inspector',
+        details: error?.message || String(error)
+      });
     }
+  }
 
   /**
    * Apply theme to document root

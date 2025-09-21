@@ -19,9 +19,15 @@ class FooterProgressBar extends BaseComponent {
   }
 
   renderContent() {
-    // The HTML structure for these elements already exists in index.html
-    // This component will attach to and update those existing elements.
-    // No need to render new content here.
+    // Render minimal footer progress markup (index.html was gutted in rewrite)
+    this.element.innerHTML = `
+      <div class="footer-progress">
+        <div class="footer-progress__bar">
+          <div id="footer-progress-fill" class="footer-progress__fill" style="width:0%"></div>
+        </div>
+        <div id="footer-progress-percentage" class="footer-progress__text">0%</div>
+      </div>
+    `;
   }
 
   setupEventSubscriptions() {

@@ -19,9 +19,14 @@ class FooterStatusDisplay extends BaseComponent {
   }
 
   renderContent() {
-    // The HTML structure for these elements already exists in index.html
-    // This component will attach to and update those existing elements.
-    // No need to render new content here.
+    // Render minimal footer status markup (index.html was gutted in rewrite)
+    this.element.innerHTML = `
+      <div class="footer-status">
+        <span id="footer-status" class="footer-status__text">Not Started</span>
+        <span id="footer-score" class="footer-status__score">--</span>
+        <span id="footer-time" class="footer-status__time">00:00:00</span>
+      </div>
+    `;
   }
 
   setupEventSubscriptions() {

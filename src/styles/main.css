@@ -21,6 +21,7 @@
 @import url('./components/error-state.css');
 @import url('./components/content-scaling.css');
 @import url('./components/navigation-controls.css'); /* Added this line */
+@import url('./components/inspector-panel.css');
 
 
 /* Theme Styles */

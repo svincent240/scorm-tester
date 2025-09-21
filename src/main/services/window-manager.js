@@ -158,67 +158,19 @@ class WindowManager extends BaseService {
   }
 
   /**
-   * Create SCORM Inspector window
+   * Create SCORM Inspector window (disabled during GUI rewrite)
    */
   async createScormInspectorWindow() {
-    try {
-      const existingInspectorWindow = this.windows.get(WINDOW_TYPES.SCORM_INSPECTOR);
-      if (existingInspectorWindow && !existingInspectorWindow.isDestroyed()) {
-        try { existingInspectorWindow.focus(); } catch (_) {}
-        return existingInspectorWindow;
-      }
-
-      this.logger?.info('WindowManager: Creating SCORM Inspector window');
-      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CREATING);
-
-      const mainWindow = this.windows.get(WINDOW_TYPES.MAIN);
-      const inspectorWindow = new BrowserWindow({
-        ...this.config.scormInspectorWindow,
-        parent: mainWindow,
-        webPreferences: {
-          // Enforced security defaults (Phase 3)
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-          enableRemoteModule: false,
-          webSecurity: true,
-          allowRunningInsecureContent: false,
-          webviewTag: false,
-          preload: PathUtils.getPreloadPath(__dirname)
-        },
-        title: 'SCORM Inspector',
-        show: false
-      });
-
-      this.windows.set(WINDOW_TYPES.SCORM_INSPECTOR, inspectorWindow);
-      this.setupScormInspectorWindowEvents(inspectorWindow);
-      this.setupConsoleLogging(inspectorWindow);
-      // Apply security policies and navigation restrictions
-      try { this.applySecurityHandlers(inspectorWindow); } catch (_) {}
-
-      // Load SCORM Inspector window content using simple protocol format
-      await inspectorWindow.loadURL('scorm-app://app/scorm-inspector.html');
-
-      inspectorWindow.show();
-      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.READY);
-
-      this.logger?.info(`WindowManager: SCORM Inspector window created successfully (ID: ${inspectorWindow.id})`);
-      this.recordOperation('createScormInspectorWindow', true);
-
-      return inspectorWindow;
-
-    } catch (error) {
-      this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CLOSED);
-      this.errorHandler?.setError(
-        MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
-        `SCORM Inspector window creation failed: ${error.message}`,
-        'WindowManager.createScormInspectorWindow'
-      );
-
-      this.logger?.error('WindowManager: SCORM Inspector window creation failed:', error);
-      this.recordOperation('createScormInspectorWindow', false);
-      throw error;
-    }
+    this.logger?.warn('WindowManager: SCORM Inspector window is disabled during GUI rewrite');
+    this.setWindowState(WINDOW_TYPES.SCORM_INSPECTOR, WINDOW_STATES.CLOSED);
+    this.errorHandler?.setError(
+      MAIN_PROCESS_ERRORS.WINDOW_CREATION_FAILED,
+      'SCORM Inspector window is disabled during GUI rewrite',
+      'WindowManager.createScormInspectorWindow'
+    );
+    const err = new Error('SCORM Inspector window disabled during GUI rewrite');
+    err.code = 'SCORM_INSPECTOR_DISABLED';
+    throw err;
   }
 
   /**

@@ -1301,34 +1301,17 @@ class IpcHandler extends BaseService {
 
 
 
+  // Disabled during GUI rewrite: SCORM Inspector runs as integrated panel
   async handleOpenScormInspectorWindow(event) {
-    const windowManager = this.getDependency('windowManager');
-    if (!windowManager) {
-      this.logger?.warn('IpcHandler: WindowManager dependency not available for open-scorm-inspector-window');
-      return { success: false, error: 'WindowManager not available' };
-    }
-
-    try {
-      // Check if SCORM Inspector window already exists
-      const inspectorWindow = windowManager.getWindow('scorm-inspector');
-      if (inspectorWindow && !inspectorWindow.isDestroyed()) {
-        inspectorWindow.focus();
-        this.logger?.info('IpcHandler: Focused existing SCORM Inspector window');
-        this.recordOperation('open-scorm-inspector-window:focused', true);
-        return { success: true, focused: true };
-      } else {
-        if (typeof windowManager.createScormInspectorWindow === 'function') {
-          await windowManager.createScormInspectorWindow();
-        }
-        this.logger?.info('IpcHandler: Created new SCORM Inspector window');
-        this.recordOperation('open-scorm-inspector-window:created', true);
-        return { success: true, created: true };
+    this.logger?.warn('IpcHandler: SCORM Inspector window is disabled during GUI rewrite');
+    this.recordOperation('open-scorm-inspector-window:disabled', false);
+    return {
+      success: false,
+      error: {
+        code: 'SCORM_INSPECTOR_DISABLED',
+        message: 'SCORM Inspector window is disabled during GUI rewrite. Use the integrated Inspector panel.'
       }
-    } catch (error) {
-      this.logger?.error('IpcHandler: Failed to open SCORM Inspector window:', error);
-      this.recordOperation('open-scorm-inspector-window:error', false);
-      return { success: false, error: error.message };
-    }
+    };
   }
 
   // Enhanced SCORM Inspector data retrieval methods
