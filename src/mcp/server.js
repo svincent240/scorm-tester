@@ -13,6 +13,12 @@ const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_se
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
 const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing } = require("./tools/runtime");
 
+const getLogger = require('../shared/utils/logger.js');
+const fs = require('fs');
+const path = require('path');
+
+const logger = getLogger();
+
 const router = new ToolRouter();
 
 // Helpful metadata for MCP clients (tools/list)
@@ -69,6 +75,54 @@ router.register("scorm_nav_get_state", scorm_nav_get_state);
 router.register("scorm_nav_next", scorm_nav_next);
 router.register("scorm_nav_previous", scorm_nav_previous);
 router.register("scorm_nav_choice", scorm_nav_choice);
+// System tools for logs and log level control
+async function system_get_logs(params = {}) {
+  const { tail = 200, levels = [], since_ts = 0, component = null } = params;
+  const file = (logger && logger.ndjsonFile) ? logger.ndjsonFile : (logger && logger.logFile);
+  if (!file) return { logs: [] };
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    const lines = text.split('\n').filter(Boolean);
+    const slice = lines.slice(-Math.max(0, Math.min(tail, lines.length)));
+    const out = [];
+    for (const line of slice) {
+      try {
+        const obj = JSON.parse(line);
+        if (since_ts && obj.ts && obj.ts < since_ts) continue;
+        if (Array.isArray(levels) && levels.length && obj.level && !levels.includes(obj.level)) continue;
+        if (component && obj.component !== component) {
+          // allow pass if no component specified in entry
+          continue;
+        }
+        out.push(obj);
+      } catch (_) {
+        // skip non-JSON lines
+      }
+    }
+    return { logs: out };
+  } catch (e) {
+    return { logs: [], error: e.message };
+  }
+}
+
+async function system_set_log_level(params = {}) {
+  const { level } = params;
+  if (!level) return { success: false, error: 'missing level' };
+  try {
+    if (logger && typeof logger.setLevel === 'function') {
+      logger.setLevel(level);
+      logger.info('Log level updated via MCP', { level });
+      return { success: true, level };
+    }
+    return { success: false, error: 'logger not available' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+router.register('system_get_logs', system_get_logs);
+router.register('system_set_log_level', system_set_log_level);
+
 router.register("scorm_sn_init", scorm_sn_init);
 router.register("scorm_sn_reset", scorm_sn_reset);
 router.register("scorm_test_navigation_flow", scorm_test_navigation_flow);
@@ -143,24 +197,31 @@ async function handleRequest(req) {
           return writeJSONRPCError(id, -32602, "Invalid params: missing tool name");
         }
         try {
+          logger?.info('MCP_TOOLS_CALL', { id, method: name, argsMeta: { keys: Object.keys(args||{}), hasArgs: !!args } });
           const data = await router.dispatch(name, args);
+          logger?.info('MCP_TOOLS_RESULT', { id, method: name, ok: true });
           return writeJSONRPCResult(id, { data });
         } catch (err) {
           const mapped = mapError(err);
+          logger?.error('MCP_TOOLS_ERROR', { id, method: name, error_code: mapped.error_code, message: mapped.message });
           return writeJSONRPCError(id, -32000, mapped.message || "Tool error", { error_code: mapped.error_code });
         }
       }
 
       // Fallback: allow direct method names over JSON-RPC too
       try {
+        logger?.info('MCP_DIRECT_CALL', { id, method, hasParams: !!params });
         const data = await router.dispatch(method, params);
+        logger?.info('MCP_DIRECT_RESULT', { id, method, ok: true });
         return writeJSONRPCResult(id, { data });
       } catch (err) {
         // Standard JSON-RPC method not found if unknown
         if (!router.has(method)) {
+          logger?.warn('MCP_DIRECT_UNKNOWN', { id, method });
           return writeJSONRPCError(id, -32601, `Method not found: ${method}`);
         }
         const mapped = mapError(err);
+        logger?.error('MCP_DIRECT_ERROR', { id, method, error_code: mapped.error_code, message: mapped.message });
         return writeJSONRPCError(id, -32000, mapped.message || "Server error", { error_code: mapped.error_code });
       }
     } catch (err) {

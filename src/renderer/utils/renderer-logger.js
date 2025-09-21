@@ -14,6 +14,10 @@ let debugCount = 0;
 
 const BACKOFF_MS = 1500;     // backoff for any level after a rate-limit error
 let backoffUntil = 0;
+let backoffNotifiedUntil = 0;
+let coalesceDrops = 0;
+let coalesceWindowStart = 0;
+let suppressedDebugCount = 0;
 
 // Coalescing settings
 const COALESCE_WINDOW_MS = 400;
@@ -70,42 +74,70 @@ const shouldCoalesceDrop = (level, args) => {
 };
 
 const safeCall = async (method, args, isDebug = false) => {
+  const bridge = getBridge();
   // Apply backoff first
   if (inBackoff()) {
-    return; // silently skip to avoid flooding
+    try {
+      if (Date.now() > backoffNotifiedUntil) {
+        backoffNotifiedUntil = backoffUntil;
+        if (bridge && typeof bridge.warn === 'function') {
+          await bridge.warn('RENDERER_BACKOFF_ACTIVE', { until: backoffUntil });
+        }
+      }
+    } catch (_) {}
+    return; // skip flooding but surface state once
   }
 
   // Coalesce duplicates per level
   if (shouldCoalesceDrop(method, args)) {
+    const now = Date.now();
+    if (now - coalesceWindowStart > COALESCE_WINDOW_MS) {
+      coalesceWindowStart = now;
+      coalesceDrops = 0;
+      try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_COALESCE_WINDOW_START'); } } catch (_) {}
+    }
+    coalesceDrops += 1;
+    if (coalesceDrops === 1) {
+      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_COALESCED_DUPLICATES', { dropped: coalesceDrops }); } } catch (_) {}
+    }
     return;
   }
 
-  // Apply debug rolling window limit
+  // Apply debug rolling window limit (no silent drops)
   if (isDebug) {
     const now = Date.now();
     if (now - debugWindowStart > DEBUG_RATE_LIMIT.WINDOW_MS) {
+      if (suppressedDebugCount > 0) {
+        try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_DEBUG_SUPPRESSED_SUMMARY', { suppressed: suppressedDebugCount }); } } catch (_) {}
+        suppressedDebugCount = 0;
+      }
       debugWindowStart = now;
       debugCount = 0;
     }
     if (debugCount >= DEBUG_RATE_LIMIT.MAX_PER_WINDOW) {
-      return; // drop silently
+      suppressedDebugCount += 1;
+      if (suppressedDebugCount === 1) {
+        try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_DEBUG_RATE_LIMIT', { windowMs: DEBUG_RATE_LIMIT.WINDOW_MS, max: DEBUG_RATE_LIMIT.MAX_PER_WINDOW }); } } catch (_) {}
+      }
+      return; // drop but surfaced via WARN
     }
     debugCount += 1;
   }
 
-  const bridge = getBridge();
   if (!bridge || typeof bridge[method] !== 'function') return;
 
   try {
     await bridge[method](...args);
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
-    // Enter silent backoff on any rate-limit indication, do not log anything
+    // Enter non-silent backoff on any rate-limit indication
     if (msg.includes('Rate limit exceeded')) {
-      backoffUntil = Date.now() + BACKOFF_MS; // silent backoff
+      backoffUntil = Date.now() + BACKOFF_MS;
+      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_BACKOFF_ENTER', { until: backoffUntil }); } } catch (_) {}
       return;
     }
-    // For any other error, swallow silently to avoid console noise and extra IPC
+    // For any other error, swallow but emit a single info for visibility
+    try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_LOG_SEND_ERROR', { error: msg }); } } catch (_) {}
     return;
   }
 };

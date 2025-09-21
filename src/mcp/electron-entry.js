@@ -24,6 +24,20 @@ async function main() {
     });
 
     // Ready the Electron app; BrowserWindows will be created by runtime tools as needed
+    // Initialize AI-accessible log directory for MCP runs if not provided
+    try {
+      if (!process.env.SCORM_TESTER_LOG_DIR) {
+        const path = require('path');
+        const fs = require('fs');
+        const logDir = path.join(process.cwd(), 'sessions', `mcp-${Date.now()}-${process.pid}`, 'logs');
+        fs.mkdirSync(logDir, { recursive: true });
+        process.env.SCORM_TESTER_LOG_DIR = logDir;
+      }
+      const getLogger = require('../shared/utils/logger.js');
+      const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
+      logger.info('MCP Electron entry initialized', { logDir: process.env.SCORM_TESTER_LOG_DIR });
+    } catch (_) {}
+
     await app.whenReady();
 
     // Start the MCP stdio server (reads newline-delimited JSON from stdin)
