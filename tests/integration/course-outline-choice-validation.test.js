@@ -70,14 +70,14 @@ describe('CourseOutline choice validation', () => {
     // Ensure validation was called
     expect(window.electronAPI.validateCourseOutlineChoice).toHaveBeenCalledWith('sco-1');
     // Should NOT emit navigationRequest
-    expect(emitSpy.mock.calls.find(c => c[0] === 'navigationRequest')).toBeUndefined();
+    expect(emitSpy.mock.calls.find(c => c[0] === 'navigation:request')).toBeUndefined();
 
     // Now allow validation and try again
     window.electronAPI.validateCourseOutlineChoice.mockResolvedValueOnce({ success: true, allowed: true, reason: 'ok' });
     await outline.navigateToItem('sco-1');
 
     // Should emit navigationRequest once allowed
-    expect(emitSpy.mock.calls.find(c => c[0] === 'navigationRequest')).toBeTruthy();
+    expect(emitSpy.mock.calls.find(c => c[0] === 'navigation:request')).toBeTruthy();
   });
 });
 

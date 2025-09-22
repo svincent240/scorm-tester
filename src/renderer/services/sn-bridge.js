@@ -267,6 +267,7 @@ class SNBridge {
       try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
     }
+  }
 
   async getScormDataModel() {
     try {
@@ -290,8 +291,6 @@ class SNBridge {
       try { this.logger.error('SNBridge: getSnState failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
     }
-  }
-
   }
 
   async getActivityTree() {

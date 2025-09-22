@@ -367,6 +367,16 @@ class CourseOutline extends BaseComponent {
     const isSuspended = scormState && scormState.suspended;
     const attemptLimitReached = scormState && scormState.attemptLimitExceeded;
 
+    // Compute coarse validation based on available navigation and browse mode
+    const validation = {
+      allowed: !!(this.browseModeEnabled || (Array.isArray(this.availableNavigation) && this.availableNavigation.includes('choice'))),
+      reason: this.browseModeEnabled
+        ? 'Browse mode'
+        : (Array.isArray(this.availableNavigation) && this.availableNavigation.includes('choice')
+            ? 'Allowed by availableNavigation'
+            : 'Sequencing disallows choice')
+    };
+
     // Log render state for debugging
     rendererLogger.info('CourseOutline: renderItem', item.identifier, {
       renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',

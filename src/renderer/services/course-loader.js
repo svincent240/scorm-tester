@@ -45,12 +45,13 @@ class CourseLoader {
    * Check Electron API availability and log details
    */
   checkElectronAPIAvailability() {
-    const electronAPIAvailable = typeof window.electronAPI !== 'undefined';
+    const windowDefined = typeof window !== 'undefined';
+    const electronAPIAvailable = windowDefined && typeof window.electronAPI !== 'undefined';
     try {
       rendererLogger.info('CourseLoader: Electron API availability check:', {
         available: electronAPIAvailable,
-        windowDefined: typeof window !== 'undefined',
-        electronAPIType: typeof window.electronAPI
+        windowDefined,
+        electronAPIType: windowDefined ? typeof window.electronAPI : 'undefined'
       });
     } catch (_) {}
 
@@ -59,7 +60,6 @@ class CourseLoader {
       // IPC surface verification removed in rewrite; fail-fast happens inside IpcClient
       const requiredMethods = [];
       const missingMethods = [];
-    }
       if (missingMethods.length > 0) {
         try { rendererLogger.error('CourseLoader: Missing required Electron API methods:', missingMethods); } catch (_) {}
       } else {

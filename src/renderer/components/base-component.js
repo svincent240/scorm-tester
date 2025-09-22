@@ -26,6 +26,7 @@ class BaseComponent {
     this.options = { ...this.getDefaultOptions(), ...options };
     this.isInitialized = false;
     this.isDestroyed = false;
+    this._eventsBound = false;
     this.eventListeners = new Map();
     this.childComponents = new Map();
     this.unsubscribeFunctions = [];
@@ -161,7 +162,13 @@ class BaseComponent {
    */
   render() {
     if (!this.element) {
-      throw new Error('Element not found for component');
+      // Lazily resolve target element for test and jsdom environments
+      try {
+        this.element = this.findOrCreateElement();
+      } catch (_) {}
+      if (!this.element) {
+        throw new Error('Element not found for component');
+      }
     }
 
     // Apply CSS classes
@@ -176,6 +183,13 @@ class BaseComponent {
 
     // Render content
     this.renderContent();
+
+    // Ensure event handlers and subscriptions are bound at least once
+    if (!this._eventsBound) {
+      try { this.safeBindEvents(); } catch (_) {}
+      try { this.safeSetupEventSubscriptions(); } catch (_) {}
+      this._eventsBound = true;
+    }
 
     this.emit('rendered');
   }
@@ -495,18 +509,37 @@ class BaseComponent {
    * @private
    */
   findOrCreateElement() {
-    let element = document.getElementById(this.elementId);
+    let selector = this.elementId;
+    let element = null;
+
+    if (typeof selector === 'string') {
+      if (selector.startsWith('#') || selector.startsWith('.')) {
+        element = document.querySelector(selector);
+      } else {
+        element = document.getElementById(selector);
+      }
+    }
 
     if (!element) {
       // Only create element if explicitly requested
       if (this.options.createIfNotFound !== false) {
         element = document.createElement('div');
-        element.id = this.elementId;
+        if (typeof selector === 'string') {
+          if (selector.startsWith('#')) {
+            element.id = selector.slice(1);
+          } else if (selector.startsWith('.')) {
+            element.className = selector.slice(1);
+          } else {
+            element.id = selector;
+          }
+        }
 
         // Add to document if no parent specified
         const parent = this.options.parent
           ? (typeof this.options.parent === 'string'
-              ? document.getElementById(this.options.parent)
+              ? (this.options.parent.startsWith('#') || this.options.parent.startsWith('.')
+                  ? document.querySelector(this.options.parent)
+                  : document.getElementById(this.options.parent))
               : this.options.parent)
           : document.body;
 
@@ -516,7 +549,7 @@ class BaseComponent {
           throw new Error(`Parent element not found for component ${this.elementId}`);
         }
       } else {
-        throw new Error(`Required element with id '${this.elementId}' not found in DOM`);
+        throw new Error(`Required element with id or selector '${this.elementId}' not found in DOM`);
       }
     }
 

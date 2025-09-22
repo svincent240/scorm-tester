@@ -38,7 +38,7 @@
     "build:mac": "npm run build:validate && electron-builder --mac",
     "build:linux": "npm run build:validate && electron-builder --linux",
     "build:dev": "electron-builder --dir",
-    "prebuild": "npm run lint && npm run test:all"
+    "prebuild": "npm run lint && npm run validate:renderer-architecture && npm run test:all"
   },
   "keywords": [
     "scorm",

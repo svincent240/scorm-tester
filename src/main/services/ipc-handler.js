@@ -1562,6 +1562,9 @@ class IpcHandler extends BaseService {
       return { success: true, data: sspData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetSSPBuckets failed: ${error.message}`);
+      return { success: false, error: error.message, data: [] };
+    }
+  }
 
   /**
    * Get current SCORM data model for Inspector
@@ -1578,10 +1581,6 @@ class IpcHandler extends BaseService {
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetDataModel failed: ${error.message}`);
       return { success: false, error: error.message, data: {} };
-    }
-  }
-
-      return { success: false, error: error.message, data: [] };
     }
   }
 

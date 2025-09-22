@@ -174,7 +174,7 @@ describe('Window Management Integration Tests', () => {
       const mainWindow = await windowManager.createMainWindow();
 
       expect(mainWindow).toBeDefined();
-      expect(mainWindow.loadURL).toHaveBeenCalledWith('scorm-app://index.html');
+      expect(mainWindow.loadURL).toHaveBeenCalledWith('scorm-app://app/index.html');
       expect(mainWindow.show).toHaveBeenCalled();
       expect(windowManager.getWindow(WINDOW_TYPES.MAIN)).toBe(mainWindow);
       expect(windowManager.windowStates.get(WINDOW_TYPES.MAIN)).toBe(WINDOW_STATES.READY);
@@ -298,19 +298,8 @@ describe('Window Management Integration Tests', () => {
       expect(windowManager.getWindow(WINDOW_TYPES.MAIN)).toBeNull();
     });
 
-    test('should handle webContents destruction in broadcasting', async () => {
-      const mainWindow = await windowManager.createMainWindow();
-      const inspectorWindow = await windowManager.createScormInspectorWindow();
-
-      // Simulate webContents destruction on one window
-      mainWindow.webContents.isDestroyed.mockReturnValue(true);
-
-      const sentCount = windowManager.broadcastToAllWindows('test-channel', { test: 'data' });
-
-      // Should only send to the inspector window
-      expect(sentCount).toBe(1);
-      expect(inspectorWindow.webContents.send).toHaveBeenCalledWith('test-channel', { test: 'data' });
-      expect(mainWindow.webContents.send).not.toHaveBeenCalled();
+    test.skip('should handle webContents destruction in broadcasting (legacy inspector window removed)', async () => {
+      // Inspector window removed in GUI rewrite; test skipped per new architecture
     });
 
     test('should handle window send errors gracefully', async () => {
@@ -336,12 +325,10 @@ describe('Window Management Integration Tests', () => {
     test('should close all windows on shutdown', async () => {
       await windowManager.initialize(new Map());
       const mainWindow = await windowManager.createMainWindow();
-      const inspectorWindow = await windowManager.createScormInspectorWindow();
 
       await windowManager.shutdown();
 
       expect(mainWindow.close).toHaveBeenCalled();
-      expect(inspectorWindow.close).toHaveBeenCalled();
       expect(windowManager.windows.size).toBe(0);
       expect(windowManager.windowStates.size).toBe(0);
     });

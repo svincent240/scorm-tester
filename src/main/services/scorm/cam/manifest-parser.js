@@ -172,11 +172,11 @@ class ManifestParser {
       }
 
       organizations = this.parseOrganizations(manifestElement, basePath); // may throw ParserError
-      resources = this.parseResources(manifestElement, basePath); // may throw ParserError
+      const parsedResourcesArray = this.parseResources(manifestElement, basePath); // may throw ParserError
 
       // Build a resource map for identifierref validation
       const resourceMap = new Map();
-      for (const r of resources) {
+      for (const r of parsedResourcesArray) {
         if (r?.identifier) resourceMap.set(r.identifier, r);
       }
 
@@ -206,12 +206,17 @@ class ManifestParser {
         }
       }
 
+      // Expose resources as an Array (for unit tests) with an alias property `resource`
+      // pointing to the same array (for consumers expecting the CAM-style object shape).
+      const resourcesArray = parsedResourcesArray;
+      try { Object.defineProperty(resourcesArray, 'resource', { value: resourcesArray, enumerable: true }); } catch (_) { resourcesArray.resource = resourcesArray; }
+
       const result = {
         identifier,
         version,
         metadata,
         organizations,
-        resources,
+        resources: resourcesArray,
         manifest: subManifests
       };
 
@@ -315,7 +320,8 @@ class ManifestParser {
 
     return {
       default: defaultOrg || organizations[0]?.identifier || null,
-      organization: organizations  // Use "organization" property for consistency
+      organization: organizations,  // Canonical shape used across services
+      organizations: organizations  // Back-compat alias for tests expecting plural key
     };
   }
 
