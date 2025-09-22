@@ -181,6 +181,22 @@ class Logger {
 
 // Provide a default log directory resolver compatible with both main and renderer contexts
 function getDefaultLogDir() {
+  // In development, use project root logs directory
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      // Find project root by looking for package.json
+      let currentDir = __dirname;
+      while (currentDir !== path.dirname(currentDir)) {
+        if (fs.existsSync(path.join(currentDir, 'package.json'))) {
+          return path.join(currentDir, 'logs');
+        }
+        currentDir = path.dirname(currentDir);
+      }
+    } catch (_) {
+      // ignore resolution failure and fallback to standard logic
+    }
+  }
+
   try {
     // Use Electron app.getPath('userData') when available
     const electron = require('electron');

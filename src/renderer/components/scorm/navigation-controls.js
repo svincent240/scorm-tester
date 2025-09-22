@@ -125,46 +125,13 @@ class NavigationControls extends BaseComponent {
    * Initialize bridge to main process SN service
    */
   async initializeSNServiceBridge() {
-    try {
-      const initResult = await snBridge.initialize();
-      if (initResult.success) {
-        this.snService = snBridge;
-        this.updateNavigationState({ 
-          snServiceAvailable: true,
-          snServiceError: null 
-        });
-
-        // Proactively pull current sequencing state to sync button availability
-        try {
-          const state = await this.snService.getSequencingState();
-          if (state && Array.isArray(state.availableNavigation)) {
-            this.updateAvailableNavigation(state.availableNavigation);
-            try {
-              const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
-              this.uiState?.updateNavigation({ ...normalized, _fromComponent: true });
-            } catch (e) {
-              this.logger?.warn('NavigationControls: Failed to sync initial availability to UIState', e?.message || e);
-            }
-          }
-        } catch (e) {
-          this.logger?.debug('NavigationControls: Initial sequencing state unavailable', e?.message || e);
-        }
-      } else {
-        this.snService = null;
-        this.updateNavigationState({ 
-          snServiceAvailable: false,
-          snServiceError: initResult.error || 'Failed to initialize SN service'
-        });
-        this.showFallbackMode('SN service unavailable - using simplified navigation');
-      }
-    } catch (error) {
-      this.snService = null;
-      this.updateNavigationState({ 
-        snServiceAvailable: false,
-        snServiceError: error.message 
-      });
-      this.showFallbackMode('Navigation service error - using basic controls');
-    }
+    // GUI_APP_SPEC: Renderer is a pure consumer; SN bridge is orchestrated by AppManager/Main.
+    // Do not perform IPC initialization here. Navigation availability will be reflected via events/UIState.
+    this.snService = null;
+    this.updateNavigationState({
+      snServiceAvailable: false,
+      snServiceError: null
+    });
   }
 
   /**
@@ -490,10 +457,10 @@ class NavigationControls extends BaseComponent {
       });
       
       if (!this.snService) {
-        this.logger?.warn('NavigationControls: SN service not available, falling back to content navigation');
-        return this.fallbackContentNavigation(navigationRequest);
+        this.logger?.warn('NavigationControls: SN service not available; navigation unavailable (fail-fast)');
+        return this.navigationUnavailable(navigationRequest);
       }
-      
+
       // Use main process SN service for proper SCORM navigation
       const result = await this.snService.processNavigation(navigationRequest, targetActivityId);
       
@@ -621,9 +588,9 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * SCORM-compliant navigation - no fallback that bypasses sequencing
+   * Navigation unavailable (fail-fast) — do not bypass sequencing service
    */
-  async fallbackContentNavigation(navigationRequest) {
+  async navigationUnavailable(navigationRequest) {
     // SCORM compliance: Do not bypass sequencing service
     this.logger?.warn(`NavigationControls: SN service unavailable - cannot perform ${navigationRequest} navigation`);
     
@@ -873,28 +840,9 @@ class NavigationControls extends BaseComponent {
    * Refresh navigation availability from SN service
    */
   async refreshNavigationAvailability() {
-    try {
-      if (this.snService) {
-        // Ask SN to recompute availability (especially important after mode changes)
-        const refreshed = await this.snService.refreshNavigationAvailability();
-        const available = refreshed && (refreshed.availableNavigation || refreshed?.availableNavigation);
-
-        if (Array.isArray(available)) {
-          // Update local state and propagate authoritative booleans to UIState
-          this.updateAvailableNavigation(available);
-          try {
-            const normalized = this.normalizeAvailableNavigation(available);
-            this.uiState?.updateNavigation({ ...normalized, _fromComponent: true });
-          } catch (e) {
-            this.logger?.warn('NavigationControls: Failed to push refreshed availability to UIState', e?.message || e);
-          }
-          this.logger?.debug('NavigationControls: Navigation availability refreshed', available);
-          return { success: true, availableNavigation: available };
-        }
-      }
-    } catch (error) {
-      this.logger?.warn('NavigationControls: Failed to refresh navigation availability', error);
-    }
+    // Renderer is a pure consumer; availability updates are driven by AppManager/Main.
+    this.logger?.debug('NavigationControls: refreshNavigationAvailability is no-op; awaiting main-driven updates');
+    return { success: true, availableNavigation: this.navigationState.availableNavigation || [] };
   }
 
   /**
@@ -954,49 +902,7 @@ class NavigationControls extends BaseComponent {
     }
   }
 
-  /**
-   * Show fallback mode notification
-   */
-  showFallbackMode(message) {
-    if (this.statusElement) {
-      this.statusElement.textContent = message;
-      this.statusElement.classList.add('navigation-controls__status--warning');
-    }
-    
-    // Add visual indicator for fallback mode
-    this.element.classList.add('navigation-controls--fallback');
-    
-    // Create error indicator if it doesn't exist
-    if (!this.errorIndicator) {
-      this.errorIndicator = document.createElement('div');
-      this.errorIndicator.className = 'navigation-controls__error-indicator';
-      this.errorIndicator.innerHTML = `
-        <span class="error-icon">⚠️</span>
-        <span class="error-text">Fallback Mode</span>
-      `;
-      this.element.appendChild(this.errorIndicator);
-    }
-    
-    if (this.logger && typeof this.logger.warn === 'function') {
-      this.logger.warn('NavigationControls: Operating in fallback mode:', message);
-    }
-  }
 
-  /**
-   * Hide fallback mode notification
-   */
-  hideFallbackMode() {
-    if (this.statusElement) {
-      this.statusElement.classList.remove('navigation-controls__status--warning');
-    }
-    
-    this.element.classList.remove('navigation-controls--fallback');
-    
-    if (this.errorIndicator) {
-      this.errorIndicator.remove();
-      this.errorIndicator = null;
-    }
-  }
 
   /**
    * Update title and status
@@ -1065,28 +971,10 @@ class NavigationControls extends BaseComponent {
    */
   async handleCourseLoaded(data) {
     this.updateTitleAndStatus('SCORM Course Player', 'Course loaded and active');
-    
-    // Initialize SN service for the course
-    if (this.snService && data.manifest) {
-      try {
-        const initResult = await this.snService.initializeCourse(data.manifest, data.packageInfo);
-        if (initResult.success) {
-          this.logger?.debug('NavigationControls: SN service initialized for course');
-          
-          // Get initial sequencing state
-          const sequencingState = await this.snService.getSequencingState();
-          if (sequencingState.success) {
-            this.updateAvailableNavigation(sequencingState.availableNavigation);
-            
-            // Store current activity info
-            this.navigationState.currentActivity = sequencingState.currentActivity;
-            this.navigationState.sequencingState = sequencingState;
-          }
-        }
-      } catch (error) {
-        this.logger?.error('NavigationControls: Failed to initialize SN service:', error);
-      }
-    }
+
+    // GUI_APP_SPEC: Renderer defers SN initialization to AppManager/Main.
+    // Navigation availability and current activity are driven by main via events/UIState.
+    // No direct SN calls from NavigationControls here.
     
     // Update UI to show course is ready
     this.element.classList.add('navigation-controls--course-loaded');

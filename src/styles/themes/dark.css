@@ -1,9 +1,9 @@
 /**
  * Dark Theme
- * 
+ *
  * Dark theme with professional color scheme optimized for low-light environments.
  * Provides excellent contrast and reduced eye strain for extended use.
- * 
+ *
  * @fileoverview Dark theme styles
  */
 
@@ -11,7 +11,7 @@
   /* Theme Identity */
   --theme-name: 'dark';
   --theme-type: 'dark';
-  
+
   /* Primary Colors - Adjusted for dark backgrounds */
   --primary-50: #1e3a8a;
   --primary-100: #1e40af;
@@ -23,13 +23,13 @@
   --primary-700: #bfdbfe;
   --primary-800: #dbeafe;
   --primary-900: #eff6ff;
-  
+
   --primary-color: var(--primary-500);
   --primary-hover: var(--primary-400);
   --primary-active: var(--primary-300);
   --primary-text: var(--neutral-900);
   --primary-color-alpha: rgba(96, 165, 250, 0.15);
-  
+
   /* Secondary Colors */
   --secondary-50: #0f172a;
   --secondary-100: #1e293b;
@@ -41,12 +41,12 @@
   --secondary-700: #e2e8f0;
   --secondary-800: #f1f5f9;
   --secondary-900: #f8fafc;
-  
+
   --secondary-color: var(--secondary-600);
   --secondary-hover: var(--secondary-700);
   --secondary-active: var(--secondary-800);
   --secondary-text: var(--neutral-900);
-  
+
   /* Success Colors */
   --success-50: #14532d;
   --success-100: #166534;
@@ -58,13 +58,13 @@
   --success-700: #bbf7d0;
   --success-800: #dcfce7;
   --success-900: #f0fdf4;
-  
+
   --success-color: var(--success-500);
   --success-hover: var(--success-400);
   --success-active: var(--success-300);
   --success-text: var(--neutral-900);
   --success-color-alpha: rgba(74, 222, 128, 0.15);
-  
+
   /* Warning Colors */
   --warning-50: #78350f;
   --warning-100: #92400e;
@@ -76,13 +76,13 @@
   --warning-700: #fde68a;
   --warning-800: #fef3c7;
   --warning-900: #fffbeb;
-  
+
   --warning-color: var(--warning-500);
   --warning-hover: var(--warning-400);
   --warning-active: var(--warning-300);
   --warning-text: var(--neutral-900);
   --warning-color-alpha: rgba(251, 191, 36, 0.15);
-  
+
   /* Danger Colors */
   --danger-50: #7f1d1d;
   --danger-100: #991b1b;
@@ -94,13 +94,13 @@
   --danger-700: #fecaca;
   --danger-800: #fee2e2;
   --danger-900: #fef2f2;
-  
+
   --danger-color: var(--danger-500);
   --danger-hover: var(--danger-400);
   --danger-active: var(--danger-300);
   --danger-text: var(--neutral-900);
   --danger-color-alpha: rgba(248, 113, 113, 0.15);
-  
+
   /* Info Colors */
   --info-50: #0c4a6e;
   --info-100: #075985;
@@ -112,13 +112,13 @@
   --info-700: #bae6fd;
   --info-800: #e0f2fe;
   --info-900: #f0f9ff;
-  
+
   --info-color: var(--info-500);
   --info-hover: var(--info-400);
   --info-active: var(--info-300);
   --info-text: var(--neutral-900);
   --info-color-alpha: rgba(56, 189, 248, 0.15);
-  
+
   /* Neutral Colors - Inverted for dark theme */
   --neutral-50: #171717;
   --neutral-100: #262626;
@@ -130,7 +130,7 @@
   --neutral-700: #e5e5e5;
   --neutral-800: #f5f5f5;
   --neutral-900: #fafafa;
-  
+
   /* Enhanced Background Colors for Dark Theme */
   --bg-color: #0a0a0b;
   --bg-secondary: var(--neutral-100);
@@ -144,29 +144,29 @@
   --bg-overlay: rgba(0, 0, 0, 0.9);
   --bg-gradient-subtle: linear-gradient(135deg, #0a0a0b 0%, #1a1a1b 100%);
   --bg-gradient-surface: linear-gradient(135deg, rgba(38, 38, 38, 0.9) 0%, rgba(26, 26, 27, 0.9) 100%);
-  
+
   /* Text Colors */
   --text-color: var(--neutral-900);       /* increase contrast */
   --text-secondary: var(--neutral-700);   /* clearer secondary */
   --text-muted: var(--neutral-600);
   --text-disabled: var(--neutral-500);
   --text-inverse: var(--neutral-100);
-  
+
   /* Border Colors */
   --border-color: var(--neutral-300);
   --border-secondary: var(--neutral-400);
   --border-focus: var(--primary-color);
   --border-hover: var(--neutral-400);
   --border-active: var(--primary-color);
-  
+
   /* Focus Colors */
   --focus-color: var(--primary-color);
   --focus-ring: 0 0 0 2px var(--primary-color-alpha);
-  
+
   /* Shadow Colors - Darker for dark theme */
   --shadow-color: rgba(0, 0, 0, 0.3);
   --shadow-color-strong: rgba(0, 0, 0, 0.6);
-  
+
   /* SCORM-specific Colors */
   --scorm-sco-color: var(--primary-500);
   --scorm-asset-color: var(--secondary-500);
@@ -175,60 +175,60 @@
   --scorm-failed-color: var(--danger-500);
   --scorm-passed-color: var(--success-500);
   --scorm-unknown-color: var(--neutral-400);
-  
+
   /* Status Colors */
   --status-online: var(--success-500);
   --status-offline: var(--neutral-400);
   --status-error: var(--danger-500);
   --status-warning: var(--warning-500);
   --status-info: var(--info-500);
-  
+
   /* Component-specific Colors */
   --header-bg: var(--bg-secondary);
   --header-border: var(--border-color);
   --header-text: var(--text-color);
-  
+
   --sidebar-bg: var(--bg-color);
   --sidebar-border: var(--border-color);
   --sidebar-text: var(--text-color);
-  
+
   --content-bg: var(--bg-color);
   --content-text: var(--text-color);
-  
+
   --footer-bg: var(--bg-secondary);
   --footer-border: var(--border-color);
   --footer-text: var(--text-muted);
-  
+
   --nav-link-hover: var(--bg-hover);
   --nav-link-active: var(--primary-color);
   --nav-link-active-text: var(--neutral-900);
-  
+
   --card-bg: var(--bg-secondary);
   --card-border: var(--border-color);
   --card-shadow: var(--shadow-md);
-  
+
   --modal-bg: var(--bg-secondary);
   --modal-overlay: var(--bg-overlay);
   --modal-border: var(--border-color);
-  
+
   --tooltip-bg: var(--neutral-700);
   --tooltip-text: var(--neutral-100);
   --tooltip-shadow: var(--shadow-lg);
-  
+
   --progress-bg: var(--neutral-200);
   --progress-fill: var(--primary-color);
   --progress-text: var(--text-color);
-  
+
   --code-bg: var(--neutral-100);
   --code-text: var(--neutral-700);
   --code-border: var(--border-color);
-  
+
   --table-bg: var(--bg-color);
   --table-border: var(--border-color);
   --table-header-bg: var(--bg-secondary);
   --table-row-hover: var(--bg-hover);
   --table-row-selected: rgba(96, 165, 250, 0.1);
-  
+
   /* Debug Panel Colors - Optimized for dark theme */
   --debug-bg: var(--neutral-50);
   --debug-text: var(--neutral-700);
@@ -237,7 +237,7 @@
   --debug-error: var(--danger-400);
   --debug-warning: var(--warning-400);
   --debug-info: var(--info-400);
-  
+
   /* Syntax Highlighting - Dark theme optimized */
   --syntax-keyword: var(--primary-400);
   --syntax-string: var(--success-400);
@@ -246,14 +246,14 @@
   --syntax-operator: var(--secondary-400);
   --syntax-function: var(--info-400);
   --syntax-variable: var(--danger-400);
-  
+
   /* Animation Colors */
   --loading-color: var(--primary-color);
   --loading-bg: var(--neutral-200);
-  
+
   --pulse-color: var(--primary-color);
   --pulse-bg: rgba(96, 165, 250, 0.1);
-  
+
   --skeleton-base: var(--neutral-200);
   --skeleton-highlight: var(--neutral-300);
 }
@@ -262,7 +262,7 @@
 .theme-dark {
   /* Ensure proper contrast ratios for dark theme */
   --min-contrast-ratio: 7;
-  
+
   /* Adjust colors for better accessibility in dark mode */
   --text-on-primary: var(--neutral-900);
   --text-on-secondary: var(--neutral-900);
@@ -270,7 +270,7 @@
   --text-on-warning: var(--neutral-900);
   --text-on-danger: var(--neutral-900);
   --text-on-info: var(--neutral-900);
-  
+
   /* High contrast variants for dark theme */
   --primary-high-contrast: var(--primary-300);
   --secondary-high-contrast: var(--secondary-700);
@@ -286,10 +286,10 @@
     /* Enhanced shadows for dark backgrounds */
     --shadow-color: rgba(0, 0, 0, 0.4);
     --shadow-color-strong: rgba(0, 0, 0, 0.7);
-    
+
     /* Stronger overlay for dark theme */
     --bg-overlay: rgba(0, 0, 0, 0.9);
-    
+
     /* Adjust scrollbar colors for dark theme */
     --scrollbar-track: var(--neutral-100);
     --scrollbar-thumb: var(--neutral-300);
@@ -307,16 +307,16 @@
     --warning-color: var(--warning-high-contrast);
     --danger-color: var(--danger-high-contrast);
     --info-color: var(--info-high-contrast);
-    
+
     /* Increase border contrast */
     --border-color: var(--neutral-400);
     --border-secondary: var(--neutral-500);
-    
+
     /* Increase text contrast */
     --text-color: var(--neutral-900);
     --text-secondary: var(--neutral-700);
     --text-muted: var(--neutral-600);
-    
+
     /* Stronger shadows */
     --shadow-color: rgba(0, 0, 0, 0.5);
     --shadow-color-strong: rgba(0, 0, 0, 0.8);
@@ -380,7 +380,7 @@
 .theme-dark img {
   opacity: 0.9;
   transition: opacity var(--transition-fast) ease;
-  
+
   &:hover {
     opacity: 1;
   }
@@ -473,8 +473,11 @@
     animation: none;
     background: var(--skeleton-base);
   }
-  
+
   .theme-dark img {
     transition: none;
   }
 }
+
+/* De-nested dark theme image hover */
+.theme-dark img:hover { opacity: 1; }

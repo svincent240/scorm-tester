@@ -52,6 +52,8 @@ class InspectorPanel extends BaseComponent {
           <button data-tab="tree">Activity Tree</button>
           <button data-tab="objectives">Objectives</button>
           <button data-tab="ssp">SSP Buckets</button>
+          <button data-tab="model">Data Model</button>
+          <button data-tab="sn">Sequencing State</button>
         </div>
         <div class="inspector-panel__body">
           <div class="inspector-panel__summary">
@@ -64,6 +66,8 @@ class InspectorPanel extends BaseComponent {
           <div class="inspector-tab" id="inspector-tab-tree" style="display:none"></div>
           <div class="inspector-tab" id="inspector-tab-objectives" style="display:none"></div>
           <div class="inspector-tab" id="inspector-tab-ssp" style="display:none"></div>
+          <div class="inspector-tab" id="inspector-tab-model" style="display:none"></div>
+          <div class="inspector-tab" id="inspector-tab-sn" style="display:none"></div>
         </div>
       </div>
     `;

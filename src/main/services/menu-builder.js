@@ -144,14 +144,22 @@ class MenuBuilder {
    */
   sendMenuAction(action, data = null) {
     const mainWindow = this.windowManager.getWindow('main');
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      // Special handling for exit menu - send as menu-event for renderer processing
-      if (action === 'menu-exit') {
-        mainWindow.webContents.send('menu-event', { action: 'exit', data });
-      } else {
-        // Keep original behavior for other menu items (even if they're not implemented)
-        mainWindow.webContents.send(action, data);
+
+    // Handle Exit entirely in the main process to ensure reliable shutdown
+    if (action === 'menu-exit') {
+      try {
+        const { app } = require('electron');
+        this.logger?.info('MenuBuilder: Exit requested, calling app.quit()');
+        app.quit();
+      } catch (e) {
+        this.logger?.error('MenuBuilder: Failed to call app.quit()', e?.message || e);
       }
+      return;
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Keep original behavior for other menu items (even if they're not implemented)
+      mainWindow.webContents.send(action, data);
     }
   }
 }

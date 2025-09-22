@@ -31,15 +31,15 @@ class HeaderControls extends BaseComponent {
   renderContent() {
     this.element.innerHTML = `
       <div class="header-controls__group">
-        <button class="hc-btn" id="hc-open-zip" title="Open SCORM Zip">Open ZIP</button>
-        <button class="hc-btn" id="hc-open-folder" title="Open Folder">Open Folder</button>
-        <button class="hc-btn" id="hc-reload" title="Reload Current Course" disabled>Reload</button>
-        <button class="hc-btn" id="hc-inspector" title="Toggle Inspector">Inspector</button>
-        <button class="hc-btn" id="hc-theme" title="Toggle Theme">Theme</button>
+        <button class="btn btn--secondary btn--sm" id="hc-open-zip" title="Open SCORM Zip">Open ZIP</button>
+        <button class="btn btn--secondary btn--sm" id="hc-open-folder" title="Open Folder">Open Folder</button>
+        <button class="btn btn--secondary btn--sm" id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
+        <button class="btn btn--secondary btn--sm" id="hc-inspector" title="Toggle Inspector">Inspector</button>
+        <button class="btn btn--secondary btn--sm" id="hc-theme" title="Toggle Theme">Theme</button>
       </div>
     `;
 
-    this.reloadBtn = this.element.querySelector('#hc-reload');
+    this.reloadBtn = this.element.querySelector('#course-reload-btn');
   }
 
   bindEvents() {
@@ -47,7 +47,7 @@ class HeaderControls extends BaseComponent {
 
     const openZip = this.element.querySelector('#hc-open-zip');
     const openFolder = this.element.querySelector('#hc-open-folder');
-    const reload = this.element.querySelector('#hc-reload');
+    const reload = this.element.querySelector('#course-reload-btn');
     const inspector = this.element.querySelector('#hc-inspector');
     const theme = this.element.querySelector('#hc-theme');
 

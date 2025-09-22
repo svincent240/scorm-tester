@@ -1,9 +1,9 @@
 /**
  * Form Component Styles
- * 
+ *
  * Comprehensive form styling system with inputs, selects, textareas, and validation.
  * Supports various states, sizes, and accessibility features.
- * 
+ *
  * @fileoverview Form component styles
  */
 
@@ -71,30 +71,30 @@
   display: block;
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
-  
+
   font-family: var(--font-family);
   font-size: var(--font-size-base);
   line-height: 1.4;
   color: var(--text-color);
-  
+
   background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  
+
   transition: all var(--transition-fast) ease;
-  
+
   &::placeholder {
     color: var(--text-muted);
     opacity: 1;
   }
-  
+
   &:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px var(--primary-color-alpha);
     background: var(--bg-color);
   }
-  
+
   &:disabled,
   &[readonly] {
     background: var(--bg-disabled);
@@ -102,7 +102,7 @@
     cursor: not-allowed;
     opacity: 0.7;
   }
-  
+
   &[readonly] {
     cursor: default;
   }
@@ -124,7 +124,7 @@
 /* Input States */
 .form-control--valid {
   border-color: var(--success-color);
-  
+
   &:focus {
     border-color: var(--success-color);
     box-shadow: 0 0 0 2px var(--success-color-alpha);
@@ -133,7 +133,7 @@
 
 .form-control--invalid {
   border-color: var(--danger-color);
-  
+
   &:focus {
     border-color: var(--danger-color);
     box-shadow: 0 0 0 2px var(--danger-color-alpha);
@@ -142,7 +142,7 @@
 
 .form-control--warning {
   border-color: var(--warning-color);
-  
+
   &:focus {
     border-color: var(--warning-color);
     box-shadow: 0 0 0 2px var(--warning-color-alpha);
@@ -172,11 +172,11 @@ select.form-control {
   background-repeat: no-repeat;
   background-size: 16px 12px;
   padding-right: calc(var(--spacing-md) + 20px);
-  
+
   &:focus {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
   }
-  
+
   &[multiple] {
     background-image: none;
     padding-right: var(--spacing-md);
@@ -262,20 +262,20 @@ select.form-control {
   appearance: none;
   color-adjust: exact;
   cursor: pointer;
-  
+
   transition: all var(--transition-fast) ease;
-  
+
   &:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px var(--primary-color-alpha);
   }
-  
+
   &:checked {
     background: var(--primary-color);
     border-color: var(--primary-color);
   }
-  
+
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -284,14 +284,14 @@ select.form-control {
 
 .form-check-input[type="checkbox"] {
   border-radius: var(--border-radius-sm);
-  
+
   &:checked {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'%3e%3cpath fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd'/%3e%3c/svg%3e");
     background-size: 100% 100%;
     background-position: center;
     background-repeat: no-repeat;
   }
-  
+
   &:indeterminate {
     background: var(--primary-color);
     border-color: var(--primary-color);
@@ -304,7 +304,7 @@ select.form-control {
 
 .form-check-input[type="radio"] {
   border-radius: 50%;
-  
+
   &:checked {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='white'/%3e%3c/svg%3e");
     background-size: 100% 100%;
@@ -333,13 +333,13 @@ select.form-control {
   background-repeat: no-repeat;
   background-size: contain;
   border-radius: 2rem;
-  
+
   transition: background-position var(--transition-fast) ease-in-out;
-  
+
   &:focus {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
   }
-  
+
   &:checked {
     background-position: right center;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
@@ -351,12 +351,12 @@ input[type="range"].form-control {
   padding: 0;
   background: transparent;
   border: none;
-  
+
   &:focus {
     box-shadow: none;
     outline: none;
   }
-  
+
   &::-webkit-slider-track {
     width: 100%;
     height: 4px;
@@ -364,7 +364,7 @@ input[type="range"].form-control {
     background: var(--border-color);
     border-radius: 2px;
   }
-  
+
   &::-webkit-slider-thumb {
     height: 16px;
     width: 16px;
@@ -376,7 +376,7 @@ input[type="range"].form-control {
     border: 2px solid var(--bg-color);
     box-shadow: var(--shadow-sm);
   }
-  
+
   &::-moz-range-track {
     width: 100%;
     height: 4px;
@@ -385,7 +385,7 @@ input[type="range"].form-control {
     border-radius: 2px;
     border: none;
   }
-  
+
   &::-moz-range-thumb {
     height: 16px;
     width: 16px;
@@ -411,7 +411,7 @@ input[type="range"].form-control {
   height: calc(1.5em + var(--spacing-sm) * 2 + 2px);
   margin: 0;
   opacity: 0;
-  
+
   &:focus ~ .form-file-label {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px var(--primary-color-alpha);
@@ -433,7 +433,7 @@ input[type="range"].form-control {
   background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  
+
   &::after {
     content: "Browse";
     display: block;
@@ -525,29 +525,29 @@ input[type="range"].form-control {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .form-group--inline {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .form-label--inline {
     text-align: left;
     min-width: auto;
     margin-right: 0;
     margin-bottom: var(--spacing-xs);
   }
-  
+
   .input-group {
     flex-direction: column;
   }
-  
+
   .input-group .form-control,
   .input-group-text {
     border-radius: var(--border-radius);
     margin: 0;
   }
-  
+
   .input-group .form-control:not(:last-child) {
     margin-bottom: -1px;
   }
@@ -558,7 +558,7 @@ input[type="range"].form-control {
   .form-control {
     border-width: 2px;
   }
-  
+
   .form-control:focus {
     outline: 2px solid;
     outline-offset: 2px;
@@ -573,3 +573,31 @@ input[type="range"].form-control {
     transition: none;
   }
 }
+
+/* De-nested form control states (no preprocessor) */
+.form-control::placeholder { color: var(--text-muted); opacity: 1; }
+.form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color-alpha); background: var(--bg-color); }
+.form-control:disabled, .form-control[aria-disabled="true"], .form-control[readonly] { background: var(--bg-disabled); color: var(--text-muted); cursor: not-allowed; opacity: 0.7; }
+.form-control[readonly] { cursor: default; }
+/* Validation focus */
+.form-control--valid:focus { border-color: var(--success-color); box-shadow: 0 0 0 2px var(--success-color-alpha); }
+.form-control--invalid:focus { border-color: var(--danger-color); box-shadow: 0 0 0 2px var(--danger-color-alpha); }
+.form-control--warning:focus { border-color: var(--warning-color); box-shadow: 0 0 0 2px var(--warning-color-alpha); }
+/* Select adornments */
+select.form-control:focus { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e"); }
+select.form-control[multiple] { background-image: none; padding-right: var(--spacing-md); height: auto; min-height: 120px; }
+/* Checkbox/Radio */
+.form-check-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color-alpha); }
+.form-check-input:checked { background: var(--primary-color); border-color: var(--primary-color); }
+.form-check-input[type="checkbox"]:checked { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'%3e%3cpath fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd'/%3e%3c/svg%3e"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+.form-check-input[type="checkbox"]:indeterminate { background: var(--primary-color); border-color: var(--primary-color); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3e%3cpath stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h8'/%3e%3c/svg%3e"); background-size: 100% 100%; background-position: center; }
+.form-check-input[type="radio"]:checked { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='white'/%3e%3c/svg%3e"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+/* Range input */
+input[type="range"].form-control:focus { box-shadow: none; outline: none; }
+input[type="range"].form-control::-webkit-slider-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-color); border-radius: 2px; }
+input[type="range"].form-control::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; margin-top: -6px; border: 2px solid var(--bg-color); box-shadow: var(--shadow-sm); }
+input[type="range"].form-control::-moz-range-track { width: 100%; height: 4px; cursor: pointer; background: var(--border-color); border-radius: 2px; border: none; }
+input[type="range"].form-control::-moz-range-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid var(--bg-color); box-shadow: var(--shadow-sm); }
+/* File input */
+.form-file-input:focus ~ .form-file-label { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color-alpha); }
+.form-file-label::after { content: "Browse"; display: block; position: absolute; top: 0; right: 0; height: 100%; padding: 0 var(--spacing-md); color: var(--text-muted); background: var(--bg-color); border-left: 1px solid var(--border-color); border-radius: 0 var(--border-radius) var(--border-radius) 0; line-height: calc(1.5em + var(--spacing-sm) * 2 + 2px); }

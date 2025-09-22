@@ -330,9 +330,29 @@ class FileManager extends BaseService {
         return { success: true, manifestPath: manifestPath };
       }
 
-      // No manifest found at root - fail fast per SCORM compliance
-      this.logger?.error(`FileManager: imsmanifest.xml not found at package root: ${folderPath}`);
-      return { success: false, error: 'imsmanifest.xml not found at package root (SCORM compliance requirement)' };
+      // No manifest found at root - fail fast and include directory listing for debugging
+      let dirEntries = [];
+      let dirCount = 0;
+      try {
+        dirEntries = fs.readdirSync(folderPath);
+        dirCount = dirEntries.length;
+      } catch (e) {
+        dirEntries = [`<failed to read directory: ${e.message}>`];
+      }
+      const maxPreview = 100;
+      const preview = dirEntries.slice(0, maxPreview);
+      this.logger?.error(
+        'FileManager: imsmanifest.xml not found at package root',
+        {
+          searchedPath: folderPath,
+          entriesCount: dirCount,
+          entriesPreview: preview
+        }
+      );
+      return {
+        success: false,
+        error: `imsmanifest.xml not found at package root (SCORM compliance requirement). Searched: ${folderPath}. Found entries (${dirCount}): ${preview.join(', ')}`
+      };
     } catch (error) {
       this.logger?.error(`FileManager: Error checking manifest: ${error.message}`);
       return { success: false, error: error.message || String(error) };

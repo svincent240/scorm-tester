@@ -183,6 +183,14 @@
   gap: var(--spacing-sm);
 }
 
+/* Header Controls Group */
+.header-controls__group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+
 /* Sidebar Components */
 .sidebar {
   display: flex;
@@ -810,3 +818,10 @@
     transition: none;
   }
 }
+
+/* De-nested nav link state rules (no preprocessor) */
+.nav__link:hover { background: var(--bg-hover); color: var(--primary-color); }
+.nav__link:focus { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.nav__link--active { background: var(--primary-color); color: var(--primary-text); }
+.nav__link--active:hover { background: var(--primary-hover); }
+.nav__link--disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
