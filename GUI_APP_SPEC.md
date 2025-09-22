@@ -4,6 +4,12 @@
 
 This document defines the architecture for the SCORM Tester's renderer process (GUI). It is the authoritative guide for creating predictable, maintainable, and secure user interface components. The GUI's primary role is to present state and forward user intentions to the main process.
 
+Note on rewrite completion:
+- The GUI rewrite (see `GUI_REWRITE_PLAN.md`) is complete; this spec reflects the post‑rewrite architecture.
+- Legacy inspector window and legacy boot scripts have been removed; the SCORM Inspector is now an integrated panel within the main UI.
+- The renderer mounts into a minimal application shell; no legacy static HTML templates remain.
+
+
 ## 2. Core Architectural Principles
 
 All GUI code (components, services, etc.) **MUST** adhere to these non-negotiable principles.
@@ -45,6 +51,13 @@ Renderer Process
     ├── FooterStatusDisplay
     └── ScormInspectorPanel
 ```
+
+
+### 3.0. Application Shell
+
+- `index.html` is a minimal shell containing only `<div id="app-root"></div>` and required base tags.
+- `AppManager` mounts the root component into `#app-root` at startup and wires services.
+- No standalone legacy windows or HTML files (e.g., `scorm-inspector.html`) exist; the Inspector is integrated into the main UI.
 
 ### 3.1. Services
 *   **`AppManager`**: The central orchestrator for the renderer. It wires services and components together on initialization. It is the primary handler for complex event sequences.
