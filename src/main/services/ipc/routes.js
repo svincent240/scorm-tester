@@ -388,6 +388,23 @@ module.exports = [
       useIpcResult: true
     }
   },
+  },
+  {
+    channel: 'scorm-inspector-get-data-model',
+    handlerName: 'handleScormInspectorGetDataModel',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'scorm-inspector-get-sn-state',
+    handlerName: 'handleSNGetSequencingState',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
   // Course Outline Navigation routes
   {
     channel: 'course-outline-get-activity-tree',

@@ -180,6 +180,9 @@ const electronAPI = {
 
   // SCORM Inspector
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
+  getScormDataModel: () => safeInvoke('scorm-inspector-get-data-model'),
+  getSnState: () => safeInvoke('scorm-inspector-get-sn-state'),
+
 
   // Enhanced SCORM Inspector data retrieval
   getActivityTree: () => safeInvoke('scorm-inspector-get-activity-tree'),

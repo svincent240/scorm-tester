@@ -717,7 +717,7 @@ class CourseOutline extends BaseComponent {
       });
     }
 
-    this.emit('navigationRequested', { itemId });
+
   }
 
   setCurrentItem(itemId) {

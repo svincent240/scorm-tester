@@ -78,11 +78,11 @@ Components are self-contained UI elements that follow a consistent lifecycle.
 *   **Data Source**: Its structure and state (e.g., completion status, attempt counts, enabled/disabled status) **MUST** be driven exclusively by the activity tree data fetched from the main process's SN service.
 *   **Navigation**: On item click, it **MUST** first perform an authoritative IPC call (`validateCourseOutlineChoice`) to the main process to verify the navigation is permitted by SCORM sequencing rules. If and only if the main process confirms the choice is valid, it may then emit a `navigationRequest` event.
 
-### 4.2. `NavigationControls`
+### 5.2. `NavigationControls`
 *   **State**: The `enabled`/`disabled` state of the "Previous" and "Next" buttons **MUST** be derived solely from the `availableNavigation` array within `UIState.navigationState`.
 *   **Action**: On click, the buttons **MUST** emit a `navigationRequest` event with the appropriate type (`continue` or `previous`).
 
-### 4.3. `ContentViewer`
+### 5.3. `ContentViewer`
 *   **Content Loading**: It **MUST** only load content from a final, resolved `scorm-app://` URL provided to it. It **MUST NOT** perform any path resolution or manipulation itself.
 *   **SCORM API**: It is responsible for injecting the SCORM API bridge (`API_1484_11`) into the content iframe's window *before* the content is loaded.
 
@@ -115,15 +115,5 @@ To maintain architectural integrity, the following patterns are strictly forbidd
 *   **Direct Component Communication:** A component calling a method on another component directly. All interaction must use the `EventBus`.
 *   **State in Components:** Components maintaining their own source-of-truth state. They must be pure consumers of `UIState`.
 *   **Services Handling UI Events:** Services **MUST NOT** listen for `ui:*` events. That is the job of other components.
-**SCORM API**: It is responsible for injecting the SCORM API bridge (`API_1484_11`) into the content iframe's window *before* the content is loaded.
-
-## 5. Error Handling
-
-*   **Display, Don't Handle**: When the GUI receives an error event from the main process, its primary job is to display it to the user via the centralized notification system.
-*   **No Recovery**: The GUI **MUST NOT** contain complex error recovery logic. For example, if a course fails to load, it displays the error. It does not attempt to parse the course differently or find a missing file.
-
-## 6. Logging
-
-*   **Mandatory Utility**: All logging **MUST** use the `renderer-logger.js` utility.
-*   **Prohibited**: `console.log`, `console.warn`, `console.error`, etc., are forbidden. The linter enforces this.
-*   **Purpose**: This ensures all diagnostic information, including from the renderer, is captured in the single `app.log` file for unified debugging.
+*   **Legacy Standalone Windows/HTML:** The GUI **MUST NOT** use separate legacy windows or HTML files (e.g., `scorm-inspector.html`). The Inspector is an integrated panel within the main UI.
+*   **Direct DOM Access:** Using `document.getElementById`/`querySelector` to manipulate the DOM is forbidden; components render purely from `UIState`.

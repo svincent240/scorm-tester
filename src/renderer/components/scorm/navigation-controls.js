@@ -373,7 +373,7 @@ class NavigationControls extends BaseComponent {
       this.showNavigationError('Navigation request failed');
     }
 
-    this.emit('navigationRequested', { direction: 'previous' });
+
   }
 
   /**
@@ -398,7 +398,7 @@ class NavigationControls extends BaseComponent {
       this.showNavigationError('Navigation request failed');
     }
 
-    this.emit('navigationRequested', { direction: 'next' });
+
   }
 
   /**
@@ -931,8 +931,6 @@ class NavigationControls extends BaseComponent {
    */
   async setMenuVisible(visible) {
     this.updateNavigationState({ menuVisible: visible });
-    this.emit('menuVisibilityChanged', { visible });
-    
     // Also emit to global eventBus for app-manager (unified only)
     try {
       const { eventBus } = await import('../../services/event-bus.js');

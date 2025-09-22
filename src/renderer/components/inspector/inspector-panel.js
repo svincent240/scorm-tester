@@ -75,6 +75,8 @@ class InspectorPanel extends BaseComponent {
       tree: this.element.querySelector('#inspector-tab-tree'),
       objectives: this.element.querySelector('#inspector-tab-objectives'),
       ssp: this.element.querySelector('#inspector-tab-ssp'),
+      model: this.element.querySelector('#inspector-tab-model'),
+      sn: this.element.querySelector('#inspector-tab-sn'),
     };
     const closeBtn = this.element.querySelector('.inspector-panel__close');
     if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
@@ -97,7 +99,7 @@ class InspectorPanel extends BaseComponent {
     // Initial tab render
 
   setActiveTab(tab) {
-    const allowed = ['api','tree','objectives','ssp'];
+    const allowed = ['api','tree','objectives','ssp','model','sn'];
     const next = allowed.includes(tab) ? tab : 'api';
     this.activeTab = next;
     // Toggle tab containers
@@ -144,6 +146,16 @@ class InspectorPanel extends BaseComponent {
           if (ssp?.success) this.state.ssp = ssp.data || [];
           break;
         }
+        case 'model': {
+          const dm = await snBridge.getScormDataModel();
+          if (dm?.success) this.state.dataModel = dm.data || {};
+          break;
+        }
+        case 'sn': {
+          const sn = await snBridge.getSnState();
+          if (sn?.success) this.state.sn = sn;
+          break;
+        }
       }
       this.updateSummaryCounts();
       this.renderActiveTab();
@@ -158,6 +170,8 @@ class InspectorPanel extends BaseComponent {
       case 'tree': return this.renderActivityTree();
       case 'objectives': return this.renderObjectives();
       case 'ssp': return this.renderSSP();
+      case 'model': return this.renderDataModel();
+      case 'sn': return this.renderSnState();
       default: return this.renderApiLog();
     }
   }
@@ -259,6 +273,21 @@ class InspectorPanel extends BaseComponent {
       <table class="kv"><thead><tr><th>ID</th><th>Satisfied</th><th>Measure</th><th>Score</th></tr></thead>
       <tbody>${rows.slice(0,200).map(renderRow).join('') || '<tr><td colspan="4"><em>No objectives</em></td></tr>'}</tbody></table></div>`;
   }
+
+  renderDataModel() {
+    const el = this.tabEls?.model; if (!el) return;
+    const dm = this.state.dataModel || {};
+    const body = `<pre class="dm-json">${this._esc(JSON.stringify(dm, null, 2))}</pre>`;
+    el.innerHTML = `<div class="tab-section"><h4>Data Model</h4>${body}</div>`;
+  }
+
+  renderSnState() {
+    const el = this.tabEls?.sn; if (!el) return;
+    const sn = this.state.sn || {};
+    const body = `<pre class="sn-json">${this._esc(JSON.stringify(sn, null, 2))}</pre>`;
+    el.innerHTML = `<div class="tab-section"><h4>SN State</h4>${body}</div>`;
+  }
+
 
   renderSSP() {
     const el = this.tabEls?.ssp; if (!el) return;

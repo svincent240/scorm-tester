@@ -348,6 +348,11 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-inspector-get-global-objectives', this.handleScormInspectorGetGlobalObjectives.bind(this));
       this.registerHandler('scorm-inspector-get-ssp-buckets', this.handleScormInspectorGetSSPBuckets.bind(this));
 
+      // Additional Inspector endpoints
+      this.registerHandler('scorm-inspector-get-data-model', this.handleScormInspectorGetDataModel?.bind(this) || this.handleScormInspectorGetDataModel);
+      this.registerHandler('scorm-inspector-get-sn-state', this.handleSNGetSequencingState.bind(this));
+
+
       // Course Outline Navigation handlers
       this.registerHandler('course-outline-get-activity-tree', this.handleCourseOutlineGetActivityTree.bind(this));
       this.registerHandler('course-outline-validate-choice', this.handleCourseOutlineValidateChoice.bind(this));
@@ -1557,6 +1562,25 @@ class IpcHandler extends BaseService {
       return { success: true, data: sspData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetSSPBuckets failed: ${error.message}`);
+
+  /**
+   * Get current SCORM data model for Inspector
+   */
+  async handleScormInspectorGetDataModel(event, { sessionId } = {}) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService || typeof scormService.getCurrentDataModel !== 'function') {
+        this.logger?.warn('IpcHandler: SCORM service or getCurrentDataModel not available');
+        return { success: false, error: 'SCORM Service not available', data: {} };
+      }
+      const dataModel = scormService.getCurrentDataModel() || {};
+      return { success: true, data: dataModel };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetDataModel failed: ${error.message}`);
+      return { success: false, error: error.message, data: {} };
+    }
+  }
+
       return { success: false, error: error.message, data: [] };
     }
   }

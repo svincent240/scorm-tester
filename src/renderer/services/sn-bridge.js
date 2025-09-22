@@ -267,6 +267,31 @@ class SNBridge {
       try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
     }
+
+  async getScormDataModel() {
+    try {
+      if (window.electronAPI?.getScormDataModel) {
+        return await window.electronAPI.getScormDataModel();
+      }
+      return { success: false, error: 'getScormDataModel not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getScormDataModel failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getSnState() {
+    try {
+      if (window.electronAPI?.getSnState) {
+        return await window.electronAPI.getSnState();
+      }
+      return { success: false, error: 'getSnState not available' };
+    } catch (error) {
+      try { this.logger.error('SNBridge: getSnState failed', error?.message || error); } catch (_) {}
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
   }
 
   async getActivityTree() {
