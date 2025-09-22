@@ -321,6 +321,8 @@ class IpcHandler extends BaseService {
       this.registerHandler('sn:getSequencingState', this.handleSNGetSequencingState.bind(this));
       this.registerHandler('sn:initialize', this.handleSNInitialize.bind(this));
       this.registerHandler('sn:processNavigation', this.handleSNProcessNavigation.bind(this));
+      this.registerHandler('sn:refreshNavigation', this.handleSNRefreshNavigation?.bind(this) || this.handleSNRefreshNavigation);
+
       this.registerHandler('sn:updateActivityProgress', this.handleSNUpdateActivityProgress.bind(this));
       this.registerHandler('sn:reset', this.handleSNReset.bind(this));
       this.registerHandler('sn:handleActivityExit', this.handleSNActivityExit.bind(this));
@@ -1418,25 +1420,25 @@ class IpcHandler extends BaseService {
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
-        this.logger?.warn('IpcHandler: SCORM Service not available, returning fallback structure');
-        return this.createFallbackActivityTree('SCORM service unavailable');
+        this.logger?.warn('IpcHandler: SCORM Service not available; failing fast');
+        return { success: false, error: 'SCORM service unavailable' };
       }
 
       // Get SN service which manages activity trees
       const snService = scormService.snService;
       if (!snService) {
-        this.logger?.warn('IpcHandler: SN service not available, returning fallback structure');
-        return this.createFallbackActivityTree('SN service not initialized');
+        this.logger?.warn('IpcHandler: SN service not available; failing fast');
+        return { success: false, error: 'SN service not initialized' };
       }
 
       if (!snService.activityTreeManager) {
-        this.logger?.warn('IpcHandler: Activity tree manager not available, returning fallback structure');
-        return this.createFallbackActivityTree('Activity tree manager not available');
+        this.logger?.warn('IpcHandler: Activity tree manager not available; failing fast');
+        return { success: false, error: 'Activity tree manager not available' };
       }
 
       if (!snService.activityTreeManager.root) {
-        this.logger?.warn('IpcHandler: Activity tree root not available, returning fallback structure');
-        return this.createFallbackActivityTree('No course loaded');
+        this.logger?.warn('IpcHandler: Activity tree root not available; failing fast');
+        return { success: false, error: 'No course loaded' };
       }
 
       // Get comprehensive activity tree data with SCORM states for course outline
@@ -1445,42 +1447,11 @@ class IpcHandler extends BaseService {
       return { success: true, data: activityTreeData };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleCourseOutlineGetActivityTree failed: ${error.message}`);
-      return this.createFallbackActivityTree(`Error: ${error.message}`);
+      return { success: false, error: `Error: ${error.message}` };
     }
   }
 
-  /**
-   * Create fallback activity tree structure when SN service is unavailable
-   */
-  createFallbackActivityTree(reason) {
-    return {
-      success: true,
-      data: {
-        id: 'fallback-root',
-        title: 'Course Structure Unavailable',
-        type: 'cluster',
-        children: [],
-        scormState: {
-          isVisible: true,
-          controlMode: { choice: true, flow: true, forwardOnly: false },
-          attempted: false,
-          attemptCount: 0,
-          suspended: false,
-          completionStatus: 'not attempted',
-          successStatus: 'unknown',
-          preConditionResult: { action: null, reason: reason },
-          objectives: [],
-          sequencingRules: {
-            hasPreConditionRules: false,
-            hasPostConditionRules: false,
-            hasExitConditionRules: false
-          }
-        }
-      },
-      fallback: true,
-      reason: reason
-    };
-  }
+
 
   /**
    * Get navigation requests analysis for SCORM Inspector

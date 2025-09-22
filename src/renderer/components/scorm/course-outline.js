@@ -228,8 +228,7 @@ class CourseOutline extends BaseComponent {
           rendererLogger.info('CourseOutline: SCORM states updated after SN initialization');
         }).catch(error => {
           rendererLogger.warn('CourseOutline: Failed to fetch SCORM states after SN init', {
-            error: error?.message || error,
-            hasElectronAPI: !!window.electronAPI
+            error: error?.message || error
           });
         });
       } else {
@@ -1124,7 +1123,6 @@ class CourseOutline extends BaseComponent {
         currentScormStatesCount: this.scormStates.size,
         scormStatesLoaded: this.scormStatesLoaded,
         browseModeEnabled: this.browseModeEnabled,
-        hasElectronAPI: (typeof window !== 'undefined') && ('electronAPI' in window),
         hasGetCourseOutlineActivityTree: !!(snb && typeof snb.getCourseOutlineActivityTree === 'function')
       });
 

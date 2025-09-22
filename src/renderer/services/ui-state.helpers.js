@@ -61,7 +61,7 @@ export function safePersistState(persistenceKey, uiSlice) {
     // Guard: localStorage may be unavailable in this protocol/environment
     if (typeof localStorage === 'undefined') {
       try {
-        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
           })
@@ -73,7 +73,7 @@ export function safePersistState(persistenceKey, uiSlice) {
     // Guard: skip persistence when running under the scorm-app custom protocol
     if (window.location?.protocol === 'scorm-app:') {
       try {
-        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
           })
@@ -104,7 +104,7 @@ export function safeLoadPersistedUI(persistenceKey) {
 
     if (typeof localStorage === 'undefined') {
       try {
-        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
           })
@@ -115,7 +115,7 @@ export function safeLoadPersistedUI(persistenceKey) {
 
     if (window.location?.protocol === 'scorm-app:') {
       try {
-        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
           })
@@ -142,7 +142,7 @@ export function safeLoadPersistedUI(persistenceKey) {
     // Swallow but log parse/load issues to renderer logger if available
     try {
       if (typeof window !== 'undefined') {
-        import(`${window.electronAPI?.rendererBaseUrl || ''}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             try { rendererLogger.warn('[UIStateHelpers] safeLoadPersistedUI failed to parse persisted data', { persistenceKey }); } catch (_) {}
           })

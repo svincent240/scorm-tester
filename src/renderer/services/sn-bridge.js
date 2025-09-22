@@ -8,6 +8,8 @@
  * @fileoverview SN service IPC bridge
  */
 
+import { ipcClient } from './ipc-client.js';
+
 /**
  * SN Bridge Class
  *
@@ -36,22 +38,16 @@ class SNBridge {
    */
   async initialize() {
     try {
-      if (!window.electronAPI) {
-        throw new Error('Electron API not available');
-      }
-
-      // Test connection to main process
-      const status = await this.invokeMain('sn:getStatus');
-      if (status.success) {
+      const status = await ipcClient.invoke('sn:getStatus');
+      if (status && status.success) {
         this.isConnected = true;
         try { this.logger.debug('SNBridge: Connected to main process SN service'); } catch (_) {}
         return { success: true };
-      } else {
-        throw new Error('Failed to connect to SN service');
       }
+      throw new Error('Failed to connect to SN service');
     } catch (error) {
       try { this.logger.error('SNBridge: Failed to initialize', error?.message || error); } catch (_) {}
-      return { success: false, error: error.message };
+      return { success: false, error: error?.message || String(error) };
     }
   }
 
@@ -185,13 +181,8 @@ class SNBridge {
    * @private
    */
   async invokeMain(channel, data = {}) {
-    if (!window.electronAPI || !window.electronAPI.invoke) {
-      throw new Error('Electron IPC not available');
-    }
-
     try {
-      const result = await window.electronAPI.invoke(channel, data);
-      return result;
+      return await ipcClient.invoke(channel, data);
     } catch (error) {
       try { this.logger.error(`SNBridge: IPC call failed for ${channel}`, error?.message || error); } catch (_) {}
       throw error;
@@ -212,14 +203,11 @@ class SNBridge {
     return this.sessionId;
   }
   /**
-   * Get course outline activity tree (renderer-safe wrapper)
+   * Get course outline activity tree
    */
   async getCourseOutlineActivityTree() {
     try {
-      if (window.electronAPI?.getCourseOutlineActivityTree) {
-        return await window.electronAPI.getCourseOutlineActivityTree();
-      }
-      return { success: false, error: 'getCourseOutlineActivityTree not available' };
+      return await ipcClient.invoke('course-outline-get-activity-tree');
     } catch (error) {
       try { this.logger.error('SNBridge: getCourseOutlineActivityTree failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -227,14 +215,11 @@ class SNBridge {
   }
 
   /**
-   * Get available navigation options (renderer-safe wrapper)
+   * Get available navigation options
    */
   async getCourseOutlineAvailableNavigation() {
     try {
-      if (window.electronAPI?.getCourseOutlineAvailableNavigation) {
-        return await window.electronAPI.getCourseOutlineAvailableNavigation();
-      }
-      return { success: false, error: 'getCourseOutlineAvailableNavigation not available' };
+      return await ipcClient.invoke('course-outline-get-available-navigation');
     } catch (error) {
       try { this.logger.error('SNBridge: getCourseOutlineAvailableNavigation failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -246,23 +231,17 @@ class SNBridge {
    */
   async validateCourseOutlineChoice(activityId) {
     try {
-      if (window.electronAPI?.validateCourseOutlineChoice) {
-        return await window.electronAPI.validateCourseOutlineChoice(activityId);
-      }
-      return { success: false, allowed: false, reason: 'validateCourseOutlineChoice not available' };
+      return await ipcClient.invoke('course-outline-validate-choice', { targetActivityId: activityId });
     } catch (error) {
       try { this.logger.error('SNBridge: validateCourseOutlineChoice failed', error?.message || error); } catch (_) {}
       return { success: false, allowed: false, reason: error?.message || String(error) };
     }
   }
 
-  /** Inspector data getters (renderer-safe wrappers) */
+  /** Inspector data getters */
   async getScormInspectorHistory() {
     try {
-      if (window.electronAPI?.getScormInspectorHistory) {
-        return await window.electronAPI.getScormInspectorHistory();
-      }
-      return { success: false, error: 'getScormInspectorHistory not available' };
+      return await ipcClient.invoke('scorm-inspector-get-history');
     } catch (error) {
       try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -271,10 +250,7 @@ class SNBridge {
 
   async getScormDataModel() {
     try {
-      if (window.electronAPI?.getScormDataModel) {
-        return await window.electronAPI.getScormDataModel();
-      }
-      return { success: false, error: 'getScormDataModel not available' };
+      return await ipcClient.invoke('scorm-inspector-get-data-model');
     } catch (error) {
       try { this.logger.error('SNBridge: getScormDataModel failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -283,10 +259,7 @@ class SNBridge {
 
   async getSnState() {
     try {
-      if (window.electronAPI?.getSnState) {
-        return await window.electronAPI.getSnState();
-      }
-      return { success: false, error: 'getSnState not available' };
+      return await ipcClient.invoke('scorm-inspector-get-sn-state');
     } catch (error) {
       try { this.logger.error('SNBridge: getSnState failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -295,10 +268,7 @@ class SNBridge {
 
   async getActivityTree() {
     try {
-      if (window.electronAPI?.getActivityTree) {
-        return await window.electronAPI.getActivityTree();
-      }
-      return { success: false, error: 'getActivityTree not available' };
+      return await ipcClient.invoke('scorm-inspector-get-activity-tree');
     } catch (error) {
       try { this.logger.error('SNBridge: getActivityTree failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -307,10 +277,7 @@ class SNBridge {
 
   async getNavigationRequests() {
     try {
-      if (window.electronAPI?.getNavigationRequests) {
-        return await window.electronAPI.getNavigationRequests();
-      }
-      return { success: false, error: 'getNavigationRequests not available' };
+      return await ipcClient.invoke('scorm-inspector-get-navigation-requests');
     } catch (error) {
       try { this.logger.error('SNBridge: getNavigationRequests failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -319,10 +286,7 @@ class SNBridge {
 
   async getGlobalObjectives() {
     try {
-      if (window.electronAPI?.getGlobalObjectives) {
-        return await window.electronAPI.getGlobalObjectives();
-      }
-      return { success: false, error: 'getGlobalObjectives not available' };
+      return await ipcClient.invoke('scorm-inspector-get-global-objectives');
     } catch (error) {
       try { this.logger.error('SNBridge: getGlobalObjectives failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -331,10 +295,7 @@ class SNBridge {
 
   async getSSPBuckets() {
     try {
-      if (window.electronAPI?.getSSPBuckets) {
-        return await window.electronAPI.getSSPBuckets();
-      }
-      return { success: false, error: 'getSSPBuckets not available' };
+      return await ipcClient.invoke('scorm-inspector-get-ssp-buckets');
     } catch (error) {
       try { this.logger.error('SNBridge: getSSPBuckets failed', error?.message || error); } catch (_) {}
       return { success: false, error: error?.message || String(error) };
@@ -344,8 +305,8 @@ class SNBridge {
   /** Subscribe to main-pushed inspector updates */
   onScormInspectorDataUpdated(handler) {
     try {
-      if (window.electronAPI?.onScormInspectorDataUpdated && typeof handler === 'function') {
-        return window.electronAPI.onScormInspectorDataUpdated(handler);
+      if (typeof handler === 'function') {
+        return ipcClient.onScormInspectorDataUpdated(handler);
       }
     } catch (_) {}
     return () => {};

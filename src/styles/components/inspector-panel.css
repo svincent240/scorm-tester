@@ -4,6 +4,7 @@
   position: relative;
   background: var(--bg-primary);
   border-top: 1px solid var(--border-color);
+  z-index: var(--z-inspector, 10);
 }
 
 .inspector-panel__container {
@@ -58,6 +59,9 @@
 
 .inspector-panel__body {
   padding-top: var(--spacing-sm);
+  max-height: min(40vh, 480px);
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .inspector-panel__summary {

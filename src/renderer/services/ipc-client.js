@@ -115,6 +115,112 @@ class IpcClient {
     return api.recentCourses.addOrUpdate(item);
   }
 
+  // Event subscriptions
+  onActivityProgressUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onActivityProgressUpdated !== 'function') {
+      throw new Error('electronAPI.onActivityProgressUpdated not available');
+    }
+    return api.onActivityProgressUpdated(handler);
+  }
+
+  onObjectivesUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onObjectivesUpdated !== 'function') {
+      throw new Error('electronAPI.onObjectivesUpdated not available');
+    }
+    return api.onObjectivesUpdated(handler);
+  }
+
+  onNavigationCompleted(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onNavigationCompleted !== 'function') {
+      throw new Error('electronAPI.onNavigationCompleted not available');
+    }
+    return api.onNavigationCompleted(handler);
+  }
+
+  onScormApiCallLogged(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormApiCallLogged !== 'function') {
+      throw new Error('electronAPI.onScormApiCallLogged not available');
+    }
+    return api.onScormApiCallLogged(handler);
+  }
+
+  onScormInspectorDataUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormInspectorDataUpdated !== 'function') {
+      throw new Error('electronAPI.onScormInspectorDataUpdated not available');
+    }
+    return api.onScormInspectorDataUpdated(handler);
+  }
+  onNavigationAvailabilityUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onNavigationAvailabilityUpdated !== 'function') {
+      throw new Error('electronAPI.onNavigationAvailabilityUpdated not available');
+    }
+    return api.onNavigationAvailabilityUpdated(handler);
+  }
+
+  // SCORM typed helpers (preserve positional arg shapes exposed by preload)
+  async scormInitialize(sessionId, options = {}) {
+    const api = this._ensureAPI();
+    if (typeof api.scormInitialize !== 'function') {
+      throw new Error('electronAPI.scormInitialize not available');
+    }
+    return api.scormInitialize(sessionId, options);
+  }
+
+  async scormGetProgressSnapshot(sessionId) {
+    const api = this._ensureAPI();
+    if (typeof api.scormGetProgressSnapshot !== 'function') {
+      throw new Error('electronAPI.scormGetProgressSnapshot not available');
+    }
+    return api.scormGetProgressSnapshot(sessionId);
+  }
+
+  async scormTerminate(sessionId) {
+    const api = this._ensureAPI();
+    if (typeof api.scormTerminate !== 'function') {
+      throw new Error('electronAPI.scormTerminate not available');
+    }
+    return api.scormTerminate(sessionId);
+  }
+
+  async scormGetValue(sessionId, element) {
+    const api = this._ensureAPI();
+    if (typeof api.scormGetValue !== 'function') {
+      throw new Error('electronAPI.scormGetValue not available');
+    }
+    return api.scormGetValue(sessionId, element);
+  }
+
+  async scormSetValue(sessionId, element, value) {
+    const api = this._ensureAPI();
+    if (typeof api.scormSetValue !== 'function') {
+      throw new Error('electronAPI.scormSetValue not available');
+    }
+    return api.scormSetValue(sessionId, element, value);
+  }
+
+  async scormSetValuesBatch(sessionId, batch) {
+    const api = this._ensureAPI();
+    if (typeof api.scormSetValuesBatch !== 'function') {
+      throw new Error('electronAPI.scormSetValuesBatch not available');
+    }
+    return api.scormSetValuesBatch(sessionId, batch);
+  }
+
+  async scormCommit(sessionId) {
+    const api = this._ensureAPI();
+    if (typeof api.scormCommit !== 'function') {
+      throw new Error('electronAPI.scormCommit not available');
+    }
+    return api.scormCommit(sessionId);
+  }
+
+
 }
 
 const ipcClient = new IpcClient();

@@ -31,12 +31,7 @@ class BaseComponent {
     this.childComponents = new Map();
     this.unsubscribeFunctions = [];
 
-    // Provide a safe rendererBaseUrl fallback for test environments where preload may not be present.
-    // In production the preload sets window.electronAPI.rendererBaseUrl; tests can run with './' base.
-    this.rendererBaseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
-      ? window.electronAPI.rendererBaseUrl
-      : './';
-
+    // Initialize bound methods
     this.bindMethods();
   }
 
@@ -121,8 +116,8 @@ class BaseComponent {
    */
   async loadDependencies() {
     try {
-      this.eventBus = (await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`)).eventBus;
-      this.uiState = await (await import(`${window.electronAPI.rendererBaseUrl}services/ui-state.js`)).uiState;
+      this.eventBus = (await import('../services/event-bus.js')).eventBus;
+      this.uiState = await (await import('../services/ui-state.js')).uiState;
     } catch (error) {
       try {
         import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
@@ -349,7 +344,7 @@ class BaseComponent {
   emit(event, data = null) {
     if (!this.eventBus) {
       try {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.warn(`[${this.constructor.name}] EventBus not loaded. Cannot emit event: ${event}`);
         });
       } catch (_) {
@@ -514,9 +509,11 @@ class BaseComponent {
 
     if (typeof selector === 'string') {
       if (selector.startsWith('#') || selector.startsWith('.')) {
-        element = document.querySelector(selector);
+        const doc = globalThis['document'];
+        element = doc ? doc.querySelector(selector) : null;
       } else {
-        element = document.getElementById(selector);
+        const doc2 = globalThis['document'];
+        element = doc2 ? doc2.getElementById(selector) : null;
       }
     }
 
@@ -538,8 +535,8 @@ class BaseComponent {
         const parent = this.options.parent
           ? (typeof this.options.parent === 'string'
               ? (this.options.parent.startsWith('#') || this.options.parent.startsWith('.')
-                  ? document.querySelector(this.options.parent)
-                  : document.getElementById(this.options.parent))
+                  ? (globalThis['document'] ? globalThis['document'].querySelector(this.options.parent) : null)
+                  : (globalThis['document'] ? globalThis['document'].getElementById(this.options.parent) : null))
               : this.options.parent)
           : document.body;
 
@@ -691,9 +688,9 @@ class BaseComponent {
         duration: 0 // Persistent until dismissed
       });
     } else {
-      // Fallback to app log even if uiState not available
+      // Log to app log even if uiState not available
       try {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
         });
       } catch (_) {
@@ -703,7 +700,7 @@ class BaseComponent {
 
     // Log via renderer logger to app log as single source of truth
     try {
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.error(`[${this.constructor.name}] ${title}`, message);
       });
     } catch (_) {
@@ -717,7 +714,7 @@ class BaseComponent {
     }
 
     // Remove the dynamically injected style if it exists
-    const oldStyle = document.querySelector('#component-error-styles');
+    const oldStyle = (globalThis['document'] ? globalThis['document'].querySelector('#component-error-styles') : null);
     if (oldStyle) {
       oldStyle.remove();
     }

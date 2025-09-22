@@ -36,7 +36,6 @@ class CourseLoader {
       })
       .catch((error) => {
         // Fallback to a no-op logger to satisfy no-console policy
-        try { window.electronAPI?.logger?.warn?.('CourseLoader: Failed to load renderer logger', error?.message || String(error)); } catch (_) {}
         this.logger = { info: ()=>{}, warn: ()=>{}, error: ()=>{}, debug: ()=>{} };
       });
   }
@@ -604,10 +603,6 @@ class CourseLoader {
    */
   async createTempFileFromBlob(file) {
     try {
-      if (!window.electronAPI || !window.electronAPI.saveTemporaryFile) {
-        throw new Error('Electron API for saving temporary files not available');
-      }
-
       // Read file as ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
       // Convert ArrayBuffer to Base64 string (browser-safe helper)

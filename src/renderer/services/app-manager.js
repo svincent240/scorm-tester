@@ -52,10 +52,7 @@ class AppManager {
 
     // Initialize logger asynchronously but safely
     try {
-      const baseUrl = (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.rendererBaseUrl)
-        ? window.electronAPI.rendererBaseUrl
-        : 'scorm-app://app/src/renderer/';
-      import(`${baseUrl}utils/renderer-logger.js`)
+      import('../utils/renderer-logger.js')
         .then(({ rendererLogger }) => {
           if (rendererLogger) {
             this.logger = rendererLogger;
@@ -678,8 +675,8 @@ class AppManager {
     // CRITICAL FIX: Handle navigation availability updates from main process
     // This propagates navigation changes when activities complete
     // Use preload bridge instead of eventBus since navigation events are blocked by eventBus validation
-    if (window.electronAPI && window.electronAPI.onNavigationAvailabilityUpdated) {
-      window.electronAPI.onNavigationAvailabilityUpdated((data) => {
+    try {
+      ipcClient.onNavigationAvailabilityUpdated((data) => {
         try {
           this.logger.info('AppManager: RECEIVED navigation:availability:updated event via preload bridge', {
             data,
@@ -729,8 +726,8 @@ class AppManager {
           });
         }
       });
-    } else {
-      this.logger.warn('AppManager: Navigation availability preload bridge not available');
+    } catch (err) {
+      try { this.logger?.warn('AppManager: Navigation availability preload bridge not available'); } catch (_) {}
     }
   }
 
@@ -817,8 +814,6 @@ class AppManager {
     try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) {}
 
     try {
-      // Reset fallback notification flag for new course
-      this._fallbackNotificationShown = false;
 
       // Update components with course data
       const contentViewer = this.components.get('contentViewer');
@@ -990,20 +985,7 @@ class AppManager {
     });
   }
 
-  /**
-   * Show fallback navigation notification
-   * BUG-006 FIX: Inform user when advanced navigation is unavailable
-   */
-  showFallbackNotification() {
-    if (!this._fallbackNotificationShown) {
-      this._fallbackNotificationShown = true;
-      this.uiState.showNotification({
-        message: 'Advanced navigation unavailable, using basic mode',
-        type: 'warning',
-        duration: 8000 // Auto-dismiss after 8 seconds
-      });
-    }
-  }
+
 
   /**
    * Get service instance
@@ -1362,7 +1344,7 @@ class AppManager {
 
       if (enabled) {
         // Enable browse mode via IPC
-        const result = await window.electronAPI.invoke('browse-mode-enable', {
+        const result = await ipcClient.invoke('browse-mode-enable', {
           navigationUnrestricted: true,
           trackingDisabled: true,
           dataIsolation: true,
@@ -1385,7 +1367,7 @@ class AppManager {
 
       } else {
         // Disable browse mode via IPC
-        const result = await window.electronAPI.invoke('browse-mode-disable');
+        const result = await ipcClient.invoke('browse-mode-disable');
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to disable browse mode');
@@ -1462,7 +1444,7 @@ class AppManager {
    */
   async refreshNavigationFromSNService() {
     try {
-      const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
+      const snBridgeModule = await import('./sn-bridge.js');
       const snBridge = snBridgeModule.snBridge;
 
       const state = await snBridge.getSequencingState();
@@ -1621,16 +1603,15 @@ class AppManager {
   async processThroughSNService(requestType, activityId, activityObject) {
     try {
       // Get SN bridge
-      const snBridgeModule = await import(`${window.electronAPI.rendererBaseUrl}services/sn-bridge.js`);
+      const snBridgeModule = await import('./sn-bridge.js');
       const snBridge = snBridgeModule.snBridge;
 
       // Initialize if needed
       const init = await snBridge.initialize().catch(() => ({ success: false }));
 
       if (!init || !init.success) {
-        this.logger.warn('AppManager: SN service unavailable, trying fallback');
-        this.showFallbackNotification();
-        return await this.processFallbackNavigation(requestType, activityId, activityObject);
+        this.logger.warn('AppManager: SN service unavailable; navigation unavailable (fail-fast)');
+        return { success: false, reason: 'SN service unavailable' };
       }
 
       // Process through SN service
@@ -1639,15 +1620,13 @@ class AppManager {
       if (result && result.success) {
         return result;
       } else {
-        this.logger.warn('AppManager: SN processing failed, trying fallback', result?.reason);
-        this.showFallbackNotification();
-        return await this.processFallbackNavigation(requestType, activityId, activityObject);
+        this.logger.warn('AppManager: SN processing failed (fail-fast)', result?.reason);
+        return { success: false, reason: result?.reason || 'SN processing failed' };
       }
 
     } catch (error) {
-      this.logger.error('AppManager: Error in SN processing, trying fallback', error);
-      this.showFallbackNotification();
-      return await this.processFallbackNavigation(requestType, activityId, activityObject);
+      this.logger.error('AppManager: Error in SN processing (fail-fast)', error);
+      return { success: false, reason: 'SN processing error', error: error.message };
     }
   }
 
@@ -1703,52 +1682,7 @@ class AppManager {
     }
   }
 
-  /**
-   * BUG-003 FIX: Process fallback navigation (simplified)
-   */
-  async processFallbackNavigation(requestType, activityId, _activityObject) {
-    try {
-      // Simple fallback for when SN service is unavailable
-      if (requestType === 'choice' && activityId) {
-        // Try to find activity in course structure
-        const structure = this.uiState.getState('courseStructure');
-        const target = this._findItemById(structure, activityId);
 
-        if (target && target.launchUrl) {
-          return {
-            success: true,
-            action: 'launch',
-            targetActivity: target,
-            availableNavigation: ['previous', 'continue'], // Heuristic
-            source: 'fallback-choice'
-          };
-        }
-      }
-
-      return {
-        success: false,
-        reason: `Fallback navigation not available for ${requestType}`,
-        fallback: true
-      };
-    } catch (error) {
-      // BUG-024 FIX: Emit navigation error event
-      const eventBus = this.services.get('eventBus');
-      if (eventBus) {
-        eventBus.emit('navigation:error', {
-          error: error.message,
-          source: 'AppManager',
-          context: 'processFallbackNavigation'
-        });
-      }
-
-      return {
-        success: false,
-        reason: 'Fallback navigation error',
-        error: error.message,
-        fallback: true
-      };
-    }
-  }
 
   /**
    * BUG-003 FIX: Update navigation state from result
@@ -1833,7 +1767,7 @@ class AppManager {
       }
 
       // Call SN service to handle activity exit
-      const result = await window.electronAPI.invoke('sn:handleActivityExit', {
+      const result = await ipcClient.invoke('sn:handleActivityExit', {
         activityId,
         exitType
       });
@@ -1863,7 +1797,7 @@ class AppManager {
       }
 
       // Call SN service to update activity location
-      const result = await window.electronAPI.invoke('sn:updateActivityLocation', {
+      const result = await ipcClient.invoke('sn:updateActivityLocation', {
         activityId,
         location
       });
@@ -1907,7 +1841,7 @@ class AppManager {
     }
 
     // Lazy-load store to avoid circular deps
-    const { recentCoursesStore } = await import(`${window.electronAPI.rendererBaseUrl}services/recent-courses.js`);
+    const { recentCoursesStore } = await import('./recent-courses.js');
     // Ensure the store has loaded its data from the main process
     await recentCoursesStore.ensureLoaded(); // Await initial load via public API
 

@@ -16,6 +16,8 @@
 import { eventBus } from './event-bus.js';
 import { sanitizeParam } from '../utils/payload-sanitizer.js';
 
+import { ipcClient } from './ipc-client.js';
+
 /**
  * SCORM Client Class
  *
@@ -63,7 +65,7 @@ class ScormClient {
   async loadValidator() {
     try {
       // Dynamic import of ES6 renderer validator
-      const validatorModule = await import(`${window.electronAPI.rendererBaseUrl}utils/scorm-validator.js`);
+      const validatorModule = await import('../utils/scorm-validator.js');
 
       this.validator = {
         isValidElement: validatorModule.isValidElement,
@@ -71,7 +73,7 @@ class ScormClient {
       };
     } catch (error) {
       try {
-        const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
         rendererLogger.error('Failed to load validator module', error?.message || error);
       } catch (_) {
         // no-op
@@ -344,14 +346,14 @@ class ScormClient {
    */
   async asyncInitialize(sessionId) {
     try {
-      const result = await window.electronAPI.scormInitialize(sessionId);
+      const result = await ipcClient.scormInitialize(sessionId);
       if (result.success) {
         // Pre-populate cache with common elements
         await this.preloadCommonElements();
 
         // Fetch a centralized progress snapshot from main and update UI state
         try {
-          const snap = await window.electronAPI.scormGetProgressSnapshot(sessionId);
+          const snap = await ipcClient.scormGetProgressSnapshot(sessionId);
           if (snap && snap.success && snap.data) {
             const d = snap.data;
             this.uiState.updateProgress({
@@ -392,7 +394,7 @@ class ScormClient {
     }
     try {
       if (this.sessionId) {
-        await window.electronAPI.scormTerminate(this.sessionId);
+        await ipcClient.scormTerminate(this.sessionId);
       }
     } catch (error) {
       const msg = (error && error.message) ? error.message : String(error);
@@ -412,7 +414,7 @@ class ScormClient {
    */
   async asyncGetValue(element) {
     try {
-      const result = await window.electronAPI.scormGetValue(this.sessionId, element);
+      const result = await ipcClient.scormGetValue(this.sessionId, element);
       if (result.success) {
         this.localCache.set(element, result.value);
         this.updateUIFromElement(element, result.value);
@@ -433,7 +435,7 @@ class ScormClient {
    */
   async asyncSetValue(element, value) {
     try {
-      const result = await window.electronAPI.scormSetValue(this.sessionId, element, value);
+      const result = await ipcClient.scormSetValue(this.sessionId, element, value);
       if (!result.success) {
         // Silent failure path; renderer cache already updated
       }
@@ -475,7 +477,7 @@ class ScormClient {
     if (!batch.length || !this.sessionId) return;
     try {
       // best-effort; renderer cache already updated
-      await window.electronAPI.scormSetValuesBatch(this.sessionId, batch);
+      await ipcClient.scormSetValuesBatch(this.sessionId, batch);
     } catch (e) {
       // swallow to keep UI smooth
     }
@@ -504,7 +506,7 @@ class ScormClient {
     if (this._finalizing) return;
     this._finalizing = true;
     try {
-      const result = await window.electronAPI.scormCommit(this.sessionId);
+      const result = await ipcClient.scormCommit(this.sessionId);
       if (!result.success) {
         // Silent failure; commit retries are not critical here
       }
@@ -546,7 +548,7 @@ class ScormClient {
 
     for (const element of commonElements) {
       try {
-        const result = await window.electronAPI.scormGetValue(this.sessionId, element);
+        const result = await ipcClient.scormGetValue(this.sessionId, element);
         if (result.success) {
           this.localCache.set(element, result.value);
         }
@@ -614,7 +616,7 @@ class ScormClient {
 
       if (is404 && isAdlDataProbe) {
         // Log as WARN to the centralized renderer logger and suppress 'scorm:error' event emission
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
+        import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
             rendererLogger?.warn('[RTE] Ignoring undefined ADL data model probe', {
               element,

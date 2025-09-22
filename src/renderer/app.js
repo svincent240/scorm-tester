@@ -74,43 +74,10 @@ async function waitForElectronAPI() {
  * Set up SCORM event forwarding from IPC to Event Bus
  */
 async function setupScormEventForwarding() {
-  // Import renderer logger for proper logging
   const { rendererLogger } = await import('./utils/renderer-logger.js');
-
   try {
-    // Import event bus dynamically
-    const { eventBus } = await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`);
-
-    // Forward activity progress updates
-    window.electronAPI.onActivityProgressUpdated((data) => {
-      eventBus.emit('activity:progress:updated', data);
-    });
-
-    // Forward objectives updates
-    window.electronAPI.onObjectivesUpdated((data) => {
-      eventBus.emit('objectives:updated', data);
-    });
-
-    // Forward navigation completion events
-    window.electronAPI.onNavigationCompleted((data) => {
-      eventBus.emit('navigation:completed', data);
-    });
-
-    // Forward SCORM API call logs (for sn:initialized detection)
-    window.electronAPI.onScormApiCallLogged((data) => {
-      // Check if this is an sn:initialized event
-      if (data && data.event === 'sn:initialized') {
-        eventBus.emit('sn:initialized', data);
-      }
-    });
-
-    // Forward course outline refresh events
-    window.electronAPI.onScormInspectorDataUpdated((data) => {
-      if (data && data.type === 'course-outline:refresh-required') {
-        eventBus.emit('course-outline:refresh-required', data);
-      }
-    });
-
+    const { initialize: initForwarder } = await import('./services/ipc-events-forwarder.js');
+    await initForwarder();
     rendererLogger.info('SCORM event forwarding initialized successfully');
   } catch (error) {
     rendererLogger.error('Failed to initialize SCORM event forwarding:', error);
@@ -128,11 +95,11 @@ async function initializeApplication() {
     // Set up SCORM event forwarding
     await setupScormEventForwarding();
 
-    // Use dynamic import to load the AppManager with absolute path
-    const { appManager } = await import(`${window.electronAPI.rendererBaseUrl}services/app-manager.js`);
+    // Import AppManager via relative path
+    const { appManager } = await import('./services/app-manager.js');
 
     if (!appManager) {
-      throw new Error('AppManager not available - check dynamic import');
+      throw new Error('AppManager not available - check import path');
     }
 
     // Initialize the application through AppManager

@@ -580,7 +580,7 @@ class UIStateSingleton {
       const { showNotification, removeNotification } = await import('./ui-state.notifications.js');
       // setupDebugMirroring removed - using SCORM Inspector architecture for content analysis
 
-      const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
+      const { rendererLogger } = await import('../utils/renderer-logger.js');
       this.instance = new UIStateManager({
         deepMerge, getNestedValue, setNestedValue, safeLoadPersistedUI, safePersistState,
         getInitialUIState, showNotification, removeNotification,
@@ -588,7 +588,7 @@ class UIStateSingleton {
       });
 
       // Load EventBus synchronously to avoid timing issues
-      const eventBusModule = await import(`${window.electronAPI.rendererBaseUrl}services/event-bus.js`);
+      const eventBusModule = await import('./event-bus.js');
       this.instance.eventBus = eventBusModule.eventBus;
       this.instance.setupEventBusListeners();
       // Initialize the state after all helpers are loaded
@@ -600,7 +600,7 @@ class UIStateSingleton {
     } catch (error) {
       let localRendererLogger = { error: () => {}, info: () => {}, debug: () => {}, warn: () => {} }; // Default no-op logger
       try {
-        const { rendererLogger } = await import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`);
+        const { rendererLogger } = await import('../utils/renderer-logger.js');
         localRendererLogger = rendererLogger;
         localRendererLogger.error('UIStateManager: Failed to initialize:', error);
       } catch (_) { /* no-op */ }
@@ -614,9 +614,9 @@ class UIStateSingleton {
 
 // Create singleton
 const uiStateSingleton = new UIStateSingleton();
-// Do NOT auto-initialize in non-renderer or when Electron rendererBaseUrl is not available (prevents async imports during tests)
+// Do NOT auto-initialize in non-renderer environments (prevents async imports during tests)
 let uiState = null;
-if (typeof window !== 'undefined' && window?.electronAPI?.rendererBaseUrl) {
+if (typeof window !== 'undefined') {
   uiState = uiStateSingleton.getInstance();
 }
 
