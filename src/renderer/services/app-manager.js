@@ -149,6 +149,9 @@ class AppManager {
         }
       } catch (_) {}
 
+      // Render recent courses on initial welcome screen if container exists
+      try { await this.renderRecentCourses(); } catch (e) { try { this.logger.error('AppManager: renderRecentCourses failed', e?.message || e); } catch (_) {} }
+
       // Emit initialization complete event
       eventBus.emit('app:initialized');
 
@@ -225,6 +228,7 @@ class AppManager {
               </div>
             </aside>
             <section class="app-content">
+              <div id="recent-courses"></div>
               <div id="content-viewer"></div>
               <div id="inspector-panel"></div>
             </section>
@@ -384,6 +388,16 @@ class AppManager {
 
    // Mark as set up exactly once
    this._eventHandlersSetup = true;
+
+  // Bridge unified menu events to the same intent path as header buttons
+  try {
+    ipcClient.onMenuEvent((payload) => {
+      const action = (payload && payload.action) || payload;
+      if (action === 'menu-load-package') {
+        eventBus.emit('course:open-zip:request');
+      }
+    });
+  } catch (_) {}
 
 
     eventBus.on('course:loadError', (errorData) => {
@@ -859,6 +873,13 @@ class AppManager {
       if (reloadBtn) {
         reloadBtn.disabled = false;
         reloadBtn.title = 'Reload Current Course';
+
+	      // Hide recent courses panel when a course is loaded
+	      try {
+	        const rc = document.getElementById('recent-courses');
+	        if (rc) rc.style.display = 'none';
+	      } catch (_) {}
+
       }
 
       // Show success message
@@ -873,6 +894,17 @@ class AppManager {
    * Handle course cleared event
    */
   handleCourseCleared() {
+
+      // Show and refresh recent courses when no course is loaded
+      try {
+        const rc = document.getElementById('recent-courses');
+        if (rc) {
+          rc.style.removeProperty('display');
+          // Re-render to reflect latest MRU
+          this.renderRecentCourses().catch(() => {});
+        }
+      } catch (_) {}
+
     try {
       // Disable reload button since no course is loaded
       const reloadBtn = document.getElementById('course-reload-btn');

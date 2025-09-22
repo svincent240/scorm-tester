@@ -113,7 +113,7 @@ class FileManager extends BaseService {
    * Select SCORM package file dialog
    * @returns {Promise<Object>} Result object with success and filePath properties
    */
-  async selectScormPackage() {
+  async selectScormPackage(options = {}) {
     try {
       this.logger?.info('FileManager: Opening SCORM package selection dialog');
 
@@ -124,13 +124,21 @@ class FileManager extends BaseService {
         cwd: process.cwd()
       });
 
-      const result = await dialog.showOpenDialog({
+      const dialogOptions = {
         properties: ['openFile'],
         filters: [
           { name: 'SCORM Packages', extensions: ['zip'] },
           { name: 'All Files', extensions: ['*'] }
         ]
-      });
+      };
+      try {
+        if (options && options.defaultPath && fs.existsSync(options.defaultPath)) {
+          dialogOptions.defaultPath = options.defaultPath;
+          this.logger?.info('FileManager: Using defaultPath for package dialog', options.defaultPath);
+        }
+      } catch (_) {}
+
+      const result = await dialog.showOpenDialog(dialogOptions);
 
       this.logger?.info('FileManager: Dialog result:', {
         canceled: result.canceled,
@@ -180,13 +188,21 @@ class FileManager extends BaseService {
    * Select a SCORM course folder (unzipped) ensuring imsmanifest.xml exists.
    * @returns {Promise<Object>} Result object with success and folderPath
    */
-  async selectScormFolder() {
+  async selectScormFolder(options = {}) {
     try {
       this.logger?.info('FileManager: Opening SCORM folder selection dialog');
 
-      const result = await dialog.showOpenDialog({
+      const dialogOptions = {
         properties: ['openDirectory']
-      });
+      };
+      try {
+        if (options && options.defaultPath && fs.existsSync(options.defaultPath)) {
+          dialogOptions.defaultPath = options.defaultPath;
+          this.logger?.info('FileManager: Using defaultPath for folder dialog', options.defaultPath);
+        }
+      } catch (_) {}
+
+      const result = await dialog.showOpenDialog(dialogOptions);
 
       if (result.canceled || result.filePaths.length === 0) {
         this.logger?.info('FileManager: SCORM folder selection cancelled');

@@ -44,13 +44,13 @@ describe('HeaderControls Component', () => {
   test('should render all control buttons', () => {
     expect(rootElement.querySelector('#hc-open-zip')).not.toBeNull();
     expect(rootElement.querySelector('#hc-open-folder')).not.toBeNull();
-    expect(rootElement.querySelector('#hc-reload')).not.toBeNull();
+    expect(rootElement.querySelector('#course-reload-btn')).not.toBeNull();
     expect(rootElement.querySelector('#hc-inspector')).not.toBeNull();
     expect(rootElement.querySelector('#hc-theme')).not.toBeNull();
   });
 
   test('should have the Reload button disabled by default', () => {
-    const reloadBtn = rootElement.querySelector('#hc-reload');
+    const reloadBtn = rootElement.querySelector('#course-reload-btn');
     expect(reloadBtn.disabled).toBe(true);
   });
 
@@ -75,7 +75,7 @@ describe('HeaderControls Component', () => {
   });
 
   test('should enable the Reload button on a "course:loaded" event', () => {
-    const reloadBtn = rootElement.querySelector('#hc-reload');
+    const reloadBtn = rootElement.querySelector('#course-reload-btn');
     expect(reloadBtn.disabled).toBe(true);
 
     // Simulate event from another service
@@ -85,7 +85,7 @@ describe('HeaderControls Component', () => {
   });
 
   test('should disable the Reload button on a "course:cleared" event', () => {
-    const reloadBtn = rootElement.querySelector('#hc-reload');
+    const reloadBtn = rootElement.querySelector('#course-reload-btn');
     // First, enable it
     eventBus.emit('course:loaded');
     expect(reloadBtn.disabled).toBe(false);
@@ -97,7 +97,7 @@ describe('HeaderControls Component', () => {
   });
 
   test('should emit "course:reload:request" when the enabled Reload button is clicked', () => {
-    const reloadBtn = rootElement.querySelector('#hc-reload');
+    const reloadBtn = rootElement.querySelector('#course-reload-btn');
     eventBus.emit('course:loaded'); // Enable the button
     
     reloadBtn.click();

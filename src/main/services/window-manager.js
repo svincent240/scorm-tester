@@ -122,9 +122,6 @@ class WindowManager extends BaseService {
 
         this.menuBuilder.createApplicationMenu(mainWindow);
 
-        if (process.env.NODE_ENV === 'development') {
-          mainWindow.webContents.openDevTools();
-        }
 
         mainWindow.show();
 

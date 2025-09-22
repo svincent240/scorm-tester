@@ -809,7 +809,22 @@ class IpcHandler extends BaseService {
   // File operation handlers
   async handleSelectScormPackage(event) {
     const fileManager = this.getDependency('fileManager');
-    return await fileManager.selectScormPackage();
+    try {
+      const recentService = this.getDependency('recentCoursesService');
+      let defaultPath = null;
+      if (recentService && typeof recentService.getRecents === 'function') {
+        const recents = await recentService.getRecents();
+        if (Array.isArray(recents)) {
+          const recentZip = recents.find(r => r && r.type === 'zip' && r.path);
+          if (recentZip) {
+            defaultPath = path.dirname(recentZip.path);
+          }
+        }
+      }
+      return await fileManager.selectScormPackage({ defaultPath });
+    } catch (_) {
+      return await fileManager.selectScormPackage();
+    }
   }
 
   async handleSelectScormFolder(event) {
@@ -818,7 +833,22 @@ class IpcHandler extends BaseService {
       this.logger?.error('IpcHandler: FileManager.selectScormFolder not available');
       return { success: false, error: 'FileManager.selectScormFolder not available' };
     }
-    return await fileManager.selectScormFolder();
+    try {
+      const recentService = this.getDependency('recentCoursesService');
+      let defaultPath = null;
+      if (recentService && typeof recentService.getRecents === 'function') {
+        const recents = await recentService.getRecents();
+        if (Array.isArray(recents)) {
+          const recentFolder = recents.find(r => r && r.type === 'folder' && r.path);
+          if (recentFolder) {
+            defaultPath = recentFolder.path;
+          }
+        }
+      }
+      return await fileManager.selectScormFolder({ defaultPath });
+    } catch (_) {
+      return await fileManager.selectScormFolder();
+    }
   }
 
   async handleExtractScorm(event, zipPath) {

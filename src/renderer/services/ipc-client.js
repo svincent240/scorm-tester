@@ -116,6 +116,14 @@ class IpcClient {
   }
 
   // Event subscriptions
+  onMenuEvent(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onMenuEvent !== 'function') {
+      throw new Error('electronAPI.onMenuEvent not available');
+    }
+    return api.onMenuEvent(handler);
+  }
+
   onActivityProgressUpdated(handler) {
     const api = this._ensureAPI();
     if (typeof api.onActivityProgressUpdated !== 'function') {
