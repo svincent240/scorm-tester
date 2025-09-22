@@ -98,6 +98,8 @@ class InspectorPanel extends BaseComponent {
 
     // Initial tab render
 
+    }
+
   setActiveTab(tab) {
     const allowed = ['api','tree','objectives','ssp','model','sn'];
     const next = allowed.includes(tab) ? tab : 'api';

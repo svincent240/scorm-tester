@@ -388,7 +388,7 @@ module.exports = [
       useIpcResult: true
     }
   },
-  },
+
   {
     channel: 'scorm-inspector-get-data-model',
     handlerName: 'handleScormInspectorGetDataModel',
