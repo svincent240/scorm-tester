@@ -81,11 +81,40 @@ function ensureIpcHandlers() {
         if (sn && typeof sn.reset === 'function') sn.reset();
         return { success: true };
       }
+      if (action === 'nav') {
+        const sn = snByWC.get(id);
+        if (!sn) return { success: false, error: 'SN_NOT_INITIALIZED' };
+        const p = (payload && payload.payload) || {};
+        const a = String(p.action || '').toLowerCase();
+        try {
+          let navRes = null;
+          if (a === 'continue') {
+            navRes = await sn.processNavigation('continue');
+          } else if (a === 'previous') {
+            navRes = await sn.processNavigation('previous');
+          } else if (a === 'choice') {
+            const targetId = String(p.targetId || p.target_id || p.activity_id || '');
+            navRes = await sn.processNavigation('choice', targetId);
+          } else {
+            return { success: false, error: 'NAV_UNSUPPORTED_ACTION' };
+          }
+          return { success: !!(navRes && navRes.success), nav: navRes };
+        } catch (e) {
+          return { success: false, error: e?.message || String(e) };
+        }
+      }
+
       return { success: false, error: 'UNKNOWN_ACTION' };
     } catch (e) {
       try { mcpLogger.error(`MCP SN: error handling action ${action}`, e && e.message ? e.message : String(e)); } catch (_) {}
       return { success: false, error: e?.message || String(e) };
     }
+  });
+
+  // Renderer error channel for preload logging; fail-fast with clear surfacing
+  ipcMain.handle("renderer-log-error", async (_event, ...args) => {
+    try { mcpLogger.error(...args); } catch (_) {}
+    return true;
   });
 
   ipcRegistered = true;

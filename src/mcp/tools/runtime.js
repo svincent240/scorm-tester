@@ -452,9 +452,10 @@ async function scorm_runtime_open(params = {}) {
   const viewport = resolveViewport(params.viewport);
   const entryPath = await resolveEntryPathFromManifest(s.package_path);
   if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
-  sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_open_start', payload: { entryPath, viewport } });
-  await RuntimeManager.openPersistent({ session_id, entryPath, viewport });
-  sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_opened', payload: {} });
+  sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_open_start', payload: { entryPath, viewport} });
+  const win = await RuntimeManager.openPersistent({ session_id, entryPath, viewport });
+  const finalURL = RuntimeManager.getURL(win);
+  sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_opened', payload: { url: finalURL || null } });
   return { runtime_id: session_id, entry_found: true, viewport };
 }
 

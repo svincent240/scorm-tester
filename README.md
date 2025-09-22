@@ -126,6 +126,13 @@ npm run test:coverage
 npm run test:watch
 ```
 
+### MCP smoke tests (JSON-RPC, Electron stdio server)
+```bash
+# Run real-world MCP scenarios against a real course
+npm run mcp:smoke
+```
+
+
 ### Test Results
 - ✅ **37/37 tests passing** (100% success rate)
 - ✅ **100% SCORM compliance** validated
@@ -159,7 +166,7 @@ npm run test:watch
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 16+ 
+- Node.js 16+
 - npm or yarn
 - Electron 28+
 
@@ -282,7 +289,7 @@ MIT License - see LICENSE file for details.
 
 ## 🎉 Project Complete!
 
-**The SCORM Tester is now production-ready!** 
+**The SCORM Tester is now production-ready!**
 
 This application provides:
 - ✅ **Complete SCORM 2004 4th Edition compliance** (100%)

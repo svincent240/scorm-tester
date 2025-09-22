@@ -23,6 +23,7 @@
     "test:error-handling": "NODE_ENV=development jest tests/integration/error-handling.test.js",
     "test:phase-integration": "NODE_ENV=development jest tests/integration/phase-integration.test.js",
     "test:renderer": "NODE_ENV=development jest tests/integration/renderer-integration.test.js",
+    "mcp:smoke": "NODE_ENV=development jest tests/integration/mcp-sn-init.real-course.test.js tests/integration/mcp-api-integration.real-course.run.test.js tests/integration/mcp-sn-navigation.real-course.test.js tests/integration/mcp-api-commit.real-course.test.js",
     "test:all": "NODE_ENV=development jest && NODE_ENV=development playwright test",
     "test:e2e": "NODE_ENV=development playwright test",
     "lint": "eslint src/ tests/",

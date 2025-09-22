@@ -87,9 +87,60 @@ class RuntimeManager {
     try { win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => { try { callback(false); } catch (_) {} }); } catch (_) {}
     if (viewport?.width && viewport?.height) win.setSize(viewport.width, viewport.height);
     const url = 'file://' + entryPath;
-    await win.loadURL(url);
-    // Always attach real adapter bridge per window
+    // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
     try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) {}
+
+    // Load the URL with explicit handling for Storyline-style redirect that triggers ERR_ABORTED
+    try {
+      await win.loadURL(url);
+    } catch (e) {
+      const msg = (e && e.message) ? String(e.message) : String(e);
+      if (msg.includes('ERR_ABORTED')) {
+        // Navigation was aborted (likely immediate redirect). Wait briefly for the new load to finish
+        const finished = await new Promise((resolve) => {
+          let done = false;
+          const cleanup = () => { if (!done) { done = true; resolve(true); } };
+          const fail = () => { if (!done) { done = true; resolve(false); } };
+          try {
+            win.webContents.once('did-finish-load', cleanup);
+            win.webContents.once('did-stop-loading', cleanup);
+            win.webContents.once('did-fail-load', fail);
+          } catch (_) { return resolve(false); }
+          setTimeout(() => { if (!done) resolve(false); }, 2000);
+        });
+        if (!finished) {
+          // Build enhanced, fail-fast error message with dir listing
+          const fs = require('fs');
+          const path = require('path');
+          let listing = [];
+          try {
+            const dir = path.dirname(entryPath);
+            listing = fs.readdirSync(dir).sort();
+          } catch (_) {}
+          const err = new Error(`ERR_ABORTED while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
+          err.code = 'ERR_ABORTED';
+          throw err;
+        }
+      } else {
+        const fs = require('fs');
+        const path = require('path');
+        let listing = [];
+        try {
+          const dir = path.dirname(entryPath);
+          listing = fs.readdirSync(dir).sort();
+        } catch (_) {}
+        const err = new Error(`${msg} while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
+        err.code = 'PAGE_LOAD_FAILED';
+        throw err;
+      }
+    }
+
+    // Log final navigated URL for traceability
+    try {
+      const finalURL = win?.webContents?.getURL?.() || null;
+      if (finalURL) { try { process.stderr.write(`DEBUG: Runtime final URL: ${finalURL}\n`); } catch (_) {} }
+    } catch (_) {}
+
     return win;
   }
 
