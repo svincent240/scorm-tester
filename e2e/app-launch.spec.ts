@@ -12,16 +12,16 @@ test('app launches successfully and shows main interface', async () => {
   const page = await electronApp.firstWindow();
   
   // Set up console monitoring
-  const consoleMonitor = new ConsoleMonitor(page);
+  const consoleMonitor = new ConsoleMonitor(page, { failFastOnStructuredErrors: true });
   
   // Wait for app to load
   await page.waitForLoadState('domcontentloaded');
   
   // Verify main UI elements are present
   await expect(page).toHaveTitle('SCORM Tester');
-  await expect(page.locator('#course-load-btn')).toBeVisible();
-  await expect(page.locator('#course-folder-btn')).toBeVisible();
-  
+  await expect(page.locator('#hc-open-zip')).toBeVisible();
+  await expect(page.locator('#hc-open-folder')).toBeVisible();
+
   // Verify iframe exists (even if hidden initially)
   await expect(page.locator('#content-frame')).toBeAttached();
   
@@ -48,20 +48,19 @@ test('app can handle navigation and UI interactions', async () => {
   const page = await electronApp.firstWindow();
   
   // Set up console monitoring
-  const consoleMonitor = new ConsoleMonitor(page);
+  const consoleMonitor = new ConsoleMonitor(page, { failFastOnStructuredErrors: true });
   
   await page.waitForLoadState('domcontentloaded');
   
-  // Test that buttons are clickable (even if they open dialogs)
-  const loadBtn = page.locator('#course-load-btn');
+  // Verify header buttons are enabled (do not click to avoid OS dialogs)
+  const loadBtn = page.locator('#hc-open-zip');
   await expect(loadBtn).toBeEnabled();
-  
-  const folderBtn = page.locator('#course-folder-btn');
+
+  const folderBtn = page.locator('#hc-open-folder');
   await expect(folderBtn).toBeEnabled();
-  
-  // Test that the app doesn't crash when clicking buttons
-  // (We won't actually click since it opens file dialogs)
-  
+
+  // Do not click buttons that open native dialogs; we verify responsiveness instead
+
   // Verify app is responsive
   const title = await page.title();
   expect(title).toBe('SCORM Tester');

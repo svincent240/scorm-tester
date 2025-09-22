@@ -65,6 +65,9 @@ class AppManager {
       // If any unexpected error occurs while resolving rendererBaseUrl, keep no-op logger
     }
 
+    // Guard: event handler registration should be idempotent
+    this._eventHandlersSetup = false;
+
     this.setupErrorHandlers();
   }
 
@@ -72,6 +75,12 @@ class AppManager {
    * Initialize the application
    */
   async initialize() {
+    // Prevent duplicate initialization and re-entrancy which can lead to double event handlers and dialogs
+    if (this.initialized || this.initializing) {
+      try { this.logger.warn('AppManager.initialize called while already initialized/initializing; skipping'); } catch (_) {}
+      return;
+    }
+    this.initializing = true;
     try {
       // Dynamically import eventBus first as it's a core dependency
       const { eventBus } = await import('./event-bus.js');
@@ -108,6 +117,7 @@ class AppManager {
       this.setupBrowseModeManagement(eventBus);
 
       this.initialized = true;
+      this.initializing = false;
 
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
@@ -357,6 +367,12 @@ class AppManager {
   setupEventHandlers() {
    // console.log('AppManager: Setting up event handlers...'); // Removed debug log
 
+   // Idempotency guard to prevent duplicate registrations
+   if (this._eventHandlersSetup) {
+     try { this.logger.warn('AppManager: setupEventHandlers called again; skipping duplicate registration'); } catch (_) {}
+     return;
+   }
+
    try { this.logger.debug('AppManager: Registering core event handlers'); } catch (_) {}
 
    // Course loading events
@@ -365,6 +381,9 @@ class AppManager {
      this.logger.error('AppManager: eventBus not found in services. Cannot set up event handlers.');
      return;
    }
+
+   // Mark as set up exactly once
+   this._eventHandlersSetup = true;
 
 
     eventBus.on('course:loadError', (errorData) => {

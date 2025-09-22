@@ -16,7 +16,7 @@ test.describe('Course Loading Tests', () => {
     page = await electronApp.firstWindow();
     
     // Set up console monitoring
-    consoleMonitor = new ConsoleMonitor(page);
+    consoleMonitor = new ConsoleMonitor(page, { failFastOnStructuredErrors: true });
     
     await page.waitForLoadState('domcontentloaded');
     
@@ -39,48 +39,26 @@ test.describe('Course Loading Tests', () => {
     await electronApp.close();
   });
 
-  test('load course button exists and is functional', async () => {
-    // Verify the button is present and can be clicked
-    const loadBtn = page.locator('#course-load-btn');
-    await expect(loadBtn).toBeVisible();
-    await expect(loadBtn).toBeEnabled();
-    
-    console.log('✓ Load course button is visible and enabled');
-    
-    // Test clicking behavior (without expecting specific dialog behavior)
-    let clickSuccessful = false;
-    try {
-      await loadBtn.click();
-      clickSuccessful = true;
-    } catch (e) {
-      console.log('Button click failed:', e);
-    }
-    
-    expect(clickSuccessful).toBe(true);
-    console.log('✓ Load course button can be clicked');
-    
-    // Give the app time to handle the click
-    await page.waitForTimeout(500);
-    
-    // Check for errors after button interaction
-    consoleMonitor.printSummary('load course button test');
-    consoleMonitor.assertNoCriticalErrors('load course button test');
+  test('header load buttons are present (no dialogs opened)', async () => {
+    // Verify header buttons are present and enabled (do not click to avoid OS dialogs)
+    const zipBtn = page.locator('#hc-open-zip');
+    const folderBtn = page.locator('#hc-open-folder');
+    await expect(zipBtn).toBeVisible();
+    await expect(zipBtn).toBeEnabled();
+    await expect(folderBtn).toBeVisible();
+    await expect(folderBtn).toBeEnabled();
+
+    console.log('✓ Header load buttons are visible and enabled');
+
+    // Check for errors after verification
+    consoleMonitor.printSummary('header load buttons present');
+    consoleMonitor.assertNoCriticalErrors('header load buttons present');
   });
 
   test('loads ZIP course programmatically', async () => {
     const zipPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004.zip');
-    
-    // Check that test helper is available
-    const hasHelper = await page.evaluate(() => {
-      return typeof (window as any).testLoadCourse === 'function';
-    });
-    
-    if (!hasHelper) {
-      console.log('Test helper not available, skipping programmatic test');
-      return;
-    }
-    
-    // Use the test helper to load the course
+
+    // Use the deterministic test helper to load the course (fail-fast if missing)
     const loadResult = await page.evaluate(async ({ zipPath }) => {
       try {
         return await (window as any).testLoadCourse(zipPath);
@@ -91,26 +69,16 @@ test.describe('Course Loading Tests', () => {
     
     console.log('Course loading result:', loadResult);
     
-    // The test passes if we can call the function without crashing
-    // Full course loading might require more complex setup
+    // Fail-fast: course must load successfully
     expect(loadResult).toBeDefined();
-    expect(typeof loadResult.success).toBe('boolean');
-    
-    if (loadResult.success) {
-      console.log('✓ Course loading initiated successfully');
-      
-      // Wait a bit and check if UI updated
-      await page.waitForTimeout(2000);
-      
-      const iframe = page.locator('#content-frame');
-      const iframeExists = await iframe.count() > 0;
-      expect(iframeExists).toBe(true);
-      
-      console.log('✓ Iframe exists in DOM');
-    } else {
-      console.log('Course loading failed:', loadResult.error);
-      // Still consider test successful if the mechanism works
-    }
+    expect(loadResult.success).toBe(true);
+
+    // Wait a bit and check if UI updated
+    await page.waitForTimeout(2000);
+
+    const iframe = page.locator('#content-frame');
+    await expect(iframe).toBeAttached();
+    console.log('✓ Iframe exists in DOM');
     
     // Check for errors after ZIP course loading
     consoleMonitor.printSummary('ZIP course loading test');
@@ -119,18 +87,8 @@ test.describe('Course Loading Tests', () => {
 
   test('loads folder course programmatically', async () => {
     const folderPath = path.resolve(process.cwd(), 'references/real_course_examples/SL360_LMS_SCORM_2004');
-    
-    // Check that test helper is available
-    const hasHelper = await page.evaluate(() => {
-      return typeof (window as any).testLoadCourse === 'function';
-    });
-    
-    if (!hasHelper) {
-      console.log('testLoadCourse helper not available, skipping programmatic test');
-      return;
-    }
-    
-    // Use the test helper to load the course from folder with correct type
+
+    // Use the deterministic test helper to load the course from folder with correct type
     const loadResult = await page.evaluate(async ({ folderPath }) => {
       try {
         if (typeof (window as any).testLoadCourse === 'function') {
@@ -142,57 +100,33 @@ test.describe('Course Loading Tests', () => {
         return { success: false, error: String(error) };
       }
     }, { folderPath });
-    
+
     console.log('Folder course loading result:', loadResult);
-    
-    // The test passes if we can call the function without crashing
+
+    // Fail-fast: course must load successfully
     expect(loadResult).toBeDefined();
-    expect(typeof loadResult.success).toBe('boolean');
-    
-    if (loadResult.success) {
-      console.log('✓ Folder course loading initiated successfully');
-      
-      // Wait a bit and check if UI updated
-      await page.waitForTimeout(2000);
-      
-      const iframe = page.locator('#content-frame');
-      const iframeExists = await iframe.count() > 0;
-      expect(iframeExists).toBe(true);
-      
-      console.log('✓ Iframe exists in DOM after folder load');
-    } else {
-      console.log('Folder course loading failed:', loadResult.error);
-      // Still consider test successful if the mechanism works
-    }
+    expect(loadResult.success).toBe(true);
+
+    // Wait a bit and check if UI updated
+    await page.waitForTimeout(2000);
+
+    const iframe = page.locator('#content-frame');
+    await expect(iframe).toBeAttached();
+    console.log('✓ Iframe exists in DOM after folder load');
     
     // Check for errors after folder course loading
     consoleMonitor.printSummary('folder course loading test');
     consoleMonitor.assertNoCriticalErrors('folder course loading test');
   });
 
-  test('folder loading button exists and is functional', async () => {
-    const folderBtn = page.locator('#course-folder-btn');
+  test('header folder button is present (no dialog opened)', async () => {
+    const folderBtn = page.locator('#hc-open-folder');
     await expect(folderBtn).toBeVisible();
     await expect(folderBtn).toBeEnabled();
-    
-    console.log('✓ Load folder button is visible and enabled');
-    
-    // Test clicking behavior
-    let clickSuccessful = false;
-    try {
-      await folderBtn.click();
-      clickSuccessful = true;
-    } catch (e) {
-      console.log('Folder button click failed:', e);
-    }
-    
-    expect(clickSuccessful).toBe(true);
-    console.log('✓ Load folder button can be clicked');
-    
-    await page.waitForTimeout(500);
-    
-    // Check for errors after folder button interaction
-    consoleMonitor.printSummary('folder loading button test');
-    consoleMonitor.assertNoCriticalErrors('folder loading button test');
+    console.log('✓ Header folder button is visible and enabled');
+
+    // Check for errors after verification
+    consoleMonitor.printSummary('header folder button present');
+    consoleMonitor.assertNoCriticalErrors('header folder button present');
   });
 });

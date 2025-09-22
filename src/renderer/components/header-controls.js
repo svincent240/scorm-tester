@@ -45,33 +45,35 @@ class HeaderControls extends BaseComponent {
   bindEvents() {
     super.bindEvents();
 
-    const openZip = this.element.querySelector('#hc-open-zip');
-    const openFolder = this.element.querySelector('#hc-open-folder');
-    const reload = this.element.querySelector('#course-reload-btn');
-    const inspector = this.element.querySelector('#hc-inspector');
-    const theme = this.element.querySelector('#hc-theme');
+    // Idempotency guard: bind header actions only once
+    if (this._headerActionsBound) return;
+    this._headerActionsBound = true;
 
-    openZip?.addEventListener('click', () => {
-      try { rendererLogger.info('HeaderControls: emit course:open-zip:request'); } catch (_) {}
-      this.eventBus.emit('course:open-zip:request');
-    });
+    // Delegate all header button clicks through a single listener on the component root
+    this.addEventListener('click', function onHeaderClick(event) {
+      const target = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (!target || !this.element.contains(target)) return;
 
-    openFolder?.addEventListener('click', () => {
-      try { rendererLogger.info('HeaderControls: emit course:open-folder:request'); } catch (_) {}
-      this.eventBus.emit('course:open-folder:request');
-    });
-
-    reload?.addEventListener('click', () => {
-      try { rendererLogger.info('HeaderControls: emit course:reload:request'); } catch (_) {}
-      this.eventBus.emit('course:reload:request');
-    });
-
-    inspector?.addEventListener('click', () => {
-      this.eventBus.emit('ui:inspector:toggle-request');
-    });
-
-    theme?.addEventListener('click', () => {
-      this.eventBus.emit('ui:theme:toggle-request');
+      switch (target.id) {
+        case 'hc-open-zip':
+          try { rendererLogger.info('HeaderControls: emit course:open-zip:request'); } catch (_) {}
+          this.eventBus.emit('course:open-zip:request');
+          break;
+        case 'hc-open-folder':
+          try { rendererLogger.info('HeaderControls: emit course:open-folder:request'); } catch (_) {}
+          this.eventBus.emit('course:open-folder:request');
+          break;
+        case 'course-reload-btn':
+          try { rendererLogger.info('HeaderControls: emit course:reload:request'); } catch (_) {}
+          this.eventBus.emit('course:reload:request');
+          break;
+        case 'hc-inspector':
+          this.eventBus.emit('ui:inspector:toggle-request');
+          break;
+        case 'hc-theme':
+          this.eventBus.emit('ui:theme:toggle-request');
+          break;
+      }
     });
   }
 
