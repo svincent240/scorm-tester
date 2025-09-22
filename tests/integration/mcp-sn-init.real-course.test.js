@@ -1,8 +1,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
-  jest.setTimeout(60000);
+describe('MCP SN init flow on real course (sequencing bridge)', () => {
+  jest.setTimeout(90000);
 
   function rpcClient() {
     const proc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'mcp'], {
@@ -46,33 +46,33 @@ describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
     return { proc, rpc };
   }
 
-  test('runs initialize and scorm_test_api_integration and prints results', async () => {
+  test('opens session, runtime, initializes SN and fetches state', async () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
     const initRes = await rpc('initialize', {}, id++);
+    expect(initRes && !initRes.error).toBe(true);
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
-    const argumentsObj = {
-      workspace_path: ws,
-      capture_api_calls: true,
-      viewport: { device: 'desktop' },
-      test_scenario: {
-        steps: ['Initialize', 'SetValue cmi.location hole_1', 'Terminate']
-      }
-    };
-    const callRes = await rpc('tools/call', { name: 'scorm_test_api_integration', arguments: argumentsObj }, id++);
-    const data = callRes && callRes.result && callRes.result.data;
 
-    // Emit a single line for easy scraping from CI output
-    const payload = {
-      init_ok: !!initRes && !initRes.error,
-      manifest_ok: !!(data && data.manifest_ok),
-      scorm_version: data && data.scorm_version,
-      initialize_success: data && data.api_test_results && data.api_test_results.initialize_success,
-      call_count: data && data.api_test_results && data.api_test_results.api_calls_captured && data.api_test_results.api_calls_captured.length || 0,
-      sample_calls: (data && data.api_test_results && data.api_test_results.api_calls_captured || []).slice(0, 3)
-    };
-    console.log('MCP_API_RESULT_JSON=' + JSON.stringify(payload));
+    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
+    const openData = openSession && openSession.result && openSession.result.data;
+    expect(openData && openData.session_id).toBeTruthy();
+    const session_id = openData.session_id;
+
+    const runtimeOpen = await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+    const runtimeData = runtimeOpen && runtimeOpen.result && runtimeOpen.result.data;
+    expect(runtimeData && runtimeData.runtime_id === session_id).toBe(true);
+
+    const snInit = await rpc('tools/call', { name: 'scorm_sn_init', arguments: { session_id } }, id++);
+    const snData = snInit && snInit.result && snInit.result.data;
+    expect(snData && snData.success).toBe(true);
+
+    const navState = await rpc('tools/call', { name: 'scorm_nav_get_state', arguments: { session_id } }, id++);
+    const navData = navState && navState.result && navState.result.data;
+    expect(navData && typeof navData.sessionState === 'string').toBe(true);
+
+    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
+    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) {}
     try { proc.kill(); } catch (_) {}
@@ -81,9 +81,6 @@ describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
       new Promise(resolve => proc.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000))
     ]);
-
-    // Basic sanity assertion so the test doesn't pass silently without running
-    expect(payload.init_ok).toBe(true);
   });
 });
 

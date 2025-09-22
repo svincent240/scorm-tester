@@ -5,7 +5,7 @@ let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
 const ScormApiHandler = require("../main/services/scorm/rte/api-handler");
 const ScormInspectorTelemetryStore = require("../main/services/scorm-inspector/scorm-inspector-telemetry-store");
-const ScormSNService = require("../main/services/scorm/sn");
+const { ScormSNService } = require("../main/services/scorm/sn");
 const ManifestParser = require("../main/services/scorm/cam/manifest-parser");
 
 // STDERR-only logger to avoid polluting MCP stdout channel

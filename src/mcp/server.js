@@ -256,9 +256,33 @@ function startServer() {
   });
 
   process.stdin.on("end", () => {
-    // Graceful shutdown path if needed later
-    process.exit(0);
+    try {
+      // Ask Electron to quit first (closes windows), then exit the process
+      let electron;
+      try { electron = require('electron'); } catch (_) { electron = null; }
+      if (electron && electron.app && !electron.app.isQuiting) {
+        try { electron.app.quit(); } catch (_) {}
+      }
+    } finally {
+      process.exit(0);
+    }
   });
+
+  // Ensure we exit cleanly on SIGINT/SIGTERM (tests/CI)
+  const handleSignal = (sig) => {
+    try {
+      let electron;
+      try { electron = require('electron'); } catch (_) { electron = null; }
+      if (electron && electron.app) {
+        try { electron.app.quit(); } catch (_) {}
+      }
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
+
 }
 
 if (require.main === module) {
