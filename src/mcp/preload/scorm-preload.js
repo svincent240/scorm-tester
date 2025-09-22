@@ -4,6 +4,9 @@
     // eslint-disable-next-line no-undef
     const { contextBridge, ipcRenderer } = require('electron');
 
+    // Local capture buffer (lives in isolated world); expose getter via SCORM_MCP.getCalls()
+    const __calls = [];
+
     // Provide a minimal bridge for invoking SCORM API via main process
     const bridge = {
       apiInvoke: async (method, args) => {
@@ -23,7 +26,8 @@
           try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] snInvoke failed', e && e.message ? e.message : String(e)); } catch (_) {}
           return null;
         }
-      }
+      },
+      getCalls: () => __calls.slice(0)
     };
 
     contextBridge.exposeInMainWorld('SCORM_MCP', bridge);
@@ -44,8 +48,9 @@
         const ts = Date.now();
         const result = await bridge.apiInvoke(method, args);
         try {
+          __calls.push({ ts, method, parameters: args, result });
           // eslint-disable-next-line no-undef
-          window.__scorm_calls.push({ ts, method, parameters: args, result });
+          if (Array.isArray(window.__scorm_calls)) window.__scorm_calls.push({ ts, method, parameters: args, result });
         } catch (_) {}
         return result;
       };

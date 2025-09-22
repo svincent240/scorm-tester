@@ -78,9 +78,13 @@ class RuntimeManager {
     const ok = await this.ensureAppReady();
     if (!ok) { const e = new Error("Electron app not ready"); e.code = "ELECTRON_REQUIRED"; throw e; }
     const { BrowserWindow } = electron;
-    const wp = { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false };
+    const wp = { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, disableDialogs: true };
     try { wp.preload = getPreloadPath(); } catch (_) {}
     const win = new BrowserWindow({ show: false, webPreferences: wp });
+    // Strictly disable popups, unload prompts, and permissions to keep MCP headless
+    try { win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); } catch (_) {}
+    try { win.webContents.on('will-prevent-unload', (e) => { try { e.preventDefault(); } catch (_) {} }); } catch (_) {}
+    try { win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => { try { callback(false); } catch (_) {} }); } catch (_) {}
     if (viewport?.width && viewport?.height) win.setSize(viewport.width, viewport.height);
     const url = 'file://' + entryPath;
     await win.loadURL(url);
@@ -172,7 +176,14 @@ class RuntimeManager {
   }
 
   static async getCapturedCalls(win) {
-    try { return await win.webContents.executeJavaScript("window.__scorm_calls || []", true); } catch (_) { return []; }
+    const script = `(() => {
+      try {
+        if (Array.isArray(window.__scorm_calls)) return window.__scorm_calls;
+        if (window.SCORM_MCP && typeof window.SCORM_MCP.getCalls === 'function') return window.SCORM_MCP.getCalls();
+        return [];
+      } catch (_) { return []; }
+    })()`;
+    try { return await win.webContents.executeJavaScript(script, true); } catch (_) { return []; }
   }
 
   static async getInitializeState(win) {

@@ -1,0 +1,83 @@
+const { spawn } = require('child_process');
+const path = require('path');
+
+describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
+  jest.setTimeout(60000);
+
+  function rpcClient() {
+    const proc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'mcp'], {
+      cwd: process.cwd(),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'false' }
+    });
+
+    let buf = '';
+    const pending = new Map();
+
+    proc.stdout.setEncoding('utf8');
+    proc.stdout.on('data', (chunk) => {
+      buf += chunk;
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx);
+        buf = buf.slice(idx + 1);
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          const id = obj && obj.id;
+          if (pending.has(id)) {
+            pending.get(id)(obj);
+            pending.delete(id);
+          }
+        } catch (_) {
+          // ignore non-JSON
+        }
+      }
+    });
+
+    function rpc(method, params, id) {
+      return new Promise((resolve) => {
+        pending.set(id, resolve);
+        const msg = { jsonrpc: '2.0', id, method, params };
+        proc.stdin.write(JSON.stringify(msg) + '\n');
+      });
+    }
+
+    return { proc, rpc };
+  }
+
+  test('runs initialize and scorm_test_api_integration and prints results', async () => {
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+    const initRes = await rpc('initialize', {}, id++);
+
+    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
+    const argumentsObj = {
+      workspace_path: ws,
+      capture_api_calls: true,
+      viewport: { device: 'desktop' },
+      test_scenario: {
+        steps: ['Initialize', 'SetValue cmi.location hole_1', 'Terminate']
+      }
+    };
+    const callRes = await rpc('tools/call', { name: 'scorm_test_api_integration', arguments: argumentsObj }, id++);
+
+    // Emit a single line for easy scraping from CI output
+    const payload = {
+      init_ok: !!initRes && !initRes.error,
+      manifest_ok: !!(callRes && callRes.result && callRes.result.manifest_ok),
+      scorm_version: callRes && callRes.result && callRes.result.scorm_version,
+      initialize_success: callRes && callRes.result && callRes.result.api_test_results && callRes.result.api_test_results.initialize_success,
+      call_count: callRes && callRes.result && callRes.result.api_test_results && callRes.result.api_test_results.api_calls_captured && callRes.result.api_test_results.api_calls_captured.length || 0,
+      sample_calls: (callRes && callRes.result && callRes.result.api_test_results && callRes.result.api_test_results.api_calls_captured || []).slice(0, 3)
+    };
+    console.log('MCP_API_RESULT_JSON=' + JSON.stringify(payload));
+
+    try { proc.stdin.end(); } catch (_) {}
+    try { proc.kill(); } catch (_) {}
+
+    // Basic sanity assertion so the test doesn't pass silently without running
+    expect(payload.init_ok).toBe(true);
+  });
+});
+

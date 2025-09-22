@@ -9,14 +9,8 @@ const { startServer } = require("./server");
 
 async function main() {
   try {
-    // Prevent multiple instances
-    if (app && typeof app.requestSingleInstanceLock === "function") {
-      const gotLock = app.requestSingleInstanceLock();
-      if (!gotLock) {
-        app.quit();
-        return;
-      }
-    }
+    // Do NOT enforce single-instance for MCP stdio server; CI/dev may spawn multiple for tests
+    // (Keep desktop app single-instance behavior in main app entry, not here).
 
     // Do not quit when all windows are closed (we run headless/offscreen)
     app.on("window-all-closed", (e) => {
@@ -38,10 +32,11 @@ async function main() {
       logger.info('MCP Electron entry initialized', { logDir: process.env.SCORM_TESTER_LOG_DIR });
     } catch (_) {}
 
-    await app.whenReady();
-
-    // Start the MCP stdio server (reads newline-delimited JSON from stdin)
+    // Start the MCP stdio server (reads newline-delimited JSON from stdin) ASAP to keep stdout responsive
+    // This allows initialize/tools/* to work immediately while Electron finishes booting.
     startServer();
+
+    await app.whenReady();
   } catch (e) {
     try { process.stderr.write(`MCP Electron bootstrap error: ${e && e.message ? e.message : String(e)}\n`); } catch (_) {}
     process.exit(1);

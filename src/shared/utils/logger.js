@@ -133,7 +133,8 @@ class Logger {
 
       if (process.env.NODE_ENV === 'development') {
         try {
-          console.log(`[${level.toUpperCase()}]`, message, ...args);
+          // Direct dev console output to STDERR to avoid polluting STDOUT (e.g., MCP JSON-RPC channel)
+          console.error(`[${level.toUpperCase()}]`, message, ...args);
         } catch (_) {
           // ignore console failure
         }

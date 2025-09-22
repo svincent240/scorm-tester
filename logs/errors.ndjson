@@ -1,1 +1,2 @@
-{"ts":1758567730188,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1758569397912,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1758569585373,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":2,"method":"scorm_test_api_integration","error_code":"ERR_FAILED","message":"ERR_FAILED (-2) loading 'file:///Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing'"}],"context":{},"pid":6769,"process":"browser"}
