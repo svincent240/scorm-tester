@@ -56,7 +56,7 @@ class EventBus {
     this.listeners.get(event).push(subscription);
 
     if (this.debugMode) {
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.debug(`EventBus: Subscribed to '${event}' (${this.listeners.get(event).length} total)`);
       });
     }
@@ -84,7 +84,7 @@ class EventBus {
       }
 
       if (this.debugMode) {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.debug(`EventBus: Unsubscribed from '${event}' (${eventListeners.length} remaining)`);
         });
       }
@@ -108,7 +108,7 @@ class EventBus {
         if (p.test(event)) {
           // Log synchronously to console/renderer logger and throw to prevent accidental usage.
       try {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger?.error(`EventBus: Forbidden event '${event}'. SCORM/debug/telemetry data must use direct IPC channels, not EventBus.`);
         }).catch(() => {
           // Fallback only - should not reach here in normal operation
@@ -129,7 +129,7 @@ class EventBus {
     this._inFlightCounts.set(event, currentDepth);
     if (currentDepth > this._maxSyncDepth) {
       // Drop further synchronous recursion to avoid stack overflow
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn(`EventBus: Dropping emit for '${event}' due to depth>${this._maxSyncDepth}`, { dataType: typeof data });
       }).catch(() => { /* no-op */ });
       // Decrement depth before returning
@@ -149,7 +149,7 @@ class EventBus {
         const d = this._recentRing[len - 1];
         const isABAB = (a === c) && (b === d) && (a !== b);
         if (isABAB) {
-          import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
             rendererLogger.error(`EventBus: Detected repeating cycle '${a}' <-> '${b}', dropping '${event}'`);
           }).catch(() => { /* no-op */ });
           this._inFlightCounts.set(event, currentDepth - 1);
@@ -189,7 +189,7 @@ class EventBus {
         this.debug.lastEvents.push(eventData);
         while (this.debug.lastEvents.length > (this.debug.maxEvents || 200)) this.debug.lastEvents.shift();
       } catch (_) { /* no-op */ }
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.debug(`EventBus: Emitting '${event}'`, data);
       }).catch(() => { /* no-op */ });
     }
@@ -208,7 +208,7 @@ class EventBus {
             }
           } catch (error) {
             // Log error (file logger via IPC; no event emission here if in error path)
-            import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+            import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
               rendererLogger.error(`EventBus: Error in event handler for '${event}'`, error?.message || error);
             }).catch(() => { /* no-op */ });
 
@@ -263,14 +263,14 @@ class EventBus {
     if (event) {
       this.listeners.delete(event);
       if (this.debugMode) {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.debug(`EventBus: Cleared all listeners for '${event}'`);
         });
       }
     } else {
       this.listeners.clear();
       if (this.debugMode) {
-        import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+        import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.debug('EventBus: Cleared all listeners');
         });
       }
@@ -337,7 +337,7 @@ class EventBus {
         debug: () => {}
       };
       // Initialize asynchronously; do not block or throw if import fails
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`)
+      import('../utils/renderer-logger.js')
         .then(({ rendererLogger }) => {
           if (rendererLogger) this._logger = rendererLogger;
         })
@@ -355,7 +355,7 @@ class EventBus {
     this.clear();
     this.history = [];
     if (this.debugMode) {
-      import(`${window.electronAPI.rendererBaseUrl}utils/renderer-logger.js`).then(({ rendererLogger }) => {
+      import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.debug('EventBus: Destroyed');
       });
     }
