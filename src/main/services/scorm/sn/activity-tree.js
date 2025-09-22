@@ -109,10 +109,8 @@ class ActivityTreeManager {
    */
   buildTree(manifest) {
     try {
-      // Validate organizations presence
-      const orgs = manifest?.organizations;
-      const orgList = orgs?.organization || [];  // ManifestParser outputs organizations.organization
-      if (!orgs || orgList.length === 0) {
+      // Normalize and validate organizations
+      if (!manifest?.organizations) {
         this.errorHandler?.setError(
           SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
           'No organizations found in manifest',
@@ -120,29 +118,45 @@ class ActivityTreeManager {
         );
         return false;
       }
- 
-      // Select organization (default or first)
-      const defaultOrgId = orgs.default;
-      const organization = (Array.isArray(orgList) ? orgList : [orgList]).find(org =>
-        org.identifier === defaultOrgId) || (Array.isArray(orgList) ? orgList[0] : orgList);
- 
-      if (!organization) {
+
+      const orgContainer = manifest.organizations;
+      const orgList = Array.isArray(orgContainer?.organization)
+        ? orgContainer.organization
+        : (orgContainer?.organization ? [orgContainer.organization] : []);
+
+      if (!Array.isArray(orgList) || orgList.length === 0) {
         this.errorHandler?.setError(
           SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
-          'No valid organization found',
+          'No organizations found in manifest',
           'buildTree'
         );
         return false;
       }
- 
-      // Create resource lookup map (support both canonical and legacy shapes)
-      const res = manifest.resources;
-      const resList = Array.isArray(res) ? res : (res?.resource || res?.resources || []);
+
+      // Select organization: prefer default if provided, else first
+      const defaultOrgId = orgContainer.default || null;
+      const organization = defaultOrgId
+        ? (orgList.find(o => o?.identifier === defaultOrgId) || orgList[0])
+        : orgList[0];
+
+      // Normalize resources into a map (strict canonical shape)
+      const resContainer = manifest.resources;
+      const resList = Array.isArray(resContainer?.resource)
+        ? resContainer.resource
+        : (resContainer?.resource ? [resContainer.resource] : []);
       const resourceMap = new Map();
-      (Array.isArray(resList) ? resList : [resList]).forEach(resource => {
-        if (resource && resource.identifier) resourceMap.set(resource.identifier, resource);
-      });
- 
+      for (const resource of resList) {
+        if (!resource || !resource.identifier) {
+          this.errorHandler?.setError(
+            SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+            'SCORM compliance violation: resource.identifier is required',
+            'buildTree'
+          );
+          return false;
+        }
+        resourceMap.set(resource.identifier, resource);
+      }
+
       const visiting = new Set();
 
       // Build root
@@ -150,16 +164,26 @@ class ActivityTreeManager {
       if (!this.root) {
         return false;
       }
-      
+
       visiting.add(this.root.identifier);
 
-      // Process children
-      const topItems = organization.items || organization.children || [];
-      if (Array.isArray(topItems)) {
-        for (const item of topItems) {
-          if (!this.addChildSubtree(item, this.root, resourceMap, visiting)) {
-            return false;
-          }
+      // Process children: strictly 'item'
+      const topItems = Array.isArray(organization?.item)
+        ? organization.item
+        : (organization?.item ? [organization.item] : []);
+
+      if (!topItems || topItems.length === 0) {
+        this.errorHandler?.setError(
+          SN_ERROR_CODES.INVALID_ACTIVITY_TREE,
+          'SCORM compliance violation: organization must contain item elements',
+          'buildTree'
+        );
+        return false;
+      }
+
+      for (const item of topItems) {
+        if (!this.addChildSubtree(item, this.root, resourceMap, visiting)) {
+          return false;
         }
       }
 
@@ -167,7 +191,7 @@ class ActivityTreeManager {
 
       this.logger?.info(`Activity tree built with ${this.activities.size} activities`);
       return true;
- 
+
     } catch (error) {
       this.logger?.error('Error building activity tree:', error);
       this.errorHandler?.setError(
@@ -249,9 +273,10 @@ class ActivityTreeManager {
     }
 
     parentNode.addChild(node);
-    
-    const children = item.children || item.items || [];
-    if (Array.isArray(children)) {
+
+    // SCORM 2004 4th Edition uses 'item' elements for nested children
+    if (item.item) {
+      const children = Array.isArray(item.item) ? item.item : [item.item];
       for (const child of children) {
         if (!this.addChildSubtree(child, node, resourceMap, visiting)) {
           return false;

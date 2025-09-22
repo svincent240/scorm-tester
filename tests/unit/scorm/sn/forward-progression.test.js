@@ -38,19 +38,21 @@ describe('SN Forward Progression', () => {
   test('linear two-sibling tree exposes or processes Continue to advance', () => {
     const manifest = {
       organizations: {
-        organizations: [{
+        organization: [{
           identifier: 'org1',
           title: 'Org',
-          items: [
+          item: [
             { identifier: 'item1', title: 'Item 1', identifierref: 'res1' },
             { identifier: 'item2', title: 'Item 2', identifierref: 'res2' }
           ]
         }]
       },
-      resources: [
-        { identifier: 'res1', scormType: 'sco', href: 'a.html' },
-        { identifier: 'res2', scormType: 'sco', href: 'b.html' }
-      ]
+      resources: {
+        resource: [
+          { identifier: 'res1', scormType: 'sco', href: 'a.html' },
+          { identifier: 'res2', scormType: 'sco', href: 'b.html' }
+        ]
+      }
     };
 
     activityTreeManager = buildManager(manifest);
@@ -86,17 +88,19 @@ describe('SN Forward Progression', () => {
   test('single-activity tree: Continue may be invalid; processing is safe and state remains valid/terminal', () => {
     const manifest = {
       organizations: {
-        organizations: [{
+        organization: [{
           identifier: 'org1',
           title: 'Org',
-          items: [
+          item: [
             { identifier: 'item1', title: 'Item 1', identifierref: 'res1' }
           ]
         }]
       },
-      resources: [
-        { identifier: 'res1', scormType: 'sco', href: 'a.html' }
-      ]
+      resources: {
+        resource: [
+          { identifier: 'res1', scormType: 'sco', href: 'a.html' }
+        ]
+      }
     };
 
     activityTreeManager = buildManager(manifest);

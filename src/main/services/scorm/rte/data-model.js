@@ -365,6 +365,10 @@ class ScormDataModel {
   getCollectionValue(element) {
     // Handle interactions
     if (element.startsWith('cmi.interactions.')) {
+      // Handle children element
+      if (element === 'cmi.interactions._children') {
+        return String(DATA_MODEL_SCHEMA['cmi.interactions._children']?.defaultValue || '');
+      }
       // Handle count element
       if (element === 'cmi.interactions._count') {
         return String(this.interactions.length);
@@ -393,6 +397,10 @@ class ScormDataModel {
 
     // Handle objectives
     if (element.startsWith('cmi.objectives.')) {
+      // Handle children element
+      if (element === 'cmi.objectives._children') {
+        return String(DATA_MODEL_SCHEMA['cmi.objectives._children']?.defaultValue || '');
+      }
       // Handle count element
       if (element === 'cmi.objectives._count') {
         return String(this.objectives.length);
@@ -421,6 +429,10 @@ class ScormDataModel {
 
     // Handle comments from learner
     if (element.startsWith('cmi.comments_from_learner.')) {
+      // Handle children element
+      if (element === 'cmi.comments_from_learner._children') {
+        return String(DATA_MODEL_SCHEMA['cmi.comments_from_learner._children']?.defaultValue || '');
+      }
       // Handle count element
       if (element === 'cmi.comments_from_learner._count') {
         return String(this.commentsFromLearner.length);
@@ -449,6 +461,10 @@ class ScormDataModel {
 
     // Handle comments from LMS
     if (element.startsWith('cmi.comments_from_lms.')) {
+      // Handle children element
+      if (element === 'cmi.comments_from_lms._children') {
+        return String(DATA_MODEL_SCHEMA['cmi.comments_from_lms._children']?.defaultValue || '');
+      }
       // Handle count element
       if (element === 'cmi.comments_from_lms._count') {
         return String(this.commentsFromLms.length);

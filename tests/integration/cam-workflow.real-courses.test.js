@@ -94,7 +94,7 @@ describe('CAM workflow with real course fixtures', () => {
 
     // CourseLoader expects { uiOutline, analysis }, pass derived values
     const normalized = CourseLoader.__test__?.normalizeStructure
-      ? CourseLoader.__test__.normalizeStructure({ uiOutline: { items: analysis.uiOutline }, analysis: { orgCount, resCount } })
+      ? CourseLoader.__test__.normalizeStructure({ uiOutline: { items: analysis.uiOutline }, analysis: { orgCount: orgs.length, resCount: resources.length } })
       : { hasStructure: Array.isArray(analysis.uiOutline) && analysis.uiOutline.length > 0, itemCount: analysis.uiOutline.length };
 
     expect(normalized.hasStructure).toBe(true);

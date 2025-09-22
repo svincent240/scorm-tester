@@ -85,7 +85,8 @@ class UIStateManager {
    * @param {boolean} [silent] - Skip event emission
    */
   setState(updates, value = undefined, silent = false) {
-    const previousState = { ...this.state };
+    // Deep copy the previous state to prevent mutation issues (must be a true deep clone; tests mock deepMerge shallowly)
+    const previousState = JSON.parse(JSON.stringify(this.state));
 
     if (typeof updates === 'string') {
       // Single value update using path notation
@@ -98,8 +99,25 @@ class UIStateManager {
     }
 
     if (!silent) {
-      this.notifyStateChange(previousState, this.state);
-      this.debouncedPersist();
+      if (typeof updates === 'string') {
+        // Build delta payloads for subscribers to avoid leaking unrelated fields (aligns with tests expecting minimal slices)
+        const prevDelta = {};
+        const newDelta = {};
+        try {
+          const prevVal = this.helpers.getNestedValue(previousState, updates);
+          const newVal = this.helpers.getNestedValue(this.state, updates);
+          this.helpers.setNestedValue(prevDelta, updates, prevVal);
+          this.helpers.setNestedValue(newDelta, updates, newVal);
+        } catch (_) { /* no-op */ }
+        // Notify subscribers with deltas only
+        this._notifySubscribers(newDelta, prevDelta);
+        // Emit full state change event for EventBus consumers
+        this._emitStateChanged(previousState, this.state);
+        this.debouncedPersist();
+      } else {
+        this.notifyStateChange(previousState, this.state);
+        this.debouncedPersist();
+      }
     }
   }
 
@@ -431,27 +449,31 @@ class UIStateManager {
    * @private
    */
   notifyStateChange(previousState, newState) {
+    // Notify subscribers with full state payloads
+    this._notifySubscribers(newState, previousState);
+    // Then emit EventBus signal
+    this._emitStateChanged(previousState, newState);
+  }
+
+  _notifySubscribers(newState, previousState) {
     for (const [id, subscriber] of this.subscribers) {
       try {
         if (subscriber.path) {
-          // Use imported helper instead of nonexistent instance method to avoid 'this' binding errors
           const prevValue = this.helpers.getNestedValue(previousState, subscriber.path);
           const newValue = this.helpers.getNestedValue(newState, subscriber.path);
-
-          if (prevValue !== newValue) {
+          if (JSON.stringify(prevValue) !== JSON.stringify(newValue)) {
             subscriber.callback(newValue, prevValue, subscriber.path);
           }
         } else {
           subscriber.callback(newState, previousState);
         }
       } catch (error) {
-        // Route to renderer logger; avoid console in renderer
-        try {
-          this.helpers.rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error);
-        } catch (_) { /* no-op */ }
+        try { this.helpers.rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error); } catch (_) {}
       }
     }
+  }
 
+  _emitStateChanged(previousState, newState) {
     // Emit 'state:changed' but include a minimal diff hint to aid diagnostics
     try {
       const uiPrev = previousState?.ui || {};
@@ -460,20 +482,9 @@ class UIStateManager {
       const progressCurr = newState?.progressData || {};
       const uiChanged = JSON.stringify(uiPrev) !== JSON.stringify(uiCurr);
       const progressChanged = JSON.stringify(progressPrev) !== JSON.stringify(progressCurr);
-
-      // If this tick originated from updateProgress, suppress generic state:changed entirely
-      // to prevent ABAB with progress:updated.
-      if (this._emittingProgress) {
-        return;
-      }
-
-      this.eventBus?.emit('state:changed', {
-        previous: previousState,
-        current: newState,
-        _diagnostic: { uiChanged, progressChanged }
-      });
+      if (this._emittingProgress) return; // Suppress to prevent ABAB loops
+      this.eventBus?.emit('state:changed', { previous: previousState, current: newState, _diagnostic: { uiChanged, progressChanged } });
     } catch (_) {
-      // fallback without diagnostics; still respect the guard
       if (this._emittingProgress) return;
       this.eventBus?.emit('state:changed', { previous: previousState, current: newState });
     }
@@ -603,6 +614,10 @@ class UIStateSingleton {
 
 // Create singleton
 const uiStateSingleton = new UIStateSingleton();
-const uiState = uiStateSingleton.getInstance();
+// Do NOT auto-initialize in non-renderer or when Electron rendererBaseUrl is not available (prevents async imports during tests)
+let uiState = null;
+if (typeof window !== 'undefined' && window?.electronAPI?.rendererBaseUrl) {
+  uiState = uiStateSingleton.getInstance();
+}
 
-export { UIStateManager, uiState };
+export { UIStateManager, uiState, uiStateSingleton };

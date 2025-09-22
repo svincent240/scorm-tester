@@ -1,10 +1,10 @@
 /**
  * SCORM 2004 4th Edition Sequencing and Navigation Service
- * 
+ *
  * Unified interface for all SN operations including activity tree management,
  * sequencing rule processing, navigation handling, and rollup management.
  * Integrates with Phase 1 RTE and Phase 2 CAM services.
- * 
+ *
  * @fileoverview SN service main entry point and orchestration
  */
 
@@ -17,7 +17,7 @@ const { SN_ERROR_CODES, SEQUENCING_SESSION_STATES, ACTIVITY_STATES } = require('
 
 /**
  * SCORM Sequencing and Navigation Service
- * 
+ *
  * Main service class that orchestrates all SN operations and provides
  * integration points with RTE and CAM services.
  */
@@ -70,7 +70,7 @@ class ScormSNService {
   async initialize(manifest, packageInfo = {}) {
     try {
       this.logger?.info('Initializing SN service with manifest');
- 
+
       // Diagnostics: summarize orgs/items/sequencing presence prior to validation
       try {
         // Debug: Log actual manifest organizations structure
@@ -82,43 +82,63 @@ class ScormSNService {
           orgPropertyType: Array.isArray(manifest?.organizations?.organization) ? 'array' : typeof manifest?.organizations?.organization,
           orgsPropertyType: Array.isArray(manifest?.organizations?.organizations) ? 'array' : typeof manifest?.organizations?.organizations
         });
-        
+
         // Get organizations array from ManifestParser output
         const orgs = manifest?.organizations?.organization || [];
- 
-        const countItems = (items) => (Array.isArray(items) ? items.reduce((n, it) => n + 1 + countItems(it?.children || it?.items || []), 0) : 0);
+
+        const countItems = (items) => (Array.isArray(items) ? items.reduce((n, it) => n + 1 + countItems(it?.item || []), 0) : 0);
         const hasExplicitSeq = orgs.some(org => {
           if (org?.sequencing) return true;
-          const stack = Array.isArray(org?.items) ? [...org.items] : [];
+          const stack = Array.isArray(org?.item) ? [...org.item] : [];
           while (stack.length) {
             const it = stack.pop();
             if (!it) continue;
             if (it.sequencing) return true;
-            const kids = (Array.isArray(it.children) ? it.children : (Array.isArray(it.items) ? it.items : []));
+            const kids = Array.isArray(it.item) ? it.item : [];
             if (kids.length) stack.push(...kids);
           }
           return false;
         });
- 
+
         const orgSummary = {
           orgs: orgs.length,
-          items: orgs.reduce((sum, org) => sum + countItems(org?.items || []), 0),
+          items: orgs.reduce((sum, org) => sum + countItems(org?.item || []), 0),
           explicitSequencing: hasExplicitSeq,
           defaultOrg: manifest?.organizations?.default || null
         };
         this.logger?.info('SN.init: CAM manifest summary', orgSummary);
       } catch (_) { /* best-effort diagnostics */ }
- 
+
+
+      // Enforce canonical organizations shape strictly (no fallbacks)
+      if (!manifest?.organizations || (manifest.organizations.organization === undefined)) {
+        const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
+        throw new ParserError({
+          code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+          message: 'SCORM compliance violation: organizations.organization required',
+          detail: {
+            reason: 'MISSING_ORGANIZATIONS_ORGANIZATION',
+            hasOrganizations: !!manifest?.organizations,
+            orgKeys: manifest?.organizations ? Object.keys(manifest.organizations) : []
+          },
+          phase: 'SN_INIT'
+        });
+      }
+
       // Validate manifest has sequencing information (or defaults allowed)
       if (!this.validateManifestForSequencing(manifest)) {
         // Strict policy: throw ParserError with actionable message (no auto-correction/fallback)
         const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
         const defaultOrgId = manifest?.organizations?.default || null;
-        const orgs = manifest?.organizations?.organization || [];
+        const orgProp = manifest?.organizations?.organization;
+        const orgs = Array.isArray(orgProp) ? orgProp : (orgProp ? [orgProp] : []);
         const defaultOrg = defaultOrgId
           ? orgs.find(o => o?.identifier === defaultOrgId)
           : orgs[0];
-        const topCount = Array.isArray(defaultOrg?.items) ? defaultOrg.items.length : 0;
+        const topItems = Array.isArray(defaultOrg?.item)
+          ? defaultOrg.item
+          : (defaultOrg?.item ? [defaultOrg.item] : []);
+        const topCount = topItems.length;
         throw new ParserError({
           code: ParserErrorCode.PARSE_VALIDATION_ERROR,
           message: topCount === 0
@@ -133,7 +153,7 @@ class ScormSNService {
           phase: 'SN_INIT'
         });
       }
- 
+
       // Build activity tree from manifest
       const treeResult = this.activityTreeManager.buildTree(manifest);
       if (!treeResult) {
@@ -202,7 +222,7 @@ class ScormSNService {
 
       // Process navigation through navigation handler
       const navResult = this.navigationHandler.processNavigationRequest(navigationRequest, targetActivityId);
-      
+
       if (!navResult.success) {
         return navResult;
       }
@@ -235,7 +255,7 @@ class ScormSNService {
           this.logger?.error('SN: Failed to resolve final launch URL for target activity', e?.message || e);
           // Strict: do not override success, but downstream will enforce scorm-app:// requirement
         }
-        
+
         return {
           ...navResult,
           sequencing: sequencingResult,
@@ -266,10 +286,10 @@ class ScormSNService {
     try {
       // Evaluate pre-condition rules
       const preConditionResult = this.sequencingEngine.evaluatePreConditionRules(activity);
-      
+
       if (preConditionResult.action) {
         const actionResult = this.sequencingEngine.processSequencingAction(preConditionResult.action, activity);
-        
+
         if (actionResult.success && actionResult.nextAction) {
           // Handle sequencing action results
           return await this.handleSequencingAction(actionResult, activity);
@@ -778,9 +798,9 @@ class ScormSNService {
   terminateSequencing() {
     try {
       this.sessionState = SEQUENCING_SESSION_STATES.ENDED;
-      
+
       const finalState = this.getSequencingState();
-      
+
       this.logger?.info('Sequencing session terminated', {
         sessionId: this.sequencingSession?.sessionId,
         duration: this.sequencingSession ? Date.now() - this.sequencingSession.startTime : 0
@@ -821,10 +841,11 @@ class ScormSNService {
     try {
       if (!manifest || !manifest.organizations) return false;
 
-      // Get organizations array from ManifestParser output
-      const orgs = manifest.organizations.organization || [];
+      // Get organizations array from ManifestParser output (support both properties)
+      const orgProp = manifest.organizations?.organization;
+      const orgs = Array.isArray(orgProp) ? orgProp : (orgProp ? [orgProp] : []);
 
-      if (!Array.isArray(orgs) || orgs.length === 0) {
+      if (orgs.length === 0) {
         return false;
       }
 
@@ -832,12 +853,12 @@ class ScormSNService {
       const hasExplicitSequencing =
         orgs.some(org => {
           if (org && org.sequencing) return true;
-          const stack = Array.isArray(org?.items) ? [...org.items] : [];
+          const stack = Array.isArray(org?.item) ? [...org.item] : [];
           while (stack.length) {
             const it = stack.pop();
             if (!it) continue;
             if (it.sequencing) return true;
-            const kids = (Array.isArray(it.children) ? it.children : (Array.isArray(it.items) ? it.items : []));
+            const kids = Array.isArray(it.item) ? it.item : [];
             if (kids.length) stack.push(...kids);
           }
           return false;
@@ -850,15 +871,14 @@ class ScormSNService {
       // Otherwise ensure at least one item exists to apply default sequencing.
       const hasAnyItems =
         orgs.some(org => {
-          const items = Array.isArray(org?.items) ? org.items : [];
+          const items = Array.isArray(org?.item) ? org.item : [];
           return items.length > 0;
         });
 
       return hasAnyItems;
     } catch (e) {
-      this.logger?.warn('SN.validateManifestForSequencing: permissive accept due to error', { message: e?.message });
-      // On parser irregularities, be permissive and allow defaults to apply
-      return true;
+      this.logger?.error('SN.validateManifestForSequencing: validation failed', { message: e?.message });
+      return false;
     }
   }
 
@@ -880,7 +900,7 @@ class ScormSNService {
     this.sessionState = SEQUENCING_SESSION_STATES.NOT_STARTED;
     this.currentPackage = null;
     this.sequencingSession = null;
-    
+
     this.logger?.debug('SN service reset');
   }
 
@@ -919,7 +939,7 @@ class ScormSNService {
           `Activity not found: ${activityId}`, 'updateActivityLocation');
         return { success: false, reason: 'Activity not found' };
       }
-      
+
       activity.location = location; // Update the location property on the ActivityNode
       this.logger?.debug(`SN Service: Updated location for activity ${activityId} to ${location}`);
       return { success: true, reason: 'Activity location updated' };

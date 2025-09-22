@@ -55,22 +55,22 @@ describe('ActivityTreeManager', () => {
       const manifest = {
         organizations: {
           default: 'org1',
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test Organization',
-            items: [{
+            item: [{
               identifier: 'item1',
               title: 'Test Item',
               identifierref: 'resource1'
             }]
           }]
         },
-        resources: [{
+        resources: { resource: [{
           identifier: 'resource1',
           type: 'webcontent',
           scormType: 'sco',
           href: 'content.html'
-        }]
+        }] }
       };
 
       const result = activityTreeManager.buildTree(manifest);
@@ -98,13 +98,13 @@ describe('ActivityTreeManager', () => {
     test('should handle nested activity structure', () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Root Organization',
-            items: [{
+            item: [{
               identifier: 'chapter1',
               title: 'Chapter 1',
-              children: [{
+              item: [{
                 identifier: 'lesson1',
                 title: 'Lesson 1',
                 identifierref: 'resource1'
@@ -116,10 +116,10 @@ describe('ActivityTreeManager', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' }
-        ]
+        ] }
       };
 
       const result = activityTreeManager.buildTree(manifest);
@@ -136,13 +136,13 @@ describe('ActivityTreeManager', () => {
     test('should detect circular references', () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test Organization',
-            items: [{
+            item: [{
               identifier: 'item1',
               title: 'Item 1',
-              children: [{
+              item: [{
                 identifier: 'item1', // Circular reference
                 title: 'Same Item'
               }]
@@ -182,10 +182,10 @@ describe('ActivityTreeManager', () => {
 
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Deep Organization',
-            items: [currentItem]
+            item: [currentItem]
           }]
         }
       };
@@ -206,10 +206,10 @@ describe('ActivityTreeManager', () => {
     beforeEach(() => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test Organization',
-            items: [{
+            item: [{
               identifier: 'item1',
               title: 'Test Item 1',
               identifierref: 'resource1'
@@ -220,10 +220,10 @@ describe('ActivityTreeManager', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'asset' }
-        ]
+        ] }
       };
       activityTreeManager.buildTree(manifest);
     });
@@ -392,13 +392,13 @@ describe('ActivityTreeManager', () => {
     test('should calculate correct statistics', () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Organization',
-            items: [{
+            item: [{
               identifier: 'chapter1',
               title: 'Chapter 1',
-              children: [{
+              item: [{
                 identifier: 'lesson1',
                 title: 'Lesson 1',
                 identifierref: 'resource1'
@@ -414,11 +414,11 @@ describe('ActivityTreeManager', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' },
           { identifier: 'resource3', scormType: 'asset' }
-        ]
+        ] }
       };
 
       activityTreeManager.buildTree(manifest);
@@ -440,10 +440,10 @@ describe('ActivityTreeManager', () => {
     test('should reset to initial state', () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test Organization',
-            items: [{ identifier: 'item1', title: 'Test Item' }]
+            item: [{ identifier: 'item1', title: 'Test Item' }]
           }]
         }
       };
@@ -489,17 +489,17 @@ describe('ActivityTreeManager', () => {
     test('should handle missing resources gracefully', () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test Organization',
-            items: [{
+            item: [{
               identifier: 'item1',
               title: 'Test Item',
               identifierref: 'missing-resource' // Resource doesn't exist
             }]
           }]
         },
-        resources: []
+        resources: { resource: [] }
       };
 
       const result = activityTreeManager.buildTree(manifest);

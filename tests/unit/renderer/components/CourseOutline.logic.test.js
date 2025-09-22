@@ -7,13 +7,13 @@ import { CourseOutline } from '../../../../src/renderer/components/scorm/course-
 import { EventBus } from '../../../../src/renderer/services/event-bus.js';
 
 // Mock dependencies
-jest.mock('../../../../src/renderer/services/sn-bridge.js', () => ({
-  snBridge: {
-    validateCourseOutlineChoice: jest.fn(),
-    getCourseOutlineActivityTree: jest.fn(),
-    getCourseOutlineAvailableNavigation: jest.fn(),
-  }
-}));
+const mockSnBridge = {
+  validateCourseOutlineChoice: jest.fn(),
+  getCourseOutlineActivityTree: jest.fn(),
+  getCourseOutlineAvailableNavigation: jest.fn(),
+};
+
+
 
 jest.mock('../../../../src/renderer/utils/renderer-logger.js', () => ({
   rendererLogger: {
@@ -52,10 +52,10 @@ describe('CourseOutline Component Logic', () => {
       setState: jest.fn(),
     };
 
-    courseOutline = new CourseOutline('#outline-root');
+    courseOutline = new CourseOutline('#outline-root', { snBridge: mockSnBridge });
     courseOutline.eventBus = eventBus;
     courseOutline.uiState = mockUiState;
-    
+
     // Mock that SCORM states are loaded so navigation is allowed
     courseOutline.scormStatesLoaded = true;
 
@@ -82,6 +82,9 @@ describe('CourseOutline Component Logic', () => {
 
   test('clicking an item should first call for authoritative validation', async () => {
     courseOutline.handleCourseLoaded({ structure: mockCourseStructure });
+    // Mark states loaded to allow navigation in unit test scope
+    courseOutline.scormStatesLoaded = true;
+
     mockSnBridge.validateCourseOutlineChoice.mockResolvedValue({ success: true, allowed: true });
 
     const itemToClick = rootElement.querySelector('[data-item-id="item-1"] .outline-item__title');
@@ -95,6 +98,8 @@ describe('CourseOutline Component Logic', () => {
 
   test('should emit "navigation:request" if validation succeeds', async () => {
     courseOutline.handleCourseLoaded({ structure: mockCourseStructure });
+    courseOutline.scormStatesLoaded = true;
+
     mockSnBridge.validateCourseOutlineChoice.mockResolvedValue({ success: true, allowed: true });
 
     const itemToClick = rootElement.querySelector('[data-item-id="item-1"] .outline-item__title');
@@ -112,6 +117,8 @@ describe('CourseOutline Component Logic', () => {
 
   test('should NOT emit "navigation:request" if validation fails', async () => {
     courseOutline.handleCourseLoaded({ structure: mockCourseStructure });
+    courseOutline.scormStatesLoaded = true;
+
     mockSnBridge.validateCourseOutlineChoice.mockResolvedValue({ success: true, allowed: false, reason: 'Sequencing rules forbid it' });
 
     const itemToClick = rootElement.querySelector('[data-item-id="item-1"] .outline-item__title');

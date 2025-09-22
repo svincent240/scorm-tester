@@ -209,9 +209,13 @@ describe('SCORM Inspector Error Handling', () => {
           this.apiTimelineElement.innerHTML = entriesHtml;
         } catch (error) {
           console.error('Error rendering API timeline:', error);
-          if (this.apiTimelineElement) {
-            this.apiTimelineElement.innerHTML =
-              '<div class="error">Error displaying API timeline</div>';
+          try {
+            if (this.apiTimelineElement) {
+              this.apiTimelineElement.innerHTML =
+                '<div class="error">Error displaying API timeline</div>';
+            }
+          } catch (_) {
+            // Swallow secondary DOM errors to satisfy fail-safe rendering
           }
         }
       }

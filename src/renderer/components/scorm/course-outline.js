@@ -12,7 +12,7 @@
 import { BaseComponent } from '../base-component.js';
 import { uiState as uiStatePromise } from '../../services/ui-state.js';
 import { rendererLogger } from '../../utils/renderer-logger.js';
-import { snBridge } from '../../services/sn-bridge.js';
+// sn-bridge is provided via dependency injection (options.snBridge). No direct import here.
 import { escapeHTML } from '../../utils/escape.js';
 
 
@@ -32,6 +32,9 @@ class CourseOutline extends BaseComponent {
     this.browseModeEnabled = false;
     this.scormStatesLoaded = false; // Track whether SCORM states have been loaded
 
+    // Injected SN bridge (renderer↔main IPC); provide via options in tests
+    this.snBridge = options.snBridge || null;
+
     // Bind handlers to preserve 'this' context across event bus calls
     this.handleCourseLoaded = this.handleCourseLoaded.bind(this);
     this.handleCourseCleared = this.handleCourseCleared.bind(this);
@@ -46,6 +49,8 @@ class CourseOutline extends BaseComponent {
     this.navigateToItem = this.navigateToItem.bind(this);
 
     rendererLogger.info('CourseOutline: constructor initialized');
+
+
   }
 
   getDefaultOptions() {
@@ -58,6 +63,9 @@ class CourseOutline extends BaseComponent {
       attributes: { 'data-component': 'course-outline' }
     };
   }
+
+
+
 
   async setup() {
     this.uiState = await uiStatePromise; // Resolve the promise
@@ -690,8 +698,9 @@ class CourseOutline extends BaseComponent {
     let allowed = true;
     let reason = 'Validation not performed';
     try {
-      if (snBridge && typeof snBridge.validateCourseOutlineChoice === 'function') {
-        const res = await snBridge.validateCourseOutlineChoice(itemId);
+      const snb = this.snBridge;
+      if (snb && typeof snb.validateCourseOutlineChoice === 'function') {
+        const res = await snb.validateCourseOutlineChoice(itemId);
         allowed = !!(res && res.success && res.allowed);
         reason = res?.reason || reason;
         rendererLogger.info('CourseOutline: Choice validation result', { itemId, allowed, reason });
@@ -706,20 +715,28 @@ class CourseOutline extends BaseComponent {
 
     if (!allowed) {
       // Do not emit navigation intent when validation fails
-      try { this.emit('navigationDenied', { itemId, reason }); } catch (_) {}
+      try {
+        if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+          throw new Error('eventBus unavailable');
+        }
+        this.eventBus.emit('navigationDenied', { itemId, reason });
+      } catch (err) {
+        rendererLogger.error('CourseOutline: Failed to emit navigationDenied', { itemId, error: err?.message || err });
+      }
       return;
     }
 
     // Emit centralized choice intent for AppManager orchestration
     try {
-      const { eventBus } = await import('../../services/event-bus.js');
-      // SCORM SN uses "choice" requests with target activity
+      if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+        throw new Error('eventBus unavailable');
+      }
       rendererLogger.info('CourseOutline: Emitting navigation:request event', {
         requestType: 'choice',
         activityId: itemId,
         source: 'course-outline'
       });
-      eventBus.emit('navigation:request', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
+      this.eventBus.emit('navigation:request', { requestType: 'choice', activityId: itemId, source: 'course-outline' });
     } catch (error) {
       rendererLogger.error('CourseOutline: Failed to emit navigation:request', {
         itemId,
@@ -857,6 +874,8 @@ class CourseOutline extends BaseComponent {
       } catch (_) {}
 
       this.setCourseStructure(courseData.structure);
+      // Expand all by default on initial load to make nested items visible (test and UX expectation)
+      try { this.expandAll(); } catch (_) {}
 
       // CRITICAL FIX: Reset SCORM states before fetching new ones
       this.scormStates.clear();
@@ -1100,22 +1119,23 @@ class CourseOutline extends BaseComponent {
    */
   async fetchScormStates() {
     try {
+      const snb = this.snBridge;
       rendererLogger.info('CourseOutline: fetchScormStates called', {
         currentScormStatesCount: this.scormStates.size,
         scormStatesLoaded: this.scormStatesLoaded,
         browseModeEnabled: this.browseModeEnabled,
         hasElectronAPI: (typeof window !== 'undefined') && ('electronAPI' in window),
-        hasGetCourseOutlineActivityTree: !!(snBridge && typeof snBridge.getCourseOutlineActivityTree === 'function')
+        hasGetCourseOutlineActivityTree: !!(snb && typeof snb.getCourseOutlineActivityTree === 'function')
       });
 
-      if (!snBridge || typeof snBridge.getCourseOutlineActivityTree !== 'function') {
+      if (!snb || typeof snb.getCourseOutlineActivityTree !== 'function') {
         rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available via snBridge');
         this.scormStatesLoaded = false;
         return null;
       }
 
       rendererLogger.info('CourseOutline: Calling SNBridge.getCourseOutlineActivityTree');
-      const result = await snBridge.getCourseOutlineActivityTree();
+      const result = await snb.getCourseOutlineActivityTree();
       rendererLogger.debug('CourseOutline: fetchScormStates IPC result received', {
         success: result?.success,
         hasData: !!result?.data,
@@ -1198,12 +1218,13 @@ class CourseOutline extends BaseComponent {
    */
   async fetchAvailableNavigation() {
     try {
-      if (!snBridge || typeof snBridge.getCourseOutlineAvailableNavigation !== 'function') {
+      const snb = this.snBridge;
+      if (!snb || typeof snb.getCourseOutlineAvailableNavigation !== 'function') {
         rendererLogger.warn('CourseOutline: getCourseOutlineAvailableNavigation not available via snBridge');
         return [];
       }
 
-      const result = await snBridge.getCourseOutlineAvailableNavigation();
+      const result = await snb.getCourseOutlineAvailableNavigation();
       if (result.success && Array.isArray(result.data)) {
         this.availableNavigation = result.data;
         rendererLogger.info('CourseOutline: Available navigation fetched successfully', this.availableNavigation.length);

@@ -38,7 +38,7 @@ describe('SCORM 2004 4th Edition Compliance', () => {
     return {
       organizations: {
         default: 'org1',
-        organizations: [{
+        organization: [{
           identifier: 'org1',
           title: 'Golf Explained - Simple Remediation',
           sequencing: {
@@ -50,7 +50,7 @@ describe('SCORM 2004 4th Edition Compliance', () => {
               }]
             }
           },
-          items: [{
+          item: [{
             identifier: 'playing_item',
             title: 'Playing the Game',
             identifierref: 'playing_resource',
@@ -74,11 +74,11 @@ describe('SCORM 2004 4th Edition Compliance', () => {
           }]
         }]
       },
-      resources: [
+      resources: { resource: [
         { identifier: 'playing_resource', scormType: 'sco', href: 'shared/launchpage.html?content=playing' },
         { identifier: 'etiquette_resource', scormType: 'sco', href: 'shared/launchpage.html?content=etiquette' },
         { identifier: 'assessment_resource', scormType: 'sco', href: 'shared/launchpage.html' }
-      ]
+      ] }
     };
   };
 
@@ -364,13 +364,13 @@ describe('SCORM 2004 4th Edition Compliance', () => {
       const emptyManifest = {
         organizations: {
           default: 'org1',
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Empty Course',
-            items: []
+            item: []
           }]
         },
-        resources: []
+        resources: { resource: [] }
       };
   
       await expect(snService.initialize(emptyManifest)).rejects.toMatchObject({
@@ -384,19 +384,19 @@ describe('SCORM 2004 4th Edition Compliance', () => {
       const manifest = {
         organizations: {
           default: 'org1',
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Long ID Test',
-            items: [{
+            item: [{
               identifier: longId,
               title: 'Long ID Item',
               identifierref: 'resource1'
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco', href: 'content.html' }
-        ]
+        ] }
       };
       
       const result = await snService.initialize(manifest);
@@ -407,19 +407,19 @@ describe('SCORM 2004 4th Edition Compliance', () => {
       const manifest = {
         organizations: {
           default: 'org1',
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Test & Special "Chars" <Title>',
-            items: [{
+            item: [{
               identifier: 'item1',
               title: 'Item with émojis 🚀 and ñ characters',
               identifierref: 'resource1'
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco', href: 'content.html' }
-        ]
+        ] }
       };
       
       const result = await snService.initialize(manifest);

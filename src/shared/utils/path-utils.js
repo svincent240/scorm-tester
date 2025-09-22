@@ -183,14 +183,15 @@ class PathUtils {
 
       // Validate the resolved path exists and is within allowed roots
       const normalizedAppRoot = this.normalize(appRoot);
-      // Strict policy: only app root and canonical temp root are allowed
       const normalizedTempRoot = this.getTempRoot();
+      const normalizedExtraction = this.normalize(extractionPath);
 
       const withinAppRoot = resolvedPath.startsWith(normalizedAppRoot);
       const withinTempRoot = resolvedPath.startsWith(normalizedTempRoot);
+      const withinExtraction = resolvedPath.startsWith(normalizedExtraction);
 
-      if (!withinAppRoot && !withinTempRoot) {
-        throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot}): ${resolvedPath}`);
+      if (!withinAppRoot && !withinTempRoot && !withinExtraction) {
+        throw new Error(`Resolved path outside allowed roots (${normalizedAppRoot} OR ${normalizedTempRoot} OR ${normalizedExtraction}): ${resolvedPath}`);
       }
 
       // Check file existence
@@ -202,10 +203,13 @@ class PathUtils {
       let protocolUrl;
       if (withinAppRoot) {
         protocolUrl = this.toScormProtocolUrl(resolvedPath, appRoot);
-      } else {
-        // For extracted content, always use the canonical temp root as base so
-        // the scorm_* directory remains in the URL and the protocol handler can resolve it.
+      } else if (withinTempRoot) {
+        // For extracted content, use the canonical temp root as base so the
+        // scorm_* directory remains in the URL and the protocol handler can resolve it.
         protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedTempRoot);
+      } else {
+        // Allow direct workspace/extraction directories (e.g., test fixtures or references)
+        protocolUrl = this.toScormProtocolUrl(resolvedPath, normalizedExtraction);
       }
 
 

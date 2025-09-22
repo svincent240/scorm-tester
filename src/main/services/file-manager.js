@@ -667,25 +667,30 @@ class FileManager extends BaseService {
   validateZipEntry(entryName, entry, extractPath, resolvedExtractRoot) {
     const normalizedEntry = PathUtils.normalize(entryName);
 
-    // Skip directory entries
+    // Skip directory entries (by flag or trailing slash after normalization)
     if (entry.isDirectory || normalizedEntry.endsWith('/')) {
       return { isValid: false };
     }
 
-    // Security checks
-    if (normalizedEntry.includes('..') || normalizedEntry.includes('\0') || normalizedEntry.includes('~')) {
+    // Security checks on original name (detect attempts before normalization cleans them)
+    const originalName = entryName;
+    if (originalName.includes('..') || originalName.includes('\0') || originalName.includes('~')) {
       return { isValid: false, reason: `suspicious entry: ${entryName}` };
     }
+    // Windows drive letter or colonized paths (e.g., C:\foo\bar.txt)
+    if (/^[A-Za-z]:[\\\/]/.test(originalName) || originalName.includes(':')) {
+      return { isValid: false, reason: `windows drive or colon path: ${entryName}` };
+    }
 
-    if (path.isAbsolute(normalizedEntry)) {
+    // Absolute paths
+    if (path.isAbsolute(normalizedEntry) || normalizedEntry.startsWith('\\\\')) {
       return { isValid: false, reason: `absolute path entry: ${entryName}` };
     }
 
-    // Path traversal check
+    // Path traversal and root-escape check
     const targetPath = path.join(extractPath, normalizedEntry);
     const resolvedTarget = path.resolve(targetPath);
     const isWithinExtractRoot = resolvedTarget === resolvedExtractRoot || resolvedTarget.startsWith(resolvedExtractRoot + path.sep);
-    
     if (!isWithinExtractRoot) {
       return { isValid: false, reason: `entry outside target: ${entryName}` };
     }

@@ -32,17 +32,20 @@ const ensureRoot = (id) => {
 };
 
 describe('CourseOutline choice validation', () => {
+  let mockSnBridge;
   beforeEach(() => {
     jest.clearAllMocks();
     ensureRoot('outline-root');
-    // Provide preload bridge pieces needed by renderer modules
+    // Provide preload bridge pieces needed by renderer modules (rendererBaseUrl for any dynamic imports)
     window.electronAPI = {
-      // Use a relative base so dynamic imports inside renderer modules resolve under Jest
       rendererBaseUrl: '../',
+      logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }
+    };
+    // Dependency-injected SN bridge for CourseOutline
+    mockSnBridge = {
       validateCourseOutlineChoice: jest.fn().mockResolvedValue({ success: true, allowed: false, reason: 'Choice disabled' }),
       getCourseOutlineActivityTree: jest.fn().mockResolvedValue({ success: true, data: { id: 'root', scormState: {}, children: [] } }),
-      getCourseOutlineAvailableNavigation: jest.fn().mockResolvedValue({ success: true, data: ['choice'] }),
-      logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }
+      getCourseOutlineAvailableNavigation: jest.fn().mockResolvedValue({ success: true, data: ['choice'] })
     };
   });
 
@@ -56,7 +59,7 @@ describe('CourseOutline choice validation', () => {
     const { CourseOutline } = await import('../../src/renderer/components/scorm/course-outline.js');
 
     // Instantiate component
-    const outline = new CourseOutline('outline-root', { autoRender: false });
+    const outline = new CourseOutline('outline-root', { autoRender: false, snBridge: mockSnBridge });
     // Minimal setup: render base content and set a simple structure
     await outline.initialize?.().catch(() => {}); // tolerate partial initialize in jsdom
     outline.renderContent();
@@ -68,12 +71,12 @@ describe('CourseOutline choice validation', () => {
     await outline.navigateToItem('sco-1');
 
     // Ensure validation was called
-    expect(window.electronAPI.validateCourseOutlineChoice).toHaveBeenCalledWith('sco-1');
+    expect(mockSnBridge.validateCourseOutlineChoice).toHaveBeenCalledWith('sco-1');
     // Should NOT emit navigationRequest
     expect(emitSpy.mock.calls.find(c => c[0] === 'navigation:request')).toBeUndefined();
 
     // Now allow validation and try again
-    window.electronAPI.validateCourseOutlineChoice.mockResolvedValueOnce({ success: true, allowed: true, reason: 'ok' });
+    mockSnBridge.validateCourseOutlineChoice.mockResolvedValueOnce({ success: true, allowed: true, reason: 'ok' });
     await outline.navigateToItem('sco-1');
 
     // Should emit navigationRequest once allowed

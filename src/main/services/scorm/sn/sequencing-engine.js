@@ -120,14 +120,20 @@ class SequencingEngine {
     let conditionCombination = 'all';
     let conditionsArray = [];
 
-    // Handle case where conditions is an array (legacy format)
+    // Handle case where conditions is an array
     if (Array.isArray(conditions)) {
       conditionsArray = conditions;
+      // Support array-carrying metadata (tests may attach conditionCombination on the array object)
+      if (typeof conditions.conditionCombination === 'string') {
+        const cc = conditions.conditionCombination.toLowerCase();
+        conditionCombination = (cc === 'any' || cc === 'all') ? cc : 'all';
+      }
     }
-    // Handle case where conditions is an object with conditionCombination and conditions array
+    // Handle case where conditions is an object with conditionCombination and inner conditions array
     else if (typeof conditions === 'object' && conditions !== null) {
-      conditionCombination = conditions.conditionCombination || 'all';
-      conditionsArray = conditions.conditions || [];
+      const cc = String(conditions.conditionCombination || 'all').toLowerCase();
+      conditionCombination = (cc === 'any' || cc === 'all') ? cc : 'all';
+      conditionsArray = Array.isArray(conditions.conditions) ? conditions.conditions : [];
     }
 
     if (!Array.isArray(conditionsArray) || conditionsArray.length === 0) {

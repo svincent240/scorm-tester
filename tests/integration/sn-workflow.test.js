@@ -48,10 +48,10 @@ describe('SN Workflow Integration Tests', () => {
       const manifest = {
         organizations: {
           default: 'org1',
-          organizations: [{
+          organization: [{
             identifier: 'org1',
             title: 'Linear Course',
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1'
@@ -66,11 +66,11 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco', href: 'lesson1.html' },
           { identifier: 'resource2', scormType: 'sco', href: 'lesson2.html' },
           { identifier: 'resource3', scormType: 'sco', href: 'lesson3.html' }
-        ]
+        ] }
       };
 
       // Initialize SN service
@@ -102,10 +102,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle previous navigation', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Bidirectional Course',
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1'
@@ -116,10 +117,10 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -143,13 +144,14 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle choice navigation requests', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Choice Course',
             sequencing: {
               controlMode: { choice: true, flow: true }
             },
-            items: [{
+            item: [{
               identifier: 'intro',
               title: 'Introduction',
               identifierref: 'resource1'
@@ -164,11 +166,11 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' },
           { identifier: 'resource3', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -186,20 +188,21 @@ describe('SN Workflow Integration Tests', () => {
     test('should reject choice navigation when disabled', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'No Choice Course',
             sequencing: {
               controlMode: { choice: false, flow: true }
             },
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1'
             }]
           }]
         },
-        resources: [{ identifier: 'resource1', scormType: 'sco' }]
+        resources: { resource: [{ identifier: 'resource1', scormType: 'sco' }] }
       };
 
       await snService.initialize(manifest);
@@ -219,10 +222,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should process skip rules based on satisfaction', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Skip Rule Course',
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1',
@@ -248,10 +252,10 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -272,13 +276,14 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle exit parent action', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Exit Parent Course',
-            items: [{
+            item: [{
               identifier: 'chapter1',
               title: 'Chapter 1',
-              children: [{
+              item: [{
                 identifier: 'lesson1',
                 title: 'Lesson 1',
                 identifierref: 'resource1',
@@ -296,7 +301,7 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [{ identifier: 'resource1', scormType: 'sco' }]
+        resources: { resource: [{ identifier: 'resource1', scormType: 'sco' }] }
       };
 
       await snService.initialize(manifest);
@@ -320,7 +325,8 @@ describe('SN Workflow Integration Tests', () => {
     test('should process objective rollup correctly', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Rollup Course',
             sequencing: {
@@ -329,7 +335,7 @@ describe('SN Workflow Integration Tests', () => {
                 rollupProgressCompletion: true
               }
             },
-            items: [{
+            item: [{
               identifier: 'test1',
               title: 'Test 1',
               identifierref: 'resource1',
@@ -350,10 +356,10 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -379,10 +385,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle global objectives mapping', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Global Objectives Course',
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1',
@@ -401,7 +408,7 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [{ identifier: 'resource1', scormType: 'sco' }]
+        resources: { resource: [{ identifier: 'resource1', scormType: 'sco' }] }
       };
 
       await snService.initialize(manifest);
@@ -426,7 +433,8 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle remediation workflow', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Remediation Course',
             sequencing: {
@@ -441,7 +449,7 @@ describe('SN Workflow Integration Tests', () => {
                 }]
               }
             },
-            items: [{
+            item: [{
               identifier: 'content1',
               title: 'Content 1',
               identifierref: 'resource1'
@@ -459,10 +467,10 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -487,13 +495,14 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle hierarchical activity structure', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Hierarchical Course',
-            items: [{
+            item: [{
               identifier: 'module1',
               title: 'Module 1',
-              children: [{
+              item: [{
                 identifier: 'lesson1_1',
                 title: 'Lesson 1.1',
                 identifierref: 'resource1'
@@ -505,7 +514,7 @@ describe('SN Workflow Integration Tests', () => {
             }, {
               identifier: 'module2',
               title: 'Module 2',
-              children: [{
+              item: [{
                 identifier: 'lesson2_1',
                 title: 'Lesson 2.1',
                 identifierref: 'resource3'
@@ -513,11 +522,11 @@ describe('SN Workflow Integration Tests', () => {
             }]
           }]
         },
-        resources: [
+        resources: { resource: [
           { identifier: 'resource1', scormType: 'sco' },
           { identifier: 'resource2', scormType: 'sco' },
           { identifier: 'resource3', scormType: 'sco' }
-        ]
+        ] }
       };
 
       await snService.initialize(manifest);
@@ -538,17 +547,18 @@ describe('SN Workflow Integration Tests', () => {
     test('should maintain session state throughout workflow', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Session Test Course',
-            items: [{
+            item: [{
               identifier: 'lesson1',
               title: 'Lesson 1',
               identifierref: 'resource1'
             }]
           }]
         },
-        resources: [{ identifier: 'resource1', scormType: 'sco' }]
+        resources: { resource: [{ identifier: 'resource1', scormType: 'sco' }] }
       };
 
       const initResult = await snService.initialize(manifest);
@@ -572,10 +582,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle service reset correctly', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Reset Test Course',
-            items: [{ identifier: 'lesson1', title: 'Lesson 1' }]
+            item: [{ identifier: 'lesson1', title: 'Lesson 1' }]
           }]
         }
       };
@@ -604,10 +615,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle invalid navigation requests', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Error Test Course',
-            items: [{ identifier: 'lesson1', title: 'Lesson 1' }]
+            item: [{ identifier: 'lesson1', title: 'Lesson 1' }]
           }]
         }
       };
@@ -628,10 +640,11 @@ describe('SN Workflow Integration Tests', () => {
     test('should handle invalid activity progress updates', async () => {
       const manifest = {
         organizations: {
-          organizations: [{
+          default: 'org1',
+          organization: [{
             identifier: 'org1',
             title: 'Progress Test Course',
-            items: [{ identifier: 'lesson1', title: 'Lesson 1' }]
+            item: [{ identifier: 'lesson1', title: 'Lesson 1' }]
           }]
         }
       };

@@ -51,9 +51,12 @@ class ScormCAMService {
    * @returns {Promise<Object>} Comprehensive package processing result
    */
   async processPackage(packagePath, manifestContent) {
+    // Keep validation available across failures for diagnostics
+    let validation = null;
+    let analysis;
     try {
       this.logger?.info(`ScormCAMService: Starting package processing for ${packagePath}`);
-      
+
       // Add comprehensive logging for debugging
       this.logger?.info(`ScormCAMService: manifestContent type: ${typeof manifestContent}, length: ${manifestContent?.length || 'undefined'}`);
       this.logger?.info(`ScormCAMService: packagePath: ${packagePath}`);
@@ -157,18 +160,32 @@ class ScormCAMService {
 
       // 2. Validate Package
       this.logger?.info('ScormCAMService: Starting package validation');
-      let validation;
       try {
         validation = await this.contentValidator.validatePackage(packagePath, manifest);
         this.logger?.info('ScormCAMService: Package validation completed', { isValid: validation.isValid });
       } catch (validationError) {
         this.logger?.error('ScormCAMService: Package validation failed:', validationError);
-        throw new Error(`Package validation failed: ${validationError.message}`);
+        validation = {
+          isValid: false,
+          errors: [validationError?.message || String(validationError)],
+          warnings: [],
+          summary: {
+            totalErrors: 1,
+            totalWarnings: 0,
+            isCompliant: false,
+            validationDate: new Date().toISOString()
+          }
+        };
+        // Continue to analysis; do not return early. Validation details will be included in the final result.
+      }
+
+      // If invalid, log and continue to analysis to provide outline/metadata for diagnostics
+      if (!validation?.isValid) {
+        this.logger?.info('ScormCAMService: Package invalid; continuing to analysis for diagnostics', { errorCount: validation?.errors?.length || 0 });
       }
 
       // 3. Analyze Package
       this.logger?.info('ScormCAMService: Starting package analysis');
-      let analysis;
       try {
         analysis = this.packageAnalyzer.analyzePackage(packagePath, manifest);
         this.logger?.info('ScormCAMService: Package analysis completed');
@@ -193,13 +210,13 @@ class ScormCAMService {
           : (orgs[0] || null);
 
         // 2) Build a resource map with xml:base resolution
-        const resources = toArray(manifest?.resources);
+        const resourceList = toArray(manifest?.resources?.resource);
         const resById = new Map();
 
         // Resolve nested xml:base at resources container and resource node levels
         const containerBase = safeStr(manifest?.resources?.['xml:base'] || manifest?.resources?.xmlBase || manifest?.resources?.xmlbase || '', '');
 
-        for (const r of resources) {
+        for (const r of resourceList) {
           const id = safeStr(r?.identifier);
           if (!id) continue;
           const localBase = safeStr(r?.['xml:base'] || r?.xmlBase || r?.xmlbase || '', '');
@@ -283,7 +300,8 @@ class ScormCAMService {
         }
 
         // Centralize resolution: convert selected href into final scorm-app:// URL
-        if (first && first.href) {
+        // Resolve launch URL only when validation has passed; otherwise leave xml:base-joined href for diagnostics
+        if (validation?.isValid && first && first.href) {
           try {
             const manifestPath = PathUtils.join(packagePath, 'imsmanifest.xml');
             const appRoot = PathUtils.getAppRoot(__dirname);
@@ -413,8 +431,8 @@ class ScormCAMService {
         throw error;
       }
 
-      // Fallback: return normalized failure
-      return { success: false, error: error.message, reason: error.message };
+      // Fail-fast but include validation snapshot when available for diagnostics
+      return { success: false, error: error.message, reason: error.message, validation: validation || undefined };
     }
   }
 

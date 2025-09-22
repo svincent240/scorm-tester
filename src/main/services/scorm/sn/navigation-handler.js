@@ -71,7 +71,44 @@ class NavigationHandler {
       // Check if browse mode is enabled - if so, use browse mode processing
       if (this.isBrowseModeEnabled()) {
         this.logger?.debug('Using browse mode navigation processing');
-        return this.processBrowseModeNavigation(navigationRequest, targetActivityId);
+        const bmResult = this.processBrowseModeNavigation(navigationRequest, targetActivityId);
+        // Ensure targetActivity is present when a targetActivityId is supplied in browse mode
+        if (bmResult && bmResult.success && navigationRequest === NAVIGATION_REQUESTS.CHOICE && targetActivityId) {
+          try {
+            let ta = null;
+            if (this.activityTreeManager?.getActivity) {
+              ta = this.activityTreeManager.getActivity(targetActivityId);
+            }
+            if (!ta && this.activityTreeManager?.findActivity) {
+              ta = this.activityTreeManager.findActivity(targetActivityId);
+            }
+            if (process?.env?.JEST_WORKER_ID) {
+              // Test diagnostics
+              // eslint-disable-next-line no-console
+              console.log('[NAV DIAG] attach-after-browse CHOICE', {
+                targetActivityId,
+                foundVia: ta ? (this.activityTreeManager?.getActivity ? 'getActivity' : 'findActivity') : 'none',
+                hadTargetBefore: !!bmResult.targetActivity,
+                success: bmResult.success
+              });
+            }
+            if (ta) bmResult.targetActivity = ta;
+          } catch (e) {
+            if (process?.env?.JEST_WORKER_ID) {
+              // eslint-disable-next-line no-console
+              console.log('[NAV DIAG] attach-after-browse error', e?.message || e);
+            }
+          }
+        }
+        if (process?.env?.JEST_WORKER_ID) {
+          // eslint-disable-next-line no-console
+          console.log('[NAV DIAG] return bmResult', {
+            navigationRequest,
+            targetActivityId,
+            hasTarget: !!bmResult?.targetActivity
+          });
+        }
+        return bmResult;
       }
 
       // Standard SCORM navigation processing
@@ -533,6 +570,10 @@ class NavigationHandler {
     */
   processBrowseModeNavigation(navigationRequest, targetActivityId = null) {
     try {
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM NAV enter', { navigationRequest, targetActivityId });
+      }
       this.logger?.debug('Browse mode navigation: Starting request processing', {
         navigationRequest,
         targetActivityId,
@@ -562,6 +603,10 @@ class NavigationHandler {
 
       // Initialize browse mode session if needed
       const sessionInit = this.initializeBrowseModeSession();
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM NAV sessionInit', sessionInit);
+      }
       if (!sessionInit.success) {
         this.logger?.error('Browse mode navigation: Session initialization failed', {
           reason: sessionInit.reason
@@ -576,20 +621,28 @@ class NavigationHandler {
 
       // Validate activity tree state
       const treeValidation = this.validateActivityTreeState();
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM NAV treeValidation', {
+          hasRoot: treeValidation.hasRoot,
+          isValid: treeValidation.isValid,
+          issues: treeValidation.issues
+        });
+      }
       this.logger?.debug('Browse mode navigation: Activity tree validation', treeValidation);
 
-      if (!treeValidation.isValid) {
-        this.logger?.error('Browse mode navigation: Invalid activity tree state', {
-          issues: treeValidation.issues,
-          hasRoot: treeValidation.hasRoot,
-          launchableCount: treeValidation.launchableActivities.length
-        });
+      if (!treeValidation.hasRoot) {
+        this.logger?.error('Browse mode navigation: No root activity in tree');
         return {
           success: false,
-          reason: `Browse mode navigation failed: ${treeValidation.issues.join(', ')}`,
+          reason: 'Browse mode navigation failed: No root activity in tree',
           browseMode: true,
           validation: treeValidation
         };
+      }
+      if (!treeValidation.isValid) {
+        // In browse mode, do not fail here solely for "no launchable"; START handler will attempt resolution.
+        this.logger?.warn('Browse mode navigation: No launchable activities reported by validation; continuing to request-specific handling');
       }
 
       this.logger?.debug('Processing browse mode navigation request', {
@@ -648,6 +701,10 @@ class NavigationHandler {
 
       // For other navigation types, use browse mode specific logic instead of SCORM sequencing
       let result;
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM NAV request', { navigationRequest, targetActivityId });
+      }
       switch (navigationRequest) {
         case NAVIGATION_REQUESTS.START:
           result = this.processBrowseModeStart();
@@ -672,13 +729,42 @@ class NavigationHandler {
       // Get browse mode session information
       const currentSession = this.browseModeService?.getCurrentSession();
 
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM NAV raw result', { success: !!result?.success, action: result?.action });
+      }
       // Enhance result with browse mode information
-      return {
+      const enhanced = {
         ...result,
         browseMode: true,
         sessionId: currentSession?.id,
         standardEvaluation: null // Not applicable for non-choice navigation
       };
+
+      // Ensure CHOICE responses include targetActivity when targetActivityId provided
+      if (navigationRequest === NAVIGATION_REQUESTS.CHOICE && targetActivityId && enhanced.success && !enhanced.targetActivity) {
+        try {
+          let ta = null;
+          if (this.activityTreeManager?.getActivity) ta = this.activityTreeManager.getActivity(targetActivityId);
+          if (!ta && this.activityTreeManager?.findActivity) ta = this.activityTreeManager.findActivity(targetActivityId);
+          if (process?.env?.JEST_WORKER_ID) {
+            // eslint-disable-next-line no-console
+            console.log('[NAV DIAG] attach-in-enhanced CHOICE', {
+              targetActivityId,
+              found: !!ta,
+              success: enhanced.success
+            });
+          }
+          if (ta) enhanced.targetActivity = ta;
+        } catch (e) {
+          if (process?.env?.JEST_WORKER_ID) {
+            // eslint-disable-next-line no-console
+            console.log('[NAV DIAG] attach-in-enhanced error', e?.message || e);
+          }
+        }
+      }
+
+      return enhanced;
 
     } catch (error) {
       this.logger?.error('Error processing browse mode navigation:', error);
@@ -837,21 +923,21 @@ class NavigationHandler {
   processBrowseModeStart() {
     try {
       this.logger?.debug('Browse mode start: Beginning navigation processing');
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM START: entered');
+      }
 
       // Validate activity tree state first
       const treeValidation = this.validateActivityTreeState();
       this.logger?.debug('Browse mode start: Activity tree validation', treeValidation);
 
       if (!treeValidation.isValid) {
-        this.logger?.error('Browse mode start: Invalid activity tree state', {
+        // In browse mode, do not fail fast here. We attempt to find a first launchable activity below.
+        this.logger?.warn('Browse mode start: Activity tree reported no launchable activities via validation; attempting direct first-activity resolution', {
           issues: treeValidation.issues
         });
-        return {
-          success: false,
-          reason: `Browse mode start failed: ${treeValidation.issues.join(', ')}`,
-          browseMode: true,
-          validation: treeValidation
-        };
+        // continue to resume/first-activity logic
       }
 
       // Check if there's a saved location to resume from
@@ -903,7 +989,20 @@ class NavigationHandler {
 
       // No saved location or invalid, start from first activity
       this.logger?.debug('Browse mode start: Finding first launchable activity');
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM START: validation + root', {
+          hasRoot: !!this.activityTreeManager.root
+        });
+      }
       const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM START: firstActivity', {
+          found: !!firstActivity,
+          id: firstActivity?.identifier
+        });
+      }
 
       if (firstActivity) {
         this.logger?.debug('Browse mode start: First activity found', {
@@ -932,6 +1031,10 @@ class NavigationHandler {
       }
 
       this.logger?.error('Browse mode start: No launchable activities found');
+      if (process?.env?.JEST_WORKER_ID) {
+        // eslint-disable-next-line no-console
+        console.log('[NAV DIAG] BM START: no launchable activities');
+      }
       return {
         success: false,
         reason: 'Browse mode start - no launchable activities found',
@@ -1177,13 +1280,15 @@ class NavigationHandler {
     // Use depth-first traversal to maintain sequential navigation order
     function traverseDFS(activity) {
       // Add launchable activities to the list in sequential order
-      if (activity.isLaunchable()) {
+      const launchable = typeof activity?.isLaunchable === 'function' ? activity.isLaunchable() : false;
+      if (launchable) {
         activities.push(activity);
       }
 
       // Recursively traverse children depth-first
-      if (activity.children && activity.children.length > 0) {
-        for (const child of activity.children) {
+      const kids = Array.isArray(activity?.children) ? activity.children : [];
+      if (kids.length > 0) {
+        for (const child of kids) {
           traverseDFS(child);
         }
       }
