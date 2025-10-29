@@ -21,13 +21,12 @@ class FooterStatusDisplay extends BaseComponent {
   }
 
   renderContent() {
-    // Render minimal footer status markup (index.html was gutted in rewrite)
+    // Render footer status markup directly without extra wrapper
+    // The element itself (#footer-status) will have the footer-status-display class
     this.element.innerHTML = `
-      <div class="footer-status">
-        <span id="footer-status" class="footer-status__text">Not Started</span>
-        <span id="footer-score" class="footer-status__score">--</span>
-        <span id="footer-time" class="footer-status__time">00:00:00</span>
-      </div>
+      <span id="footer-status-text" class="footer-status__text">Not Started</span>
+      <span id="footer-score" class="footer-status__score">--</span>
+      <span id="footer-time" class="footer-status__time">00:00:00</span>
     `;
   }
 
@@ -47,12 +46,12 @@ class FooterStatusDisplay extends BaseComponent {
       return;
     }
 
-    const footerStatus = this.element.querySelector('#footer-status');
+    const footerStatus = this.element.querySelector('#footer-status-text');
     if (footerStatus) {
       footerStatus.textContent = this.formatStatus(progressData.completionStatus);
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
-        rendererLogger.warn('FooterStatusDisplay: #footer-status not found in DOM');
+        rendererLogger.warn('FooterStatusDisplay: #footer-status-text not found in DOM');
       }).catch(() => {});
     }
 

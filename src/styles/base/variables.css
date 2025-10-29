@@ -318,6 +318,7 @@
 
   --z-header: 100;
   --z-sidebar: 90;
+  --z-inspector: 80;
   --z-overlay: 1000;
 
   --header-height: 52px;   /* slimmer header */

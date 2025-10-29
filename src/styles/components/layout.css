@@ -757,8 +757,9 @@
   gap: var(--spacing-lg);
 }
 
-/* Footer Progress */
-.footer-progress {
+/* Footer Progress - Component wrapper and content */
+.footer-progress-bar,
+#footer-progress {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -782,10 +783,22 @@
   min-width: 36px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
 
-/* Footer Status */
-.footer-status {
+/* Footer Progress Loading State */
+.footer-progress-bar--loading .footer-progress__fill {
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Footer Status - Component wrapper and content */
+.footer-status-display,
+#footer-status {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-md);

@@ -1,16 +1,108 @@
-/* Styles for error state display */
+/**
+ * Error State Component Styles
+ *
+ * Styles for error notifications and error state displays
+ * that match the application's design system.
+ *
+ * @fileoverview Error state component styles
+ */
 
+/* Error Notification */
 .notification.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 4px;
+  background-color: var(--danger-light);
+  color: var(--danger-dark);
+  border: 1px solid var(--danger-color);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  box-shadow: var(--shadow-sm);
 }
 
+.notification.error::before {
+  content: '⚠️';
+  font-size: var(--font-size-lg);
+  flex-shrink: 0;
+}
+
+/* Component Error State */
 .component-error {
-  color: #dc3545;
-  font-weight: bold;
-  margin-top: 10px;
+  color: var(--danger-color);
+  font-weight: var(--font-weight-semibold);
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--danger-light);
+  border-left: 3px solid var(--danger-color);
+  border-radius: var(--border-radius);
+}
+
+/* Empty State Styles */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-state__icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.6;
+}
+
+.empty-state__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-state__message {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  max-width: 400px;
+}
+
+/* Welcome Screen Styles */
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.welcome-screen__icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-lg);
+  animation: float 3s ease-in-out infinite;
+}
+
+.welcome-screen__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.welcome-screen__message {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  max-width: 500px;
+}
+
+/* Float animation for welcome icon */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }

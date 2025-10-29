@@ -1,0 +1,298 @@
+/**
+ * Notifications Component Styles
+ * 
+ * Styles for toast notifications, alerts, and notification containers
+ * that appear throughout the application.
+ * 
+ * @fileoverview Notification system styles
+ */
+
+/* Notification Container */
+.notifications-container {
+  position: fixed;
+  z-index: var(--z-index-toast);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-width: var(--notification-width);
+}
+
+/* Position variants */
+.notifications-container--top-right {
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+}
+
+.notifications-container--top-left {
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+}
+
+.notifications-container--bottom-right {
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
+}
+
+.notifications-container--bottom-left {
+  bottom: var(--spacing-md);
+  left: var(--spacing-md);
+}
+
+.notifications-container--top-center {
+  top: var(--spacing-md);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.notifications-container--bottom-center {
+  bottom: var(--spacing-md);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Individual Notification */
+.notification {
+  background: var(--notification-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--notification-border-radius);
+  box-shadow: var(--notification-shadow);
+  padding: var(--spacing-md);
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 300px;
+  max-width: var(--notification-width);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notification--dismissing {
+  animation: slideOutRight 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Notification Types */
+.notification--info {
+  border-left: 4px solid var(--primary-color);
+}
+
+.notification--success {
+  border-left: 4px solid var(--success-color);
+}
+
+.notification--warning {
+  border-left: 4px solid var(--warning-color);
+}
+
+.notification--error {
+  border-left: 4px solid var(--danger-color);
+}
+
+/* Notification Icon */
+.notification__icon {
+  font-size: var(--font-size-xl);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.notification--info .notification__icon {
+  color: var(--primary-color);
+}
+
+.notification--success .notification__icon {
+  color: var(--success-color);
+}
+
+.notification--warning .notification__icon {
+  color: var(--warning-color);
+}
+
+.notification--error .notification__icon {
+  color: var(--danger-color);
+}
+
+/* Notification Content */
+.notification__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification__title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.4;
+}
+
+.notification__message {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.notification__details {
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-monospace);
+  color: var(--text-secondary);
+  overflow-x: auto;
+}
+
+/* Notification Actions */
+.notification__actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.notification__action {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.notification__action:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary-color);
+}
+
+.notification__action--primary {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.notification__action--primary:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.notification__action--danger {
+  background: var(--danger-color);
+  color: white;
+  border-color: var(--danger-color);
+}
+
+.notification__action--danger:hover {
+  background: var(--danger-dark);
+  border-color: var(--danger-dark);
+}
+
+/* Notification Close Button */
+.notification__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  color: var(--text-secondary);
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  transition: all var(--transition-fast) ease;
+  flex-shrink: 0;
+}
+
+.notification__close:hover {
+  background: var(--bg-hover);
+  color: var(--text-color);
+}
+
+/* Progress Bar for Timed Notifications */
+.notification__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--bg-secondary);
+  border-radius: 0 0 var(--notification-border-radius) var(--notification-border-radius);
+  overflow: hidden;
+}
+
+.notification__progress-bar {
+  height: 100%;
+  background: var(--primary-color);
+  transition: width linear;
+}
+
+.notification--info .notification__progress-bar {
+  background: var(--primary-color);
+}
+
+.notification--success .notification__progress-bar {
+  background: var(--success-color);
+}
+
+.notification--warning .notification__progress-bar {
+  background: var(--warning-color);
+}
+
+.notification--error .notification__progress-bar {
+  background: var(--danger-color);
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Accessibility */
+.notification[role="alert"] {
+  /* Screen readers will announce this */
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .notification {
+    animation: none;
+  }
+  
+  .notification--dismissing {
+    animation: none;
+    opacity: 0;
+  }
+  
+  .notification__progress-bar {
+    transition: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .notifications-container {
+    display: none;
+  }
+}
+

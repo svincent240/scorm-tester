@@ -36,6 +36,13 @@ class InspectorPanel extends BaseComponent {
     };
   }
 
+  setupEventSubscriptions() {
+    // Listen for inspector toggle requests from header controls
+    this.subscribe('ui:inspector:toggle-request', () => this.toggleVisibility());
+    this.subscribe('ui:inspector:show-request', () => this.show());
+    this.subscribe('ui:inspector:hide-request', () => this.hide());
+  }
+
   renderContent() {
     // Shell with tabs, controls, summary, and per-tab containers
     this.element.innerHTML = `
