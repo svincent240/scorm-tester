@@ -180,12 +180,17 @@ async function handleRequest(req) {
         try {
           for (const name of router.tools.keys()) {
             const meta = TOOL_META.get(name) || {};
-            tools.push({
+            const tool = {
               name,
               description: meta.description || "SCORM MCP tool",
-              inputSchema: meta.inputSchema || { type: "object" },
-              outputSchema: meta.outputSchema || { type: "object" }
-            });
+              inputSchema: meta.inputSchema || { type: "object" }
+            };
+            // Only include outputSchema if explicitly defined in TOOL_META
+            // MCP requires structured content format when outputSchema is present
+            if (meta.outputSchema) {
+              tool.outputSchema = meta.outputSchema;
+            }
+            tools.push(tool);
           }
         } catch (_) {}
         return writeJSONRPCResult(id, { tools });
