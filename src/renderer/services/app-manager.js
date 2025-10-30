@@ -843,6 +843,13 @@ class AppManager {
         return;
       }
 
+      // Reset SCORM client state before reloading to prevent "Already initialized" errors
+      const { scormClient } = await import('./scorm-client.js');
+      if (scormClient) {
+        this.logger.info('AppManager: Resetting SCORM client state for reload');
+        scormClient.reset();
+      }
+
       // Set loading state on the reload button
       const reloadBtn = document.getElementById('course-reload-btn');
       if (reloadBtn) {
@@ -1090,7 +1097,7 @@ class AppManager {
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'success',
-      duration: 5000 // Auto-dismiss after 5 seconds
+      duration: 2000 // Auto-dismiss after 2 seconds
     });
   }
 

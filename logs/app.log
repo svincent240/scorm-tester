@@ -1,495 +1,526 @@
-Log start 2025-10-30T16:32:48.815Z
-2025-10-30T16:32:48.848Z [INFO] SCORM Tester: Log file path: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log 
-2025-10-30T16:32:48.850Z [INFO] SCORM Tester: process.env.LOG_LEVEL: undefined 
-2025-10-30T16:32:48.850Z [INFO] SCORM Tester: Logger logLevel: info 
-2025-10-30T16:32:48.850Z [INFO] SCORM Tester Log File: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log 
-2025-10-30T16:32:48.850Z [INFO] Check this file for detailed debugging information 
-2025-10-30T16:32:48.851Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-10-30T16:32:48.851Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-10-30T16:32:48.851Z [INFO] SCORM Tester: Core dependencies initialized 
-2025-10-30T16:32:48.851Z [INFO] SCORM Tester: Initializing services 
-2025-10-30T16:32:48.851Z [DEBUG] WindowManager base service created 
-2025-10-30T16:32:48.851Z [INFO] Initializing WindowManager service 
-2025-10-30T16:32:48.851Z [DEBUG] WindowManager state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.861Z [INFO] WindowManager: Custom protocol "scorm-app://" registered successfully 
-2025-10-30T16:32:48.862Z [INFO] WindowManager: Storage-capable origin feature is active 
-2025-10-30T16:32:48.862Z [DEBUG] WindowManager state changed: initializing -> ready 
-2025-10-30T16:32:48.862Z [INFO] WindowManager service initialized successfully in 11ms 
-2025-10-30T16:32:48.862Z [DEBUG] FileManager base service created 
-2025-10-30T16:32:48.862Z [INFO] Initializing FileManager service 
-2025-10-30T16:32:48.862Z [DEBUG] FileManager state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.862Z [DEBUG] FileManager: Starting initialization 
-2025-10-30T16:32:48.862Z [DEBUG] FileManager: Ensuring temp directory exists: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester 
-2025-10-30T16:32:48.869Z [DEBUG] FileManager: Cleaned up leftover temp entry: scorm_1761841742642 
-2025-10-30T16:32:48.869Z [INFO] FileManager: Cleaned up 1 leftover temp entries from previous sessions 
-2025-10-30T16:32:48.870Z [DEBUG] FileManager: Initialization completed 
-2025-10-30T16:32:48.870Z [DEBUG] FileManager state changed: initializing -> ready 
-2025-10-30T16:32:48.870Z [INFO] FileManager service initialized successfully in 8ms 
-2025-10-30T16:32:48.870Z [DEBUG] WindowManager: TelemetryStore instance set. 
-2025-10-30T16:32:48.871Z [DEBUG] [ScormInspectorTelemetryStore] Window manager reference set 
-2025-10-30T16:32:48.871Z [DEBUG] ScormService base service created 
-2025-10-30T16:32:48.871Z [INFO] Initializing ScormService service 
-2025-10-30T16:32:48.871Z [DEBUG] ScormService state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.871Z [DEBUG] ScormService: Starting initialization 
-2025-10-30T16:32:48.871Z [DEBUG] ScormCAMService initialized 
-2025-10-30T16:32:48.871Z [DEBUG] BrowseModeService initialized [{"defaultTimeout":1800000,"maxSessions":10,"scormService":{"_events":{},"_eventsCount":0,"serviceName":"ScormService","errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"options":{},"state":"initializing","initializationTime":null,"lastError":null,"dependencies":{},"metrics":{"startTime":null,"operationCount":0,"errorCount":0,"lastOperation":null},"config":{"maxSessions":10,"sessionTimeout":86400000,"enableGlobalObjectives":true,"enableRollupProcessing":true,"maxSequencingDepth":10},"rteService":null,"camService":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"manifestParser":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"parser":{"options":{"errorHandler":{}}},"namespaces":{"imscp":"http://www.imsglobal.org/xsd/imscp_v1p1","adlcp":"http://www.adlnet.org/xsd/adlcp_v1p3","imsss":"http://www.imsglobal.org/xsd/imsss","adlseq":"http://www.adlnet.org/xsd/adlseq_v1p3","adlnav":"http://www.adlnet.org/xsd/adlnav_v1p3","lom":"http://ltsc.ieee.org/xsd/LOM"}},"contentValidator":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"validationErrors":[],"validationWarnings":[],"hasRequiredElements":false,"validScormTypes":false,"validIdentifiers":false,"sequencingCompliance":false,"metadataCompliance":false,"overallCompliance":false},"metadataHandler":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"lomCategories":{"GENERAL":"general","LIFECYCLE":"lifecycle","META_METADATA":"metaMetadata","TECHNICAL":"technical","EDUCATIONAL":"educational","RIGHTS":"rights","RELATION":"relation","ANNOTATION":"annotation","CLASSIFICATION":"classification"},"dublinCoreMapping":{"dc:title":"general.title","dc:creator":"lifecycle.contribute.entity","dc:subject":"general.keyword","dc:description":"general.description","dc:publisher":"lifecycle.contribute.entity","dc:contributor":"lifecycle.contribute.entity","dc:date":"lifecycle.contribute.date","dc:type":"educational.learningResourceType","dc:format":"technical.format","dc:identifier":"general.identifier","dc:source":"relation.resource.identifier","dc:language":"general.language","dc:relation":"relation.resource.identifier","dc:coverage":"general.coverage","dc:rights":"rights.description"}},"packageAnalyzer":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"contentValidator":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"validationErrors":[],"validationWarnings":[],"hasRequiredElements":false,"validScormTypes":false,"validIdentifiers":false,"sequencingCompliance":false,"metadataCompliance":false,"overallCompliance":false},"logger":{}}},"snService":null,"browseModeService":null,"rteInstances":{},"sessions":{},"sessionCounter":0,"lmsProfiles":{"litmos":{"name":"Litmos LMS","settings":{"cmi.core.student_name":"Test Learner","cmi.core.student_id":"learner123","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":4096,"commitOnEverySet":true}},"moodle":{"name":"Moodle","settings":{"cmi.core.student_name":"Test User","cmi.core.student_id":"user123","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":false,"maxSuspendDataLength":65536,"commitOnEverySet":false}},"scormcloud":{"name":"SCORM Cloud","settings":{"cmi.core.student_name":"Test Student","cmi.core.student_id":"student_001","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":65536,"commitOnEverySet":false}},"generic":{"name":"Generic LMS","settings":{"cmi.core.student_name":"Test User","cmi.core.student_id":"test_001","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":4096,"commitOnEverySet":false}}},"activeWorkflows":{},"eventEmitter":{"_events":{},"_eventsCount":0}}}]
-2025-10-30T16:32:48.873Z [DEBUG] ActivityTreeManager initialized 
-2025-10-30T16:32:48.873Z [DEBUG] SequencingEngine initialized [{"browseModeSupport":true}]
-2025-10-30T16:32:48.873Z [DEBUG] NavigationHandler initialized [{"browseModeSupport":true}]
-2025-10-30T16:32:48.873Z [DEBUG] RollupManager initialized 
-2025-10-30T16:32:48.873Z [DEBUG] ScormSNService initialized [{"browseModeSupport":true}]
-2025-10-30T16:32:48.873Z [DEBUG] ScormService: SCORM service components initialized 
-2025-10-30T16:32:48.873Z [DEBUG] ScormService: Initialization completed 
-2025-10-30T16:32:48.873Z [DEBUG] ScormService state changed: initializing -> ready 
-2025-10-30T16:32:48.873Z [INFO] ScormService service initialized successfully in 2ms 
-2025-10-30T16:32:48.873Z [INFO] [SNSnapshotService] Started polling SN status 
-2025-10-30T16:32:48.874Z [INFO] SCORM Tester: SNSnapshotService wired to ScormService and started 
-2025-10-30T16:32:48.874Z [DEBUG] RecentCoursesService base service created 
-2025-10-30T16:32:48.874Z [DEBUG] RecentCoursesService: Constructor - userData path: ["/Users/seth/Library/Application Support/scorm-tester"]
-2025-10-30T16:32:48.874Z [DEBUG] RecentCoursesService: Constructor - recents file path: ["/Users/seth/Library/Application Support/scorm-tester/recents.json"]
-2025-10-30T16:32:48.874Z [INFO] Initializing RecentCoursesService service 
-2025-10-30T16:32:48.874Z [DEBUG] RecentCoursesService state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.874Z [DEBUG] RecentCoursesService: Starting initialization 
-2025-10-30T16:32:48.881Z [INFO] RecentCoursesService: Loaded 5 recent courses from file. 
-2025-10-30T16:32:48.881Z [DEBUG] RecentCoursesService: Initialization completed 
-2025-10-30T16:32:48.881Z [DEBUG] RecentCoursesService state changed: initializing -> ready 
-2025-10-30T16:32:48.881Z [INFO] RecentCoursesService service initialized successfully in 7ms 
-2025-10-30T16:32:48.881Z [DEBUG] AppStateService base service created 
-2025-10-30T16:32:48.881Z [INFO] Initializing AppStateService service 
-2025-10-30T16:32:48.881Z [DEBUG] AppStateService state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.882Z [INFO] AppStateService initialized 
-2025-10-30T16:32:48.882Z [DEBUG] AppStateService state changed: initializing -> ready 
-2025-10-30T16:32:48.882Z [INFO] AppStateService service initialized successfully in 1ms 
-2025-10-30T16:32:48.882Z [DEBUG] IpcHandler base service created 
-2025-10-30T16:32:48.882Z [INFO] Initializing IpcHandler service 
-2025-10-30T16:32:48.882Z [DEBUG] IpcHandler state changed: not_initialized -> initializing 
-2025-10-30T16:32:48.882Z [INFO] [ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors 
-2025-10-30T16:32:48.883Z [DEBUG] IpcHandler state changed: initializing -> ready 
-2025-10-30T16:32:48.884Z [INFO] IpcHandler service initialized successfully in 1ms 
-2025-10-30T16:32:48.884Z [INFO] SCORM Tester: 6 services initialized successfully 
-2025-10-30T16:32:48.884Z [DEBUG] SCORM Tester: Application event handlers set up 
-2025-10-30T16:32:48.884Z [INFO] WindowManager: Creating main window 
-2025-10-30T16:32:48.884Z [DEBUG] WindowManager: main window state: closed -> creating 
-2025-10-30T16:32:48.884Z [INFO] WindowManager: Screen work area: 1710x1005 
-2025-10-30T16:32:48.961Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/index.html"}]
-2025-10-30T16:32:48.962Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/index.html"}]
-2025-10-30T16:32:48.969Z [INFO] Preload script is loading... 
-2025-10-30T16:32:48.969Z [DEBUG] contextBridge exists: [true]
-2025-10-30T16:32:48.970Z [DEBUG] ipcRenderer exists: [true]
-2025-10-30T16:32:48.970Z [INFO] [PRELOAD] Attempting to expose electronAPI via contextBridge... 
-2025-10-30T16:32:48.970Z [INFO] [PRELOAD] electronAPI successfully exposed via contextBridge 
-2025-10-30T16:32:48.970Z [INFO] Preload script loaded; electronAPI exposed [{"0":"rendererBaseUrl","1":"selectScormPackage","2":"selectScormFolder","3":"extractScorm","4":"saveTemporaryFile","5":"getCourseInfo","6":"getCourseManifest","7":"findScormEntry","8":"processScormManifest","9":"scormInitialize"}]
-2025-10-30T16:32:48.971Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/main.css"}]
-2025-10-30T16:32:48.971Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/boot/theme-init.js"}]
-2025-10-30T16:32:48.972Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/main.css"}]
-2025-10-30T16:32:48.972Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/boot/theme-init.js"}]
-2025-10-30T16:32:48.972Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/reset.css"}]
-2025-10-30T16:32:48.973Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/variables.css"}]
-2025-10-30T16:32:48.973Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/reset.css"}]
-2025-10-30T16:32:48.973Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/typography.css"}]
-2025-10-30T16:32:48.973Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/variables.css"}]
-2025-10-30T16:32:48.973Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/buttons.css"}]
-2025-10-30T16:32:48.974Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/forms.css"}]
-2025-10-30T16:32:48.976Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/layout.css"}]
-2025-10-30T16:32:48.976Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/typography.css"}]
-2025-10-30T16:32:48.976Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-viewer.css"}]
-2025-10-30T16:32:48.976Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/course-outline.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/error-state.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/notifications.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-scaling.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/navigation-controls.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/buttons.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/forms.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/layout.css"}]
-2025-10-30T16:32:48.977Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/inspector-panel.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/default.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/dark.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-viewer.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/course-outline.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/error-state.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/notifications.css"}]
-2025-10-30T16:32:48.978Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-scaling.css"}]
-2025-10-30T16:32:48.979Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/navigation-controls.css"}]
-2025-10-30T16:32:48.979Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/inspector-panel.css"}]
-2025-10-30T16:32:48.979Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/default.css"}]
-2025-10-30T16:32:48.979Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/dark.css"}]
-2025-10-30T16:32:48.981Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/app.js"}]
-2025-10-30T16:32:48.981Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/app.js"}]
-2025-10-30T16:32:48.982Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/renderer-logger.js"}]
-2025-10-30T16:32:48.982Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/renderer-logger.js"}]
-2025-10-30T16:32:48.983Z [INFO] [Renderer] DOM ready 
-2025-10-30T16:32:48.983Z [INFO] [Renderer] Page finished loading 
-2025-10-30T16:32:48.984Z [DEBUG] MenuBuilder: Application menu created successfully 
-2025-10-30T16:32:48.989Z [DEBUG] WindowManager: main window state: creating -> ready 
-2025-10-30T16:32:48.990Z [INFO] WindowManager: Main window created successfully (ID: 1) 
-2025-10-30T16:32:48.990Z [INFO] SCORM Tester: Main window created (ID: 1) 
-2025-10-30T16:32:48.990Z [INFO] SCORM Tester: Main process initialization completed successfully 
-2025-10-30T16:32:49.016Z [DEBUG] WindowManager: main window state: ready -> focused 
-2025-10-30T16:32:49.017Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-events-forwarder.js"}]
-2025-10-30T16:32:49.017Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-events-forwarder.js"}]
-2025-10-30T16:32:49.018Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-client.js"}]
-2025-10-30T16:32:49.018Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/event-bus.js"}]
-2025-10-30T16:32:49.019Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-client.js"}]
-2025-10-30T16:32:49.019Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/event-bus.js"}]
-2025-10-30T16:32:49.020Z [INFO] ipc-events-forwarder: initialized 
-2025-10-30T16:32:49.020Z [INFO] SCORM event forwarding initialized successfully 
-2025-10-30T16:32:49.020Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/app-manager.js"}]
-2025-10-30T16:32:49.021Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/app-manager.js"}]
-2025-10-30T16:32:49.021Z [INFO] Test helpers available: 
-2025-10-30T16:32:49.022Z [INFO]   window.testLoadCourse(path) - Load course from path 
-2025-10-30T16:32:49.022Z [INFO]   window.loadSampleCourse() - Load the sample SL360 course 
-2025-10-30T16:32:49.022Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.js"}]
-2025-10-30T16:32:49.022Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.js"}]
-2025-10-30T16:32:49.023Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.helpers.js"}]
-2025-10-30T16:32:49.024Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.initial.js"}]
-2025-10-30T16:32:49.024Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.helpers.js"}]
-2025-10-30T16:32:49.024Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.notifications.js"}]
-2025-10-30T16:32:49.025Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.initial.js"}]
-2025-10-30T16:32:49.025Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.notifications.js"}]
-2025-10-30T16:32:49.026Z [INFO] [UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
-2025-10-30T16:32:49.026Z [DEBUG] AppManager - uiState resolved 
-2025-10-30T16:32:49.026Z [INFO] RENDERER_COALESCE_WINDOW_START 
-2025-10-30T16:32:49.026Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-client.js"}]
-2025-10-30T16:32:49.026Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
-2025-10-30T16:32:49.026Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-client.js"}]
-2025-10-30T16:32:49.027Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/payload-sanitizer.js"}]
-2025-10-30T16:32:49.027Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/payload-sanitizer.js"}]
-2025-10-30T16:32:49.028Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/scorm-validator.js"}]
-2025-10-30T16:32:49.028Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-api-bridge.js"}]
-2025-10-30T16:32:49.028Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/scorm-validator.js"}]
-2025-10-30T16:32:49.029Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-api-bridge.js"}]
-2025-10-30T16:32:49.029Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/course-loader.js"}]
-2025-10-30T16:32:49.030Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/course-loader.js"}]
-2025-10-30T16:32:49.030Z [INFO] CourseLoader: Electron API availability check: [{"available":true,"windowDefined":true,"electronAPIType":"object"}]
-2025-10-30T16:32:49.030Z [INFO] CourseLoader: Using IpcClient for file selection and prep 
-2025-10-30T16:32:49.030Z [INFO] CourseLoader: All required Electron API methods available 
-2025-10-30T16:32:49.030Z [INFO] AppManager: Initializing components... 
-2025-10-30T16:32:49.030Z [INFO] CourseLoader: Logger initialized 
-2025-10-30T16:32:49.031Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/base-component.js"}]
-2025-10-30T16:32:49.031Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/base-component.js"}]
-2025-10-30T16:32:49.032Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/content-viewer.js"}]
-2025-10-30T16:32:49.033Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/content-viewer.js"}]
-2025-10-30T16:32:49.034Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/navigation-controls.js"}]
-2025-10-30T16:32:49.034Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/navigation-controls.js"}]
-2025-10-30T16:32:49.035Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/sn-bridge.js"}]
-2025-10-30T16:32:49.035Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/sn-bridge.js"}]
-2025-10-30T16:32:49.036Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/course-outline.js"}]
-2025-10-30T16:32:49.036Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/course-outline.js"}]
-2025-10-30T16:32:49.037Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/escape.js"}]
-2025-10-30T16:32:49.037Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/escape.js"}]
-2025-10-30T16:32:49.037Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-progress-bar.js"}]
-2025-10-30T16:32:49.039Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-progress-bar.js"}]
-2025-10-30T16:32:49.040Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-status-display.js"}]
-2025-10-30T16:32:49.040Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-status-display.js"}]
-2025-10-30T16:32:49.040Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/inspector/inspector-panel.js"}]
-2025-10-30T16:32:49.041Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/inspector/inspector-panel.js"}]
-2025-10-30T16:32:49.041Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/header-controls.js"}]
-2025-10-30T16:32:49.042Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/header-controls.js"}]
-2025-10-30T16:32:49.042Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/notification-container.js"}]
-2025-10-30T16:32:49.042Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/notification-container.js"}]
-2025-10-30T16:32:49.043Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-dialog.js"}]
-2025-10-30T16:32:49.043Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-dialog.js"}]
-2025-10-30T16:32:49.044Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-badge.js"}]
-2025-10-30T16:32:49.044Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-badge.js"}]
-2025-10-30T16:32:49.045Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-list-panel.js"}]
-2025-10-30T16:32:49.045Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-list-panel.js"}]
-2025-10-30T16:32:49.045Z [DEBUG] AppManager: progress-tracking mount point not found; skipping component import 
-2025-10-30T16:32:49.045Z [DEBUG] AppManager: Found DOM element 'content-viewer' for component mounting 
-2025-10-30T16:32:49.045Z [DEBUG] AppManager: Found DOM element 'navigation-controls' for component mounting 
-2025-10-30T16:32:49.046Z [DEBUG] AppManager: Found DOM element 'footer-progress' for component mounting 
-2025-10-30T16:32:49.046Z [DEBUG] AppManager: Found DOM element 'footer-status' for component mounting 
-2025-10-30T16:32:49.046Z [DEBUG] AppManager: Found DOM element 'course-outline' for component mounting 
-2025-10-30T16:32:49.046Z [DEBUG] AppManager: Creating component 'headerControls' with elementId='header-controls' 
-2025-10-30T16:32:49.046Z [DEBUG] AppManager: Component 'headerControls' initialize() resolved [{"elementId":"header-controls","className":"HeaderControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":1,"subscriptionCount":4}]
-2025-10-30T16:32:49.046Z [INFO] AppManager: headerControls initialized 
-2025-10-30T16:32:49.047Z [DEBUG] AppManager: Creating component 'contentViewer' with elementId='content-viewer' 
-2025-10-30T16:32:49.047Z [DEBUG] [ContentViewer] Starting component initialization [null]
-2025-10-30T16:32:49.057Z [WARN] [Renderer Console] An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can remove its sandboxing. (scorm-app://app/src/renderer/components/scorm/content-viewer.js:83) 
-2025-10-30T16:32:49.082Z [DEBUG] [ContentViewer] Component initialization completed [null]
-2025-10-30T16:32:49.082Z [DEBUG] AppManager: Component 'contentViewer' initialize() resolved [{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}]
-2025-10-30T16:32:49.083Z [INFO] AppManager: contentViewer initialized 
-2025-10-30T16:32:49.083Z [DEBUG] AppManager: Creating component 'navigationControls' with elementId='navigation-controls' 
-2025-10-30T16:32:49.083Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
-2025-10-30T16:32:49.083Z [DEBUG] NavigationControls: Navigation state updated [{"snServiceAvailable":false,"snServiceError":null}]
-2025-10-30T16:32:49.083Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
-2025-10-30T16:32:49.083Z [DEBUG] [NavigationControls] Component initialization completed [null]
-2025-10-30T16:32:49.084Z [DEBUG] AppManager: Component 'navigationControls' initialize() resolved [{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":20}]
-2025-10-30T16:32:49.084Z [INFO] AppManager: navigationControls initialized 
-2025-10-30T16:32:49.084Z [DEBUG] AppManager: Creating component 'footerProgressBar' with elementId='footer-progress' 
-2025-10-30T16:32:49.084Z [WARN] RENDERER_DEBUG_RATE_LIMIT [{"windowMs":400,"max":20}]
-2025-10-30T16:32:49.084Z [INFO] AppManager: footerProgressBar initialized 
-2025-10-30T16:32:49.084Z [INFO] AppManager: footerStatusDisplay initialized 
-2025-10-30T16:32:49.084Z [INFO] CourseOutline: constructor initialized 
-2025-10-30T16:32:49.084Z [INFO] CourseOutline.setup: uiState resolved 
-2025-10-30T16:32:49.084Z [INFO] CourseOutline: HTML structure created successfully 
-2025-10-30T16:32:49.084Z [INFO] CourseOutline: Empty state displayed 
-2025-10-30T16:32:49.084Z [INFO] CourseOutline.setup: Initial component state [{"hasScormStates":false,"scormStatesLoaded":false,"availableNavigation":[],"browseModeEnabled":false,"courseStructureItems":0}]
-2025-10-30T16:32:49.084Z [INFO] CourseOutline: HTML structure created successfully 
-2025-10-30T16:32:49.085Z [INFO] AppManager: courseOutline initialized 
-2025-10-30T16:32:49.085Z [INFO] AppManager: inspectorPanel initialized 
-2025-10-30T16:32:49.085Z [INFO] AppManager: notificationContainer initialized 
-2025-10-30T16:32:49.085Z [INFO] AppManager: errorDialog initialized 
-2025-10-30T16:32:49.085Z [INFO] AppManager: errorBadge initialized 
-2025-10-30T16:32:49.086Z [INFO] AppManager: errorListPanel initialized 
-2025-10-30T16:32:49.086Z [INFO] AppManager: Post-init component status snapshot [{"courseOutline":{"elementId":"course-outline","className":"CourseOutline","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":39},"navigationControls":{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":20},"contentViewer":{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}}]
-2025-10-30T16:32:49.086Z [INFO] AppManager: All components initialized 
-2025-10-30T16:32:49.086Z [INFO] IPC_ENVELOPE { channel: ui-settings:get, requestId: 1, durationMs: 0, status: 'success' } 
-2025-10-30T16:32:49.086Z [DEBUG] Browse mode status: [{"enabled":false,"currentSession":null,"totalSessions":0,"navigationOverrides":{"ignoreSequencingRules":true,"allowUnrestrictedChoice":true,"ignoreAttemptLimits":true,"ignorePrerequisites":true}}]
-2025-10-30T16:32:49.087Z [INFO] IPC_ENVELOPE { channel: browse-mode-status, requestId: 2, durationMs: 1, status: 'success' } 
-2025-10-30T16:32:49.087Z [INFO] EventBus: Debug mode disabled 
-2025-10-30T16:32:49.087Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/recent-courses.js"}]
-2025-10-30T16:32:49.087Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/recent-courses.js"}]
-2025-10-30T16:32:49.088Z [INFO] IPC_ENVELOPE { channel: recent:get, requestId: 3, durationMs: 0, status: 'success' } 
-2025-10-30T16:32:49.089Z [INFO] RecentCoursesStore: Loaded 5 recent courses from main process. 
-2025-10-30T16:32:50.091Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
-2025-10-30T16:32:52.463Z [INFO] HeaderControls: emit course:open-folder:request 
-2025-10-30T16:32:52.465Z [INFO] FileManager: Opening SCORM folder selection dialog 
-2025-10-30T16:32:52.465Z [INFO] FileManager: Using defaultPath for folder dialog ["/Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/SL360_LMS_SCORM_2004"]
-2025-10-30T16:33:05.001Z [INFO] FileManager: Checking manifest path: /Users/seth/Documents/GitHub/fom-markdown/scorm/scorm_trc_template/imsmanifest.xml 
-2025-10-30T16:33:05.002Z [INFO] FileManager: Folder exists: true 
-2025-10-30T16:33:05.002Z [INFO] FileManager: Directory contents: ["README.md","XMLSchema.dtd","adlcp_v1p3.xsd","adlnav_v1p3.xsd","adlseq_v1p3.xsd","common","content","datatypes.dtd","docs","ims_xml.xsd","imscp_v1p1.xsd","imsmanifest.xml","imsss_v1p0.xsd","imsss_v1p0auxresource.xsd","imsss_v1p0control.xsd","imsss_v1p0delivery.xsd","imsss_v1p0limit.xsd","imsss_v1p0objective.xsd","imsss_v1p0random.xsd","imsss_v1p0rollup.xsd","imsss_v1p0seqrule.xsd","imsss_v1p0util.xsd","lom.xsd","lomCustom.xsd","lomLoose.xsd","lomStrict.xsd","variants","xml.xsd"] 
-2025-10-30T16:33:05.002Z [INFO] FileManager: Found manifest at package root: /Users/seth/Documents/GitHub/fom-markdown/scorm/scorm_trc_template/imsmanifest.xml 
-2025-10-30T16:33:05.002Z [INFO] FileManager: SCORM folder selected: scorm_trc_template 
-2025-10-30T16:33:05.002Z [INFO] IPC_ENVELOPE { channel: select-scorm-folder, requestId: 4, durationMs: 12538, status: 'success' } 
-2025-10-30T16:33:05.002Z [DEBUG] WindowManager: main window state: focused -> focused 
-2025-10-30T16:33:05.003Z [INFO] FileManager: Checking manifest path: /Users/seth/Documents/GitHub/fom-markdown/scorm/scorm_trc_template/imsmanifest.xml 
-2025-10-30T16:33:05.003Z [INFO] FileManager: Folder exists: true 
-2025-10-30T16:33:05.003Z [INFO] FileManager: Directory contents: ["README.md","XMLSchema.dtd","adlcp_v1p3.xsd","adlnav_v1p3.xsd","adlseq_v1p3.xsd","common","content","datatypes.dtd","docs","ims_xml.xsd","imscp_v1p1.xsd","imsmanifest.xml","imsss_v1p0.xsd","imsss_v1p0auxresource.xsd","imsss_v1p0control.xsd","imsss_v1p0delivery.xsd","imsss_v1p0limit.xsd","imsss_v1p0objective.xsd","imsss_v1p0random.xsd","imsss_v1p0rollup.xsd","imsss_v1p0seqrule.xsd","imsss_v1p0util.xsd","lom.xsd","lomCustom.xsd","lomLoose.xsd","lomStrict.xsd","variants","xml.xsd"] 
-2025-10-30T16:33:05.003Z [INFO] FileManager: Found manifest at package root: /Users/seth/Documents/GitHub/fom-markdown/scorm/scorm_trc_template/imsmanifest.xml 
-2025-10-30T16:33:05.034Z [INFO] FileManager: Checking manifest path: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/imsmanifest.xml 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Folder exists: true 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Directory contents: ["README.md","XMLSchema.dtd","adlcp_v1p3.xsd","adlnav_v1p3.xsd","adlseq_v1p3.xsd","common","content","datatypes.dtd","docs","ims_xml.xsd","imscp_v1p1.xsd","imsmanifest.xml","imsss_v1p0.xsd","imsss_v1p0auxresource.xsd","imsss_v1p0control.xsd","imsss_v1p0delivery.xsd","imsss_v1p0limit.xsd","imsss_v1p0objective.xsd","imsss_v1p0random.xsd","imsss_v1p0rollup.xsd","imsss_v1p0seqrule.xsd","imsss_v1p0util.xsd","lom.xsd","lomCustom.xsd","lomLoose.xsd","lomStrict.xsd","variants","xml.xsd"] 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Found manifest at package root: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/imsmanifest.xml 
-2025-10-30T16:33:05.035Z [INFO] IPC_ENVELOPE { channel: prepare-course-source, requestId: 5, durationMs: 32, status: 'success' } 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Getting manifest info from scorm_1761841985003 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Checking manifest path: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/imsmanifest.xml 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Folder exists: true 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Directory contents: ["README.md","XMLSchema.dtd","adlcp_v1p3.xsd","adlnav_v1p3.xsd","adlseq_v1p3.xsd","common","content","datatypes.dtd","docs","ims_xml.xsd","imscp_v1p1.xsd","imsmanifest.xml","imsss_v1p0.xsd","imsss_v1p0auxresource.xsd","imsss_v1p0control.xsd","imsss_v1p0delivery.xsd","imsss_v1p0limit.xsd","imsss_v1p0objective.xsd","imsss_v1p0random.xsd","imsss_v1p0rollup.xsd","imsss_v1p0seqrule.xsd","imsss_v1p0util.xsd","lom.xsd","lomCustom.xsd","lomLoose.xsd","lomStrict.xsd","variants","xml.xsd"] 
-2025-10-30T16:33:05.035Z [INFO] FileManager: Found manifest at package root: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/imsmanifest.xml 
-2025-10-30T16:33:05.036Z [INFO] FileManager: Manifest content retrieved 
-2025-10-30T16:33:05.036Z [INFO] IPC_ENVELOPE { channel: get-course-manifest, requestId: 6, durationMs: 1, status: 'success' } 
-2025-10-30T16:33:05.036Z [INFO] ScormService: Processing SCORM manifest for /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003 
-2025-10-30T16:33:05.036Z [INFO] ScormCAMService: Starting package processing for /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003 
-2025-10-30T16:33:05.036Z [INFO] ScormCAMService: manifestContent type: string, length: 17580 
-2025-10-30T16:33:05.036Z [INFO] ScormCAMService: packagePath: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003 
-2025-10-30T16:33:05.037Z [INFO] ScormCAMService: About to parse manifest XML 
-2025-10-30T16:33:05.037Z [INFO] ManifestParser: start [{"phase":"CAM_PARSE","basePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","inputType":"string","len":17580}]
-2025-10-30T16:33:05.037Z [DEBUG] ManifestParser: xml preview [{"phase":"CAM_PARSE","preview":"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- SCORM 2004 4th Edition manifest for scorm_trc_template\n     Base profile: Single-SCO (simple starting template)\n     See references/spec_guide_2.md for CAM/"}]
-2025-10-30T16:33:05.040Z [INFO] ManifestParser: Starting PathUtils integration for xml:base resolution [{"operation":"xmlBaseResolution","resourceId":"res-shared","xmlBase":"content/shared/","href":null,"basePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.040Z [DEBUG] ManifestParser: Path resolution result [{"originalPath":"content/shared/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","duration":0}]
-2025-10-30T16:33:05.040Z [INFO] ManifestParser: Starting PathUtils integration for xml:base resolution [{"operation":"xmlBaseResolution","resourceId":"res-1","xmlBase":"content/sco1/","href":"index.html","basePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.040Z [DEBUG] ManifestParser: Path resolution result [{"originalPath":"content/sco1/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","duration":0}]
-2025-10-30T16:33:05.040Z [INFO] ManifestParser: Starting PathUtils integration for xml:base resolution [{"operation":"xmlBaseResolution","resourceId":"res-config","xmlBase":"content/shared/","href":null,"basePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.041Z [DEBUG] ManifestParser: Path resolution result [{"originalPath":"content/shared/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","duration":0}]
-2025-10-30T16:33:05.041Z [INFO] ManifestParser: success [{"phase":"CAM_PARSE","code":"PARSE_SUCCESS","message":"Manifest parsed successfully","manifestId":"MANIFEST-TEMPLATE2","defaultOrgId":"org-1","stats":{"orgCount":1,"topCount":1},"severity":"INFO"}]
-2025-10-30T16:33:05.041Z [INFO] ScormCAMService: Manifest parsing completed successfully 
-2025-10-30T16:33:05.041Z [DEBUG] ScormCAMService: Parsed manifest structure: [{"hasIdentifier":true,"hasOrganizations":true,"hasResources":true,"manifestType":"object"}]
-2025-10-30T16:33:05.041Z [INFO] ScormCAMService: Parser snapshot [{"phase":"CAM_PARSE","code":"PARSE_VALIDATION_ERROR","message":"Parser defaultOrg top-level snapshot","detail":{"topIds":["item-1"]},"manifestId":"MANIFEST-TEMPLATE2","defaultOrgId":"org-1","stats":{"orgCount":1,"topCount":1},"packagePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","severity":"info"}]
-2025-10-30T16:33:05.041Z [INFO] ScormCAMService: Starting package validation 
-2025-10-30T16:33:05.041Z [DEBUG] ContentValidator: Starting manifest structure validation 
-2025-10-30T16:33:05.041Z [DEBUG] ContentValidator: manifest type: ["object"]
-2025-10-30T16:33:05.041Z [DEBUG] ContentValidator: manifest is null/undefined: [false]
-2025-10-30T16:33:05.041Z [DEBUG] ContentValidator: Manifest structure: [{"hasIdentifier":true,"identifierValue":"MANIFEST-TEMPLATE2","hasOrganizations":true,"hasResources":true,"hasMetadata":true}]
-2025-10-30T16:33:05.041Z [DEBUG] ContentValidator: Identifier found: ["MANIFEST-TEMPLATE2"]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Organizations found 
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Resources found, count: [3]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Required elements check completed, hasRequiredElements: [true]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Validating metadata structure 
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Metadata validation completed 
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Invalid version format: ["1.0.0"]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: Manifest structure validation completed 
-2025-10-30T16:33:05.042Z [INFO] ContentValidator: Starting PathUtils integration for file validation [{"operation":"fileValidation","resourceId":"res-shared","resourceBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-shared","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared/SCORM_2004_APIWrapper.js","fileExists":true,"success":true}]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-shared","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared/scorm_api_wrapper.js","fileExists":true,"success":true}]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-shared","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared/config.js","fileExists":true,"success":true}]
-2025-10-30T16:33:05.042Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-shared","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared/logos/TRC Logo final_White.png","fileExists":true,"success":true}]
-2025-10-30T16:33:05.043Z [INFO] ContentValidator: PathUtils integration completed for file validation [{"operation":"fileValidation","resourceId":"res-shared","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.043Z [INFO] ContentValidator: Starting PathUtils integration for file validation [{"operation":"fileValidation","resourceId":"res-1","resourceBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/index.html","fileExists":true,"success":true}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/index.html","fileExists":true,"success":true}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/runtime.js","fileExists":false,"success":false}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/course_content.js","fileExists":true,"success":true}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/interaction-types.js","fileExists":false,"success":false}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/feedback-system.js","fileExists":false,"success":false}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-1","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/style.css","fileExists":false,"success":false}]
-2025-10-30T16:33:05.043Z [INFO] ContentValidator: PathUtils integration completed for file validation [{"operation":"fileValidation","resourceId":"res-1","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.043Z [INFO] ContentValidator: Starting PathUtils integration for file validation [{"operation":"fileValidation","resourceId":"res-config","resourceBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.043Z [DEBUG] ContentValidator: File validation result [{"operation":"fileValidation","resourceId":"res-config","filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/shared/config.js","fileExists":true,"success":true}]
-2025-10-30T16:33:05.044Z [INFO] ContentValidator: PathUtils integration completed for file validation [{"operation":"fileValidation","resourceId":"res-config","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.044Z [INFO] ScormCAMService: Package validation completed [{"isValid":false}]
-2025-10-30T16:33:05.044Z [INFO] ScormCAMService: Package invalid; continuing to analysis for diagnostics [{"errorCount":4}]
-2025-10-30T16:33:05.044Z [INFO] ScormCAMService: Starting package analysis 
-2025-10-30T16:33:05.045Z [INFO] PathUtils: Starting content resolution [{"operation":"contentResolution","contentPath":"content/sco1/index.html","extractionPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003","manifestPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/imsmanifest.xml","phase":"CAM_INTEGRATION"}]
-2025-10-30T16:33:05.045Z [INFO] PathUtils: toScormProtocolUrl success [{"operation":"toScormProtocolUrl","duration":0,"filePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/index.html","appRoot":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester","url":"scorm-app://app/scorm_1761841985003/content/sco1/index.html"}]
-2025-10-30T16:33:05.046Z [DEBUG] PathUtils: content resolution result [{"operation":"contentResolution","success":true,"originalPath":"content/sco1/index.html","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003/content/sco1/index.html","url":"scorm-app://app/scorm_1761841985003/content/sco1/index.html","usedBase":"tempRoot","duration":1}]
-2025-10-30T16:33:05.046Z [DEBUG] PackageAnalyzer: Starting synchronous compliance check 
-2025-10-30T16:33:05.046Z [DEBUG] PackageAnalyzer: packagePath: ["/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1761841985003"]
-2025-10-30T16:33:05.046Z [DEBUG] PackageAnalyzer: manifest type: ["object"]
-2025-10-30T16:33:05.046Z [DEBUG] PackageAnalyzer: manifest is null/undefined: [false]
-2025-10-30T16:33:05.046Z [DEBUG] PackageAnalyzer: Synchronous compliance check completed: [{"hasRequiredElements":true,"validScormTypes":true,"validIdentifiers":true,"sequencingCompliance":true,"metadataCompliance":true,"overallCompliance":true,"isValid":true,"errors":[],"warnings":[]}]
-2025-10-30T16:33:05.046Z [INFO] ScormCAMService: Package analysis completed 
-2025-10-30T16:33:05.046Z [INFO] CAM: inline resource href resolved [{"resourceId":"res-shared","xmlBaseContainer":null,"xmlBaseResource":"content/shared/","hrefOriginal":null,"hrefEffective":"content/shared/","scormType":"asset"}]
-2025-10-30T16:33:05.046Z [INFO] CAM: inline resource href resolved [{"resourceId":"res-1","xmlBaseContainer":null,"xmlBaseResource":"content/sco1/","hrefOriginal":"index.html","hrefEffective":"content/sco1/index.html","scormType":"sco"}]
-2025-10-30T16:33:05.046Z [INFO] CAM: inline resource href resolved [{"resourceId":"res-config","xmlBaseContainer":null,"xmlBaseResource":"content/shared/","hrefOriginal":null,"hrefEffective":"content/shared/","scormType":"asset"}]
-2025-10-30T16:33:05.046Z [INFO] ScormCAMService: Starting metadata extraction 
-2025-10-30T16:33:05.047Z [INFO] ScormCAMService: Metadata extraction completed 
-2025-10-30T16:33:05.047Z [DEBUG] ScormCAMService: Manifest cleaned and normalized for serialization [{"orgCount":1,"resCount":3}]
-2025-10-30T16:33:05.047Z [INFO] ScormCAMService: Cleaned manifest shapes [{"hasOrganizations":true,"hasResources":true,"orgKeyType":"organization[]","resKeyType":"resource[]","orgCount":1,"resCount":3}]
-2025-10-30T16:33:05.047Z [INFO] ScormCAMService: Package processing completed successfully 
-2025-10-30T16:33:05.047Z [INFO] Initializing SN service with manifest 
-2025-10-30T16:33:05.047Z [INFO] SN.init: manifest.organizations structure [{"hasOrganizations":true,"orgKeys":["default","organization"],"hasOrgProperty":true,"hasOrgsProperty":false,"orgPropertyType":"array","orgsPropertyType":"undefined"}]
-2025-10-30T16:33:05.047Z [INFO] SN.init: CAM manifest summary [{"orgs":1,"items":1,"explicitSequencing":true,"defaultOrg":"org-1"}]
-2025-10-30T16:33:05.048Z [INFO] Activity tree built with 2 activities 
-2025-10-30T16:33:05.048Z [INFO] SN service initialized successfully [{"totalActivities":2,"leafActivities":1,"launchableActivities":1,"maxDepth":1,"globalObjectives":0}]
-2025-10-30T16:33:05.048Z [INFO] ScormService: SN service initialized with manifest 
-2025-10-30T16:33:05.048Z [INFO] [ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors 
-2025-10-30T16:33:05.048Z [DEBUG] Broadcasted message on channel 'course-loaded' to 1 windows 
-2025-10-30T16:33:05.048Z [DEBUG] Broadcasted course-loaded event to all windows 
-2025-10-30T16:33:05.048Z [DEBUG] Broadcasted message on channel 'sn:initialized' to 1 windows 
-2025-10-30T16:33:05.048Z [INFO] ScormService: Emitted sn:initialized event to renderer 
-2025-10-30T16:33:05.048Z [INFO] IPC_ENVELOPE { channel: process-scorm-manifest, requestId: 7, durationMs: 12, status: 'success' } 
-2025-10-30T16:33:05.049Z [ERROR] CourseLoader: Error in loadCourseFromFolder: [{"type":"Error","name":"Error","message":"CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href","stackHead":["Error: CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href","    at async CourseLoader.handleFolderLoad (scorm-app://app/src/renderer/services/course-loader.js:134:7)"]}]
-2025-10-30T16:33:05.050Z [ERROR] AppManager: Course load error ["CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href"]
-2025-10-30T16:33:06.053Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
-2025-10-30T16:33:07.848Z [INFO] IPC_ENVELOPE { channel: get-error-logs, requestId: 8, durationMs: 2, status: 'success' } 
-2025-10-30T16:33:07.850Z [DEBUG] Permission granted: clipboard-sanitized-write 
-2025-10-30T16:33:08.930Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
-2025-10-30T16:33:19.672Z [DEBUG] WindowManager: main window state: focused -> focused 
-2025-10-30T16:33:20.949Z [INFO] MenuBuilder: Exit menu clicked 
-2025-10-30T16:33:20.950Z [INFO] MenuBuilder: Exit requested, calling app.quit() 
-2025-10-30T16:33:20.950Z [INFO] SCORM Tester: before-quit event received 
-2025-10-30T16:33:20.950Z [INFO] SCORM Tester: Starting graceful shutdown from before-quit 
-2025-10-30T16:33:20.950Z [INFO] SCORM Tester: Starting graceful shutdown 
-2025-10-30T16:33:20.950Z [DEBUG] Broadcasted message on channel 'app-quit' to 1 windows 
-2025-10-30T16:33:20.951Z [DEBUG] SCORM Tester: Broadcasted app-quit signal to all windows 
-2025-10-30T16:33:20.951Z [DEBUG] SCORM Tester: Shutting down ipcHandler 
-2025-10-30T16:33:20.951Z [INFO] Shutting down IpcHandler service 
-2025-10-30T16:33:20.951Z [DEBUG] IpcHandler state changed: ready -> shutting_down 
-2025-10-30T16:33:20.951Z [DEBUG] Service ipcHandler state changed: [{"serviceName":"IpcHandler","oldState":"ready","newState":"shutting_down"}]
-2025-10-30T16:33:20.951Z [INFO] [SNSnapshotService] Stopped polling SN status 
-2025-10-30T16:33:20.951Z [INFO] Shutting down ScormService service 
-2025-10-30T16:33:20.951Z [DEBUG] ScormService state changed: ready -> shutting_down 
-2025-10-30T16:33:20.952Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"ready","newState":"shutting_down"}]
-2025-10-30T16:33:20.952Z [DEBUG] ScormService: Starting shutdown 
-2025-10-30T16:33:20.952Z [INFO] ScormService: Active sessions at shutdown: [] 
-2025-10-30T16:33:20.952Z [DEBUG] Activity tree reset 
-2025-10-30T16:33:20.952Z [DEBUG] RollupManager reset 
-2025-10-30T16:33:20.952Z [DEBUG] SN service reset 
-2025-10-30T16:33:20.952Z [DEBUG] ScormService: Shutdown completed 
-2025-10-30T16:33:20.952Z [DEBUG] ScormService state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.952Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.952Z [INFO] ScormService service shutdown completed 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-initialize 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-get-value 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-set-value 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-set-values-batch 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-commit 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-terminate 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-get-progress-snapshot 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: ui-settings:get 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: ui-settings:set 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-enable 
-2025-10-30T16:33:20.953Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-disable 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-status 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-create-session 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: select-scorm-package 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: select-scorm-folder 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: extract-scorm 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: prepare-course-source 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: save-temporary-file 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: find-scorm-entry 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: get-course-info 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: get-course-manifest 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:get 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:addOrUpdate 
-2025-10-30T16:33:20.954Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:remove 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:clear 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: validate-scorm-compliance 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: analyze-scorm-content 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-version 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-path 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: get-session-data 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: reset-session 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: get-all-sessions 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: process-scorm-manifest 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:getStatus 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:getSequencingState 
-2025-10-30T16:33:20.955Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:initialize 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:processNavigation 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:refreshNavigation 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:updateActivityProgress 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:reset 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:handleActivityExit 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:updateActivityLocation 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: apply-lms-profile 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: get-lms-profiles 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: run-test-scenario 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: open-external 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: path-to-file-url 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-root 
-2025-10-30T16:33:20.956Z [DEBUG] IpcHandler: Unregistered handler for channel: path-normalize 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: path-join 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-history 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-activity-tree 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-navigation-requests 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-global-objectives 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-ssp-buckets 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-data-model 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-sn-state 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-get-activity-tree 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-validate-choice 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-get-available-navigation 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: load-shared-logger-adapter 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: quit-app 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler: Unregistered handler for channel: get-error-logs 
-2025-10-30T16:33:20.957Z [INFO] IpcHandler: All handlers unregistered 
-2025-10-30T16:33:20.957Z [DEBUG] IpcHandler state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.958Z [DEBUG] Service ipcHandler state changed: [{"serviceName":"IpcHandler","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.958Z [INFO] IpcHandler service shutdown completed 
-2025-10-30T16:33:20.958Z [DEBUG] SCORM Tester: Shutting down scormService 
-2025-10-30T16:33:20.958Z [INFO] Shutting down ScormService service 
-2025-10-30T16:33:20.958Z [DEBUG] ScormService state changed: shutdown -> shutting_down 
-2025-10-30T16:33:20.958Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutdown","newState":"shutting_down"}]
-2025-10-30T16:33:20.958Z [DEBUG] ScormService: Starting shutdown 
-2025-10-30T16:33:20.958Z [INFO] ScormService: Active sessions at shutdown: [] 
-2025-10-30T16:33:20.958Z [DEBUG] Activity tree reset 
-2025-10-30T16:33:20.958Z [DEBUG] RollupManager reset 
-2025-10-30T16:33:20.958Z [DEBUG] SN service reset 
-2025-10-30T16:33:20.958Z [DEBUG] ScormService: Shutdown completed 
-2025-10-30T16:33:20.958Z [DEBUG] ScormService state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.958Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.958Z [INFO] ScormService service shutdown completed 
-2025-10-30T16:33:20.958Z [DEBUG] SCORM Tester: Shutting down recentCoursesService 
-2025-10-30T16:33:20.959Z [INFO] Shutting down RecentCoursesService service 
-2025-10-30T16:33:20.959Z [DEBUG] RecentCoursesService state changed: ready -> shutting_down 
-2025-10-30T16:33:20.959Z [DEBUG] Service recentCoursesService state changed: [{"serviceName":"RecentCoursesService","oldState":"ready","newState":"shutting_down"}]
-2025-10-30T16:33:20.959Z [DEBUG] RecentCoursesService: Starting shutdown 
-2025-10-30T16:33:20.959Z [DEBUG] RecentCoursesService: Shutdown completed 
-2025-10-30T16:33:20.959Z [DEBUG] RecentCoursesService state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.959Z [DEBUG] Service recentCoursesService state changed: [{"serviceName":"RecentCoursesService","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.959Z [INFO] RecentCoursesService service shutdown completed 
-2025-10-30T16:33:20.959Z [DEBUG] SCORM Tester: Shutting down fileManager 
-2025-10-30T16:33:20.959Z [INFO] Shutting down FileManager service 
-2025-10-30T16:33:20.959Z [DEBUG] FileManager state changed: ready -> shutting_down 
-2025-10-30T16:33:20.959Z [DEBUG] Service fileManager state changed: [{"serviceName":"FileManager","oldState":"ready","newState":"shutting_down"}]
-2025-10-30T16:33:20.959Z [DEBUG] FileManager: Starting shutdown 
-2025-10-30T16:33:20.959Z [DEBUG] FileManager: Shutdown completed 
-2025-10-30T16:33:20.959Z [DEBUG] FileManager state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.959Z [DEBUG] Service fileManager state changed: [{"serviceName":"FileManager","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.960Z [INFO] FileManager service shutdown completed 
-2025-10-30T16:33:20.960Z [DEBUG] SCORM Tester: Shutting down windowManager 
-2025-10-30T16:33:20.960Z [INFO] Shutting down WindowManager service 
-2025-10-30T16:33:20.960Z [DEBUG] WindowManager state changed: ready -> shutting_down 
-2025-10-30T16:33:20.960Z [DEBUG] Service windowManager state changed: [{"serviceName":"WindowManager","oldState":"ready","newState":"shutting_down"}]
-2025-10-30T16:33:20.960Z [DEBUG] WindowManager: Starting shutdown 
-2025-10-30T16:33:20.960Z [DEBUG] WindowManager: Closing main window 
-2025-10-30T16:33:20.982Z [DEBUG] WindowManager: Shutdown completed 
-2025-10-30T16:33:20.982Z [DEBUG] WindowManager state changed: shutting_down -> shutdown 
-2025-10-30T16:33:20.982Z [DEBUG] Service windowManager state changed: [{"serviceName":"WindowManager","oldState":"shutting_down","newState":"shutdown"}]
-2025-10-30T16:33:20.982Z [INFO] WindowManager service shutdown completed 
-2025-10-30T16:33:20.982Z [INFO] SCORM Tester: Graceful shutdown completed 
-2025-10-30T16:33:20.982Z [INFO] SCORM Tester: Calling app.quit() after shutdown 
-2025-10-30T16:33:20.982Z [INFO] SCORM Tester: before-quit event received 
-2025-10-30T16:33:20.982Z [INFO] SCORM Tester: Already shutting down, allowing quit 
-2025-10-30T16:33:20.984Z [INFO] [PRELOAD] App quit signal received, setting shutdown flag 
-2025-10-30T16:33:20.985Z [DEBUG] WindowManager: main window state: undefined -> closed 
+Log start 2025-10-30T21:55:24.158Z
+2025-10-30T21:55:24.189Z [INFO] SCORM Tester: Log file path: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log 
+2025-10-30T21:55:24.191Z [INFO] SCORM Tester: process.env.LOG_LEVEL: undefined 
+2025-10-30T21:55:24.191Z [INFO] SCORM Tester: Logger logLevel: info 
+2025-10-30T21:55:24.191Z [INFO] SCORM Tester Log File: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log 
+2025-10-30T21:55:24.191Z [INFO] Check this file for detailed debugging information 
+2025-10-30T21:55:24.191Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-10-30T21:55:24.192Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-10-30T21:55:24.192Z [INFO] SCORM Tester: Core dependencies initialized 
+2025-10-30T21:55:24.192Z [INFO] SCORM Tester: Initializing services 
+2025-10-30T21:55:24.192Z [DEBUG] WindowManager base service created 
+2025-10-30T21:55:24.192Z [INFO] Initializing WindowManager service 
+2025-10-30T21:55:24.192Z [DEBUG] WindowManager state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.201Z [INFO] WindowManager: Custom protocol "scorm-app://" registered successfully 
+2025-10-30T21:55:24.202Z [INFO] WindowManager: Storage-capable origin feature is active 
+2025-10-30T21:55:24.202Z [DEBUG] WindowManager state changed: initializing -> ready 
+2025-10-30T21:55:24.202Z [INFO] WindowManager service initialized successfully in 10ms 
+2025-10-30T21:55:24.202Z [DEBUG] FileManager base service created 
+2025-10-30T21:55:24.202Z [INFO] Initializing FileManager service 
+2025-10-30T21:55:24.202Z [DEBUG] FileManager state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.202Z [DEBUG] FileManager: Starting initialization 
+2025-10-30T21:55:24.202Z [DEBUG] FileManager: Ensuring temp directory exists: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester 
+2025-10-30T21:55:24.208Z [DEBUG] FileManager: Cleaned up leftover temp entry: scorm_1761861225361 
+2025-10-30T21:55:24.212Z [DEBUG] FileManager: Cleaned up leftover temp entry: scorm_1761861227399 
+2025-10-30T21:55:24.212Z [INFO] FileManager: Cleaned up 2 leftover temp entries from previous sessions 
+2025-10-30T21:55:24.212Z [DEBUG] FileManager: Initialization completed 
+2025-10-30T21:55:24.212Z [DEBUG] FileManager state changed: initializing -> ready 
+2025-10-30T21:55:24.212Z [INFO] FileManager service initialized successfully in 10ms 
+2025-10-30T21:55:24.213Z [DEBUG] WindowManager: TelemetryStore instance set. 
+2025-10-30T21:55:24.213Z [DEBUG] [ScormInspectorTelemetryStore] Window manager reference set 
+2025-10-30T21:55:24.214Z [DEBUG] ScormService base service created 
+2025-10-30T21:55:24.214Z [INFO] Initializing ScormService service 
+2025-10-30T21:55:24.214Z [DEBUG] ScormService state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.214Z [DEBUG] ScormService: Starting initialization 
+2025-10-30T21:55:24.214Z [DEBUG] ScormCAMService initialized 
+2025-10-30T21:55:24.214Z [DEBUG] BrowseModeService initialized [{"defaultTimeout":1800000,"maxSessions":10,"scormService":{"_events":{},"_eventsCount":0,"serviceName":"ScormService","errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"options":{},"state":"initializing","initializationTime":null,"lastError":null,"dependencies":{},"metrics":{"startTime":null,"operationCount":0,"errorCount":0,"lastOperation":null},"config":{"maxSessions":10,"sessionTimeout":86400000,"enableGlobalObjectives":true,"enableRollupProcessing":true,"maxSequencingDepth":10},"rteService":null,"camService":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"manifestParser":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"parser":{"options":{"errorHandler":{}}},"namespaces":{"imscp":"http://www.imsglobal.org/xsd/imscp_v1p1","adlcp":"http://www.adlnet.org/xsd/adlcp_v1p3","imsss":"http://www.imsglobal.org/xsd/imsss","adlseq":"http://www.adlnet.org/xsd/adlseq_v1p3","adlnav":"http://www.adlnet.org/xsd/adlnav_v1p3","lom":"http://ltsc.ieee.org/xsd/LOM"}},"contentValidator":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"validationErrors":[],"validationWarnings":[],"hasRequiredElements":false,"validScormTypes":false,"validIdentifiers":false,"sequencingCompliance":false,"metadataCompliance":false,"overallCompliance":false},"metadataHandler":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"lomCategories":{"GENERAL":"general","LIFECYCLE":"lifecycle","META_METADATA":"metaMetadata","TECHNICAL":"technical","EDUCATIONAL":"educational","RIGHTS":"rights","RELATION":"relation","ANNOTATION":"annotation","CLASSIFICATION":"classification"},"dublinCoreMapping":{"dc:title":"general.title","dc:creator":"lifecycle.contribute.entity","dc:subject":"general.keyword","dc:description":"general.description","dc:publisher":"lifecycle.contribute.entity","dc:contributor":"lifecycle.contribute.entity","dc:date":"lifecycle.contribute.date","dc:type":"educational.learningResourceType","dc:format":"technical.format","dc:identifier":"general.identifier","dc:source":"relation.resource.identifier","dc:language":"general.language","dc:relation":"relation.resource.identifier","dc:coverage":"general.coverage","dc:rights":"rights.description"}},"packageAnalyzer":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"contentValidator":{"errorHandler":{"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"lastError":"0","lastDiagnostic":"","sessionState":"not_initialized","errorHistory":[],"maxHistorySize":100,"diagnosticInfo":{},"scormErrorCodes":{"0":"No Error","101":"General Exception","102":"General Initialization Failure","103":"Already Initialized","104":"Content Instance Terminated","111":"General Termination Failure","112":"Termination Before Initialization","113":"Termination After Termination","122":"Retrieve Data Before Initialization","123":"Retrieve Data After Termination","132":"Store Data Before Initialization","133":"Store Data After Termination","142":"Commit Before Initialization","143":"Commit After Termination","201":"General Argument Error","301":"General Get Failure","351":"General Set Failure","391":"General Commit Failure","401":"General Get Failure","402":"General Set Failure","403":"General Commit Failure","404":"Undefined Data Model Element","405":"Unimplemented Data Model Element","406":"Data Model Element Value Not Initialized","407":"Data Model Element Is Read Only","408":"Data Model Element Is Write Only","409":"Data Model Element Type Mismatch","410":"Data Model Element Value Out Of Range","411":"Data Model Dependency Not Established","600":"Window Management Failure","601":"Window Creation Failed","602":"Window Configuration Invalid","603":"Window State Persistence Failed","604":"Menu Creation Failed","605":"Window Event Handler Failed","610":"IPC Handler Failure","611":"IPC Message Validation Failed","612":"IPC Channel Registration Failed","613":"IPC Security Violation","614":"IPC Message Routing Failed","615":"IPC Response Timeout","620":"File System Operation Failed","621":"Package Extraction Failed","622":"File Path Validation Failed","623":"Temporary File Cleanup Failed","624":"File Access Permission Denied","625":"File Size Limit Exceeded","630":"Service Initialization Failed","631":"Service Dependency Missing","632":"Service Configuration Invalid","633":"Service Shutdown Failed","634":"Service State Invalid","635":"Service Communication Failed","640":"SCORM Service Integration Failed","641":"SCORM Session Management Failed","642":"SCORM Workflow Coordination Failed","643":"SCORM Service State Synchronization Failed","644":"SCORM LMS Profile Application Failed","645":"SCORM Cross-Service Communication Failed"}},"logger":{"logFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.log","ndjsonFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/app.ndjson","errorsFile":"/Users/seth/Documents/GitHub/scorm-tester/logs/errors.ndjson","logLevel":"info","defaultContext":{},"processType":"browser"},"validationErrors":[],"validationWarnings":[],"hasRequiredElements":false,"validScormTypes":false,"validIdentifiers":false,"sequencingCompliance":false,"metadataCompliance":false,"overallCompliance":false},"logger":{}}},"snService":null,"browseModeService":null,"rteInstances":{},"sessions":{},"sessionCounter":0,"lmsProfiles":{"litmos":{"name":"Litmos LMS","settings":{"cmi.core.student_name":"Test Learner","cmi.core.student_id":"learner123","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":4096,"commitOnEverySet":true}},"moodle":{"name":"Moodle","settings":{"cmi.core.student_name":"Test User","cmi.core.student_id":"user123","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":false,"maxSuspendDataLength":65536,"commitOnEverySet":false}},"scormcloud":{"name":"SCORM Cloud","settings":{"cmi.core.student_name":"Test Student","cmi.core.student_id":"student_001","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":65536,"commitOnEverySet":false}},"generic":{"name":"Generic LMS","settings":{"cmi.core.student_name":"Test User","cmi.core.student_id":"test_001","cmi.launch_data":"","cmi.core.lesson_mode":"normal","strictValidation":true,"maxSuspendDataLength":4096,"commitOnEverySet":false}}},"activeWorkflows":{},"eventEmitter":{"_events":{},"_eventsCount":0}}}]
+2025-10-30T21:55:24.215Z [DEBUG] ActivityTreeManager initialized 
+2025-10-30T21:55:24.215Z [DEBUG] SequencingEngine initialized [{"browseModeSupport":true}]
+2025-10-30T21:55:24.215Z [DEBUG] NavigationHandler initialized [{"browseModeSupport":true}]
+2025-10-30T21:55:24.216Z [DEBUG] RollupManager initialized 
+2025-10-30T21:55:24.216Z [DEBUG] ScormSNService initialized [{"browseModeSupport":true}]
+2025-10-30T21:55:24.216Z [DEBUG] ScormService: SCORM service components initialized 
+2025-10-30T21:55:24.216Z [DEBUG] ScormService: Initialization completed 
+2025-10-30T21:55:24.216Z [DEBUG] ScormService state changed: initializing -> ready 
+2025-10-30T21:55:24.216Z [INFO] ScormService service initialized successfully in 2ms 
+2025-10-30T21:55:24.216Z [INFO] [SNSnapshotService] Started polling SN status 
+2025-10-30T21:55:24.216Z [INFO] SCORM Tester: SNSnapshotService wired to ScormService and started 
+2025-10-30T21:55:24.216Z [DEBUG] RecentCoursesService base service created 
+2025-10-30T21:55:24.216Z [DEBUG] RecentCoursesService: Constructor - userData path: ["/Users/seth/Library/Application Support/scorm-tester"]
+2025-10-30T21:55:24.216Z [DEBUG] RecentCoursesService: Constructor - recents file path: ["/Users/seth/Library/Application Support/scorm-tester/recents.json"]
+2025-10-30T21:55:24.216Z [INFO] Initializing RecentCoursesService service 
+2025-10-30T21:55:24.216Z [DEBUG] RecentCoursesService state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.216Z [DEBUG] RecentCoursesService: Starting initialization 
+2025-10-30T21:55:24.221Z [INFO] RecentCoursesService: Loaded 5 recent courses from file. 
+2025-10-30T21:55:24.222Z [DEBUG] RecentCoursesService: Initialization completed 
+2025-10-30T21:55:24.222Z [DEBUG] RecentCoursesService state changed: initializing -> ready 
+2025-10-30T21:55:24.222Z [INFO] RecentCoursesService service initialized successfully in 6ms 
+2025-10-30T21:55:24.222Z [DEBUG] AppStateService base service created 
+2025-10-30T21:55:24.222Z [INFO] Initializing AppStateService service 
+2025-10-30T21:55:24.222Z [DEBUG] AppStateService state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.222Z [INFO] AppStateService initialized 
+2025-10-30T21:55:24.222Z [DEBUG] AppStateService state changed: initializing -> ready 
+2025-10-30T21:55:24.222Z [INFO] AppStateService service initialized successfully in 0ms 
+2025-10-30T21:55:24.222Z [DEBUG] IpcHandler base service created 
+2025-10-30T21:55:24.222Z [INFO] Initializing IpcHandler service 
+2025-10-30T21:55:24.223Z [DEBUG] IpcHandler state changed: not_initialized -> initializing 
+2025-10-30T21:55:24.223Z [INFO] [ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors 
+2025-10-30T21:55:24.224Z [DEBUG] IpcHandler state changed: initializing -> ready 
+2025-10-30T21:55:24.224Z [INFO] IpcHandler service initialized successfully in 2ms 
+2025-10-30T21:55:24.224Z [INFO] SCORM Tester: 6 services initialized successfully 
+2025-10-30T21:55:24.224Z [DEBUG] SCORM Tester: Application event handlers set up 
+2025-10-30T21:55:24.224Z [INFO] WindowManager: Creating main window 
+2025-10-30T21:55:24.224Z [DEBUG] WindowManager: main window state: closed -> creating 
+2025-10-30T21:55:24.224Z [INFO] WindowManager: Screen work area: 1710x1005 
+2025-10-30T21:55:24.307Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/index.html"}]
+2025-10-30T21:55:24.308Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/index.html"}]
+2025-10-30T21:55:24.357Z [INFO] Preload script is loading... 
+2025-10-30T21:55:24.357Z [DEBUG] contextBridge exists: [true]
+2025-10-30T21:55:24.357Z [DEBUG] ipcRenderer exists: [true]
+2025-10-30T21:55:24.358Z [INFO] [PRELOAD] Attempting to expose electronAPI via contextBridge... 
+2025-10-30T21:55:24.358Z [INFO] [PRELOAD] electronAPI successfully exposed via contextBridge 
+2025-10-30T21:55:24.358Z [INFO] Preload script loaded; electronAPI exposed [{"0":"rendererBaseUrl","1":"selectScormPackage","2":"selectScormFolder","3":"extractScorm","4":"saveTemporaryFile","5":"getCourseInfo","6":"getCourseManifest","7":"findScormEntry","8":"processScormManifest","9":"scormInitialize"}]
+2025-10-30T21:55:24.360Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/main.css"}]
+2025-10-30T21:55:24.360Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/boot/theme-init.js"}]
+2025-10-30T21:55:24.360Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/main.css"}]
+2025-10-30T21:55:24.360Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/boot/theme-init.js"}]
+2025-10-30T21:55:24.361Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/reset.css"}]
+2025-10-30T21:55:24.361Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/variables.css"}]
+2025-10-30T21:55:24.361Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/typography.css"}]
+2025-10-30T21:55:24.361Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/reset.css"}]
+2025-10-30T21:55:24.362Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/variables.css"}]
+2025-10-30T21:55:24.362Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/buttons.css"}]
+2025-10-30T21:55:24.362Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/forms.css"}]
+2025-10-30T21:55:24.363Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/base/typography.css"}]
+2025-10-30T21:55:24.363Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/layout.css"}]
+2025-10-30T21:55:24.363Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-viewer.css"}]
+2025-10-30T21:55:24.364Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/course-outline.css"}]
+2025-10-30T21:55:24.364Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/error-state.css"}]
+2025-10-30T21:55:24.364Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/buttons.css"}]
+2025-10-30T21:55:24.364Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/forms.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/notifications.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-scaling.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/navigation-controls.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/inspector-panel.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/layout.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-viewer.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/course-outline.css"}]
+2025-10-30T21:55:24.365Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/error-state.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/default.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/dark.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/notifications.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/navigation-controls.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/content-scaling.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/components/inspector-panel.css"}]
+2025-10-30T21:55:24.366Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/default.css"}]
+2025-10-30T21:55:24.367Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/styles/themes/dark.css"}]
+2025-10-30T21:55:24.368Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/app.js"}]
+2025-10-30T21:55:24.369Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/app.js"}]
+2025-10-30T21:55:24.369Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/renderer-logger.js"}]
+2025-10-30T21:55:24.370Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/renderer-logger.js"}]
+2025-10-30T21:55:24.370Z [INFO] [Renderer] DOM ready 
+2025-10-30T21:55:24.370Z [INFO] [Renderer] Page finished loading 
+2025-10-30T21:55:24.371Z [DEBUG] MenuBuilder: Application menu created successfully 
+2025-10-30T21:55:24.385Z [DEBUG] WindowManager: main window state: creating -> ready 
+2025-10-30T21:55:24.385Z [INFO] WindowManager: Main window created successfully (ID: 1) 
+2025-10-30T21:55:24.385Z [INFO] SCORM Tester: Main window created (ID: 1) 
+2025-10-30T21:55:24.385Z [INFO] SCORM Tester: Main process initialization completed successfully 
+2025-10-30T21:55:24.403Z [DEBUG] WindowManager: main window state: ready -> focused 
+2025-10-30T21:55:24.403Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-events-forwarder.js"}]
+2025-10-30T21:55:24.404Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-events-forwarder.js"}]
+2025-10-30T21:55:24.405Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-client.js"}]
+2025-10-30T21:55:24.405Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/event-bus.js"}]
+2025-10-30T21:55:24.405Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ipc-client.js"}]
+2025-10-30T21:55:24.405Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/event-bus.js"}]
+2025-10-30T21:55:24.406Z [INFO] ipc-events-forwarder: initialized 
+2025-10-30T21:55:24.406Z [INFO] SCORM event forwarding initialized successfully 
+2025-10-30T21:55:24.407Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/app-manager.js"}]
+2025-10-30T21:55:24.407Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/app-manager.js"}]
+2025-10-30T21:55:24.408Z [INFO] Test helpers available: 
+2025-10-30T21:55:24.408Z [INFO]   window.testLoadCourse(path) - Load course from path 
+2025-10-30T21:55:24.408Z [INFO]   window.loadSampleCourse() - Load the sample SL360 course 
+2025-10-30T21:55:24.409Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.js"}]
+2025-10-30T21:55:24.409Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.js"}]
+2025-10-30T21:55:24.410Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.helpers.js"}]
+2025-10-30T21:55:24.410Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.initial.js"}]
+2025-10-30T21:55:24.410Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.notifications.js"}]
+2025-10-30T21:55:24.410Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.helpers.js"}]
+2025-10-30T21:55:24.411Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.initial.js"}]
+2025-10-30T21:55:24.411Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/ui-state.notifications.js"}]
+2025-10-30T21:55:24.411Z [INFO] [UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:24.412Z [DEBUG] AppManager - uiState resolved 
+2025-10-30T21:55:24.412Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:24.412Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-client.js"}]
+2025-10-30T21:55:24.412Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:24.412Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-client.js"}]
+2025-10-30T21:55:24.413Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/payload-sanitizer.js"}]
+2025-10-30T21:55:24.413Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/payload-sanitizer.js"}]
+2025-10-30T21:55:24.414Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/scorm-validator.js"}]
+2025-10-30T21:55:24.414Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-api-bridge.js"}]
+2025-10-30T21:55:24.414Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/scorm-validator.js"}]
+2025-10-30T21:55:24.414Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/scorm-api-bridge.js"}]
+2025-10-30T21:55:24.415Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/course-loader.js"}]
+2025-10-30T21:55:24.415Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/course-loader.js"}]
+2025-10-30T21:55:24.416Z [INFO] CourseLoader: Electron API availability check: [{"available":true,"windowDefined":true,"electronAPIType":"object"}]
+2025-10-30T21:55:24.416Z [INFO] CourseLoader: Using IpcClient for file selection and prep 
+2025-10-30T21:55:24.416Z [INFO] CourseLoader: All required Electron API methods available 
+2025-10-30T21:55:24.416Z [INFO] AppManager: Initializing components... 
+2025-10-30T21:55:24.417Z [INFO] CourseLoader: Logger initialized 
+2025-10-30T21:55:24.417Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/base-component.js"}]
+2025-10-30T21:55:24.417Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/base-component.js"}]
+2025-10-30T21:55:24.418Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/content-viewer.js"}]
+2025-10-30T21:55:24.418Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/content-viewer.js"}]
+2025-10-30T21:55:24.419Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/navigation-controls.js"}]
+2025-10-30T21:55:24.419Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/navigation-controls.js"}]
+2025-10-30T21:55:24.420Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/sn-bridge.js"}]
+2025-10-30T21:55:24.420Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/sn-bridge.js"}]
+2025-10-30T21:55:24.421Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/course-outline.js"}]
+2025-10-30T21:55:24.421Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/course-outline.js"}]
+2025-10-30T21:55:24.422Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/escape.js"}]
+2025-10-30T21:55:24.422Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/utils/escape.js"}]
+2025-10-30T21:55:24.423Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-progress-bar.js"}]
+2025-10-30T21:55:24.423Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-progress-bar.js"}]
+2025-10-30T21:55:24.423Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-status-display.js"}]
+2025-10-30T21:55:24.424Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/scorm/footer-status-display.js"}]
+2025-10-30T21:55:24.424Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/inspector/inspector-panel.js"}]
+2025-10-30T21:55:24.424Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/inspector/inspector-panel.js"}]
+2025-10-30T21:55:24.425Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/header-controls.js"}]
+2025-10-30T21:55:24.425Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/header-controls.js"}]
+2025-10-30T21:55:24.425Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/notification-container.js"}]
+2025-10-30T21:55:24.426Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/notification-container.js"}]
+2025-10-30T21:55:24.426Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-dialog.js"}]
+2025-10-30T21:55:24.427Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-dialog.js"}]
+2025-10-30T21:55:24.427Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-badge.js"}]
+2025-10-30T21:55:24.427Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-badge.js"}]
+2025-10-30T21:55:24.428Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-list-panel.js"}]
+2025-10-30T21:55:24.428Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/components/notifications/error-list-panel.js"}]
+2025-10-30T21:55:24.428Z [DEBUG] AppManager: progress-tracking mount point not found; skipping component import 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Found DOM element 'content-viewer' for component mounting 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Found DOM element 'navigation-controls' for component mounting 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Found DOM element 'footer-progress' for component mounting 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Found DOM element 'footer-status' for component mounting 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Found DOM element 'course-outline' for component mounting 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Creating component 'headerControls' with elementId='header-controls' 
+2025-10-30T21:55:24.429Z [DEBUG] AppManager: Component 'headerControls' initialize() resolved [{"elementId":"header-controls","className":"HeaderControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":1,"subscriptionCount":4}]
+2025-10-30T21:55:24.429Z [INFO] AppManager: headerControls initialized 
+2025-10-30T21:55:24.430Z [DEBUG] AppManager: Creating component 'contentViewer' with elementId='content-viewer' 
+2025-10-30T21:55:24.430Z [DEBUG] [ContentViewer] Starting component initialization [null]
+2025-10-30T21:55:24.440Z [WARN] [Renderer Console] An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can remove its sandboxing. (scorm-app://app/src/renderer/components/scorm/content-viewer.js:83) 
+2025-10-30T21:55:24.454Z [DEBUG] [ContentViewer] Component initialization completed [null]
+2025-10-30T21:55:24.454Z [DEBUG] AppManager: Component 'contentViewer' initialize() resolved [{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}]
+2025-10-30T21:55:24.454Z [INFO] AppManager: contentViewer initialized 
+2025-10-30T21:55:24.455Z [DEBUG] AppManager: Creating component 'navigationControls' with elementId='navigation-controls' 
+2025-10-30T21:55:24.455Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
+2025-10-30T21:55:24.455Z [DEBUG] NavigationControls: Navigation state updated [{"snServiceAvailable":false,"snServiceError":null}]
+2025-10-30T21:55:24.455Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
+2025-10-30T21:55:24.456Z [DEBUG] [NavigationControls] Component initialization completed [null]
+2025-10-30T21:55:24.456Z [DEBUG] AppManager: Component 'navigationControls' initialize() resolved [{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":20}]
+2025-10-30T21:55:24.456Z [INFO] AppManager: navigationControls initialized 
+2025-10-30T21:55:24.456Z [DEBUG] AppManager: Creating component 'footerProgressBar' with elementId='footer-progress' 
+2025-10-30T21:55:24.456Z [WARN] RENDERER_DEBUG_RATE_LIMIT [{"windowMs":400,"max":20}]
+2025-10-30T21:55:24.456Z [INFO] AppManager: footerProgressBar initialized 
+2025-10-30T21:55:24.456Z [INFO] AppManager: footerStatusDisplay initialized 
+2025-10-30T21:55:24.456Z [INFO] CourseOutline: constructor initialized 
+2025-10-30T21:55:24.457Z [INFO] CourseOutline.setup: uiState resolved 
+2025-10-30T21:55:24.457Z [INFO] CourseOutline: HTML structure created successfully 
+2025-10-30T21:55:24.457Z [INFO] CourseOutline: Empty state displayed 
+2025-10-30T21:55:24.458Z [INFO] CourseOutline.setup: Initial component state [{"hasScormStates":false,"scormStatesLoaded":false,"availableNavigation":[],"browseModeEnabled":false,"courseStructureItems":0}]
+2025-10-30T21:55:24.458Z [INFO] CourseOutline: HTML structure created successfully 
+2025-10-30T21:55:24.458Z [INFO] AppManager: courseOutline initialized 
+2025-10-30T21:55:24.458Z [INFO] AppManager: inspectorPanel initialized 
+2025-10-30T21:55:24.458Z [INFO] AppManager: notificationContainer initialized 
+2025-10-30T21:55:24.487Z [INFO] AppManager: errorDialog initialized 
+2025-10-30T21:55:24.489Z [INFO] AppManager: errorBadge initialized 
+2025-10-30T21:55:24.490Z [INFO] AppManager: errorListPanel initialized 
+2025-10-30T21:55:24.490Z [INFO] AppManager: Post-init component status snapshot [{"courseOutline":{"elementId":"course-outline","className":"CourseOutline","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":39},"navigationControls":{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":20},"contentViewer":{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}}]
+2025-10-30T21:55:24.490Z [INFO] AppManager: All components initialized 
+2025-10-30T21:55:24.490Z [INFO] IPC_ENVELOPE { channel: ui-settings:get, requestId: 1, durationMs: 0, status: 'success' } 
+2025-10-30T21:55:24.491Z [DEBUG] Browse mode status: [{"enabled":false,"currentSession":null,"totalSessions":0,"navigationOverrides":{"ignoreSequencingRules":true,"allowUnrestrictedChoice":true,"ignoreAttemptLimits":true,"ignorePrerequisites":true}}]
+2025-10-30T21:55:24.491Z [INFO] IPC_ENVELOPE { channel: browse-mode-status, requestId: 2, durationMs: 0, status: 'success' } 
+2025-10-30T21:55:24.491Z [INFO] EventBus: Debug mode disabled 
+2025-10-30T21:55:24.491Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/recent-courses.js"}]
+2025-10-30T21:55:24.492Z [INFO] PathUtils: handleProtocolRequest start [{"operation":"protocolRequest","url":"scorm-app://app/src/renderer/services/recent-courses.js"}]
+2025-10-30T21:55:24.493Z [INFO] IPC_ENVELOPE { channel: recent:get, requestId: 3, durationMs: 1, status: 'success' } 
+2025-10-30T21:55:24.493Z [INFO] RecentCoursesStore: Loaded 5 recent courses from main process. 
+2025-10-30T21:55:25.492Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:27.146Z [INFO] Browse mode enabled [{"sessionId":"browse_1761861327146_je1nvl95y","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:27.147Z [INFO] Browse mode enabled [object Object]
+2025-10-30T21:55:27.148Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":true,"availableNavigation":[]}]
+2025-10-30T21:55:27.149Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":true}]
+2025-10-30T21:55:27.149Z [DEBUG] Initializing browse mode navigation session 
+2025-10-30T21:55:27.150Z [DEBUG] Navigation session already synchronized [{}]
+2025-10-30T21:55:27.150Z [ERROR] Error initializing browse mode session: [{"type":"Error","name":"TypeError","message":"Cannot read properties of null (reading 'isLaunchable')","stackHead":["TypeError: Cannot read properties of null (reading 'isLaunchable')","    at NavigationHandler.findFirstLaunchableActivity (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:478:23)","    at NavigationHandler.initializeBrowseModeSession (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:895:34)"]}]
+2025-10-30T21:55:27.152Z [DEBUG] Browse mode: Navigation handler session initialized [{"success":false,"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:27.153Z [WARN] Browse mode: Navigation handler session initialization failed [{"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:27.153Z [INFO] Browse mode enabled via ScormService [{"sessionId":"browse_1761861327146_je1nvl95y","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:27.153Z [DEBUG] Browse mode enable result: [{"success":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true}}]
+2025-10-30T21:55:27.154Z [INFO] IPC_ENVELOPE { channel: browse-mode-enable, requestId: 4, durationMs: 9, status: 'success' } 
+2025-10-30T21:55:27.155Z [INFO] AppManager: Browse mode enabled [{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:27.156Z [INFO] RENDERER_DEBUG_SUPPRESSED_SUMMARY [{"suppressed":18}]
+2025-10-30T21:55:27.156Z [INFO] IPC_ENVELOPE { channel: ui-settings:set, requestId: 5, durationMs: 0, status: 'success' } 
+2025-10-30T21:55:27.157Z [INFO] ContentViewer: Browse mode changed [{"enabled":true}]
+2025-10-30T21:55:27.157Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:27.157Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:27.158Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":false,"data":{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:27.158Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:27.158Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:27.159Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:27.159Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:27.160Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:27.160Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861327146_je1nvl95y","startTime":"2025-10-30T21:55:27.146Z","lastActivity":"2025-10-30T21:55:27.146Z","launchMode":"browse","duration":7,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:27.171Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":true,"canNavigateNext":true,"browseMode":true}]
+2025-10-30T21:55:28.159Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:30.648Z [DEBUG] Browse session destroyed: [{"sessionId":"browse_1761861327146_je1nvl95y","duration":3502,"operations":0}]
+2025-10-30T21:55:30.649Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861327146_je1nvl95y"}]
+2025-10-30T21:55:30.649Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861327146_je1nvl95y"}]
+2025-10-30T21:55:30.650Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":false,"availableNavigation":[]}]
+2025-10-30T21:55:30.650Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":false}]
+2025-10-30T21:55:30.650Z [INFO] Browse mode disabled via ScormService [{"sessionId":"browse_1761861327146_je1nvl95y"}]
+2025-10-30T21:55:30.650Z [DEBUG] Browse mode disable result: [{"success":true,"sessionId":"browse_1761861327146_je1nvl95y"}]
+2025-10-30T21:55:30.651Z [INFO] IPC_ENVELOPE { channel: browse-mode-disable, requestId: 6, durationMs: 4, status: 'success' } 
+2025-10-30T21:55:30.651Z [INFO] AppManager: Browse mode disabled 
+2025-10-30T21:55:30.652Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
+2025-10-30T21:55:30.652Z [INFO] ContentViewer: Browse mode changed [{"enabled":false}]
+2025-10-30T21:55:30.653Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:30.653Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:30.654Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":true,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:30.654Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:30.655Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:30.655Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:30.655Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:30.655Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:30.656Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:30.656Z [ERROR] SNBridge: Failed to get sequencing state ["SN service not connected"]
+2025-10-30T21:55:31.653Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:32.245Z [INFO] Browse mode enabled [{"sessionId":"browse_1761861332245_e7ebki0bo","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:32.246Z [INFO] Browse mode enabled [object Object]
+2025-10-30T21:55:32.247Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":true,"availableNavigation":[]}]
+2025-10-30T21:55:32.247Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":true}]
+2025-10-30T21:55:32.248Z [DEBUG] Initializing browse mode navigation session 
+2025-10-30T21:55:32.248Z [DEBUG] Navigation session already synchronized [{}]
+2025-10-30T21:55:32.248Z [ERROR] Error initializing browse mode session: [{"type":"Error","name":"TypeError","message":"Cannot read properties of null (reading 'isLaunchable')","stackHead":["TypeError: Cannot read properties of null (reading 'isLaunchable')","    at NavigationHandler.findFirstLaunchableActivity (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:478:23)","    at NavigationHandler.initializeBrowseModeSession (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:895:34)"]}]
+2025-10-30T21:55:32.249Z [DEBUG] Browse mode: Navigation handler session initialized [{"success":false,"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:32.249Z [WARN] Browse mode: Navigation handler session initialization failed [{"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:32.250Z [INFO] Browse mode enabled via ScormService [{"sessionId":"browse_1761861332245_e7ebki0bo","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:32.250Z [DEBUG] Browse mode enable result: [{"success":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true}}]
+2025-10-30T21:55:32.250Z [INFO] IPC_ENVELOPE { channel: browse-mode-enable, requestId: 7, durationMs: 5, status: 'success' } 
+2025-10-30T21:55:32.251Z [INFO] AppManager: Browse mode enabled [{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:32.252Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":true,"canNavigateNext":true,"browseMode":true}]
+2025-10-30T21:55:32.252Z [INFO] ContentViewer: Browse mode changed [{"enabled":true}]
+2025-10-30T21:55:32.252Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:32.253Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:32.253Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":false,"data":{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:32.254Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:32.254Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:32.254Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:32.255Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:32.255Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:32.255Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861332245_e7ebki0bo","startTime":"2025-10-30T21:55:32.245Z","lastActivity":"2025-10-30T21:55:32.245Z","launchMode":"browse","duration":4,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:32.995Z [DEBUG] Browse session destroyed: [{"sessionId":"browse_1761861332245_e7ebki0bo","duration":750,"operations":0}]
+2025-10-30T21:55:32.996Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861332245_e7ebki0bo"}]
+2025-10-30T21:55:32.997Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861332245_e7ebki0bo"}]
+2025-10-30T21:55:32.997Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":false,"availableNavigation":[]}]
+2025-10-30T21:55:32.997Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":false}]
+2025-10-30T21:55:32.998Z [INFO] Browse mode disabled via ScormService [{"sessionId":"browse_1761861332245_e7ebki0bo"}]
+2025-10-30T21:55:32.998Z [DEBUG] Browse mode disable result: [{"success":true,"sessionId":"browse_1761861332245_e7ebki0bo"}]
+2025-10-30T21:55:32.998Z [INFO] IPC_ENVELOPE { channel: browse-mode-disable, requestId: 8, durationMs: 3, status: 'success' } 
+2025-10-30T21:55:32.999Z [INFO] AppManager: Browse mode disabled 
+2025-10-30T21:55:32.999Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
+2025-10-30T21:55:33.000Z [INFO] ContentViewer: Browse mode changed [{"enabled":false}]
+2025-10-30T21:55:33.000Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:33.000Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:33.001Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":true,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:33.001Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:33.001Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:33.002Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:33.002Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:33.002Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:33.003Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:33.003Z [ERROR] SNBridge: Failed to get sequencing state ["SN service not connected"]
+2025-10-30T21:55:34.004Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:35.310Z [INFO] Browse mode enabled [{"sessionId":"browse_1761861335310_6843cdma8","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:35.311Z [INFO] Browse mode enabled [object Object]
+2025-10-30T21:55:35.312Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":true,"availableNavigation":[]}]
+2025-10-30T21:55:35.312Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":true}]
+2025-10-30T21:55:35.312Z [DEBUG] Initializing browse mode navigation session 
+2025-10-30T21:55:35.312Z [DEBUG] Navigation session already synchronized [{}]
+2025-10-30T21:55:35.313Z [ERROR] Error initializing browse mode session: [{"type":"Error","name":"TypeError","message":"Cannot read properties of null (reading 'isLaunchable')","stackHead":["TypeError: Cannot read properties of null (reading 'isLaunchable')","    at NavigationHandler.findFirstLaunchableActivity (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:478:23)","    at NavigationHandler.initializeBrowseModeSession (/Users/seth/Documents/GitHub/scorm-tester/src/main/services/scorm/sn/navigation-handler.js:895:34)"]}]
+2025-10-30T21:55:35.313Z [DEBUG] Browse mode: Navigation handler session initialized [{"success":false,"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:35.313Z [WARN] Browse mode: Navigation handler session initialization failed [{"reason":"Browse mode session initialization failed: Cannot read properties of null (reading 'isLaunchable')"}]
+2025-10-30T21:55:35.313Z [INFO] Browse mode enabled via ScormService [{"sessionId":"browse_1761861335310_6843cdma8","options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"visualIndicators":true}}]
+2025-10-30T21:55:35.314Z [DEBUG] Browse mode enable result: [{"success":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true}}]
+2025-10-30T21:55:35.314Z [INFO] IPC_ENVELOPE { channel: browse-mode-enable, requestId: 9, durationMs: 4, status: 'success' } 
+2025-10-30T21:55:35.315Z [INFO] AppManager: Browse mode enabled [{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:35.315Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":true,"canNavigateNext":true,"browseMode":true}]
+2025-10-30T21:55:35.315Z [INFO] ContentViewer: Browse mode changed [{"enabled":true}]
+2025-10-30T21:55:35.316Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:35.316Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:35.316Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":false,"data":{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:35.316Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:35.317Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:35.317Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:35.317Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:35.317Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}}]
+2025-10-30T21:55:35.318Z [INFO] CourseOutline: Browse mode changed [{"enabled":true,"previousEnabled":true,"data":{"enabled":true,"session":{"id":"browse_1761861335310_6843cdma8","startTime":"2025-10-30T21:55:35.310Z","lastActivity":"2025-10-30T21:55:35.310Z","launchMode":"browse","duration":3,"options":{"navigationUnrestricted":true,"trackingDisabled":true,"dataIsolation":true,"sessionTimeout":1800000,"preserveOriginalState":true,"visualIndicators":true},"state":{"operationsCount":0,"temporaryDataSize":0,"hasOriginalState":false},"active":true},"config":{"navigationUnrestricted":true,"trackingDisabled":true}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:36.128Z [DEBUG] Browse session destroyed: [{"sessionId":"browse_1761861335310_6843cdma8","duration":818,"operations":0}]
+2025-10-30T21:55:36.129Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861335310_6843cdma8"}]
+2025-10-30T21:55:36.130Z [INFO] Browse mode disabled [{"sessionId":"browse_1761861335310_6843cdma8"}]
+2025-10-30T21:55:36.130Z [DEBUG] NavigationHandler: Navigation availability refreshed [{"browseMode":false,"availableNavigation":[]}]
+2025-10-30T21:55:36.130Z [DEBUG] Browse mode: Navigation availability refreshed [{"success":0,"browseMode":false}]
+2025-10-30T21:55:36.131Z [INFO] Browse mode disabled via ScormService [{"sessionId":"browse_1761861335310_6843cdma8"}]
+2025-10-30T21:55:36.131Z [DEBUG] Browse mode disable result: [{"success":true,"sessionId":"browse_1761861335310_6843cdma8"}]
+2025-10-30T21:55:36.131Z [INFO] IPC_ENVELOPE { channel: browse-mode-disable, requestId: 10, durationMs: 3, status: 'success' } 
+2025-10-30T21:55:36.132Z [INFO] AppManager: Browse mode disabled 
+2025-10-30T21:55:36.132Z [DEBUG] NavigationControls: Button states updated [{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false}]
+2025-10-30T21:55:36.132Z [INFO] ContentViewer: Browse mode changed [{"enabled":false}]
+2025-10-30T21:55:36.133Z [INFO] RENDERER_COALESCE_WINDOW_START 
+2025-10-30T21:55:36.133Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:36.133Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":true,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:36.134Z [WARN] CourseOutline: No course structure available for browse mode re-render 
+2025-10-30T21:55:36.134Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:36.134Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:36.135Z [WARN] RENDERER_COALESCED_DUPLICATES [{"dropped":1}]
+2025-10-30T21:55:36.135Z [INFO] CourseOutline: Browse mode changed event received [{"enabled":false,"session":null,"config":{}}]
+2025-10-30T21:55:36.135Z [INFO] CourseOutline: Browse mode changed [{"enabled":false,"previousEnabled":false,"data":{"enabled":false,"session":null,"config":{}},"hasCourseStructure":false,"scormStatesLoaded":false,"scormStatesCount":0}]
+2025-10-30T21:55:36.135Z [ERROR] SNBridge: Failed to get sequencing state ["SN service not connected"]
+2025-10-30T21:55:36.880Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:38.216Z [INFO] [UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage) [{"persistenceKey":"scorm-tester-ui-state"}]
+2025-10-30T21:55:41.450Z [DEBUG] WindowManager: main window state: focused -> focused 
+2025-10-30T21:55:42.256Z [INFO] MenuBuilder: Exit menu clicked 
+2025-10-30T21:55:42.257Z [INFO] MenuBuilder: Exit requested, calling app.quit() 
+2025-10-30T21:55:42.257Z [INFO] SCORM Tester: before-quit event received 
+2025-10-30T21:55:42.257Z [INFO] SCORM Tester: Starting graceful shutdown from before-quit 
+2025-10-30T21:55:42.257Z [INFO] SCORM Tester: Starting graceful shutdown 
+2025-10-30T21:55:42.257Z [DEBUG] Broadcasted message on channel 'app-quit' to 1 windows 
+2025-10-30T21:55:42.257Z [DEBUG] SCORM Tester: Broadcasted app-quit signal to all windows 
+2025-10-30T21:55:42.258Z [DEBUG] SCORM Tester: Shutting down ipcHandler 
+2025-10-30T21:55:42.258Z [INFO] Shutting down IpcHandler service 
+2025-10-30T21:55:42.258Z [DEBUG] IpcHandler state changed: ready -> shutting_down 
+2025-10-30T21:55:42.258Z [DEBUG] Service ipcHandler state changed: [{"serviceName":"IpcHandler","oldState":"ready","newState":"shutting_down"}]
+2025-10-30T21:55:42.258Z [INFO] [SNSnapshotService] Stopped polling SN status 
+2025-10-30T21:55:42.258Z [INFO] Shutting down ScormService service 
+2025-10-30T21:55:42.258Z [DEBUG] ScormService state changed: ready -> shutting_down 
+2025-10-30T21:55:42.258Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"ready","newState":"shutting_down"}]
+2025-10-30T21:55:42.259Z [DEBUG] ScormService: Starting shutdown 
+2025-10-30T21:55:42.259Z [INFO] ScormService: Active sessions at shutdown: [] 
+2025-10-30T21:55:42.259Z [DEBUG] Activity tree reset 
+2025-10-30T21:55:42.259Z [DEBUG] RollupManager reset 
+2025-10-30T21:55:42.259Z [DEBUG] SN service reset 
+2025-10-30T21:55:42.259Z [DEBUG] ScormService: Shutdown completed 
+2025-10-30T21:55:42.259Z [DEBUG] ScormService state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.259Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.259Z [INFO] ScormService service shutdown completed 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-initialize 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-get-value 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-set-value 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-set-values-batch 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-commit 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-terminate 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-get-progress-snapshot 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: ui-settings:get 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: ui-settings:set 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-enable 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-disable 
+2025-10-30T21:55:42.260Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-status 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: browse-mode-create-session 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: select-scorm-package 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: select-scorm-folder 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: extract-scorm 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: prepare-course-source 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: save-temporary-file 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: find-scorm-entry 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: get-course-info 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: get-course-manifest 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:get 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:addOrUpdate 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:remove 
+2025-10-30T21:55:42.261Z [DEBUG] IpcHandler: Unregistered handler for channel: recent:clear 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: validate-scorm-compliance 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: analyze-scorm-content 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-version 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-path 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: get-session-data 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: reset-session 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: get-all-sessions 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: process-scorm-manifest 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:getStatus 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:getSequencingState 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:initialize 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:processNavigation 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:refreshNavigation 
+2025-10-30T21:55:42.262Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:updateActivityProgress 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:reset 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:handleActivityExit 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: sn:updateActivityLocation 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: apply-lms-profile 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: get-lms-profiles 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: run-test-scenario 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: open-external 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: path-to-file-url 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: get-app-root 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: path-normalize 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: path-join 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-history 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-activity-tree 
+2025-10-30T21:55:42.263Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-navigation-requests 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-global-objectives 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-ssp-buckets 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-data-model 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: scorm-inspector-get-sn-state 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-get-activity-tree 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-validate-choice 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: course-outline-get-available-navigation 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: load-shared-logger-adapter 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: quit-app 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler: Unregistered handler for channel: get-error-logs 
+2025-10-30T21:55:42.264Z [INFO] IpcHandler: All handlers unregistered 
+2025-10-30T21:55:42.264Z [DEBUG] IpcHandler state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.264Z [DEBUG] Service ipcHandler state changed: [{"serviceName":"IpcHandler","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.264Z [INFO] IpcHandler service shutdown completed 
+2025-10-30T21:55:42.265Z [DEBUG] SCORM Tester: Shutting down scormService 
+2025-10-30T21:55:42.265Z [INFO] Shutting down ScormService service 
+2025-10-30T21:55:42.265Z [DEBUG] ScormService state changed: shutdown -> shutting_down 
+2025-10-30T21:55:42.265Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutdown","newState":"shutting_down"}]
+2025-10-30T21:55:42.265Z [DEBUG] ScormService: Starting shutdown 
+2025-10-30T21:55:42.265Z [INFO] ScormService: Active sessions at shutdown: [] 
+2025-10-30T21:55:42.265Z [DEBUG] Activity tree reset 
+2025-10-30T21:55:42.265Z [DEBUG] RollupManager reset 
+2025-10-30T21:55:42.265Z [DEBUG] SN service reset 
+2025-10-30T21:55:42.265Z [DEBUG] ScormService: Shutdown completed 
+2025-10-30T21:55:42.265Z [DEBUG] ScormService state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.265Z [DEBUG] Service scormService state changed: [{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.265Z [INFO] ScormService service shutdown completed 
+2025-10-30T21:55:42.266Z [DEBUG] SCORM Tester: Shutting down recentCoursesService 
+2025-10-30T21:55:42.266Z [INFO] Shutting down RecentCoursesService service 
+2025-10-30T21:55:42.266Z [DEBUG] RecentCoursesService state changed: ready -> shutting_down 
+2025-10-30T21:55:42.266Z [DEBUG] Service recentCoursesService state changed: [{"serviceName":"RecentCoursesService","oldState":"ready","newState":"shutting_down"}]
+2025-10-30T21:55:42.266Z [DEBUG] RecentCoursesService: Starting shutdown 
+2025-10-30T21:55:42.266Z [DEBUG] RecentCoursesService: Shutdown completed 
+2025-10-30T21:55:42.266Z [DEBUG] RecentCoursesService state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.266Z [DEBUG] Service recentCoursesService state changed: [{"serviceName":"RecentCoursesService","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.266Z [INFO] RecentCoursesService service shutdown completed 
+2025-10-30T21:55:42.266Z [DEBUG] SCORM Tester: Shutting down fileManager 
+2025-10-30T21:55:42.266Z [INFO] Shutting down FileManager service 
+2025-10-30T21:55:42.266Z [DEBUG] FileManager state changed: ready -> shutting_down 
+2025-10-30T21:55:42.266Z [DEBUG] Service fileManager state changed: [{"serviceName":"FileManager","oldState":"ready","newState":"shutting_down"}]
+2025-10-30T21:55:42.267Z [DEBUG] FileManager: Starting shutdown 
+2025-10-30T21:55:42.267Z [DEBUG] FileManager: Shutdown completed 
+2025-10-30T21:55:42.267Z [DEBUG] FileManager state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.267Z [DEBUG] Service fileManager state changed: [{"serviceName":"FileManager","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.267Z [INFO] FileManager service shutdown completed 
+2025-10-30T21:55:42.267Z [DEBUG] SCORM Tester: Shutting down windowManager 
+2025-10-30T21:55:42.267Z [INFO] Shutting down WindowManager service 
+2025-10-30T21:55:42.267Z [DEBUG] WindowManager state changed: ready -> shutting_down 
+2025-10-30T21:55:42.267Z [DEBUG] Service windowManager state changed: [{"serviceName":"WindowManager","oldState":"ready","newState":"shutting_down"}]
+2025-10-30T21:55:42.267Z [DEBUG] WindowManager: Starting shutdown 
+2025-10-30T21:55:42.267Z [DEBUG] WindowManager: Closing main window 
+2025-10-30T21:55:42.287Z [DEBUG] WindowManager: Shutdown completed 
+2025-10-30T21:55:42.287Z [DEBUG] WindowManager state changed: shutting_down -> shutdown 
+2025-10-30T21:55:42.287Z [DEBUG] Service windowManager state changed: [{"serviceName":"WindowManager","oldState":"shutting_down","newState":"shutdown"}]
+2025-10-30T21:55:42.287Z [INFO] WindowManager service shutdown completed 
+2025-10-30T21:55:42.287Z [INFO] SCORM Tester: Graceful shutdown completed 
+2025-10-30T21:55:42.287Z [INFO] SCORM Tester: Calling app.quit() after shutdown 
+2025-10-30T21:55:42.288Z [INFO] SCORM Tester: before-quit event received 
+2025-10-30T21:55:42.288Z [INFO] SCORM Tester: Already shutting down, allowing quit 
+2025-10-30T21:55:42.291Z [INFO] [PRELOAD] App quit signal received, setting shutdown flag 
+2025-10-30T21:55:42.291Z [DEBUG] WindowManager: main window state: undefined -> closed 

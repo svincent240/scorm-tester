@@ -769,6 +769,48 @@ class ScormClient {
   }
 
   /**
+   * Reset the SCORM client to initial state
+   * Used when reloading a course to clear previous session state
+   */
+  reset() {
+    // Clear session state
+    this.sessionId = null;
+    this.isInitialized = false;
+    this.lastError = '0';
+
+    // Clear timers
+    if (this.sessionTimer) {
+      clearInterval(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+
+    if (this._batchTimer) {
+      clearTimeout(this._batchTimer);
+      this._batchTimer = null;
+    }
+
+    if (this._commitTimer) {
+      clearTimeout(this._commitTimer);
+      this._commitTimer = null;
+    }
+
+    // Clear queues and caches
+    this.apiCallQueue = [];
+    this.isProcessingQueue = false;
+    this.clearCache();
+
+    // Reset throttle/backoff state
+    this._finalizing = false;
+    this._lastSessionTimeSetAt = 0;
+    this._lastIpcRateLimitAt = 0;
+    this._pendingSetBatch = [];
+    this._apiSeq = 0;
+
+    // Emit reset event
+    eventBus.emit('ui:scorm:reset');
+  }
+
+  /**
    * Destroy the SCORM client
    */
   destroy() {

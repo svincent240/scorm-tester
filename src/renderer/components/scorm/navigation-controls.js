@@ -144,9 +144,6 @@ class NavigationControls extends BaseComponent {
           <div class="navigation-controls__title" id="${this.elementId}-title">
             Learning Management System
           </div>
-          <div class="navigation-controls__status" id="${this.elementId}-status">
-            No course loaded
-          </div>
         </div>
         
         <div class="navigation-controls__center">
@@ -212,7 +209,7 @@ class NavigationControls extends BaseComponent {
 
     // Get references to elements
     this.titleElement = this.find('.navigation-controls__title');
-    this.statusElement = this.find('.navigation-controls__status');
+    // Status element removed to free up space in top bar
     this.progressElement = this.find('.navigation-controls__progress');
     this.progressFill = this.find('.progress-fill');
     this.progressText = this.find('.progress-text');
@@ -608,21 +605,15 @@ class NavigationControls extends BaseComponent {
    * Show navigation error message to user
    */
   showNavigationError(message) {
-    if (this.statusElement) {
-      const originalText = this.statusElement.textContent;
-      this.statusElement.textContent = message;
-      this.statusElement.classList.add('navigation-controls__status--error');
-      
-      // Restore original text after 3 seconds
-      setTimeout(() => {
-        if (this.statusElement) {
-          this.statusElement.textContent = originalText;
-          this.statusElement.classList.remove('navigation-controls__status--error');
-        }
-      }, 3000);
-    }
-    
-    this.logger?.warn('NavigationControls: Navigation error displayed:', message);
+    // Status element removed - errors now shown via notification system
+    this.logger?.warn('NavigationControls: Navigation error:', message);
+
+    // Emit error event for notification system to handle
+    this.eventBus?.emit('ui:notification', {
+      type: 'error',
+      message: message,
+      duration: 3000
+    });
   }
 
 
@@ -849,14 +840,14 @@ class NavigationControls extends BaseComponent {
    * Show browse mode indicator (SCORM-compliant)
    */
   showBrowseModeIndicator() {
-    if (this.statusElement && !this.browseModeIndicator) {
+    if (this.titleElement && !this.browseModeIndicator) {
       this.browseModeIndicator = document.createElement('div');
       this.browseModeIndicator.className = 'browse-mode-indicator';
       this.browseModeIndicator.innerHTML = '🔍 Browse Mode - Data Not Tracked';
 
-      // Insert after status element
-      if (this.statusElement.parentNode) {
-        this.statusElement.parentNode.insertBefore(this.browseModeIndicator, this.statusElement.nextSibling);
+      // Insert after title element
+      if (this.titleElement.parentNode) {
+        this.titleElement.parentNode.insertBefore(this.browseModeIndicator, this.titleElement.nextSibling);
       }
     }
 
@@ -893,28 +884,23 @@ class NavigationControls extends BaseComponent {
    */
   setFlowOnlyMode(isFlowOnly) {
     this.updateNavigationState({ isFlowOnly });
-    
+
     // Update UI to indicate flow-only mode
     this.element.classList.toggle('navigation-controls--flow-only', isFlowOnly);
-    
-    if (isFlowOnly) {
-      this.statusElement.textContent = 'Sequential navigation course';
-    }
+
+    // Status element removed - flow-only mode indicated by CSS class only
   }
 
 
 
   /**
-   * Update title and status
+   * Update title (status parameter ignored - status element removed)
    */
-  updateTitleAndStatus(title, status) {
+  updateTitleAndStatus(title, _status) {
     if (this.titleElement && title) {
       this.titleElement.textContent = title;
     }
-    
-    if (this.statusElement && status) {
-      this.statusElement.textContent = status;
-    }
+    // Status element removed to free up space in top bar
   }
 
   /**
@@ -1092,20 +1078,8 @@ class NavigationControls extends BaseComponent {
   /**
    * Update completion status display
    */
-  updateCompletionStatus(status) {
-    // Update any completion status indicators in the navigation bar
-    const statusElement = this.find('.navigation-controls__status');
-    if (statusElement && status) {
-      // Keep existing status text but ensure progress is reflected
-      const currentText = statusElement.textContent;
-      if (currentText && !currentText.includes('No course')) {
-        // Update status to reflect current completion
-        const statusText = status === 'completed' ? 'Course Completed' :
-                          status === 'incomplete' ? 'Course In Progress' :
-                          'Course Status: ' + status;
-        statusElement.textContent = statusText;
-      }
-    }
+  updateCompletionStatus(_status) {
+    // Status element removed - completion status shown in footer and progress bar
   }
 
   /**

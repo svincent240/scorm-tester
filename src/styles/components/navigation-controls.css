@@ -48,15 +48,7 @@
   color: var(--text-color);
 }
 
-.navigation-controls__status {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
-.navigation-controls__status--warning {
-  color: var(--warning-color);
-  font-weight: var(--font-weight-semibold);
-}
+/* Status element removed to free up space in top bar */
 
 .navigation-controls__btn {
   background-color: var(--bg-primary);

@@ -12,6 +12,11 @@ async function main() {
     // Do NOT enforce single-instance for MCP stdio server; CI/dev may spawn multiple for tests
     // (Keep desktop app single-instance behavior in main app entry, not here).
 
+    // Hide dock icon on macOS when running as MCP background server
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.hide();
+    }
+
     // Do not quit when all windows are closed (we run headless/offscreen)
     app.on("window-all-closed", (e) => {
       try { e.preventDefault(); } catch (_) {}
