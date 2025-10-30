@@ -395,6 +395,8 @@ class AppManager {
       const action = (payload && payload.action) || payload;
       if (action === 'menu-load-package') {
         eventBus.emit('course:open-zip:request');
+      } else if (action === 'menu-toggle-theme') {
+        eventBus.emit('ui:theme:toggle-request');
       }
     });
   } catch (_) {}
@@ -1899,11 +1901,23 @@ class AppManager {
     const items = recentCoursesStore.getAll();
     // Clear
     container.innerHTML = '';
+
+    // Add welcome content wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'recent-courses-wrapper';
+
+    // Add title
+    const title = document.createElement('h2');
+    title.className = 'recent-courses-title';
+    title.textContent = 'Recent Courses';
+    wrapper.appendChild(title);
+
     if (!Array.isArray(items) || items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'recent-empty';
-      empty.textContent = 'No recent courses';
-      container.appendChild(empty);
+      empty.textContent = 'No recent courses. Load a SCORM package to get started.';
+      wrapper.appendChild(empty);
+      container.appendChild(wrapper);
       return;
     }
 
@@ -1940,7 +1954,8 @@ class AppManager {
         list.appendChild(li);
       });
 
-      container.appendChild(list);
+      wrapper.appendChild(list);
+      container.appendChild(wrapper);
   }
 
   /**

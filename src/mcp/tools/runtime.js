@@ -509,6 +509,17 @@ async function scorm_api_call(params = {}) {
   return { result: String(res || '') };
 }
 
+/**
+ * Get sequencing/navigation state
+ *
+ * Error handling strategy (fail-fast, no masking):
+ * - SN_NOT_INITIALIZED: Expected when scorm_sn_init not called (single-SCO courses) → return success with sn_available: false
+ * - SN_INIT_FAILED: Actual error when scorm_sn_init was called but failed → thrown by scorm_sn_init
+ * - SN_BRIDGE_ERROR: Real SN engine errors → throw error
+ * - SN_BRIDGE_UNAVAILABLE: Bridge not available → throw error
+ *
+ * This ensures we don't mask real errors while handling expected states gracefully.
+ */
 async function scorm_nav_get_state(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
@@ -516,10 +527,36 @@ async function scorm_nav_get_state(params = {}) {
   if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const statusRes = await RuntimeManager.snInvoke(win, 'status');
   if (statusRes == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
-  if (!statusRes.success) { const e = new Error(statusRes.error || 'SN not initialized'); e.code = (statusRes.error === 'SN_NOT_INITIALIZED') ? 'SN_NOT_INITIALIZED' : 'SN_BRIDGE_ERROR'; throw e; }
-  return statusRes.status || {};
+
+  // SN_NOT_INITIALIZED is expected when scorm_sn_init has not been called (e.g., single-SCO courses)
+  // Return success with sn_available: false instead of throwing
+  if (!statusRes.success && statusRes.error === 'SN_NOT_INITIALIZED') {
+    return {
+      sn_available: false,
+      reason: 'SN_NOT_INITIALIZED',
+      message: 'Sequencing not initialized (expected for single-SCO courses or when scorm_sn_init not called)'
+    };
+  }
+
+  // Other errors are real failures - throw them
+  if (!statusRes.success) {
+    const e = new Error(statusRes.error || 'SN bridge error');
+    e.code = 'SN_BRIDGE_ERROR';
+    throw e;
+  }
+
+  return {
+    sn_available: true,
+    ...statusRes.status
+  };
 }
 
+/**
+ * Navigate to next activity
+ *
+ * Error handling: SN_NOT_INITIALIZED → return applicable:false (expected for single-SCO)
+ * Real errors (NAV_UNSUPPORTED_ACTION, etc.) → throw error
+ */
 async function scorm_nav_next(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
@@ -527,10 +564,32 @@ async function scorm_nav_next(params = {}) {
   if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'continue' });
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
-  if (!res.success) { const e = new Error(res.error || 'Navigation unsupported'); e.code = (res.error === 'SN_NOT_INITIALIZED') ? 'SN_NOT_INITIALIZED' : 'NAV_UNSUPPORTED_ACTION'; throw e; }
-  return { success: true };
+
+  // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
+  if (!res.success && res.error === 'SN_NOT_INITIALIZED') {
+    return {
+      success: false,
+      applicable: false,
+      reason: 'Navigation not applicable (scorm_sn_init not called - expected for single-SCO courses)'
+    };
+  }
+
+  // Other navigation failures are real errors
+  if (!res.success) {
+    const e = new Error(res.error || 'Navigation unsupported');
+    e.code = 'NAV_UNSUPPORTED_ACTION';
+    throw e;
+  }
+
+  return { success: true, applicable: true };
 }
 
+/**
+ * Navigate to previous activity
+ *
+ * Error handling: SN_NOT_INITIALIZED → return applicable:false (expected for single-SCO)
+ * Real errors (NAV_UNSUPPORTED_ACTION, etc.) → throw error
+ */
 async function scorm_nav_previous(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
@@ -538,10 +597,32 @@ async function scorm_nav_previous(params = {}) {
   if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'previous' });
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
-  if (!res.success) { const e = new Error(res.error || 'Navigation unsupported'); e.code = (res.error === 'SN_NOT_INITIALIZED') ? 'SN_NOT_INITIALIZED' : 'NAV_UNSUPPORTED_ACTION'; throw e; }
-  return { success: true };
+
+  // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
+  if (!res.success && res.error === 'SN_NOT_INITIALIZED') {
+    return {
+      success: false,
+      applicable: false,
+      reason: 'Navigation not applicable (scorm_sn_init not called - expected for single-SCO courses)'
+    };
+  }
+
+  // Other navigation failures are real errors
+  if (!res.success) {
+    const e = new Error(res.error || 'Navigation unsupported');
+    e.code = 'NAV_UNSUPPORTED_ACTION';
+    throw e;
+  }
+
+  return { success: true, applicable: true };
 }
 
+/**
+ * Navigate to specific activity by choice
+ *
+ * Error handling: SN_NOT_INITIALIZED → return applicable:false (expected for single-SCO)
+ * Real errors (NAV_UNSUPPORTED_ACTION, etc.) → throw error
+ */
 async function scorm_nav_choice(params = {}) {
   const session_id = params.session_id;
   const targetId = params.targetId || params.target_id || params.activity_id;
@@ -551,8 +632,24 @@ async function scorm_nav_choice(params = {}) {
   if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'choice', targetId });
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
-  if (!res.success) { const e = new Error(res.error || 'Navigation unsupported'); e.code = (res.error === 'SN_NOT_INITIALIZED') ? 'SN_NOT_INITIALIZED' : 'NAV_UNSUPPORTED_ACTION'; throw e; }
-  return { success: true };
+
+  // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
+  if (!res.success && res.error === 'SN_NOT_INITIALIZED') {
+    return {
+      success: false,
+      applicable: false,
+      reason: 'Navigation not applicable (scorm_sn_init not called - expected for single-SCO courses)'
+    };
+  }
+
+  // Other navigation failures are real errors
+  if (!res.success) {
+    const e = new Error(res.error || 'Navigation unsupported');
+    e.code = 'NAV_UNSUPPORTED_ACTION';
+    throw e;
+  }
+
+  return { success: true, applicable: true };
 }
 
 async function scorm_sn_init(params = {}) {

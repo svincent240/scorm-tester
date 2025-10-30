@@ -35,7 +35,6 @@ class HeaderControls extends BaseComponent {
         <button class="btn btn--secondary btn--sm" id="hc-open-folder" title="Open Folder">Open Folder</button>
         <button class="btn btn--secondary btn--sm" id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
         <button class="btn btn--secondary btn--sm" id="hc-inspector" title="Toggle Inspector">Inspector</button>
-        <button class="btn btn--secondary btn--sm" id="hc-theme" title="Toggle Theme">Theme</button>
       </div>
     `;
 
@@ -69,9 +68,6 @@ class HeaderControls extends BaseComponent {
           break;
         case 'hc-inspector':
           this.eventBus.emit('ui:inspector:toggle-request');
-          break;
-        case 'hc-theme':
-          this.eventBus.emit('ui:theme:toggle-request');
           break;
       }
     });

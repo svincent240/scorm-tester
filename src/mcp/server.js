@@ -203,13 +203,38 @@ async function handleRequest(req) {
         }
         try {
           logger?.info('MCP_TOOLS_CALL', { id, method: name, argsMeta: { keys: Object.keys(args||{}), hasArgs: !!args } });
-          const data = await router.dispatch(name, args);
+          const toolResult = await router.dispatch(name, args);
           logger?.info('MCP_TOOLS_RESULT', { id, method: name, ok: true });
-          return writeJSONRPCResult(id, { data });
+
+          // Convert tool result to MCP format: { content: [...], isError: false }
+          // Tools return plain objects, so we wrap them in MCP's content array format
+          const mcpResult = {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(toolResult, null, 2)
+              }
+            ],
+            isError: false
+          };
+
+          return writeJSONRPCResult(id, mcpResult);
         } catch (err) {
           const mapped = mapError(err);
           logger?.error('MCP_TOOLS_ERROR', { id, method: name, error_code: mapped.error_code, message: mapped.message });
-          return writeJSONRPCError(id, -32000, mapped.message || "Tool error", { error_code: mapped.error_code });
+
+          // Return error in MCP format
+          const mcpError = {
+            content: [
+              {
+                type: "text",
+                text: mapped.message || "Tool error"
+              }
+            ],
+            isError: true
+          };
+
+          return writeJSONRPCResult(id, mcpError);
         }
       }
 

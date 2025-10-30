@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { parseMcpResponse } = require('../helpers/mcp-response-parser');
 
 describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
   jest.setTimeout(60000);
@@ -61,7 +62,7 @@ describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
       }
     };
     const callRes = await rpc('tools/call', { name: 'scorm_test_api_integration', arguments: argumentsObj }, id++);
-    const data = callRes && callRes.result && callRes.result.data;
+    const data = parseMcpResponse(callRes);
 
     // Emit a single line for easy scraping from CI output
     const payload = {

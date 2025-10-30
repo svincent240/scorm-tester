@@ -133,6 +133,7 @@
   padding: var(--spacing-xs);  /* Minimal padding to maximize content space */
   min-width: 0;  /* Allow flex shrinking */
   min-height: 0;  /* Allow proper flex shrinking */
+  position: relative;  /* For absolute positioning of recent-courses */
 }
 
 .app-footer {
@@ -188,6 +189,12 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  flex-wrap: nowrap;
+}
+
+.header-controls__group .btn {
+  flex-shrink: 0;
+  min-width: fit-content;
 }
 
 

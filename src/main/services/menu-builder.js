@@ -82,6 +82,12 @@ class MenuBuilder {
         label: 'View',
         submenu: [
           {
+            label: 'Toggle Light/Dark Mode',
+            accelerator: 'CmdOrCtrl+Shift+T',
+            click: () => this.sendMenuAction('menu-toggle-theme')
+          },
+          { type: 'separator' },
+          {
             label: 'Fullscreen Course',
             accelerator: 'F11',
             click: () => this.sendMenuAction('menu-fullscreen')

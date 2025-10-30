@@ -329,6 +329,15 @@ body.dev-mode .dev-mode-toggle {
   }
 }
 
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
 /* Focus Management */
 .focus-trap {
   position: relative;

@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { parseMcpResponse } = require('../helpers/mcp-response-parser');
 
 describe('MCP SN init flow on real course (sequencing bridge)', () => {
   jest.setTimeout(90000);
@@ -55,20 +56,20 @@ describe('MCP SN init flow on real course (sequencing bridge)', () => {
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
 
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
-    const openData = openSession && openSession.result && openSession.result.data;
+    const openData = parseMcpResponse(openSession);
     expect(openData && openData.session_id).toBeTruthy();
     const session_id = openData.session_id;
 
     const runtimeOpen = await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    const runtimeData = runtimeOpen && runtimeOpen.result && runtimeOpen.result.data;
+    const runtimeData = parseMcpResponse(runtimeOpen);
     expect(runtimeData && runtimeData.runtime_id === session_id).toBe(true);
 
     const snInit = await rpc('tools/call', { name: 'scorm_sn_init', arguments: { session_id } }, id++);
-    const snData = snInit && snInit.result && snInit.result.data;
+    const snData = parseMcpResponse(snInit);
     expect(snData && snData.success).toBe(true);
 
     const navState = await rpc('tools/call', { name: 'scorm_nav_get_state', arguments: { session_id } }, id++);
-    const navData = navState && navState.result && navState.result.data;
+    const navData = parseMcpResponse(navState);
     expect(navData && typeof navData.sessionState === 'string').toBe(true);
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);

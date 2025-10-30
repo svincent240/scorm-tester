@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { parseMcpResponse } = require('../helpers/mcp-response-parser');
 
 describe('MCP API flow (Initialize → Commit → Terminate) on persistent runtime', () => {
   jest.setTimeout(90000);
@@ -52,24 +53,24 @@ describe('MCP API flow (Initialize → Commit → Terminate) on persistent runti
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
-    const openData = openSession && openSession.result && openSession.result.data;
+    const openData = parseMcpResponse(openSession);
     expect(openData && openData.session_id).toBeTruthy();
     const session_id = openData.session_id;
 
     const runtimeOpen = await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    const runtimeData = runtimeOpen && runtimeOpen.result && runtimeOpen.result.data;
+    const runtimeData = parseMcpResponse(runtimeOpen);
     expect(runtimeData && runtimeData.runtime_id === session_id).toBe(true);
 
     const apiInit = await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
-    const apiInitData = apiInit && apiInit.result && apiInit.result.data;
+    const apiInitData = parseMcpResponse(apiInit);
     expect(apiInitData && apiInitData.result === 'true').toBe(true);
 
     const apiCommit = await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Commit', args: [''] } }, id++);
-    const apiCommitData = apiCommit && apiCommit.result && apiCommit.result.data;
+    const apiCommitData = parseMcpResponse(apiCommit);
     expect(apiCommitData && apiCommitData.result === 'true').toBe(true);
 
     const apiTerm = await rpc('tools/call', { name: 'scorm_attempt_terminate', arguments: { session_id } }, id++);
-    const apiTermData = apiTerm && apiTerm.result && apiTerm.result.data;
+    const apiTermData = parseMcpResponse(apiTerm);
     expect(apiTermData && apiTermData.result === 'true').toBe(true);
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);

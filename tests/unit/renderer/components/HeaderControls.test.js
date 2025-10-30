@@ -46,7 +46,6 @@ describe('HeaderControls Component', () => {
     expect(rootElement.querySelector('#hc-open-folder')).not.toBeNull();
     expect(rootElement.querySelector('#course-reload-btn')).not.toBeNull();
     expect(rootElement.querySelector('#hc-inspector')).not.toBeNull();
-    expect(rootElement.querySelector('#hc-theme')).not.toBeNull();
   });
 
   test('should have the Reload button disabled by default', () => {
@@ -67,11 +66,6 @@ describe('HeaderControls Component', () => {
   test('should emit "ui:inspector:toggle-request" when Inspector is clicked', () => {
     rootElement.querySelector('#hc-inspector').click();
     expect(eventBus.emit).toHaveBeenCalledWith('ui:inspector:toggle-request');
-  });
-
-  test('should emit "ui:theme:toggle-request" when Theme is clicked', () => {
-    rootElement.querySelector('#hc-theme').click();
-    expect(eventBus.emit).toHaveBeenCalledWith('ui:theme:toggle-request');
   });
 
   test('should enable the Reload button on a "course:loaded" event', () => {

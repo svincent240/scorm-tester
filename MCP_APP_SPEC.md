@@ -159,8 +159,11 @@ Example minimal MCP client config (conceptual):
 - Tool errors use -32000 with data.error_code for precise classification. Common codes:
   - MCP_INVALID_PARAMS, MCP_UNKNOWN_SESSION, RUNTIME_NOT_OPEN, ELECTRON_REQUIRED
   - MANIFEST_NOT_FOUND, CONTENT_FILE_MISSING, MANIFEST_VALIDATION_ERROR
-  - SN_BRIDGE_UNAVAILABLE, SN_NOT_INITIALIZED, NAV_UNSUPPORTED_ACTION
+  - SN_BRIDGE_UNAVAILABLE, SN_BRIDGE_ERROR, NAV_UNSUPPORTED_ACTION
   - INVALID_SCORM_METHOD, SCORM_API_ERROR
+  - SN_INIT_FAILED, SN_RESET_FAILED
+
+**Important:** `SN_NOT_INITIALIZED` is NOT an error code. When sequencing is not initialized (because `scorm_sn_init` was not called), navigation and state tools return success with `sn_available: false` or `applicable: false` to indicate the operation is not applicable. This is expected for single-SCO courses that don't use complex sequencing. Only actual failures (like `SN_INIT_FAILED` when initialization is attempted but fails) result in errors.
 
 - Result shape:
   - On success: { "jsonrpc":"2.0", "id":N, "result": { data: { …tool specific… } } }
@@ -474,23 +477,35 @@ Notes:
 
 - scorm_nav_get_state
   - params: { session_id: string }
-  - result.data: { ...status }
-  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, SN_NOT_INITIALIZED
+  - result.data:
+    - When SN available: { sn_available: true, ...status }
+    - When SN not initialized: { sn_available: false, reason: "SN_NOT_INITIALIZED", message: string }
+  - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, SN_BRIDGE_ERROR
+  - Note: Returns success even when SN not initialized (expected for single-SCO courses)
 
 - scorm_nav_next
   - params: { session_id: string }
-  - result.data: { success: boolean }
+  - result.data:
+    - When applicable: { success: boolean, applicable: true }
+    - When not applicable: { success: false, applicable: false, reason: string }
   - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+  - Note: Returns success with applicable:false when SN not initialized (expected for single-SCO courses)
 
 - scorm_nav_previous
   - params: { session_id: string }
-  - result.data: { success: boolean }
+  - result.data:
+    - When applicable: { success: boolean, applicable: true }
+    - When not applicable: { success: false, applicable: false, reason: string }
   - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+  - Note: Returns success with applicable:false when SN not initialized (expected for single-SCO courses)
 
 - scorm_nav_choice
   - params: { session_id: string, targetId: string }
-  - result.data: { success: boolean }
+  - result.data:
+    - When applicable: { success: boolean, applicable: true }
+    - When not applicable: { success: false, applicable: false, reason: string }
   - errors: RUNTIME_NOT_OPEN, SN_BRIDGE_UNAVAILABLE, NAV_UNSUPPORTED_ACTION
+  - Note: Returns success with applicable:false when SN not initialized (expected for single-SCO courses)
 
 - scorm_sn_init
   - params: { session_id: string }
