@@ -500,6 +500,14 @@ module.exports = [
     }
   },
   {
+    channel: 'get-error-logs',
+    handlerName: 'handleGetErrorLogs',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
     channel: 'get-app-version',
     handlerName: 'handleGetAppVersion',
     options: {

@@ -382,11 +382,24 @@ class WindowManager extends BaseService {
       });
 
       const ses = wc.session;
-      // Deny all permission requests by default
+      // Set permission handler with allowlist for essential features
       try {
         ses.setPermissionRequestHandler((_webContents, permission, callback) => {
-          try { this.logger?.debug(`Permission denied by policy: ${permission}`); } catch (_) {}
-          callback(false);
+          // Allow clipboard access for error reporting and debugging
+          const allowedPermissions = [
+            'clipboard-sanitized-write',
+            'clipboard-read'
+          ];
+
+          const allowed = allowedPermissions.includes(permission);
+
+          if (allowed) {
+            try { this.logger?.debug(`Permission granted: ${permission}`); } catch (_) {}
+          } else {
+            try { this.logger?.debug(`Permission denied by policy: ${permission}`); } catch (_) {}
+          }
+
+          callback(allowed);
         });
       } catch (_) {}
 

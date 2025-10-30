@@ -48,7 +48,10 @@ export function getInitialUIState() {
       devModeEnabled: false,
       loading: false,
       error: null,
-      notifications: []
+      notifications: [],
+      catastrophicErrors: [],
+      nonCatastrophicErrors: [],
+      errorBadgeCount: 0
     },
 
     // Browse mode state (SCORM-compliant)

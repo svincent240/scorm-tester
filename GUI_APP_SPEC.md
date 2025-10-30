@@ -71,6 +71,15 @@ Components are self-contained UI elements that follow a consistent lifecycle.
 *   **Responsibilities**: A component is responsible for rendering its UI based on state from `UIState` and emitting user-intent events to the `EventBus`.
 *   **State**: Components **MUST NOT** maintain their own complex internal state. They should be stateless renderings of the global `UIState`.
 
+### 3.3. Error Presentation Components
+
+The following components are responsible for presenting errors to users:
+
+*   **`NotificationContainer`**: Renders toast notifications from `UIState.state.ui.notifications` in a fixed position on screen.
+*   **`ErrorDialog`**: Modal dialog for catastrophic errors with log export functionality.
+*   **`ErrorBadge`**: Header badge showing count of unacknowledged non-catastrophic errors.
+*   **`ErrorListPanel`**: Expandable panel listing all non-catastrophic errors with details and actions.
+
 ## 4. Component Contracts
 
 ### 4.1. `HeaderControls`
@@ -101,8 +110,73 @@ Components are self-contained UI elements that follow a consistent lifecycle.
 
 ## 5. Error Handling
 
-*   **Display, Don't Handle**: When the GUI receives an error event from the main process, its primary job is to display it to the user via the centralized notification system.
+The GUI's role in error handling is to present errors clearly to users with appropriate context and diagnostic information. All errors **MUST** be classified and presented according to their severity and impact.
+
+### 5.1. Error Classification
+
+Errors **MUST** be classified into two categories:
+
+*   **Catastrophic Errors**: Errors that prevent core functionality from working. These include:
+    *   Application initialization failures
+    *   Course load failures
+    *   Critical service crashes
+    *   File system access failures
+    *   IPC communication failures
+
+*   **Non-Catastrophic Errors**: Errors that occur during operation but don't prevent the application from functioning. These include:
+    *   SCORM API validation errors
+    *   Individual SCO navigation failures
+    *   Data model constraint violations
+    *   Content rendering warnings
+    *   Sequencing rule violations
+
+### 5.2. Catastrophic Error Presentation
+
+When a catastrophic error occurs, the GUI **MUST**:
+
+1. **Display a Modal Dialog** that:
+   *   Blocks interaction with the rest of the application
+   *   Shows a clear error title and message
+   *   Displays technical details in an expandable section
+   *   Provides a "Copy Logs" button that copies relevant log entries to the clipboard
+   *   Provides an "OK" or "Close" button to dismiss (if the application can continue)
+   *   Provides a "Restart" button if the error requires application restart
+
+2. **Log Export**: The "Copy Logs" button **MUST**:
+   *   Include the last 100 lines from `app.log` or all error-level entries from `errors.ndjson`
+   *   Include the specific error stack trace
+   *   Include relevant context (timestamp, component, operation being performed)
+   *   Format the output as readable text suitable for bug reports
+
+### 5.3. Non-Catastrophic Error Presentation
+
+For non-catastrophic errors, the GUI **MUST**:
+
+1. **Display an Error Badge** in the header that:
+   *   Shows the count of unacknowledged errors
+   *   Uses visual indicators (color, icon) to draw attention
+   *   Is clickable to open the Error List Panel
+   *   Persists until the user acknowledges the errors
+
+2. **Error List Panel**: When the badge is clicked, display a panel that:
+   *   Lists all non-catastrophic errors with timestamps
+   *   Shows error type, message, and affected component
+   *   Provides expandable details for each error
+   *   Includes a "Copy All Logs" button to export all error details
+   *   Includes a "Clear All" button to acknowledge and dismiss all errors
+   *   Includes individual "Dismiss" buttons for each error
+
+3. **Toast Notifications**: For immediate feedback, non-catastrophic errors **MAY** also:
+   *   Show a brief toast notification when they first occur
+   *   Auto-dismiss after 5 seconds
+   *   Not block user interaction
+
+### 5.4. Error Handling Principles
+
+*   **Display, Don't Handle**: When the GUI receives an error event from the main process, its primary job is to display it to the user via the appropriate presentation mechanism based on error classification.
 *   **No Recovery**: The GUI **MUST NOT** contain complex error recovery logic. For example, if a course fails to load, it displays the error. It does not attempt to parse the course differently or find a missing file.
+*   **Fail-Fast Visibility**: All errors **MUST** be surfaced to the user. Silent failures are forbidden.
+*   **Diagnostic Support**: All error presentations **MUST** provide a way to export relevant logs for troubleshooting and bug reporting.
 
 ## 6. Logging
 

@@ -1,1 +1,3 @@
-{"ts":1761793500316,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1761841968816,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1761841985049,"level":"error","msg":"CourseLoader: Error in loadCourseFromFolder:","args":[{"type":"Error","name":"Error","message":"CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href","stackHead":["Error: CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href","    at async CourseLoader.handleFolderLoad (scorm-app://app/src/renderer/services/course-loader.js:134:7)"]}],"context":{},"pid":32546,"process":"browser"}
+{"ts":1761841985050,"level":"error","msg":"AppManager: Course load error","args":["CAM analysis did not provide a final scorm-app:// URL in launchSequence[0].href"],"context":{},"pid":32546,"process":"browser"}

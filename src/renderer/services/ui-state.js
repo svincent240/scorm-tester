@@ -267,11 +267,13 @@ class UIStateManager {
       return;
     }
 
-    // Silent update to avoid generic state:changed feedback immediately
-    // notifyStateChange will still compute and emit state:changed if needed elsewhere,
-    // but we guard ABAB cycles by not emitting a separate ui:updated when no consumers require it.
-    // Instead, emit ui:updated only when there is a meaningful change and mark it as originating from UI to prevent loops.
-    this.setState({ ui: mergedUI }, undefined, true); // silent
+    // Update state and notify subscribers
+    const previousState = JSON.parse(JSON.stringify(this.state));
+    this.setState({ ui: mergedUI }, undefined, true); // silent to skip automatic notification
+
+    // Manually notify subscribers of the UI changes
+    // This ensures path-based subscriptions (e.g., 'ui.errorBadgeCount') are triggered
+    this.notifyStateChange(previousState, this.state);
 
     // Emit generic UI update with correlation and origin flag to help EventBus cycle guard
     const uiUpdatedPayload = { ...mergedUI, _origin: 'ui-state', _corr: `ui:updated:${Date.now()}` };
@@ -376,6 +378,87 @@ class UIStateManager {
       } catch (_) { /* no-op */ }
       this.eventBus?.emit('error', errorData);
     }
+  }
+
+  /**
+   * Add a catastrophic error (blocks core functionality)
+   * @param {Object} error - Error object with message, stack, context
+   */
+  addCatastrophicError(error) {
+    const errorEntry = {
+      id: Date.now() + Math.random(),
+      type: 'catastrophic',
+      message: error.message || String(error),
+      stack: error.stack || null,
+      context: error.context || {},
+      timestamp: Date.now(),
+      acknowledged: false
+    };
+
+    const catastrophicErrors = [...(this.state.ui?.catastrophicErrors || []), errorEntry];
+    this.updateUI({ catastrophicErrors });
+    this.eventBus?.emit('error:catastrophic', errorEntry);
+
+    return errorEntry.id;
+  }
+
+  /**
+   * Add a non-catastrophic error (doesn't block core functionality)
+   * @param {Object} error - Error object with message, stack, context
+   */
+  addNonCatastrophicError(error) {
+    const errorEntry = {
+      id: Date.now() + Math.random(),
+      type: 'non-catastrophic',
+      message: error.message || String(error),
+      stack: error.stack || null,
+      context: error.context || {},
+      component: error.component || 'unknown',
+      timestamp: Date.now(),
+      acknowledged: false
+    };
+
+    const nonCatastrophicErrors = [...(this.state.ui?.nonCatastrophicErrors || []), errorEntry];
+    const errorBadgeCount = nonCatastrophicErrors.filter(e => !e.acknowledged).length;
+
+    this.updateUI({ nonCatastrophicErrors, errorBadgeCount });
+    this.eventBus?.emit('error:non-catastrophic', errorEntry);
+
+    return errorEntry.id;
+  }
+
+  /**
+   * Acknowledge a non-catastrophic error
+   * @param {string|number} errorId - Error ID to acknowledge
+   */
+  acknowledgeError(errorId) {
+    const nonCatastrophicErrors = (this.state.ui?.nonCatastrophicErrors || []).map(e =>
+      e.id === errorId ? { ...e, acknowledged: true } : e
+    );
+    const errorBadgeCount = nonCatastrophicErrors.filter(e => !e.acknowledged).length;
+
+    this.updateUI({ nonCatastrophicErrors, errorBadgeCount });
+  }
+
+  /**
+   * Acknowledge all non-catastrophic errors
+   */
+  acknowledgeAllErrors() {
+    const nonCatastrophicErrors = (this.state.ui?.nonCatastrophicErrors || []).map(e =>
+      ({ ...e, acknowledged: true })
+    );
+
+    this.updateUI({ nonCatastrophicErrors, errorBadgeCount: 0 });
+  }
+
+  /**
+   * Clear all acknowledged errors
+   */
+  clearAcknowledgedErrors() {
+    const nonCatastrophicErrors = (this.state.ui?.nonCatastrophicErrors || []).filter(e => !e.acknowledged);
+    const errorBadgeCount = nonCatastrophicErrors.length;
+
+    this.updateUI({ nonCatastrophicErrors, errorBadgeCount });
   }
 
   /**

@@ -85,6 +85,7 @@ class AppManager {
       // Dynamically import eventBus first as it's a core dependency
       const { eventBus } = await import('./event-bus.js');
       this.services.set('eventBus', eventBus); // Set it early
+      this.eventBus = eventBus; // Also expose as direct property for easier access
 
       // Dynamically import uiStatePromise
       const { uiState: uiStatePromise } = await import('./ui-state.js');
@@ -215,6 +216,7 @@ class AppManager {
                 <div id="navigation-controls"></div>
               </div>
               <div class="header__actions">
+                <div id="error-badge"></div>
                 <div id="header-controls"></div>
               </div>
             </div>
@@ -237,6 +239,10 @@ class AppManager {
             <div id="footer-progress"></div>
             <div id="footer-status"></div>
           </footer>
+          <!-- Notification components (overlays) -->
+          <div id="notification-container"></div>
+          <div id="error-dialog"></div>
+          <div id="error-list-panel"></div>
         </div>
       `;
     } catch (_) {
@@ -271,6 +277,16 @@ class AppManager {
     const _modHeader = await import('../components/header-controls.js');
     const HeaderControls = _modHeader.HeaderControls;
 
+    // Notification components
+    const _modNotifContainer = await import('../components/notifications/notification-container.js');
+    const NotificationContainer = _modNotifContainer.NotificationContainer;
+    const _modErrorDialog = await import('../components/notifications/error-dialog.js');
+    const ErrorDialog = _modErrorDialog.ErrorDialog;
+    const _modErrorBadge = await import('../components/notifications/error-badge.js');
+    const ErrorBadge = _modErrorBadge.ErrorBadge;
+    const _modErrorListPanel = await import('../components/notifications/error-list-panel.js');
+    const ErrorListPanel = _modErrorListPanel.ErrorListPanel;
+
     // Optional components (lazy/conditional import)
     let ProgressTracking = null;
     try {
@@ -295,6 +311,11 @@ class AppManager {
       { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'footer-status', required: true },
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true },
       { name: 'inspectorPanel', class: InspectorPanel, elementId: 'inspector-panel', required: false },
+      // Notification components
+      { name: 'notificationContainer', class: NotificationContainer, elementId: 'notification-container', required: true },
+      { name: 'errorDialog', class: ErrorDialog, elementId: 'error-dialog', required: true },
+      { name: 'errorBadge', class: ErrorBadge, elementId: 'error-badge', required: true },
+      { name: 'errorListPanel', class: ErrorListPanel, elementId: 'error-list-panel', required: true },
     ];
 
     // Add optional component configs conditionally
@@ -404,7 +425,21 @@ class AppManager {
 
     eventBus.on('course:loadError', (errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
-      this.showError('Course Loading Error', (errorData && (errorData.error || errorData.message)) || 'Unknown error');
+
+      // Course load failures are catastrophic - they prevent core functionality
+      const errorMessage = (errorData && (errorData.error || errorData.message)) || 'Unknown error';
+      const error = new Error(errorMessage);
+      error.context = {
+        source: 'course-loader',
+        errorData: errorData
+      };
+
+      if (this.uiState) {
+        this.uiState.addCatastrophicError(error);
+      } else {
+        // Fallback to old notification system if UIState not available
+        this.showError('Course Loading Error', errorMessage);
+      }
     });
 
     eventBus.on('course:loaded', (courseData) => {
@@ -439,6 +474,19 @@ class AppManager {
           source: errorData && errorData.source,
           timestamp: new Date().toISOString()
         });
+
+        // SCORM API errors are non-catastrophic - they don't block core app functionality
+        const error = new Error(safeMsg);
+        error.context = {
+          code: errorData && errorData.code,
+          source: errorData && errorData.source,
+          timestamp: new Date().toISOString()
+        };
+        error.component = 'scorm-api';
+
+        if (this.uiState) {
+          this.uiState.addNonCatastrophicError(error);
+        }
       } catch (_) {}
     });
 
@@ -952,9 +1000,17 @@ class AppManager {
       if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
     } catch (_) {}
 
-    // Centralized UI handling via UIState notification (no inline HTML)
+    // Initialization errors are catastrophic - they prevent the app from working
     try {
-      if (this.uiState && typeof this.uiState.showNotification === 'function') {
+      if (this.uiState && typeof this.uiState.addCatastrophicError === 'function') {
+        const initError = error instanceof Error ? error : new Error(String(error));
+        initError.context = {
+          source: 'app-initialization',
+          phase: 'startup'
+        };
+        this.uiState.addCatastrophicError(initError);
+      } else if (this.uiState && typeof this.uiState.showNotification === 'function') {
+        // Fallback to old notification system
         if (typeof this.uiState.setError === 'function') {
           this.uiState.setError(error);
         }

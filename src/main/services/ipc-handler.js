@@ -366,6 +366,9 @@ class IpcHandler extends BaseService {
       // App quit handler
       this.registerHandler('quit-app', this.handleQuitApp.bind(this));
 
+      // Error log export handler
+      this.registerHandler('get-error-logs', this.handleGetErrorLogs.bind(this));
+
       // Direct renderer logging channels already registered in _registerCriticalHandlers()
 
       this.recordOperation('registerHandlers', true);
@@ -1847,6 +1850,99 @@ class IpcHandler extends BaseService {
     } catch (error) {
       this.logger?.error('IpcHandler: Failed to quit app:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Handle get error logs request from renderer
+   * Returns recent error logs for export/debugging
+   */
+  async handleGetErrorLogs(event, options = {}) {
+    try {
+      const fs = require('fs').promises;
+      const path = require('path');
+      const { app } = require('electron');
+
+      // Determine log directory
+      const logDir = process.env.SCORM_TESTER_LOG_DIR || app.getPath('userData');
+      const errorLogPath = path.join(logDir, 'errors.ndjson');
+      const appLogPath = path.join(logDir, 'app.log');
+
+      const entries = [];
+      const maxEntries = options.maxEntries || 100;
+
+      // Try to read error log first (NDJSON format)
+      try {
+        const errorLogContent = await fs.readFile(errorLogPath, 'utf-8');
+        const lines = errorLogContent.trim().split('\n').filter(line => line.trim());
+
+        // Parse NDJSON entries
+        const parsedEntries = lines
+          .slice(-maxEntries) // Get last N entries
+          .map(line => {
+            try {
+              return JSON.parse(line);
+            } catch (e) {
+              return null;
+            }
+          })
+          .filter(entry => entry !== null);
+
+        entries.push(...parsedEntries);
+      } catch (err) {
+        this.logger?.warn('IpcHandler: Could not read errors.ndjson:', err.message);
+      }
+
+      // If no error log entries, try to parse app.log for error lines
+      if (entries.length === 0) {
+        try {
+          const appLogContent = await fs.readFile(appLogPath, 'utf-8');
+          const lines = appLogContent.trim().split('\n').filter(line => line.trim());
+
+          // Extract error lines (simple heuristic)
+          const errorLines = lines
+            .filter(line => line.toLowerCase().includes('error'))
+            .slice(-maxEntries);
+
+          entries.push(...errorLines.map((line, index) => ({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            message: line,
+            index
+          })));
+        } catch (err) {
+          this.logger?.warn('IpcHandler: Could not read app.log:', err.message);
+        }
+      }
+
+      // Include specific error context if errorId provided
+      let errorContext = null;
+      if (options.errorId && options.includeContext) {
+        // Find matching error entry
+        const matchingEntry = entries.find(e =>
+          e.errorId === options.errorId ||
+          e.id === options.errorId
+        );
+
+        if (matchingEntry) {
+          errorContext = matchingEntry;
+        }
+      }
+
+      return {
+        success: true,
+        entries,
+        errorContext,
+        logDir,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to get error logs:', error);
+      return {
+        success: false,
+        error: error.message,
+        entries: []
+      };
     }
   }
 }
