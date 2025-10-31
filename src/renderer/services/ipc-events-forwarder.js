@@ -21,6 +21,14 @@ export async function initialize() {
       try { eventBus.emit('navigation:completed', data); } catch (_) {}
     });
 
+    ipcClient.onCourseLoaded((data) => {
+      try { eventBus.emit('course:loaded', data); } catch (_) {}
+    });
+
+    ipcClient.onCourseExited((data) => {
+      try { eventBus.emit('course:exited', data); } catch (_) {}
+    });
+
     ipcClient.onScormApiCallLogged((data) => {
       try {
         if (data && data.event === 'sn:initialized') {

@@ -608,6 +608,19 @@ class NavigationControls extends BaseComponent {
     // Status element removed - errors now shown via notification system
     this.logger?.warn('NavigationControls: Navigation error:', message);
 
+    // Add to error tracking system as non-catastrophic error
+    if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+      this.uiState.addNonCatastrophicError({
+        message: message,
+        stack: null,
+        context: {
+          source: 'navigation-controls',
+          timestamp: new Date().toISOString()
+        },
+        component: 'NavigationControls'
+      });
+    }
+
     // Emit error event for notification system to handle
     this.eventBus?.emit('ui:notification', {
       type: 'error',

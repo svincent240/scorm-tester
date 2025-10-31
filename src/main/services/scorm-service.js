@@ -479,9 +479,10 @@ class ScormService extends BaseService {
   /**
    * Terminate SCORM session
    * @param {string} sessionId - Session identifier
+   * @param {string} exitValue - Optional exit value from renderer (cmi.exit)
    * @returns {Promise<Object>} Termination result
    */
-  async terminate(sessionId) {
+  async terminate(sessionId, exitValue = '') {
     try {
       const session = this.sessions.get(sessionId);
       if (!session) {
@@ -489,7 +490,7 @@ class ScormService extends BaseService {
         this.logger?.warn(`ScormService: Terminate called for non-existent session ${sessionId} (idempotent)`);
         return { success: true, errorCode: '0', alreadyTerminated: true };
       }
- 
+
       // Guard against double-terminate races
       if (session.__terminating || session.state === 'terminated') {
         this.logger?.info(`ScormService: Session ${sessionId} already terminating/terminated (idempotent)`);
@@ -500,10 +501,13 @@ class ScormService extends BaseService {
         return { success: true, errorCode: '0', alreadyTerminated: true };
       }
       session.__terminating = true;
- 
+
       // Log API call
       this.logApiCall(session, 'Terminate', '', '', '0');
- 
+
+      // Collect session data before termination for exit summary
+      const exitData = await this.collectExitData(sessionId, exitValue);
+
       // Perform RTE termination if present
       let rteSuccess = true;
       try {
@@ -524,16 +528,18 @@ class ScormService extends BaseService {
       const preState = session.state;
       session.state = 'terminated';
       session.endTime = new Date();
- 
-      
- 
-      // Remove session and RTE instance
-      this.sessions.delete(sessionId);
+
+      // Emit course exit event with collected data
+      this.emitCourseExitEvent(sessionId, exitData);
+
+      // Keep session in memory for potential resume testing (don't delete immediately)
+      // The session cleanup interval will remove it after timeout
+      // Delete RTE instance but preserve session data for resume
       try { this.rteInstances.delete(sessionId); } catch (_) {}
- 
-      this.logger?.info(`ScormService: Session ${sessionId} terminated (prevState=${preState})`);
+
+      this.logger?.info(`ScormService: Session ${sessionId} terminated (prevState=${preState}), data preserved for resume testing`);
       this.recordOperation('terminate', rteSuccess);
- 
+
       return { success: rteSuccess, errorCode: '0' };
  
     } catch (error) {
@@ -687,6 +693,175 @@ class ScormService extends BaseService {
     }
   }
  
+   /**
+    * Resume a terminated session for testing
+    * Creates a new session with the same data but sets cmi.entry='resume'
+    * @param {string} oldSessionId - The terminated session to resume from
+    * @param {Object} options - Resume options (coursePath, launchUrl, etc.)
+    * @returns {Promise<Object>} Resume result with new sessionId
+    */
+   async resumeSession(oldSessionId, options = {}) {
+     try {
+       // Get the terminated session data
+       const oldSession = this.sessions.get(oldSessionId);
+       if (!oldSession) {
+         return {
+           success: false,
+           errorCode: '301',
+           reason: 'Original session not found (may have been cleaned up)'
+         };
+       }
+
+       if (oldSession.state !== 'terminated') {
+         return {
+           success: false,
+           errorCode: '103',
+           reason: 'Can only resume from terminated sessions'
+         };
+       }
+
+       // Create a new session ID for the resumed session
+       const newSessionId = `session_${++this.sessionCounter}`;
+       this.logger?.info(`ScormService: Resuming session ${oldSessionId} as ${newSessionId}`);
+
+       // Create new session with same structure
+       const newSession = {
+         id: newSessionId,
+         state: 'initialized',
+         startTime: new Date(),
+         lastActivity: Date.now(),
+         launchMode: options.launchMode || 'normal',
+         browseMode: false,
+         memoryOnlyStorage: true,
+         isResumed: true,
+         resumedFrom: oldSessionId
+       };
+
+       this.sessions.set(newSessionId, newSession);
+
+       // Create new RTE instance (match initializeSession pattern)
+       const ScormApiHandler = require('./scorm/rte/api-handler');
+       const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
+       const sessionManager = {
+         registerSession: (id, handler) => { try { this.rteInstances.set(id, handler); } catch (_) {} return true; },
+         unregisterSession: (id) => { try { this.rteInstances.delete(id); } catch (_) {} },
+         persistSessionData: (id, data) => {
+           try {
+             const telemetry = this.getDependency && this.getDependency('telemetryStore');
+             if (telemetry && typeof telemetry.storeApiCall === 'function') {
+               telemetry.storeApiCall({ type: 'rte:commit', sessionId: id, data, timestamp: Date.now() });
+               return true;
+             }
+           } catch (e) {
+             this.logger?.warn('ScormService: telemetry store persist failed', e?.message || e);
+           }
+           this.logger?.info('ScormService: Persist session data (no telemetry store):', id);
+           return true;
+         },
+         getLearnerInfo: () => {
+           return { id: oldSession?.lmsProfile?.learnerId || 'unknown', name: oldSession?.lmsProfile?.learnerName || 'Learner' };
+         }
+       };
+       const rteOptions = {
+         launchMode: newSession.launchMode,
+         memoryOnlyStorage: true,
+         browseModeService: this.browseModeService
+       };
+       const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
+
+       // Get old RTE data if it still exists (unlikely, but check)
+       // Otherwise we'll need to reconstruct from session data
+       const oldRte = this.rteInstances.get(oldSessionId);
+       let dataToRestore = null;
+
+       if (oldRte && typeof oldRte.dataModel?.getAllData === 'function') {
+         dataToRestore = oldRte.dataModel.getAllData();
+       }
+
+       // Initialize the new RTE
+       const initResult = rte.Initialize('');
+       try {
+         this.logger?.info('ScormService: Resume Initialize result', {
+           initResult,
+           lastError: rte?.errorHandler?.getLastError ? rte.errorHandler.getLastError() : 'n/a',
+           lastErrorString: rte?.errorHandler?.getErrorString && rte?.errorHandler?.getLastError
+             ? rte.errorHandler.getErrorString(rte.errorHandler.getLastError())
+             : 'n/a'
+         });
+       } catch (_) {}
+       if (initResult !== 'true') {
+         this.sessions.delete(newSessionId);
+         return {
+           success: false,
+           errorCode: '102',
+           reason: 'Failed to initialize resumed session'
+         };
+       }
+
+       // Restore data model values from old session
+       if (dataToRestore && dataToRestore.coreData) {
+         // Set cmi.entry to 'resume' (critical for SCORM compliance)
+         rte.SetValue('cmi.entry', 'resume');
+
+         // Restore key data elements
+         const elementsToRestore = [
+           'cmi.location',
+           'cmi.suspend_data',
+           'cmi.completion_status',
+           'cmi.success_status',
+           'cmi.score.scaled',
+           'cmi.score.raw',
+           'cmi.score.max',
+           'cmi.score.min',
+           'cmi.progress_measure',
+           'cmi.total_time'
+         ];
+
+         for (const element of elementsToRestore) {
+           const value = dataToRestore.coreData.get(element);
+           if (value !== undefined && value !== null && value !== '') {
+             rte.SetValue(element, String(value));
+           }
+         }
+
+         // Restore objectives if present
+         if (dataToRestore.objectives && dataToRestore.objectives.length > 0) {
+           dataToRestore.objectives.forEach((obj, index) => {
+             if (obj.id) rte.SetValue(`cmi.objectives.${index}.id`, obj.id);
+             if (obj.success_status) rte.SetValue(`cmi.objectives.${index}.success_status`, obj.success_status);
+             if (obj.completion_status) rte.SetValue(`cmi.objectives.${index}.completion_status`, obj.completion_status);
+             if (obj.score_scaled !== undefined) rte.SetValue(`cmi.objectives.${index}.score.scaled`, String(obj.score_scaled));
+           });
+         }
+
+         this.logger?.info(`ScormService: Restored data model for resumed session ${newSessionId}`);
+       }
+
+       // Store the new RTE instance
+       this.rteInstances.set(newSessionId, rte);
+
+       // Update session state
+       newSession.state = 'active';
+
+       this.logger?.info(`ScormService: Session ${newSessionId} resumed from ${oldSessionId}`);
+
+       return {
+         success: true,
+         sessionId: newSessionId,
+         errorCode: '0',
+         resumedFrom: oldSessionId
+       };
+
+     } catch (error) {
+       this.logger?.error('ScormService: Resume session failed:', error);
+       return {
+         success: false,
+         errorCode: '101',
+         reason: error.message || 'Resume failed'
+       };
+     }
+   }
+
    /**
     * Get session data
     * @param {string} sessionId - Session identifier
@@ -1103,6 +1278,105 @@ class ScormService extends BaseService {
   }
 
   /**
+   * Collect session data for exit summary
+   * @private
+   * @param {string} sessionId - Session identifier
+   * @param {string} exitValueFromRenderer - Optional exit value from renderer (cmi.exit)
+   * @returns {Promise<Object>} Exit data object
+   */
+  async collectExitData(sessionId, exitValueFromRenderer = '') {
+    try {
+      const session = this.sessions.get(sessionId);
+      const rte = this.rteInstances.get(sessionId);
+
+      // Get all data from RTE if available
+      let allData = null;
+      if (rte && typeof rte.dataModel?.getAllData === 'function') {
+        allData = rte.dataModel.getAllData();
+      }
+
+      // Extract key values
+      const completionStatus = await this.getValue(sessionId, 'cmi.completion_status');
+      const successStatus = await this.getValue(sessionId, 'cmi.success_status');
+      const scoreRaw = await this.getValue(sessionId, 'cmi.score.raw');
+      const scoreScaled = await this.getValue(sessionId, 'cmi.score.scaled');
+      const scoreMin = await this.getValue(sessionId, 'cmi.score.min');
+      const scoreMax = await this.getValue(sessionId, 'cmi.score.max');
+      const sessionTime = await this.getValue(sessionId, 'cmi.session_time');
+      const totalTime = await this.getValue(sessionId, 'cmi.total_time');
+      const location = await this.getValue(sessionId, 'cmi.location');
+      const suspendData = await this.getValue(sessionId, 'cmi.suspend_data');
+      // cmi.exit is write-only, so we use the value from renderer if provided, otherwise try _getInternalValue
+      const exitType = exitValueFromRenderer ||
+        ((rte && rte.dataModel && typeof rte.dataModel._getInternalValue === 'function')
+          ? rte.dataModel._getInternalValue('cmi.exit')
+          : '');
+      // Do NOT read 'adl.nav.request' here — it is write-only per SCORM 2004 and causes 408 errors.
+      // The exit summary does not require the current navigation request; default to '_none_'.
+      const navRequest = { value: '_none_' };
+
+      // Get course info from session
+      const courseInfo = session?.courseInfo || null;
+
+      return {
+        sessionId,
+        courseTitle: courseInfo?.title || 'SCORM Course',
+        completionStatus: completionStatus.value || 'unknown',
+        successStatus: successStatus.value || 'unknown',
+        scoreRaw: scoreRaw.value ? parseFloat(scoreRaw.value) : null,
+        scoreScaled: scoreScaled.value ? parseFloat(scoreScaled.value) : null,
+        scoreMin: scoreMin.value ? parseFloat(scoreMin.value) : null,
+        scoreMax: scoreMax.value ? parseFloat(scoreMax.value) : null,
+        sessionTime: sessionTime.value || 'PT0H0M0S',
+        totalTime: totalTime.value || 'PT0H0M0S',
+        location: location.value || '',
+        suspendData: suspendData.value || '',
+        exitType: (typeof exitType === 'string' ? exitType : (exitType?.value || '')),
+        navigationRequest: navRequest.value || '_none_',
+        objectives: allData?.objectives || [],
+        startTime: session?.startTime || null,
+        endTime: new Date()
+      };
+    } catch (error) {
+      this.logger?.error(`ScormService: Error collecting exit data for session ${sessionId}:`, error);
+      return {
+        sessionId,
+        courseTitle: 'SCORM Course',
+        completionStatus: 'unknown',
+        successStatus: 'unknown',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Emit course exit event to renderer
+   * @private
+   * @param {string} sessionId - Session identifier
+   * @param {Object} exitData - Exit data object
+   */
+  emitCourseExitEvent(sessionId, exitData) {
+    try {
+      this.logger?.info(`ScormService: Emitting course:exited event for session ${sessionId}`, {
+        completionStatus: exitData.completionStatus,
+        successStatus: exitData.successStatus,
+        exitType: exitData.exitType,
+        navigationRequest: exitData.navigationRequest
+      });
+
+      // Emit to renderer via windowManager
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager?.broadcastToAllWindows) {
+        windowManager.broadcastToAllWindows('course:exited', exitData);
+      } else {
+        this.logger?.warn('ScormService: WindowManager not available for course:exited event');
+      }
+    } catch (error) {
+      this.logger?.error(`ScormService: Error emitting course exit event for session ${sessionId}:`, error);
+    }
+  }
+
+  /**
    * Process navigation request after SCO termination (SCORM 2004 4th Edition requirement)
    * @private
    * @param {string} sessionId - Session identifier
@@ -1110,15 +1384,16 @@ class ScormService extends BaseService {
    */
   async processNavigationRequestAfterTermination(sessionId) {
     try {
-      // Get the navigation request value from the data model
-      const navRequestResult = await this.getValue(sessionId, 'adl.nav.request');
-
-      if (!navRequestResult.success) {
-        this.logger?.debug(`ScormService: Could not retrieve adl.nav.request for session ${sessionId}`);
-        return;
-      }
-
-      const navRequest = navRequestResult.value;
+      // Get the navigation request value without violating SCORM write-only constraints.
+      // adl.nav.request is write-only to content; use RTE internal value instead of GetValue.
+      let navRequest = '_none_';
+      try {
+        const rte = this.rteInstances.get(sessionId);
+        if (rte && rte.dataModel && typeof rte.dataModel._getInternalValue === 'function') {
+          const v = rte.dataModel._getInternalValue('adl.nav.request');
+          navRequest = (typeof v === 'string') ? v : (v?.value ?? '_none_');
+        }
+      } catch (_) { /* keep default */ }
 
       // If no navigation request was set (default '_none_'), do nothing
       if (!navRequest || navRequest === '_none_') {

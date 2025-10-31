@@ -42,7 +42,39 @@ export class ConsoleMonitor {
   }
 
   private getLogFilePath(): string {
-    // Cross-platform log directory
+    // 1) Explicit override via env
+    const overrideDir = process.env['SCORM_TESTER_LOG_DIR'];
+    const candidatesFrom = (dir: string) => ['errors.ndjson', 'app.ndjson', 'app.log'].map(f => path.join(dir, f));
+    if (overrideDir) {
+      const c = candidatesFrom(overrideDir);
+      const hit = c.find(p => fs.existsSync(p));
+      if (hit) return hit;
+    }
+
+    // 2) Development mode uses project-root ./logs (matches shared logger)
+    if (process.env['NODE_ENV'] === 'development') {
+      try {
+        let current = process.cwd();
+        let steps = 0;
+        while (current && steps < 15) {
+          if (fs.existsSync(path.join(current, 'package.json'))) {
+            const devDir = path.join(current, 'logs');
+            const c = candidatesFrom(devDir);
+            const hit = c.find(p => fs.existsSync(p));
+            if (hit) return hit;
+            break;
+          }
+          const parent = path.dirname(current);
+          if (parent === current) break;
+          current = parent;
+          steps++;
+        }
+      } catch (_) {
+        // fall through to userData
+      }
+    }
+
+    // 3) Electron userData path (prod default)
     const platform = process.platform;
     const baseDir = platform === 'darwin'
       ? path.join(os.homedir(), 'Library', 'Application Support', 'scorm-tester')
@@ -50,8 +82,7 @@ export class ConsoleMonitor {
       ? path.join(os.homedir(), 'AppData', 'Roaming', 'scorm-tester')
       : path.join(os.homedir(), '.config', 'scorm-tester');
 
-    // Prefer structured logs if present
-    const candidates = ['errors.ndjson', 'app.ndjson', 'app.log'].map(f => path.join(baseDir, f));
+    const candidates = candidatesFrom(baseDir);
     const existing = candidates.find(p => fs.existsSync(p));
     return existing || candidates[candidates.length - 1];
   }

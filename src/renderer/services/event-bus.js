@@ -149,8 +149,16 @@ class EventBus {
         const d = this._recentRing[len - 1];
         const isABAB = (a === c) && (b === d) && (a !== b);
         if (isABAB) {
+          const benignPair = (
+            (a === 'state:changed' && b === 'ui:updated') || (a === 'ui:updated' && b === 'state:changed') ||
+            (a === 'navigation:availability:updated' && b === 'navigation:completed') || (a === 'navigation:completed' && b === 'navigation:availability:updated')
+          );
           import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            rendererLogger.error(`EventBus: Detected repeating cycle '${a}' <-> '${b}', dropping '${event}'`);
+            if (benignPair) {
+              rendererLogger.warn(`EventBus: Benign ABAB pattern '${a}' <-> '${b}', dropping '${event}' to avoid spurious loop`);
+            } else {
+              rendererLogger.error(`EventBus: Detected repeating cycle '${a}' <-> '${b}', dropping '${event}'`);
+            }
           }).catch(() => { /* no-op */ });
           this._inFlightCounts.set(event, currentDepth - 1);
           return;

@@ -71,25 +71,30 @@ export class ErrorListPanel extends BaseComponent {
       <div class="error-list-panel__header">
         <h3 class="error-list-panel__title">
           <span class="error-list-panel__icon">⚠️</span>
-          Errors (${unacknowledgedErrors.length} unacknowledged)
+          Error Log (${unacknowledgedErrors.length} unacknowledged, ${this.errors.length} total)
         </h3>
         <button class="error-list-panel__close" aria-label="Close error list">×</button>
       </div>
-      
+
       <div class="error-list-panel__body">
-        ${unacknowledgedErrors.length === 0 ? `
+        ${this.errors.length === 0 ? `
           <div class="error-list-panel__empty">
-            <p>No unacknowledged errors</p>
+            <p>No errors logged</p>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+              Application errors and warnings will appear here
+            </p>
           </div>
-        ` : `
+        ` : ''}
+
+        ${unacknowledgedErrors.length > 0 ? `
           <div class="error-list-panel__section">
             <h4 class="error-list-panel__section-title">Unacknowledged Errors</h4>
             <div class="error-list-panel__items">
               ${unacknowledgedErrors.map(error => this.renderErrorItem(error)).join('')}
             </div>
           </div>
-        `}
-        
+        ` : ''}
+
         ${acknowledgedErrors.length > 0 ? `
           <div class="error-list-panel__section">
             <h4 class="error-list-panel__section-title">Acknowledged Errors</h4>

@@ -9,6 +9,7 @@
  * @fileoverview Main application management service
  */
 import { ipcClient } from './ipc-client.js';
+import { rendererLogger } from '../utils/renderer-logger.js';
 
 
 
@@ -25,6 +26,9 @@ class AppManager {
 
     // Prevent recursive initialization error handling loops
     this._handlingInitError = false;
+
+    // Track startup errors for diagnostic purposes
+    this.startupErrors = [];
 
     // BUG-003 FIX: Navigation state machine
     this.navigationState = 'IDLE'; // IDLE, PROCESSING, LOADING
@@ -153,6 +157,9 @@ class AppManager {
       // Render recent courses on initial welcome screen if container exists
       try { await this.renderRecentCourses(); } catch (e) { try { this.logger.error('AppManager: renderRecentCourses failed', e?.message || e); } catch (_) {} }
 
+      // Display any startup errors that were captured
+      this.displayStartupErrors();
+
       // Emit initialization complete event
       eventBus.emit('app:initialized');
 
@@ -243,6 +250,7 @@ class AppManager {
           <div id="notification-container"></div>
           <div id="error-dialog"></div>
           <div id="error-list-panel"></div>
+          <div id="course-exit-summary"></div>
         </div>
       `;
     } catch (_) {
@@ -286,6 +294,8 @@ class AppManager {
     const ErrorBadge = _modErrorBadge.ErrorBadge;
     const _modErrorListPanel = await import('../components/notifications/error-list-panel.js');
     const ErrorListPanel = _modErrorListPanel.ErrorListPanel;
+    const _modCourseExitSummary = await import('../components/scorm/course-exit-summary.js');
+    const CourseExitSummary = _modCourseExitSummary.CourseExitSummary;
 
     // Optional components (lazy/conditional import)
     let ProgressTracking = null;
@@ -316,6 +326,7 @@ class AppManager {
       { name: 'errorDialog', class: ErrorDialog, elementId: 'error-dialog', required: true },
       { name: 'errorBadge', class: ErrorBadge, elementId: 'error-badge', required: true },
       { name: 'errorListPanel', class: ErrorListPanel, elementId: 'error-list-panel', required: true },
+      { name: 'courseExitSummary', class: CourseExitSummary, elementId: 'course-exit-summary', required: true },
     ];
 
     // Add optional component configs conditionally
@@ -450,6 +461,22 @@ class AppManager {
     eventBus.on('course:cleared', () => {
       try { this.logger.info('AppManager: Course cleared event received'); } catch (_) {}
       this.handleCourseCleared();
+    });
+
+    eventBus.on('course:exited', (exitData) => {
+      try { this.logger.info('AppManager: Course exited event received'); } catch (_) {}
+      this.handleCourseExit(exitData);
+    });
+
+    eventBus.on('course:test-resume', (data) => {
+      try { this.logger.info('AppManager: Test resume event received'); } catch (_) {}
+      try { rendererLogger.info('AppManager: [DIAG] course:test-resume received', { sessionId: data?.sessionId }); } catch (_) {}
+      this.handleTestResume(data);
+    });
+
+    eventBus.on('course:exit-summary-closed', (data) => {
+      try { this.logger.info('AppManager: Exit summary closed event received'); } catch (_) {}
+      this.handleExitSummaryClosed(data);
     });
 
     eventBus.on('course:loadingStateChanged', (stateData) => {
@@ -977,6 +1004,113 @@ class AppManager {
   }
 
   /**
+   * Handle course exit event from main process
+   * @param {Object} exitData - Exit data from ScormService
+   */
+  async handleCourseExit(exitData) {
+    try {
+      this.logger.info('AppManager: Course exit event received', {
+        sessionId: exitData.sessionId,
+        completionStatus: exitData.completionStatus,
+        successStatus: exitData.successStatus,
+        exitType: exitData.exitType
+      });
+
+      // Hide the course content when it exits
+      const contentViewer = this.services.get('contentViewer');
+      if (contentViewer) {
+        // Clear the iframe content
+        contentViewer.clearContent();
+      }
+
+      // Get the already-initialized CourseExitSummary component
+      const courseExitSummary = this.components.get('courseExitSummary');
+      if (!courseExitSummary) {
+        this.logger.error('AppManager: CourseExitSummary component not found');
+        return;
+      }
+
+      // Show the exit summary
+      courseExitSummary.show(exitData);
+
+    } catch (error) {
+      this.logger.error('AppManager: Error handling course exit', error);
+    }
+  }
+
+  /**
+   * Handle test resume request
+   * @param {Object} data - Resume data
+   */
+  async handleTestResume(data) {
+    try {
+      try { rendererLogger.info('AppManager: [DIAG] handleTestResume begin', { sessionId: data?.sessionId }); } catch (_) {}
+      this.logger.info('AppManager: Test resume requested', {
+        sessionId: data.sessionId
+      });
+
+      // Get current course path
+      const currentCoursePath = this.uiState.getState('currentCoursePath');
+      if (!currentCoursePath) {
+        this.showError('Resume Failed', 'No course path available for resume');
+        return;
+      }
+
+      this.logger.info('AppManager: Requesting resume from main process', {
+        coursePath: currentCoursePath,
+        sessionId: data.sessionId
+      });
+      try { rendererLogger.info('AppManager: [DIAG] invoking scorm:resume-session', { coursePath: currentCoursePath, sessionId: data?.sessionId }); } catch (_) {}
+
+      // Request resume from main process
+      const result = await ipcClient.invoke('scorm:resume-session', {
+        coursePath: currentCoursePath,
+        sessionId: data.sessionId
+      });
+      try { rendererLogger.info('AppManager: [DIAG] scorm:resume-session result', { success: !!result?.success }); } catch (_) {}
+
+      this.logger.info('AppManager: Resume result received', result);
+
+      if (result.success) {
+        this.logger.info('AppManager: Resume test successful');
+        this.showSuccess('Resume Test', 'Course resumed successfully with saved progress');
+      } else {
+        this.logger.error('AppManager: Resume test failed', result.error);
+        this.showError('Resume Failed', result.error || 'Failed to resume course');
+      }
+
+    } catch (error) {
+      this.logger.error('AppManager: Error handling test resume', error);
+      this.showError('Resume Failed', error.message);
+    }
+  }
+
+  /**
+   * Handle exit summary closed (cleanup terminated session)
+   * @param {Object} data - Close data with sessionId
+   */
+  async handleExitSummaryClosed(data) {
+    try {
+      if (!data?.sessionId) {
+        return;
+      }
+
+      this.logger.info('AppManager: Exit summary closed, cleaning up session', {
+        sessionId: data.sessionId
+      });
+
+      // Request session cleanup from main process
+      await ipcClient.invoke('scorm:cleanup-terminated-session', {
+        sessionId: data.sessionId
+      });
+
+    } catch (error) {
+      // Non-critical error, just log it
+      this.logger.warn('AppManager: Error cleaning up terminated session', error);
+    }
+  }
+
+  /**
    * Setup error handlers
    */
   setupErrorHandlers() {
@@ -1007,13 +1141,21 @@ class AppManager {
       if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
     } catch (_) {}
 
+    // Track startup error for diagnostics
+    this.startupErrors.push({
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+      timestamp: Date.now()
+    });
+
     // Initialization errors are catastrophic - they prevent the app from working
     try {
       if (this.uiState && typeof this.uiState.addCatastrophicError === 'function') {
         const initError = error instanceof Error ? error : new Error(String(error));
         initError.context = {
           source: 'app-initialization',
-          phase: 'startup'
+          phase: 'startup',
+          timestamp: new Date().toISOString()
         };
         this.uiState.addCatastrophicError(initError);
       } else if (this.uiState && typeof this.uiState.showNotification === 'function') {
@@ -1082,6 +1224,21 @@ class AppManager {
     import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
       rendererLogger.error(`AppManager: ${title}`, message);
     });
+
+    // Add to error tracking system as non-catastrophic error
+    if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+      this.uiState.addNonCatastrophicError({
+        message: `${title}: ${message}`,
+        stack: null,
+        context: {
+          source: 'app-manager',
+          timestamp: new Date().toISOString()
+        },
+        component: 'AppManager'
+      });
+    }
+
+    // Also show notification for immediate feedback
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'error',
@@ -1101,6 +1258,36 @@ class AppManager {
     });
   }
 
+  /**
+   * Display any startup errors that were captured
+   */
+  displayStartupErrors() {
+    if (!this.startupErrors || this.startupErrors.length === 0) {
+      return;
+    }
+
+    try {
+      this.logger.info(`AppManager: Displaying ${this.startupErrors.length} startup error(s)`);
+
+      // Add each startup error to the error tracking system
+      this.startupErrors.forEach((error, index) => {
+        if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+          this.uiState.addNonCatastrophicError({
+            message: error.message || 'Unknown startup error',
+            stack: error.stack || null,
+            context: {
+              source: 'app-startup',
+              errorIndex: index,
+              timestamp: new Date(error.timestamp).toISOString()
+            },
+            component: 'app-manager'
+          });
+        }
+      });
+    } catch (err) {
+      this.logger.error('AppManager: Failed to display startup errors', err);
+    }
+  }
 
 
   /**
@@ -2133,7 +2320,7 @@ class AppManager {
 const appManager = new AppManager();
 
 // Make test helper available globally for e2e tests and console debugging
-import { rendererLogger } from '../utils/renderer-logger.js';
+
 
 if (typeof window !== 'undefined') {
   window.appManager = appManager;

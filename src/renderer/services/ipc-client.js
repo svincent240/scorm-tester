@@ -171,6 +171,22 @@ class IpcClient {
     return api.onNavigationAvailabilityUpdated(handler);
   }
 
+  onCourseLoaded(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onCourseLoaded !== 'function') {
+      throw new Error('electronAPI.onCourseLoaded not available');
+    }
+    return api.onCourseLoaded(handler);
+  }
+
+  onCourseExited(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onCourseExited !== 'function') {
+      throw new Error('electronAPI.onCourseExited not available');
+    }
+    return api.onCourseExited(handler);
+  }
+
   // SCORM typed helpers (preserve positional arg shapes exposed by preload)
   async scormInitialize(sessionId, options = {}) {
     const api = this._ensureAPI();
@@ -188,12 +204,12 @@ class IpcClient {
     return api.scormGetProgressSnapshot(sessionId);
   }
 
-  async scormTerminate(sessionId) {
+  async scormTerminate(sessionId, exitValue = '') {
     const api = this._ensureAPI();
     if (typeof api.scormTerminate !== 'function') {
       throw new Error('electronAPI.scormTerminate not available');
     }
-    return api.scormTerminate(sessionId);
+    return api.scormTerminate(sessionId, exitValue);
   }
 
   async scormGetValue(sessionId, element) {

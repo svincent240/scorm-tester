@@ -276,6 +276,9 @@ class ScormClient {
 
     this.lastError = '0';
 
+    // Flush any pending SetValue batch before committing
+    this._flushSetBatch();
+
     // Debounced commit to main process
     this._scheduleCommit();
 
@@ -394,7 +397,14 @@ class ScormClient {
     }
     try {
       if (this.sessionId) {
-        await ipcClient.scormTerminate(this.sessionId);
+        // Get exit value from local cache to pass to main process
+        // This ensures the exit value is available even if batched SetValue hasn't been processed yet
+        const exitValue = this.localCache.get('cmi.exit') || '';
+        try {
+          const { rendererLogger } = await import('../utils/renderer-logger.js');
+          rendererLogger.debug(`ScormClient: asyncTerminate - exitValue from cache: "${exitValue}"`);
+        } catch (_) {}
+        await ipcClient.scormTerminate(this.sessionId, exitValue);
       }
     } catch (error) {
       const msg = (error && error.message) ? error.message : String(error);

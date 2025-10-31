@@ -50,7 +50,13 @@ const safeInvoke = async (channel, ...args) => {
   } catch (error) {
     // Also log to main logger if available
     try {
-      ipcRenderer.invoke('renderer-log-error', `[PRELOAD] IPC invoke failed for channel '${channel}': ${error.message}`);
+      const msg = String(error?.message || error || '');
+      // Demote expected shutdown/missing-handler errors to warn only when app is shutting down
+      if (isShuttingDown && (msg.includes('No handler registered') || msg.includes('Handler not found'))) {
+        ipcRenderer.invoke('renderer-log-warn', `[PRELOAD] IPC invoke during shutdown or missing handler for channel '${channel}': ${msg}`);
+      } else {
+        ipcRenderer.invoke('renderer-log-error', `[PRELOAD] IPC invoke failed for channel '${channel}': ${msg}`);
+      }
     } catch (_) {}
     return { success: false, error: error.message };
   }
@@ -111,7 +117,7 @@ const electronAPI = {
 
   // SCORM API
   scormInitialize: (sessionId) => safeInvoke('scorm-initialize', sessionId),
-  scormTerminate: (sessionId) => safeInvoke('scorm-terminate', sessionId),
+  scormTerminate: (sessionId, exitValue) => safeInvoke('scorm-terminate', sessionId, exitValue),
   scormGetValue: (sessionId, element) => safeInvoke('scorm-get-value', sessionId, element),
   scormSetValue: (sessionId, element, value) => safeInvoke('scorm-set-value', sessionId, element, value),
   scormSetValuesBatch: (sessionId, ops) => safeInvoke('scorm-set-values-batch', sessionId, ops),
@@ -203,6 +209,9 @@ const electronAPI = {
   onActivityProgressUpdated: (callback) => safeOn('activity:progress:updated', callback),
   onObjectivesUpdated: (callback) => safeOn('objectives:updated', callback),
   onNavigationCompleted: (callback) => safeOn('navigation:completed', callback),
+
+  // Course Exit Event Listener
+  onCourseExited: (callback) => safeOn('course:exited', callback),
 
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),

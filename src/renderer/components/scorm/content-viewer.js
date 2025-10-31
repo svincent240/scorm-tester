@@ -312,6 +312,9 @@ class ContentViewer extends BaseComponent {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
 
+      // Detach any previous SCORM API bindings to avoid stray calls from the old content
+      this.teardownScormAPIs();
+
       // Setup SCORM APIs BEFORE iframe loads
       this.setupScormAPIs();
 
@@ -565,6 +568,53 @@ class ContentViewer extends BaseComponent {
     }
   }
 
+  /**
+   * Teardown SCORM APIs to prevent stray calls from previous content during transitions
+   * - Detaches bridge from scormClient
+   * - Mutates existing API objects to inert stubs that return "false" without emitting errors
+   */
+  teardownScormAPIs() {
+    try {
+      // Detach bridge from client so any lingering calls do not reach scormClient
+      try { scormAPIBridge.setScormClient(null); } catch (_) {}
+
+      const makeStub = (methodName) => {
+        return (...args) => {
+          try {
+            import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
+              rendererLogger.info('[ContentViewer] Ignored SCORM call during teardown', { method: methodName, argsCount: args?.length || 0 });
+            }).catch(() => {});
+          } catch (_) {}
+          // SCORM API returns string values; return "false" to indicate failure without surfacing an error
+          return 'false';
+        };
+      };
+
+      const stubify = (apiObj) => {
+        if (!apiObj || typeof apiObj !== 'object') return;
+        Object.keys(apiObj).forEach((k) => { apiObj[k] = makeStub(k); });
+      };
+
+      // Mutate existing API objects so even cached references in content become inert
+      stubify(this._api12);
+      stubify(this._api2004);
+
+      // Replace globals on parent windows as well
+      try { window.API = this._api12 || { Initialize: makeStub('Initialize') }; } catch (_) {}
+      try { window.API_1484_11 = this._api2004 || { Initialize: makeStub('Initialize') }; } catch (_) {}
+
+      if (this.element && this.element.ownerDocument && this.element.ownerDocument.defaultView) {
+        const docWindow = this.element.ownerDocument.defaultView;
+        try { docWindow.API = window.API; } catch (_) {}
+        try { docWindow.API_1484_11 = window.API_1484_11; } catch (_) {}
+      }
+
+    } catch (_) {
+      // Swallow teardown errors to avoid noisy logs during transitions
+    }
+  }
+
+
 
   /**
    * Show loading state
@@ -662,6 +712,21 @@ class ContentViewer extends BaseComponent {
     this.hideContent();
     this.hideNoContent();
 
+    // Add to error tracking system as non-catastrophic error
+    if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+      this.uiState.addNonCatastrophicError({
+        message: message,
+        stack: details || null,
+        context: {
+          source: 'content-viewer',
+          details: details,
+          timestamp: new Date().toISOString()
+        },
+        component: 'ContentViewer'
+      });
+    }
+
+    // Also show notification for immediate feedback
     this.uiState.showNotification({
       message: message,
       type: 'error',
@@ -753,6 +818,21 @@ class ContentViewer extends BaseComponent {
     this.hideContent();
     this.hideNoContent();
 
+    // Add to error tracking system as non-catastrophic error
+    if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+      this.uiState.addNonCatastrophicError({
+        message: `${title}: ${message}`,
+        stack: options.details || null,
+        context: {
+          source: 'content-viewer',
+          details: options.details,
+          timestamp: new Date().toISOString()
+        },
+        component: 'ContentViewer'
+      });
+    }
+
+    // Also show notification for immediate feedback
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'error',
@@ -929,6 +1009,21 @@ class ContentViewer extends BaseComponent {
   handleScormError(data) {
     // Route user-visible error through notifications; no console logging
     const message = typeof data === 'string' ? data : (data?.message || 'SCORM error occurred');
+
+    // Add to error tracking system as non-catastrophic error
+    if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
+      this.uiState.addNonCatastrophicError({
+        message: `SCORM Error: ${message}`,
+        stack: data?.stack || null,
+        context: {
+          source: 'scorm-api',
+          timestamp: new Date().toISOString()
+        },
+        component: 'ContentViewer'
+      });
+    }
+
+    // Also show notification for immediate feedback
     this.uiState.showNotification({
       type: 'error',
       message: `SCORM Error: ${message}`,
@@ -1434,6 +1529,9 @@ class ContentViewer extends BaseComponent {
       this._mutationObserver.disconnect();
       this._mutationObserver = null;
     }
+    // Ensure SCORM APIs are detached so no further calls are routed during teardown
+    try { this.teardownScormAPIs(); } catch (_) {}
+
 
     if (this._apiCheckTimeout) {
       clearTimeout(this._apiCheckTimeout);

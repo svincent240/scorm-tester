@@ -47,13 +47,7 @@ export class ErrorBadge extends BaseComponent {
   renderContent() {
     if (!this.element) return;
 
-    // Hide badge if no errors
-    if (this.errorCount === 0) {
-      this.element.style.display = 'none';
-      this.element.innerHTML = '';
-      return;
-    }
-
+    // Always show badge - even with 0 errors so users can access error log
     this.element.style.display = 'flex';
 
     this.element.innerHTML = `

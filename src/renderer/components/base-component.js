@@ -682,6 +682,20 @@ class BaseComponent {
     if (!this.element) return;
 
     if (this.uiState) {
+      // Add to error tracking system as non-catastrophic error
+      if (typeof this.uiState.addNonCatastrophicError === 'function') {
+        this.uiState.addNonCatastrophicError({
+          message: `${title}: ${message}`,
+          stack: null,
+          context: {
+            source: 'component-error',
+            timestamp: new Date().toISOString()
+          },
+          component: this.constructor.name
+        });
+      }
+
+      // Also show notification for immediate feedback
       this.uiState.showNotification({
         message: `${title}: ${message}`,
         type: 'error',

@@ -331,8 +331,15 @@ class WindowManager extends BaseService {
   setupConsoleLogging(window) {
     // Capture all console messages from renderer process
     window.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      const logLevel = this.mapConsoleLevel(level);
+      let logLevel = this.mapConsoleLevel(level);
       const source = sourceId ? `${sourceId}:${line}` : 'renderer';
+      try {
+        const msgStr = String(message || '');
+        // Demote known benign CSP violations from embedded SCORM content to warnings
+        if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
+          logLevel = 'warn';
+        }
+      } catch (_) { /* no-op */ }
       this.logger?.[logLevel](`[Renderer Console] ${message} (${source})`);
     });
 

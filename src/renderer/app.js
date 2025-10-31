@@ -118,6 +118,19 @@ async function initializeApplication() {
 
     try {
       const resolvedUiState = await uiState;
+
+      // Add as catastrophic error to error tracking system
+      resolvedUiState.addCatastrophicError({
+        message: error?.message || 'Application initialization failed',
+        stack: error?.stack || null,
+        context: {
+          source: 'app-initialization',
+          phase: 'startup',
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      // Also set legacy error state for backward compatibility
       resolvedUiState.setError(error);
       resolvedUiState.showNotification({
         message: `Initialization Error: ${error?.message || 'Unknown error'}`,
