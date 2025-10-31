@@ -21,8 +21,12 @@ export async function initialize() {
       try { eventBus.emit('navigation:completed', data); } catch (_) {}
     });
 
+    // NOTE: Do NOT forward course-loaded IPC event to course:loaded EventBus event
+    // UIState.updateCourse() already emits course:loaded when CourseLoader updates the state
+    // Forwarding this would cause duplicate course:loaded events and duplicate success notifications
     ipcClient.onCourseLoaded((data) => {
-      try { eventBus.emit('course:loaded', data); } catch (_) {}
+      // IPC event received but not forwarded to EventBus to prevent duplicates
+      try { rendererLogger.debug('ipc-events-forwarder: course-loaded IPC event received (not forwarded to EventBus)'); } catch (_) {}
     });
 
     ipcClient.onCourseExited((data) => {
@@ -42,6 +46,13 @@ export async function initialize() {
         if (data && data.type === 'course-outline:refresh-required') {
           eventBus.emit('course-outline:refresh-required', data);
         }
+      } catch (_) {}
+    });
+
+    // Forward console errors from main process to EventBus for UI display
+    ipcClient.onRendererConsoleError((data) => {
+      try {
+        eventBus.emit('renderer:console-error', data);
       } catch (_) {}
     });
 

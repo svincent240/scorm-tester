@@ -109,6 +109,11 @@ export class ErrorListPanel extends BaseComponent {
         <button class="error-list-panel__button error-list-panel__button--secondary" id="error-list-copy-all">
           Copy All Logs
         </button>
+        ${this.errors.length > 0 ? `
+          <button class="error-list-panel__button error-list-panel__button--danger" id="error-list-clear-all">
+            Clear All
+          </button>
+        ` : ''}
         ${unacknowledgedErrors.length > 0 ? `
           <button class="error-list-panel__button error-list-panel__button--primary" id="error-list-acknowledge-all">
             Acknowledge All
@@ -194,6 +199,12 @@ export class ErrorListPanel extends BaseComponent {
       copyAllBtn.addEventListener('click', () => this.copyAllLogs());
     }
 
+    // Clear all button
+    const clearAllBtn = this.element.querySelector('#error-list-clear-all');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => this.clearAll());
+    }
+
     // Acknowledge all button
     const acknowledgeAllBtn = this.element.querySelector('#error-list-acknowledge-all');
     if (acknowledgeAllBtn) {
@@ -254,6 +265,16 @@ export class ErrorListPanel extends BaseComponent {
     if (this.uiState) {
       this.uiState.acknowledgeAllErrors();
       this.logger?.info('ErrorListPanel: Acknowledged all errors');
+    }
+  }
+
+  /**
+   * Clear all errors
+   */
+  clearAll() {
+    if (this.uiState) {
+      this.uiState.clearAllErrors();
+      this.logger?.info('ErrorListPanel: Cleared all errors');
     }
   }
 

@@ -517,7 +517,36 @@ class AppManager {
       } catch (_) {}
     });
 
+    // Renderer console errors from main process (captured via window.webContents.on('console-message'))
+    eventBus.on('renderer:console-error', (errorData) => {
+      try {
+        if (!errorData) return;
 
+        const message = errorData.message || 'Console error';
+        const source = errorData.source || 'unknown';
+        const line = errorData.line || 0;
+        const level = errorData.level || 'error';
+
+        // Format source location for display
+        const sourceLocation = line > 0 ? `${source}:${line}` : source;
+
+        this.logger.error('AppManager: Renderer console error', message, { source: sourceLocation });
+
+        // Add to error tracking UI (non-catastrophic)
+        const error = new Error(message);
+        error.context = {
+          source: sourceLocation,
+          level: level,
+          timestamp: errorData.timestamp ? new Date(errorData.timestamp).toISOString() : new Date().toISOString(),
+          errorCode: errorData.errorCode || null
+        };
+        error.component = 'renderer-console';
+
+        if (this.uiState) {
+          this.uiState.addNonCatastrophicError(error);
+        }
+      } catch (_) {}
+    });
 
 
 

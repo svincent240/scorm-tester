@@ -163,12 +163,21 @@ class IpcClient {
     }
     return api.onScormInspectorDataUpdated(handler);
   }
+
   onNavigationAvailabilityUpdated(handler) {
     const api = this._ensureAPI();
     if (typeof api.onNavigationAvailabilityUpdated !== 'function') {
       throw new Error('electronAPI.onNavigationAvailabilityUpdated not available');
     }
     return api.onNavigationAvailabilityUpdated(handler);
+  }
+
+  onRendererConsoleError(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onRendererConsoleError !== 'function') {
+      throw new Error('electronAPI.onRendererConsoleError not available');
+    }
+    return api.onRendererConsoleError(handler);
   }
 
   onCourseLoaded(handler) {

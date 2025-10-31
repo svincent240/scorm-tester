@@ -462,6 +462,13 @@ class UIStateManager {
   }
 
   /**
+   * Clear all errors (both acknowledged and unacknowledged)
+   */
+  clearAllErrors() {
+    this.updateUI({ nonCatastrophicErrors: [], errorBadgeCount: 0 });
+  }
+
+  /**
    * Reset application state
    */
   reset() {

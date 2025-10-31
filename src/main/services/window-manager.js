@@ -333,24 +333,65 @@ class WindowManager extends BaseService {
     window.webContents.on('console-message', (event, level, message, line, sourceId) => {
       let logLevel = this.mapConsoleLevel(level);
       const source = sourceId ? `${sourceId}:${line}` : 'renderer';
+      let shouldBroadcastToUI = false;
+
       try {
         const msgStr = String(message || '');
         // Demote known benign CSP violations from embedded SCORM content to warnings
         if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
           logLevel = 'warn';
         }
+
+        // Broadcast errors and warnings to renderer UI for visibility
+        if (logLevel === 'error' || logLevel === 'warn') {
+          shouldBroadcastToUI = true;
+        }
       } catch (_) { /* no-op */ }
+
       this.logger?.[logLevel](`[Renderer Console] ${message} (${source})`);
+
+      // Forward console errors to renderer for UI display
+      if (shouldBroadcastToUI && window && !window.isDestroyed()) {
+        try {
+          window.webContents.send('renderer-console-error', {
+            level: logLevel,
+            message: String(message || ''),
+            source: sourceId || 'unknown',
+            line: line || 0,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          this.logger?.warn('WindowManager: Failed to broadcast console error to renderer', err?.message || err);
+        }
+      }
     });
 
     // Capture JavaScript errors
     window.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       this.logger?.error(`[Renderer Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
+
+      // Broadcast load errors to renderer UI
+      if (window && !window.isDestroyed()) {
+        try {
+          window.webContents.send('renderer-console-error', {
+            level: 'error',
+            message: `Failed to load: ${errorDescription}`,
+            source: validatedURL || 'unknown',
+            line: 0,
+            errorCode: errorCode,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          this.logger?.warn('WindowManager: Failed to broadcast load error to renderer', err?.message || err);
+        }
+      }
     });
 
     // Capture unhandled exceptions
     window.webContents.on('crashed', (event, killed) => {
       this.logger?.error(`[Renderer Crash] Renderer process crashed. Killed: ${killed}`);
+
+      // Note: Cannot send to crashed window, but log for debugging
     });
 
     // Capture DOM ready and script loading

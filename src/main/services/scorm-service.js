@@ -654,14 +654,41 @@ class ScormService extends BaseService {
         throw new Error('CAM Service not initialized');
       }
       const result = await this.camService.processPackage(folderPath, manifestContent);
-      
+
       // Initialize SN service with the processed manifest if successful
       if (result.success && result.manifest && this.snService) {
         const snInitResult = await this.snService.initialize(result.manifest, { folderPath });
         if (snInitResult.success) {
           this.logger?.info(`ScormService: SN service initialized with manifest`);
-          this.eventEmitter.emit('course:loaded', { folderPath, manifest: result.manifest });
-          
+
+          // Extract launch URL from CAM analysis
+          const launchUrl = Array.isArray(result.analysis?.launchSequence) && result.analysis.launchSequence.length > 0
+            ? result.analysis.launchSequence[0].href
+            : null;
+
+          if (!launchUrl) {
+            this.logger?.error('ScormService: No launch URL found in CAM analysis');
+            throw new Error('No launch URL found in course');
+          }
+
+          // Extract course info for the event payload
+          const courseInfo = {
+            title: (result.manifest?.organizations?.organizations?.[0]?.title)
+                   || result.manifest?.organizations?.organization?.title
+                   || result.manifest?.identifier
+                   || 'Course',
+            version: result.manifest?.version,
+            scormVersion: result.manifest?.metadata?.schemaversion || 'Unknown',
+            hasManifest: true
+          };
+
+          this.eventEmitter.emit('course:loaded', {
+            folderPath,
+            manifest: result.manifest,
+            launchUrl,
+            info: courseInfo
+          });
+
           // Emit sn:initialized event to renderer process for course outline integration
           const windowManager = this.getDependency('windowManager');
           if (windowManager?.broadcastToAllWindows) {

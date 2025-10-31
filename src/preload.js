@@ -170,6 +170,7 @@ const electronAPI = {
   onScormApiCallLogged: (callback) => safeOn('scorm-api-call-logged', callback),
   onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
   onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
+  onRendererConsoleError: (callback) => safeOn('renderer-console-error', callback),
 
   // Utility
   pathUtils: {

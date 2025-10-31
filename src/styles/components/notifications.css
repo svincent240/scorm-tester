@@ -529,7 +529,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-xl);
-  display: none;
+  display: flex;
   flex-direction: column;
   z-index: var(--z-index-dropdown);
   animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -579,9 +579,11 @@
 }
 
 .error-list-panel__body {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--spacing-sm);
+  min-height: 0; /* Critical for flex scrolling */
 }
 
 .error-list-panel__empty {
@@ -780,6 +782,17 @@
 
 .error-list-panel__button--secondary:hover {
   background: var(--bg-hover);
+}
+
+.error-list-panel__button--danger {
+  background: var(--danger-color);
+  color: white;
+  border-color: var(--danger-color);
+}
+
+.error-list-panel__button--danger:hover {
+  background: var(--danger-dark);
+  border-color: var(--danger-dark);
 }
 
 /* Reduced Motion for Error Components */
