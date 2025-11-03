@@ -11,18 +11,42 @@
  */
 
 /**
- * Basic SCORM element patterns for quick validation
+ * Basic SCORM 2004 4th Edition element patterns for quick validation
  */
 const ELEMENT_PATTERNS = [
-  /^cmi\.core\./,
-  /^cmi\.suspend_data$/,
+  // Core CMI elements
+  /^cmi\._version$/,
+  /^cmi\.comments_from_learner\./,
+  /^cmi\.comments_from_lms\./,
+  /^cmi\.completion_status$/,
+  /^cmi\.completion_threshold$/,
+  /^cmi\.credit$/,
+  /^cmi\.entry$/,
+  /^cmi\.exit$/,
+  /^cmi\.interactions\./,
   /^cmi\.launch_data$/,
-  /^cmi\.comments$/,
-  /^cmi\.comments_from_lms$/,
-  /^cmi\.interactions\.\d+\./,
-  /^cmi\.objectives\.\d+\./,
-  /^cmi\.student_data\./,
-  /^cmi\.student_preference\./
+  /^cmi\.learner_id$/,
+  /^cmi\.learner_name$/,
+  /^cmi\.learner_preference\./,
+  /^cmi\.location$/,
+  /^cmi\.max_time_allowed$/,
+  /^cmi\.mode$/,
+  /^cmi\.objectives\./,
+  /^cmi\.progress_measure$/,
+  /^cmi\.scaled_passing_score$/,
+  /^cmi\.score\./,
+  /^cmi\.session_time$/,
+  /^cmi\.success_status$/,
+  /^cmi\.suspend_data$/,
+  /^cmi\.time_limit_action$/,
+  /^cmi\.total_time$/,
+
+  // ADL Navigation elements
+  /^adl\.nav\.request$/,
+  /^adl\.nav\.request_valid\./,
+
+  // ADL Data elements (optional)
+  /^adl\.data\./
 ];
 
 /**
@@ -40,7 +64,8 @@ function isValidElement(element) {
   const matchesPattern = ELEMENT_PATTERNS.some(pattern => pattern.test(element));
 
   // Be permissive in renderer - let main process handle detailed validation
-  return matchesPattern || element.startsWith('cmi.');
+  // Accept cmi.* and adl.* elements
+  return matchesPattern || element.startsWith('cmi.') || element.startsWith('adl.');
 }
 
 /**

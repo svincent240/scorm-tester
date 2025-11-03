@@ -644,7 +644,18 @@ class ScormClient {
 
     // Default behavior: emit scorm:error for all other cases
     // Route SCORM errors through UI-prefixed EventBus events so EventBus remains UI-focused
-    eventBus.emit('ui:scorm:error', { code: String(errorCode), message: this.GetErrorString(String(errorCode)), source: 'renderer/scorm-client' });
+    // Include element information in error event for better debugging
+    const element = typeof context.element === 'string' ? context.element : null;
+    const errorMessage = element
+      ? `${this.GetErrorString(String(errorCode))}: ${element}`
+      : this.GetErrorString(String(errorCode));
+
+    eventBus.emit('ui:scorm:error', {
+      code: String(errorCode),
+      message: errorMessage,
+      element: element,
+      source: 'renderer/scorm-client'
+    });
   }
 
   /**
