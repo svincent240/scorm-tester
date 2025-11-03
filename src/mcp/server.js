@@ -51,6 +51,8 @@ const TOOL_META = new Map([
   ["scorm_debug_api_calls", { description: "Capture and summarize SCORM API calls (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, filter_methods: { type: "array", items: { type: "string" } }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_trace_sequencing", { description: "Trace SCORM SN structure and environment", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, trace_level: { type: "string", enum: ["basic", "detailed", "verbose"] }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_report", { description: "Generate a compliance report (JSON or HTML)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, format: { type: "string", enum: ["json", "html"] } }, required: ["workspace_path"] } }],
+  ["system_get_logs", { description: "Get recent log entries including browser console errors, warnings, and all application logs (NDJSON format)", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
+  ["system_set_log_level", { description: "Set log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
 ]);
 
 router.register("scorm_echo", scorm_echo);
@@ -81,7 +83,7 @@ router.register("scorm_nav_choice", scorm_nav_choice);
 async function system_get_logs(params = {}) {
   const { tail = 200, levels = [], since_ts = 0, component = null } = params;
   const file = (logger && logger.ndjsonFile) ? logger.ndjsonFile : (logger && logger.logFile);
-  if (!file) return { logs: [] };
+  if (!file) return { logs: [], note: 'No log file available' };
   try {
     const text = fs.readFileSync(file, 'utf8');
     const lines = text.split('\n').filter(Boolean);
@@ -101,7 +103,11 @@ async function system_get_logs(params = {}) {
         // skip non-JSON lines
       }
     }
-    return { logs: out };
+    return {
+      logs: out,
+      note: 'Includes browser console errors/warnings from SCORM content, application logs, and all MCP operations',
+      log_file: file
+    };
   } catch (e) {
     return { logs: [], error: e.message };
   }

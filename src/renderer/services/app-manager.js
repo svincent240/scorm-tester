@@ -943,12 +943,10 @@ class AppManager {
         return;
       }
 
-      // Reset SCORM client state before reloading to prevent "Already initialized" errors
-      const { scormClient } = await import('./scorm-client.js');
-      if (scormClient) {
-        this.logger.info('AppManager: Resetting SCORM client state for reload');
-        scormClient.reset();
-      }
+      // DO NOT reset SCORM client here - the old content needs a valid session
+      // to handle its unload events (which typically call Commit/Terminate).
+      // The scormClient will be reset in ContentViewer.teardownScormAPIs()
+      // AFTER the old content has been unloaded.
 
       // Set loading state on the reload button
       const reloadBtn = document.getElementById('course-reload-btn');

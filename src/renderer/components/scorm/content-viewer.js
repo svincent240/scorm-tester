@@ -595,6 +595,11 @@ class ContentViewer extends BaseComponent {
    * - Resets scormClient to clear session state (isInitialized, sessionId, caches, timers)
    * - Detaches bridge from scormClient
    * - Mutates existing API objects to inert stubs that return "false" without emitting errors
+   *
+   * CRITICAL TIMING: This must be called AFTER the old content has been unloaded
+   * (after iframe.src = 'about:blank' and the 50ms delay) to allow the old content's
+   * unload handlers to complete their SCORM API calls (typically Commit/Terminate).
+   * Resetting the scormClient before unload would cause error 142 (Commit before initialization).
    */
   teardownScormAPIs() {
     try {

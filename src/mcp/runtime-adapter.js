@@ -32,6 +32,31 @@ let ipcRegistered = false;
 function ensureIpcHandlers() {
   if (!electron || !electron.ipcMain || ipcRegistered) return;
   const { ipcMain } = electron;
+
+  // Synchronous IPC handler for SCORM API compliance
+  // Real SCORM content expects synchronous API methods that return strings immediately
+  ipcMain.on("scorm-mcp:api-sync", (event, payload = {}) => {
+    try {
+      const wc = event?.sender;
+      const id = wc?.id;
+      const handler = id != null ? handlerByWC.get(id) : null;
+      const method = String(payload?.method || "");
+      const args = Array.isArray(payload?.args) ? payload.args : [];
+      if (!handler || !method || typeof handler[method] !== "function") {
+        try { mcpLogger.error(`MCP API (sync): handler missing or method not found`, { id, method }); } catch (_) {}
+        event.returnValue = "false";
+        return;
+      }
+      // SCORM methods are synchronous and return strings per spec
+      const res = handler[method].apply(handler, args);
+      event.returnValue = typeof res === "string" ? res : String(res);
+    } catch (e) {
+      try { mcpLogger.error(`MCP API (sync): error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) {}
+      event.returnValue = "false";
+    }
+  });
+
+  // Async IPC handler for MCP tools that can handle promises
   ipcMain.handle("scorm-mcp:api", async (event, payload = {}) => {
     try {
       const wc = event?.sender;

@@ -7,6 +7,10 @@ let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
 const PathUtils = require("../shared/utils/path-utils");
 const { getPreloadPath, installRealAdapterForWindow } = require("./runtime-adapter");
+const getLogger = require("../shared/utils/logger");
+
+// Get logger instance for browser console capture
+const logger = getLogger();
 
 async function resolveEntryPathFromManifest(workspace) {
   const manifestPath = path.join(workspace, "imsmanifest.xml");
@@ -61,6 +65,67 @@ async function resolveEntryPathFromManifest(workspace) {
 // Persistent runtime registry keyed by session_id
 const _persistentBySession = new Map();
 
+/**
+ * Map Chromium console level to logger level
+ * @param {number} level - Chromium console level (0-3)
+ * @returns {string} Logger level string
+ */
+function mapConsoleLevel(level) {
+  switch (level) {
+    case 0: return 'debug';  // verbose
+    case 1: return 'info';   // info
+    case 2: return 'warn';   // warning
+    case 3: return 'error';  // error
+    default: return 'info';
+  }
+}
+
+/**
+ * Set up console logging capture for a BrowserWindow
+ * Captures all browser console messages and logs them to the unified logging system
+ * @param {BrowserWindow} win - The BrowserWindow to monitor
+ */
+function setupConsoleLogging(win) {
+  if (!win || !win.webContents) return;
+
+  // Capture all console messages from renderer process
+  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    let logLevel = mapConsoleLevel(level);
+    const source = sourceId ? `${sourceId}:${line}` : 'scorm-content';
+
+    try {
+      const msgStr = String(message || '');
+
+      // Demote known benign CSP violations from embedded SCORM content to warnings
+      if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
+        logLevel = 'warn';
+      }
+
+      // Filter out benign Chromium warnings
+      const isBenignWarning = logLevel === 'warn' && (
+        // Iframe sandboxing warning - expected when loading SCORM content
+        msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
+        msgStr.includes("can remove its sandboxing")
+      );
+
+      // Log all non-benign messages to unified logging system
+      if (!isBenignWarning) {
+        logger?.[logLevel](`[Browser Console] ${message}`, { source, line });
+      }
+    } catch (_) { /* no-op */ }
+  });
+
+  // Capture page load errors
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    logger?.error(`[Browser Load Error] ${errorDescription} (${errorCode})`, { url: validatedURL, isMainFrame });
+  });
+
+  // Capture renderer crashes
+  win.webContents.on('crashed', (event, killed) => {
+    logger?.error(`[Browser Crash] Renderer process crashed`, { killed });
+  });
+}
+
 class RuntimeManager {
   static get isSupported() {
     return !!(electron && electron.app && electron.BrowserWindow);
@@ -89,6 +154,8 @@ class RuntimeManager {
     const url = 'file://' + entryPath;
     // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
     try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) {}
+    // Capture browser console messages to unified log (accessible via system_get_logs)
+    this.setupConsoleLogging(win);
 
     // Load the URL with explicit handling for Storyline-style redirect that triggers ERR_ABORTED
     try {
@@ -260,6 +327,63 @@ class RuntimeManager {
 
   static async close(win) {
     try { win?.destroy(); } catch (_) {}
+  }
+
+  /**
+   * Set up console logging capture for browser console messages.
+   * Captures all console output from SCORM content and logs to unified log system.
+   * These logs are accessible via system_get_logs MCP tool.
+   */
+  static setupConsoleLogging(win) {
+    if (!win || !win.webContents) return;
+
+    // Map Chromium console levels to our log levels
+    const mapConsoleLevel = (level) => {
+      switch (level) {
+        case 0: return 'debug';  // verbose
+        case 1: return 'info';   // info
+        case 2: return 'warn';   // warning
+        case 3: return 'error';  // error
+        default: return 'info';
+      }
+    };
+
+    // Capture all console messages from SCORM content
+    win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      let logLevel = mapConsoleLevel(level);
+      const source = sourceId ? `${sourceId}:${line}` : 'scorm-content';
+
+      try {
+        const msgStr = String(message || '');
+
+        // Demote known benign CSP violations from embedded SCORM content to warnings
+        if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
+          logLevel = 'warn';
+        }
+
+        // Filter out benign Chromium warnings
+        const isBenignWarning = logLevel === 'warn' && (
+          msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
+          msgStr.includes("can remove its sandboxing")
+        );
+
+        // Skip benign warnings from logs
+        if (isBenignWarning) return;
+      } catch (_) { /* no-op */ }
+
+      // Log to unified system (accessible via system_get_logs)
+      logger?.[logLevel](`[Browser Console] ${message} (${source})`);
+    });
+
+    // Capture page load errors
+    win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      logger?.error(`[Browser Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
+    });
+
+    // Capture renderer crashes
+    win.webContents.on('crashed', (event, killed) => {
+      logger?.error(`[Browser Crash] Renderer process crashed. Killed: ${killed}`);
+    });
   }
 }
 

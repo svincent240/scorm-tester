@@ -9,6 +9,18 @@
 
     // Provide a minimal bridge for invoking SCORM API via main process
     const bridge = {
+      // Synchronous API invoke for SCORM compliance
+      // Real SCORM content expects synchronous API methods that return strings immediately
+      apiInvokeSync: (method, args) => {
+        try {
+          const res = ipcRenderer.sendSync('scorm-mcp:api-sync', { method, args: Array.isArray(args) ? args : [] });
+          return typeof res === 'string' ? res : String(res);
+        } catch (e) {
+          try { ipcRenderer.send('renderer-log-error', '[MCP preload] apiInvokeSync failed', e && e.message ? e.message : String(e)); } catch (_) {}
+          return 'false';
+        }
+      },
+      // Async API invoke for MCP tools that can handle promises
       apiInvoke: async (method, args) => {
         try {
           const res = await ipcRenderer.invoke('scorm-mcp:api', { method, args: Array.isArray(args) ? args : [] });
@@ -41,12 +53,14 @@
       window.__scorm_calls = [];
     }
 
-    function wrap(method) {
-      return async function () {
+    // Synchronous wrapper for SCORM API compliance
+    // Real SCORM content expects synchronous methods that return strings immediately
+    function wrapSync(method) {
+      return function () {
         const args = Array.from(arguments).map(a => String(a));
         // eslint-disable-next-line no-undef
         const ts = Date.now();
-        const result = await bridge.apiInvoke(method, args);
+        const result = bridge.apiInvokeSync(method, args);
         try {
           __calls.push({ ts, method, parameters: args, result });
           // eslint-disable-next-line no-undef
@@ -56,16 +70,17 @@
       };
     }
 
-    // Expose SCORM 2004 API (window.API_1484_11)
+    // Expose SCORM 2004 API (window.API_1484_11) with synchronous methods
+    // This is required for SCORM compliance - content expects immediate string returns
     contextBridge.exposeInMainWorld('API_1484_11', {
-      Initialize: wrap('Initialize'),
-      Terminate: wrap('Terminate'),
-      GetValue: wrap('GetValue'),
-      SetValue: wrap('SetValue'),
-      Commit: wrap('Commit'),
-      GetLastError: wrap('GetLastError'),
-      GetErrorString: wrap('GetErrorString'),
-      GetDiagnostic: wrap('GetDiagnostic')
+      Initialize: wrapSync('Initialize'),
+      Terminate: wrapSync('Terminate'),
+      GetValue: wrapSync('GetValue'),
+      SetValue: wrapSync('SetValue'),
+      Commit: wrapSync('Commit'),
+      GetLastError: wrapSync('GetLastError'),
+      GetErrorString: wrapSync('GetErrorString'),
+      GetDiagnostic: wrapSync('GetDiagnostic')
     });
   } catch (e) {
     try {
