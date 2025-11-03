@@ -429,6 +429,8 @@ class AppManager {
         eventBus.emit('course:open-zip:request');
       } else if (action === 'menu-toggle-theme') {
         eventBus.emit('ui:theme:toggle-request');
+      } else if (action === 'menu-toggle-error-log') {
+        eventBus.emit('error-list:toggle');
       }
     });
   } catch (_) {}

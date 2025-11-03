@@ -252,6 +252,51 @@ class CourseLoader {
       this.currentCourse = courseData;
       const uiState = await uiStatePromise;
       uiState.updateCourse(courseData);
+
+      // Surface validation errors and warnings as non-catastrophic errors
+      const allValidationIssues = [
+        ...(courseData.validation?.errors || []),
+        ...(courseData.validation?.warnings || [])
+      ];
+
+      if (allValidationIssues.length > 0) {
+        this.logger?.info && this.logger.info('CourseLoader: Surfacing validation issues to error system', {
+          errorCount: courseData.validation?.errors?.length || 0,
+          warningCount: courseData.validation?.warnings?.length || 0
+        });
+
+        for (const validationIssue of allValidationIssues) {
+          // Check if this is a detailed error object (parent DOM violation) or simple string
+          if (typeof validationIssue === 'object' && validationIssue.type === 'parent_dom_violation') {
+            uiState.addNonCatastrophicError({
+              message: validationIssue.message,
+              stack: null,
+              context: {
+                source: 'scorm-validation',
+                file: validationIssue.file,
+                line: validationIssue.line,
+                severity: validationIssue.severity,
+                code_snippet: validationIssue.code_snippet,
+                fix_suggestion: validationIssue.fix_suggestion,
+                type: 'parent_dom_violation'
+              },
+              component: 'CourseValidator'
+            });
+          } else {
+            // Simple string error/warning
+            const issueMessage = typeof validationIssue === 'string' ? validationIssue : validationIssue.message;
+            uiState.addNonCatastrophicError({
+              message: issueMessage,
+              stack: null,
+              context: {
+                source: 'scorm-validation'
+              },
+              component: 'CourseValidator'
+            });
+          }
+        }
+      }
+
       // Update MRU
       try {
         const { recentCoursesStore } = await import('./recent-courses.js');
@@ -541,6 +586,50 @@ class CourseLoader {
       this.logger?.info && this.logger.info('CourseLoader: UI state obtained, calling updateCourse');
       uiState.updateCourse(courseData);
       this.logger?.info && this.logger.info('CourseLoader: UI state updated successfully');
+
+      // Surface validation errors and warnings as non-catastrophic errors
+      const allValidationIssues = [
+        ...(courseData.validation?.errors || []),
+        ...(courseData.validation?.warnings || [])
+      ];
+
+      if (allValidationIssues.length > 0) {
+        this.logger?.info && this.logger.info('CourseLoader: Surfacing validation issues to error system', {
+          errorCount: courseData.validation?.errors?.length || 0,
+          warningCount: courseData.validation?.warnings?.length || 0
+        });
+
+        for (const validationIssue of allValidationIssues) {
+          // Check if this is a detailed error object (parent DOM violation) or simple string
+          if (typeof validationIssue === 'object' && validationIssue.type === 'parent_dom_violation') {
+            uiState.addNonCatastrophicError({
+              message: validationIssue.message,
+              stack: null,
+              context: {
+                source: 'scorm-validation',
+                file: validationIssue.file,
+                line: validationIssue.line,
+                severity: validationIssue.severity,
+                code_snippet: validationIssue.code_snippet,
+                fix_suggestion: validationIssue.fix_suggestion,
+                type: 'parent_dom_violation'
+              },
+              component: 'CourseValidator'
+            });
+          } else {
+            // Simple string error/warning
+            const issueMessage = typeof validationIssue === 'string' ? validationIssue : validationIssue.message;
+            uiState.addNonCatastrophicError({
+              message: issueMessage,
+              stack: null,
+              context: {
+                source: 'scorm-validation'
+              },
+              component: 'CourseValidator'
+            });
+          }
+        }
+      }
 
       // Update MRU
       try {

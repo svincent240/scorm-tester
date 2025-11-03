@@ -131,6 +131,156 @@ async function scorm_lint_api_usage(params = {}) {
   return { scanned_files, issues };
 }
 
+async function scorm_lint_parent_dom_access(params = {}) {
+  const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
+  if (!workspace) {
+    const e = new Error("workspace_path is required");
+    e.code = "MCP_INVALID_PARAMS";
+    throw e;
+  }
+  const files = listFilesRecursive(workspace).filter(f => /\.(html?|js|css)$/i.test(f));
+
+  const violations = [];
+  const scanned_files = files.map(f => path.relative(workspace, f));
+
+  // JavaScript patterns that indicate parent DOM manipulation (violations)
+  const jsViolationPatterns = [
+    {
+      pattern: /\bparent\.document\b(?!\.API)(?!\.API_1484_11)/g,
+      message: "Accesses parent.document (parent window DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\bwindow\.parent\.document\b(?!\.API)(?!\.API_1484_11)/g,
+      message: "Accesses window.parent.document (parent window DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\btop\.document\b(?!\.API)(?!\.API_1484_11)/g,
+      message: "Accesses top.document (top window DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\bwindow\.top\.document\b(?!\.API)(?!\.API_1484_11)/g,
+      message: "Accesses window.top.document (top window DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\$\s*\(\s*parent\.document/g,
+      message: "Uses jQuery on parent.document",
+      severity: "error"
+    },
+    {
+      pattern: /\$\s*\(\s*window\.parent\.document/g,
+      message: "Uses jQuery on window.parent.document",
+      severity: "error"
+    },
+    {
+      pattern: /\bjQuery\s*\(\s*parent\.document/g,
+      message: "Uses jQuery on parent.document",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.getElementById/g,
+      message: "Calls parent.document.getElementById (modifies parent DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.querySelector/g,
+      message: "Calls parent.document.querySelector (accesses parent DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.getElementsBy/g,
+      message: "Calls parent.document.getElementsBy* (accesses parent DOM)",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.body/g,
+      message: "Accesses parent.document.body",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.head/g,
+      message: "Accesses parent.document.head",
+      severity: "error"
+    },
+    {
+      pattern: /\bparent\.document\.styleSheets/g,
+      message: "Accesses parent.document.styleSheets (may inject styles)",
+      severity: "warning"
+    },
+    {
+      pattern: /\bparent\.document\.createElement/g,
+      message: "Calls parent.document.createElement (may modify parent DOM)",
+      severity: "warning"
+    }
+  ];
+
+  // CSS patterns that can escape iframe boundaries and affect parent window
+  const cssViolationPatterns = [
+    {
+      pattern: /position\s*:\s*fixed/gi,
+      message: "Uses position:fixed which escapes iframe boundaries and can overlap parent window UI",
+      severity: "warning"
+    },
+    {
+      pattern: /position\s*:\s*sticky/gi,
+      message: "Uses position:sticky which can cause layout issues in iframes",
+      severity: "info"
+    }
+  ];
+
+  for (const file of files) {
+    let content = "";
+    try { content = fs.readFileSync(file, "utf8"); } catch (_) { continue; }
+
+    const lines = content.split(/\r?\n/);
+    const relPath = path.relative(workspace, file);
+    const ext = path.extname(file).toLowerCase();
+
+    // Choose patterns based on file type
+    const patterns = (ext === '.css') ? cssViolationPatterns : jsViolationPatterns;
+    const defaultFixSuggestion = (ext === '.css')
+      ? "Replace position:fixed with position:absolute. Fixed positioning in same-origin iframes can escape iframe boundaries and overlap parent window UI elements."
+      : "SCORM content should only access parent.API or parent.API_1484_11 for API discovery. Remove all parent window DOM manipulation.";
+
+    for (const { pattern, message, severity } of patterns) {
+      // Reset regex state
+      pattern.lastIndex = 0;
+
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        // Find line number
+        let lineNumber = 1;
+        let charCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+          charCount += lines[i].length + 1; // +1 for newline
+          if (charCount > match.index) {
+            lineNumber = i + 1;
+            break;
+          }
+        }
+
+        // Get code snippet (the line where violation occurs)
+        const codeLine = lines[lineNumber - 1] || "";
+        const codeSnippet = codeLine.trim();
+
+        violations.push({
+          file: relPath,
+          line: lineNumber,
+          severity: severity,
+          issue: message,
+          code_snippet: codeSnippet,
+          fix_suggestion: defaultFixSuggestion
+        });
+      }
+    }
+  }
+
+  return { scanned_files, violations };
+}
+
 async function scorm_validate_workspace(params = {}) {
   const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
   if (!workspace) {
@@ -141,16 +291,19 @@ async function scorm_validate_workspace(params = {}) {
 
   const manifestResult = await scorm_lint_manifest({ workspace_path: workspace });
   const apiUsage = await scorm_lint_api_usage({ workspace_path: workspace, scan_depth: params.scan_depth, api_version: params.api_version });
+  const parentDomAccess = await scorm_lint_parent_dom_access({ workspace_path: workspace });
 
-  // simple scoring: start 100, minus 25 per manifest error, minus 10 per api issue (cap at 0)
+  // simple scoring: start 100, minus 25 per manifest error, minus 10 per api issue, minus 15 per parent DOM violation (cap at 0)
   const manifestErrorCount = Array.isArray(manifestResult.errors) ? manifestResult.errors.length : 0;
   const apiIssueCount = Array.isArray(apiUsage.issues) ? apiUsage.issues.length : 0;
-  let compliance_score = 100 - 25 * manifestErrorCount - 10 * apiIssueCount;
+  const parentDomViolationCount = Array.isArray(parentDomAccess.violations) ? parentDomAccess.violations.length : 0;
+  let compliance_score = 100 - 25 * manifestErrorCount - 10 * apiIssueCount - 15 * parentDomViolationCount;
   if (compliance_score < 0) compliance_score = 0;
 
   const actionable_fixes = [];
   if (!manifestResult.valid) actionable_fixes.push("Fix imsmanifest.xml parsing/structure issues");
   if (apiIssueCount > 0) actionable_fixes.push("Initialize API before calling SetValue/GetValue and Terminate when done");
+  if (parentDomViolationCount > 0) actionable_fixes.push("Remove parent window DOM access - SCORM content should only access parent.API or parent.API_1484_11");
 
   const validation_results = {
     manifest: {
@@ -161,6 +314,10 @@ async function scorm_validate_workspace(params = {}) {
     api_usage: {
       scanned_files: apiUsage.scanned_files,
       issues: apiUsage.issues
+    },
+    parent_dom_access: {
+      scanned_files: parentDomAccess.scanned_files,
+      violations: parentDomAccess.violations
     }
   };
 
@@ -343,5 +500,5 @@ async function scorm_report(params = {}) {
 }
 
 
-module.exports = { scorm_lint_manifest, scorm_lint_api_usage, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report };
+module.exports = { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report };
 

@@ -8,7 +8,7 @@ function mktempDir(prefix = 'mcp_val_') {
 }
 
 describe('MCP scorm_validate_workspace', () => {
-  test('aggregates manifest and api usage', async () => {
+  test('aggregates manifest, api usage, and parent dom access', async () => {
     const dir = mktempDir();
     try {
       fs.writeFileSync(path.join(dir, 'imsmanifest.xml'), '<manifest/>');
@@ -17,6 +17,7 @@ describe('MCP scorm_validate_workspace', () => {
       expect(res).toHaveProperty('validation_results');
       expect(res.validation_results).toHaveProperty('manifest');
       expect(res.validation_results).toHaveProperty('api_usage');
+      expect(res.validation_results).toHaveProperty('parent_dom_access');
       expect(typeof res.compliance_score).toBe('number');
       expect(Array.isArray(res.actionable_fixes)).toBe(true);
     } finally {

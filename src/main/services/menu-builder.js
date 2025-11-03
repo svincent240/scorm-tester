@@ -100,6 +100,12 @@ class MenuBuilder {
           },
           { type: 'separator' },
           {
+            label: 'Error Log',
+            accelerator: 'CmdOrCtrl+Shift+E',
+            click: () => this.sendMenuAction('menu-toggle-error-log')
+          },
+          { type: 'separator' },
+          {
             label: 'Fullscreen Course',
             accelerator: 'F11',
             click: () => this.sendMenuAction('menu-fullscreen')

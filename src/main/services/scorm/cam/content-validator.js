@@ -18,10 +18,13 @@
  */
 
 const fs = require('fs').promises;
+const fsSync = require('fs');
+const path = require('path');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
 const PathUtils = require('../../../../shared/utils/path-utils');
 const { ParserError, ParserErrorCode } = require('../../../../shared/errors/parser-error');
 const getLogger = require('../../../../shared/utils/logger');
+const { scorm_lint_parent_dom_access } = require('../../../../mcp/tools/validate');
 
 /**
  * SCORM Content Validator
@@ -61,6 +64,7 @@ class ContentValidator {
       await this.validateScormTypes(manifest);
       await this.validateOrganizationStructure(manifest);
       await this.validateSequencingCompliance(manifest); // New validation step
+      await this.validateParentDOMAccess(packagePath); // Parent DOM access validation
       await this.validateOverallCompliance(); // New validation step
 
       return {
@@ -428,7 +432,7 @@ class ContentValidator {
 
   /**
    * Add validation error
-   * @param {string} message - Error message
+   * @param {string|Object} message - Error message or detailed error object
    */
   addError(message) {
     this.validationErrors.push(message);
@@ -436,7 +440,7 @@ class ContentValidator {
 
   /**
    * Add validation warning
-   * @param {string} message - Warning message
+   * @param {string|Object} message - Warning message or detailed warning object
    */
   addWarning(message) {
     this.validationWarnings.push(message);
@@ -503,6 +507,50 @@ class ContentValidator {
       }
     }
     return false;
+  }
+
+  /**
+   * Validate parent DOM access in course files
+   * Scans HTML/JS files for patterns that indicate parent window DOM manipulation
+   * @param {string} packagePath - Path to SCORM package directory
+   */
+  async validateParentDOMAccess(packagePath) {
+    try {
+      this.logger?.debug && this.logger.debug('ContentValidator: Starting parent DOM access validation');
+
+      const result = await scorm_lint_parent_dom_access({ workspace_path: packagePath });
+
+      if (result.violations && result.violations.length > 0) {
+        this.logger?.warn && this.logger.warn('ContentValidator: Found parent DOM access violations', {
+          count: result.violations.length
+        });
+
+        // Add each violation as an error with detailed information
+        for (const violation of result.violations) {
+          const errorMessage = `${violation.file}:${violation.line} - ${violation.issue}`;
+          const detailedError = {
+            message: errorMessage,
+            file: violation.file,
+            line: violation.line,
+            severity: violation.severity,
+            code_snippet: violation.code_snippet,
+            fix_suggestion: violation.fix_suggestion,
+            type: 'parent_dom_violation'
+          };
+
+          if (violation.severity === 'error') {
+            this.addError(detailedError);
+          } else {
+            this.addWarning(detailedError);
+          }
+        }
+      } else {
+        this.logger?.debug && this.logger.debug('ContentValidator: No parent DOM access violations found');
+      }
+    } catch (error) {
+      this.logger?.error && this.logger.error('ContentValidator: Parent DOM validation failed', error);
+      this.addWarning(`Parent DOM validation failed: ${error.message}`);
+    }
   }
 
   /**

@@ -44,10 +44,16 @@ export class ErrorListPanel extends BaseComponent {
 
     // Listen for open event from error badge via EventBus
     if (this.eventBus) {
-      const unsubscribeEventBus = this.eventBus.on('error-list:open', () => {
+      const unsubscribeOpen = this.eventBus.on('error-list:open', () => {
         this.open();
       });
-      this.unsubscribeFunctions.push(unsubscribeEventBus);
+      this.unsubscribeFunctions.push(unsubscribeOpen);
+
+      // Listen for toggle event from menu via EventBus
+      const unsubscribeToggle = this.eventBus.on('error-list:toggle', () => {
+        this.toggle();
+      });
+      this.unsubscribeFunctions.push(unsubscribeToggle);
     }
   }
 
@@ -62,7 +68,7 @@ export class ErrorListPanel extends BaseComponent {
       return;
     }
 
-    this.element.style.display = 'block';
+    this.element.style.display = 'flex';
 
     const unacknowledgedErrors = this.errors.filter(e => !e.acknowledged);
     const acknowledgedErrors = this.errors.filter(e => e.acknowledged);
@@ -135,8 +141,73 @@ export class ErrorListPanel extends BaseComponent {
     const safeComponent = escapeHTML(error.component || 'unknown');
     const timestamp = new Date(error.timestamp).toLocaleString();
     const safeStack = error.stack ? escapeHTML(error.stack) : '';
-    const contextStr = error.context ? JSON.stringify(error.context, null, 2) : '';
-    const safeContext = contextStr ? escapeHTML(contextStr) : '';
+
+    // Check if this is a parent DOM violation with special formatting
+    const isParentDomViolation = error.context?.type === 'parent_dom_violation';
+
+    let detailsContent = '';
+    if (isParentDomViolation) {
+      // Special formatting for parent DOM violations
+      const safeFile = escapeHTML(error.context.file || '');
+      const safeLine = escapeHTML(String(error.context.line || ''));
+      const safeCodeSnippet = escapeHTML(error.context.code_snippet || '');
+      const safeFixSuggestion = escapeHTML(error.context.fix_suggestion || '');
+      const severity = error.context.severity || 'error';
+
+      detailsContent = `
+        <details class="error-list-panel__item-details" open>
+          <summary>Violation Details</summary>
+          <div class="error-list-panel__item-details-content">
+            <div class="error-list-panel__item-section">
+              <strong>File:</strong> ${safeFile}:${safeLine}
+            </div>
+            <div class="error-list-panel__item-section">
+              <strong>Severity:</strong> <span style="color: ${severity === 'error' ? 'var(--error-color, #ff4444)' : 'var(--warning-color, #ffaa00)'}">${severity}</span>
+            </div>
+            ${safeCodeSnippet ? `
+              <div class="error-list-panel__item-section">
+                <strong>Code:</strong>
+                <pre class="error-list-panel__item-code">${safeCodeSnippet}</pre>
+              </div>
+            ` : ''}
+            ${safeFixSuggestion ? `
+              <div class="error-list-panel__item-section">
+                <strong>Fix:</strong>
+                <div style="padding: 0.5rem; background: var(--bg-secondary, #f5f5f5); border-radius: 4px; margin-top: 0.25rem;">
+                  ${safeFixSuggestion}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </details>
+      `;
+    } else {
+      // Standard error formatting
+      const contextStr = error.context ? JSON.stringify(error.context, null, 2) : '';
+      const safeContext = contextStr ? escapeHTML(contextStr) : '';
+
+      if (safeStack || safeContext) {
+        detailsContent = `
+          <details class="error-list-panel__item-details">
+            <summary>Technical Details</summary>
+            <div class="error-list-panel__item-details-content">
+              ${safeStack ? `
+                <div class="error-list-panel__item-section">
+                  <strong>Stack Trace:</strong>
+                  <pre class="error-list-panel__item-code">${safeStack}</pre>
+                </div>
+              ` : ''}
+              ${safeContext ? `
+                <div class="error-list-panel__item-section">
+                  <strong>Context:</strong>
+                  <pre class="error-list-panel__item-code">${safeContext}</pre>
+                </div>
+              ` : ''}
+            </div>
+          </details>
+        `;
+      }
+    }
 
     return `
       <div class="error-list-panel__item ${error.acknowledged ? 'error-list-panel__item--acknowledged' : ''}" data-error-id="${error.id}">
@@ -159,26 +230,8 @@ export class ErrorListPanel extends BaseComponent {
             </button>
           </div>
         </div>
-        
-        ${safeStack || safeContext ? `
-          <details class="error-list-panel__item-details">
-            <summary>Technical Details</summary>
-            <div class="error-list-panel__item-details-content">
-              ${safeStack ? `
-                <div class="error-list-panel__item-section">
-                  <strong>Stack Trace:</strong>
-                  <pre class="error-list-panel__item-code">${safeStack}</pre>
-                </div>
-              ` : ''}
-              ${safeContext ? `
-                <div class="error-list-panel__item-section">
-                  <strong>Context:</strong>
-                  <pre class="error-list-panel__item-code">${safeContext}</pre>
-                </div>
-              ` : ''}
-            </div>
-          </details>
-        ` : ''}
+
+        ${detailsContent}
       </div>
     `;
   }
@@ -245,6 +298,17 @@ export class ErrorListPanel extends BaseComponent {
     this._panelVisible = false;
     this.render();
     this.logger?.info('ErrorListPanel: Closed');
+  }
+
+  /**
+   * Toggle error list panel visibility
+   */
+  toggle() {
+    if (this._panelVisible) {
+      this.close();
+    } else {
+      this.open();
+    }
   }
 
   /**

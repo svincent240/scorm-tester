@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="com.example.test" version="1.0"
+          xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+          xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
+          xmlns:adlseq="http://www.adlnet.org/xsd/adlseq_v1p3"
+          xmlns:adlnav="http://www.adlnet.org/xsd/adlnav_v1p3"
+          xmlns:imsss="http://www.imsglobal.org/xsd/imsss">
+  
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>2004 4th Edition</schemaversion>
+  </metadata>
+  
+  <organizations default="ORG-001">
+    <organization identifier="ORG-001">
+      <title>Test Course with Parent DOM Violation</title>
+      <item identifier="ITEM-001" identifierref="RES-001">
+        <title>SCO with Parent DOM Access</title>
+      </item>
+    </organization>
+  </organizations>
+  
+  <resources>
+    <resource identifier="RES-001" type="webcontent" adlcp:scormType="sco" href="sco.html">
+      <file href="sco.html"/>
+      <file href="script.js"/>
+    </resource>
+  </resources>
+</manifest>
+

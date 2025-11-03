@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test SCO with Parent DOM Violation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Course - Parent DOM Violation</h1>
+  
+  <div class="warning">
+    <strong>⚠️ Warning:</strong> This course intentionally contains parent DOM access violations for testing purposes.
+  </div>
+  
+  <p>This SCORM course is designed to test the parent DOM violation detection system.</p>
+  
+  <p>The course will attempt to:</p>
+  <ul>
+    <li>Access parent.document.getElementById</li>
+    <li>Modify parent window styles</li>
+    <li>Query parent DOM elements</li>
+  </ul>
+  
+  <p>These violations should be detected and reported in the error system.</p>
+  
+  <button onclick="completeLesson()">Complete Lesson</button>
+  
+  <script src="script.js"></script>
+</body>
+</html>
+

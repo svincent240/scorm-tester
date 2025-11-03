@@ -10,7 +10,7 @@ const { mapError } = require("./errors");
 const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
 const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
-const { scorm_lint_manifest, scorm_lint_api_usage, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
+const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
 const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing } = require("./tools/runtime");
 
 const getLogger = require('../shared/utils/logger.js');
@@ -30,6 +30,7 @@ const TOOL_META = new Map([
   ["scorm_session_close", { description: "Close a session and finalize artifacts", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_lint_manifest", { description: "Parse and lint imsmanifest.xml", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
   ["scorm_lint_api_usage", { description: "Static check for Initialize/GetValue/SetValue/Terminate usage", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
+  ["scorm_lint_parent_dom_access", { description: "Detect parent window DOM access violations in SCORM content", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
   ["scorm_lint_sequencing", { description: "Basic sequencing structure lint", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
   ["scorm_validate_workspace", { description: "Aggregate validation of manifest and API usage", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
   ["scorm_validate_compliance", { description: "Aggregate compliance score and report data", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
@@ -59,6 +60,7 @@ router.register("scorm_session_events", scorm_session_events);
 router.register("scorm_session_close", scorm_session_close);
 router.register("scorm_lint_manifest", scorm_lint_manifest);
 router.register("scorm_lint_api_usage", scorm_lint_api_usage);
+router.register("scorm_lint_parent_dom_access", scorm_lint_parent_dom_access);
 router.register("scorm_validate_workspace", scorm_validate_workspace);
 router.register("scorm_lint_sequencing", scorm_lint_sequencing);
 router.register("scorm_validate_compliance", scorm_validate_compliance);
