@@ -744,6 +744,8 @@
   font-size: var(--font-size-xs);
   color: var(--text-color);
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 150px; /* Prevent extremely long snippets from dominating the UI */
   white-space: pre-wrap;
   word-break: break-all;
 }

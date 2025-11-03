@@ -300,8 +300,8 @@ class ScormCAMService {
         }
 
         // Centralize resolution: convert selected href into final scorm-app:// URL
-        // Resolve launch URL only when validation has passed; otherwise leave xml:base-joined href for diagnostics
-        if (validation?.isValid && first && first.href) {
+        // Always resolve the URL regardless of validation status - validation errors should not prevent content loading
+        if (first && first.href) {
           try {
             const manifestPath = PathUtils.join(packagePath, 'imsmanifest.xml');
             const appRoot = PathUtils.getAppRoot(__dirname);

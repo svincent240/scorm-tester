@@ -21,34 +21,47 @@
 }
 
 .navigation-controls__container {
-  display: flex;
+  display: grid;
+  /* 2-column layout: title | controls (progress removed - shown in footer only) */
+  grid-template-columns: minmax(200px, 1fr) minmax(auto, max-content);
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   gap: var(--spacing-md);
 }
 
-.navigation-controls__left,
+.navigation-controls__left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  /* Fixed width prevents layout shift when title changes */
+  min-width: 200px;
+  max-width: 300px;
+  overflow: hidden;
+}
+
 .navigation-controls__right {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  /* Prevent shrinking - buttons stay in place */
+  flex-shrink: 0;
+  justify-self: end;
 }
 
-.navigation-controls__center {
-  flex-grow: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+
 
 .navigation-controls__title {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-color);
+  /* Prevent text overflow from breaking layout */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Status element removed to free up space in top bar */
+/* Progress element removed - progress shown in footer only */
 
 .navigation-controls__btn {
   background-color: var(--bg-primary);
@@ -285,14 +298,24 @@
   }
 
   .navigation-controls__container {
-    flex-direction: column;
+    /* Stack vertically on mobile */
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
     gap: var(--spacing-xs);
   }
 
-  .navigation-controls__left,
+  .navigation-controls__left {
+    /* Remove width constraints on mobile */
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    justify-content: center;
+  }
+
   .navigation-controls__right {
     width: 100%;
     justify-content: center;
+    justify-self: center;
   }
 
   .navigation-controls__center {
@@ -303,13 +326,13 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-  
+
   .mode-toggle {
     width: 100%;
     justify-content: center;
     margin-bottom: var(--spacing-xs);
   }
-  
+
   .mode-btn {
     flex: 1;
   }

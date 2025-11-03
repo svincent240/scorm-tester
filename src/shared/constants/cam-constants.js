@@ -168,7 +168,7 @@ const VALIDATION_RULES = {
   },
   VERSION: {
     REQUIRED: false,
-    PATTERN: /^\d+\.\d+$/,
+    PATTERN: /^\d+\.\d+(\.\d+)?$/,  // Accepts both X.Y and X.Y.Z formats
     DEFAULT: '1.0'
   },
   HREF: {

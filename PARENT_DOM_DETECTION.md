@@ -27,6 +27,13 @@ The system scans all HTML, JavaScript, and CSS files in the course for these pat
 **CSS Violations (Warnings):**
 - `position: fixed` - Can escape iframe boundaries and overlap parent window UI
 - `position: sticky` - Can cause layout issues in iframes
+- `height: 100vh` - Can cause iframe to expand beyond container and shift parent UI elements
+- `width: 100vw` - Can cause iframe to expand beyond container and shift parent UI elements
+- `min-height: 100vh` - Can cause iframe to expand beyond container and shift parent UI elements
+
+**Not Flagged (Legitimate Patterns):**
+- `html { height: 100% }` and `body { height: 100% }` - This is a standard flexbox layout pattern when properly constrained with `max-width`, `overflow`, etc.
+- High z-index values (e.g., 1000+) - Z-index is scoped to the iframe's stacking context and cannot affect the parent window's UI
 
 **Allowed (Not Flagged):**
 - `parent.API` - Required for SCORM API discovery
@@ -161,7 +168,7 @@ This matches `parent.document` but NOT `parent.document.API` or `parent.document
 
 ### Performance
 
-- Scans only HTML and JS files
+- Scans HTML, JavaScript, and CSS files
 - Runs during course load (one-time cost)
 - Minimal impact on load time (< 100ms for typical courses)
 

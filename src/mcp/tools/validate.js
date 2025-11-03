@@ -228,6 +228,21 @@ async function scorm_lint_parent_dom_access(params = {}) {
       pattern: /position\s*:\s*sticky/gi,
       message: "Uses position:sticky which can cause layout issues in iframes",
       severity: "info"
+    },
+    {
+      pattern: /height\s*:\s*100vh/gi,
+      message: "Uses height:100vh which can cause iframe to expand beyond container and shift parent UI elements",
+      severity: "warning"
+    },
+    {
+      pattern: /width\s*:\s*100vw/gi,
+      message: "Uses width:100vw which can cause iframe to expand beyond container and shift parent UI elements",
+      severity: "warning"
+    },
+    {
+      pattern: /min-height\s*:\s*100vh/gi,
+      message: "Uses min-height:100vh which can cause iframe to expand beyond container and shift parent UI elements",
+      severity: "warning"
     }
   ];
 
@@ -241,9 +256,19 @@ async function scorm_lint_parent_dom_access(params = {}) {
 
     // Choose patterns based on file type
     const patterns = (ext === '.css') ? cssViolationPatterns : jsViolationPatterns;
-    const defaultFixSuggestion = (ext === '.css')
-      ? "Replace position:fixed with position:absolute. Fixed positioning in same-origin iframes can escape iframe boundaries and overlap parent window UI elements."
-      : "SCORM content should only access parent.API or parent.API_1484_11 for API discovery. Remove all parent window DOM manipulation.";
+
+    // Generate fix suggestion based on violation type
+    const getFixSuggestion = (violationMessage) => {
+      if (violationMessage.includes('position:fixed')) {
+        return "Replace position:fixed with position:absolute. Fixed positioning in same-origin iframes can escape iframe boundaries and overlap parent window UI elements.";
+      } else if (violationMessage.includes('position:sticky')) {
+        return "Replace position:sticky with position:absolute or relative. Sticky positioning can cause layout issues in iframes.";
+      } else if (violationMessage.includes('100vh') || violationMessage.includes('100vw')) {
+        return "Avoid using 100vh/100vw on root elements in SCORM content. Use percentage-based heights (100%) or max-height instead to prevent iframe expansion issues.";
+      } else {
+        return "SCORM content should only access parent.API or parent.API_1484_11 for API discovery. Remove all parent window DOM manipulation.";
+      }
+    };
 
     for (const { pattern, message, severity } of patterns) {
       // Reset regex state
@@ -264,7 +289,29 @@ async function scorm_lint_parent_dom_access(params = {}) {
 
         // Get code snippet (the line where violation occurs)
         const codeLine = lines[lineNumber - 1] || "";
-        const codeSnippet = codeLine.trim();
+        const trimmedLine = codeLine.trim();
+
+        // Truncate long code snippets (e.g., minified files) to keep UI readable
+        const MAX_SNIPPET_LENGTH = 200;
+        let codeSnippet = trimmedLine;
+
+        if (trimmedLine.length > MAX_SNIPPET_LENGTH) {
+          // Find the position of the match within the line
+          const lineStartIndex = lines.slice(0, lineNumber - 1).reduce((sum, line) => sum + line.length + 1, 0);
+          const matchPositionInLine = match.index - lineStartIndex;
+
+          // Extract context around the match
+          const contextBefore = 50;
+          const contextAfter = MAX_SNIPPET_LENGTH - contextBefore - 20; // Reserve space for ellipsis
+
+          const start = Math.max(0, matchPositionInLine - contextBefore);
+          const end = Math.min(trimmedLine.length, matchPositionInLine + match[0].length + contextAfter);
+
+          const prefix = start > 0 ? '...' : '';
+          const suffix = end < trimmedLine.length ? '...' : '';
+
+          codeSnippet = prefix + trimmedLine.substring(start, end) + suffix;
+        }
 
         violations.push({
           file: relPath,
@@ -272,7 +319,7 @@ async function scorm_lint_parent_dom_access(params = {}) {
           severity: severity,
           issue: message,
           code_snippet: codeSnippet,
-          fix_suggestion: defaultFixSuggestion
+          fix_suggestion: getFixSuggestion(message)
         });
       }
     }

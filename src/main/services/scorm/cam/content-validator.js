@@ -423,11 +423,12 @@ class ContentValidator {
 
   /**
    * Check if version string is valid
+   * Accepts both 2-part (X.Y) and 3-part semantic versioning (X.Y.Z)
    * @param {string} version - Version string
    * @returns {boolean} True if valid
    */
   isValidVersion(version) {
-    return /^\d+\.\d+$/.test(version);
+    return /^\d+\.\d+(\.\d+)?$/.test(version);
   }
 
   /**

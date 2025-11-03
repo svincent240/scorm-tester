@@ -145,16 +145,7 @@ class NavigationControls extends BaseComponent {
             Learning Management System
           </div>
         </div>
-        
-        <div class="navigation-controls__center">
-          <div class="navigation-controls__progress" id="${this.elementId}-progress" style="display: none;">
-            <div class="progress-bar">
-              <div class="progress-fill" id="${this.elementId}-progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="progress-text" id="${this.elementId}-progress-text">0%</div>
-          </div>
-        </div>
-        
+
         <div class="navigation-controls__right">
           <!-- Mode Toggle -->
           <div class="mode-toggle" id="${this.elementId}-mode-toggle">
@@ -210,9 +201,7 @@ class NavigationControls extends BaseComponent {
     // Get references to elements
     this.titleElement = this.find('.navigation-controls__title');
     // Status element removed to free up space in top bar
-    this.progressElement = this.find('.navigation-controls__progress');
-    this.progressFill = this.find('.progress-fill');
-    this.progressText = this.find('.progress-text');
+    // Progress element removed - progress shown in footer only
     this.previousBtn = this.find('.navigation-controls__btn--previous');
     this.nextBtn = this.find('.navigation-controls__btn--next');
     this.menuBtn = this.find('.navigation-controls__btn--menu');
@@ -236,17 +225,16 @@ class NavigationControls extends BaseComponent {
     // Listen for course events
     this.subscribe('course:loaded', this.handleCourseLoaded);
     this.subscribe('course:cleared', this.handleCourseCleared);
-    
+
     // Listen for navigation events
     this.subscribe('navigation:updated', this.handleNavigationUpdated);
-    
-    // Listen for progress events
-    this.subscribe('progress:updated', this.handleProgressUpdated);
-    
+
+    // Progress events removed - progress shown in footer only
+
     // Listen for SCORM events (UI-scoped)
     this.subscribe('ui:scorm:initialized', this.handleScormInitialized);
     this.subscribe('ui:scorm:dataChanged', this.handleScormDataChanged);
-    
+
     // Listen for UI events
     this.subscribe('ui:updated', this.handleUIUpdated);
     
@@ -916,23 +904,7 @@ class NavigationControls extends BaseComponent {
     // Status element removed to free up space in top bar
   }
 
-  /**
-   * Update progress display
-   */
-  updateProgress(progressData) {
-    if (!this.progressElement || !this.progressFill || !this.progressText) return;
-    
-    const progress = progressData.progressMeasure || 0;
-    const percentage = Math.round(progress * 100);
-    
-    this.progressFill.style.width = `${percentage}%`;
-    this.progressText.textContent = `${percentage}%`;
-    
-    // Show progress if there's meaningful progress
-    if (progress > 0) {
-      this.progressElement.style.display = 'block';
-    }
-  }
+
 
   /**
    * Get content viewer reference
@@ -1005,13 +977,11 @@ class NavigationControls extends BaseComponent {
     
     this.updateButtonStates();
     this.updateMenuButton();
-    
+
     // Update UI to show no course
     this.element.classList.remove('navigation-controls--course-loaded');
-    
-    if (this.progressElement) {
-      this.progressElement.style.display = 'none';
-    }
+
+    // Progress element removed - progress shown in footer only
   }
 
   /**
@@ -1050,12 +1020,7 @@ class NavigationControls extends BaseComponent {
   }
 
 
-  /**
-   * Handle progress updated event
-   */
-  handleProgressUpdated(data) {
-    this.updateProgress(data);
-  }
+
 
   /**
    * Handle SCORM initialized event
@@ -1070,21 +1035,12 @@ class NavigationControls extends BaseComponent {
   handleScormDataChanged(data) {
     const { element, value } = data.data || data;
 
-    // Update progress indicators reactively when SCORM data changes
+    // Progress indicators removed - progress shown in footer only
+    // Keep handlers for potential future use
     if (element === 'cmi.completion_status') {
       this.updateCompletionStatus(value);
-    } else if (element === 'cmi.progress_measure') {
-      this.updateProgressMeasure(value);
     } else if (element === 'cmi.success_status') {
       this.updateSuccessStatus(value);
-    }
-
-    // Update overall progress display if any relevant data changed
-    if (['cmi.completion_status', 'cmi.progress_measure', 'cmi.success_status'].includes(element)) {
-      const progressData = this.uiState?.getState('progressData');
-      if (progressData) {
-        this.updateProgress(progressData);
-      }
     }
   }
 
@@ -1092,29 +1048,14 @@ class NavigationControls extends BaseComponent {
    * Update completion status display
    */
   updateCompletionStatus(_status) {
-    // Status element removed - completion status shown in footer and progress bar
-  }
-
-  /**
-   * Update progress measure display
-   */
-  updateProgressMeasure(measure) {
-    if (typeof measure === 'number' && measure >= 0 && measure <= 1) {
-      // Update progress bar if visible
-      if (this.progressFill && this.progressText) {
-        const percentage = Math.round(measure * 100);
-        this.progressFill.style.width = `${percentage}%`;
-        this.progressText.textContent = `${percentage}%`;
-      }
-    }
+    // Status element removed - completion status shown in footer only
   }
 
   /**
    * Update success status display
    */
   updateSuccessStatus(_status) {
-    // Could add success status indicator if needed
-    // For now, this ensures success status changes trigger progress updates
+    // Success status shown in footer only
   }
 
   /**
