@@ -680,45 +680,66 @@ class NavigationControls extends BaseComponent {
    */
   updateButtonStates() {
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
-    
+    const navState = this.uiState?.getState('navigationState') || {};
+    const hiddenControls = navState.hiddenControls || [];
+
+    // In learner mode, respect hideLMSUI settings from manifest
+    const hidePrevious = !browseMode && hiddenControls.includes('previous');
+    const hideNext = !browseMode && hiddenControls.includes('continue');
+
     // Trust SN service for navigation availability
     const canNavigatePrevious = browseMode || !!this.navigationState.canNavigatePrevious;
     const canNavigateNext = browseMode || !!this.navigationState.canNavigateNext;
 
     if (this.previousBtn) {
-      this.previousBtn.disabled = !canNavigatePrevious;
-      this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
-      this.previousBtn.classList.toggle('nav-available', canNavigatePrevious);
+      // Hide button if manifest specifies hideLMSUI for previous
+      if (hidePrevious) {
+        this.previousBtn.style.display = 'none';
+      } else {
+        this.previousBtn.style.display = '';
+        this.previousBtn.disabled = !canNavigatePrevious;
+        this.previousBtn.classList.toggle('disabled', !canNavigatePrevious);
+        this.previousBtn.classList.toggle('nav-available', canNavigatePrevious);
 
-      const title = browseMode 
-        ? 'Previous Activity (Browse Mode - Unrestricted Navigation)'
-        : canNavigatePrevious 
-          ? 'Previous Activity (SCORM sequencing allows)' 
-          : 'Previous navigation blocked by SCORM rules';
-      
-      this.previousBtn.title = title;
-      this.previousBtn.setAttribute('aria-disabled', String(!canNavigatePrevious));
+        const title = browseMode
+          ? 'Previous Activity (Browse Mode - Unrestricted Navigation)'
+          : canNavigatePrevious
+            ? 'Previous Activity (SCORM sequencing allows)'
+            : 'Previous navigation blocked by SCORM rules';
+
+        this.previousBtn.title = title;
+        this.previousBtn.setAttribute('aria-disabled', String(!canNavigatePrevious));
+      }
     }
 
     if (this.nextBtn) {
-      this.nextBtn.disabled = !canNavigateNext;
-      this.nextBtn.classList.toggle('disabled', !canNavigateNext);
-      this.nextBtn.classList.toggle('nav-available', canNavigateNext);
+      // Hide button if manifest specifies hideLMSUI for continue
+      if (hideNext) {
+        this.nextBtn.style.display = 'none';
+      } else {
+        this.nextBtn.style.display = '';
+        this.nextBtn.disabled = !canNavigateNext;
+        this.nextBtn.classList.toggle('disabled', !canNavigateNext);
+        this.nextBtn.classList.toggle('nav-available', canNavigateNext);
 
-      const title = browseMode 
-        ? 'Next Activity (Browse Mode - Unrestricted Navigation)'
-        : canNavigateNext 
-          ? 'Next Activity (SCORM sequencing allows)' 
-          : 'Next navigation blocked by SCORM rules';
-      
-      this.nextBtn.title = title;
-      this.nextBtn.setAttribute('aria-disabled', String(!canNavigateNext));
+        const title = browseMode
+          ? 'Next Activity (Browse Mode - Unrestricted Navigation)'
+          : canNavigateNext
+            ? 'Next Activity (SCORM sequencing allows)'
+            : 'Next navigation blocked by SCORM rules';
+
+        this.nextBtn.title = title;
+        this.nextBtn.setAttribute('aria-disabled', String(!canNavigateNext));
+      }
     }
 
     this.logger?.debug('NavigationControls: Button states updated', {
       canNavigatePrevious,
       canNavigateNext,
-      browseMode
+      browseMode,
+      hidePrevious,
+      hideNext,
+      hiddenControls
     });
   }
 

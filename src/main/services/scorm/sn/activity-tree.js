@@ -36,10 +36,12 @@ class ActivityNode {
     
     // Sequencing information from manifest
     this.sequencing = item.sequencing || {};
+    // Presentation information from manifest (ADL Navigation)
+    this.presentation = item.presentation || null;
     // Handle isvisible attribute correctly - treat "false" as false, everything else as true
     this.isVisible = item.isvisible !== "false" && item.isvisible !== false;
     this.parameters = item.parameters || '';
-    
+
     // Objective tracking
     this.objectives = new Map();
     this.primaryObjective = null;

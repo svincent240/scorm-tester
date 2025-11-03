@@ -1765,9 +1765,9 @@ class IpcHandler extends BaseService {
               score: obj.normalizedMeasure
             })),
             sequencingDefinition: {
-              choice: node.sequencing?.choice !== false,
-              flow: node.sequencing?.flow !== false,
-              forwardOnly: node.sequencing?.forwardOnly === true
+              choice: node.sequencing?.controlMode?.choice !== false,
+              flow: node.sequencing?.controlMode?.flow !== false,
+              forwardOnly: node.sequencing?.controlMode?.forwardOnly === true
             }
           };
         }

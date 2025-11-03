@@ -720,7 +720,14 @@ class AppManager {
       try {
         const available = status && (status.availableNavigation || status.available || []);
         const normalized = this.normalizeAvailableNavigation(available);
-        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+        const presentation = status?.presentation || null;
+        const hiddenControls = status?.hiddenControls || [];
+        this.uiState.updateNavigation({
+          ...normalized,
+          presentation,
+          hiddenControls,
+          _fromComponent: true
+        });
       } catch (e) {
         try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) {}
       }
@@ -825,7 +832,7 @@ class AppManager {
             availableNavigation: data?.availableNavigation
           });
 
-          const { availableNavigation } = data || {};
+          const { availableNavigation, presentation, hiddenControls } = data || {};
           if (Array.isArray(availableNavigation)) {
             const normalized = this.normalizeAvailableNavigation(availableNavigation);
 
@@ -833,14 +840,21 @@ class AppManager {
               availableNavigation,
               normalized,
               canNavigateNext: normalized.canNavigateNext,
-              canNavigatePrevious: normalized.canNavigatePrevious
+              canNavigatePrevious: normalized.canNavigatePrevious,
+              presentation,
+              hiddenControls
             });
 
             // Update UI state for other components
             this.uiState.updateNavigation({
               ...normalized,
+              presentation: presentation || null,
+              hiddenControls: hiddenControls || [],
               _fromNavigationAvailabilityUpdate: true
             });
+
+            // Update sidebar visibility based on course sequencing (learner mode only)
+            this.updateSidebarVisibilityFromNavigation(availableNavigation);
 
             // Rewrite: Broadcast availability update via EventBus for decoupled components
             const eventBus = this.services.get('eventBus');
@@ -997,8 +1011,11 @@ class AppManager {
 
       }
 
-      // Show success message
-      this.showSuccess('Course Loaded', `Successfully loaded: ${courseData.info?.title || 'Course'}`);
+      // Set sidebar visibility based on course sequencing (deferred to allow SN initialization)
+      // This will be called after SN service provides availableNavigation
+      this._pendingCourseLoadedSidebarUpdate = true;
+
+      // Success notification removed per user request - course loads should not show a notification
 
     } catch (error) {
       try { this.logger.error('AppManager: Error handling course loaded', error?.message || error); } catch (_) {}
@@ -1586,6 +1603,50 @@ class AppManager {
   }
 
   /**
+   * Update sidebar visibility based on course sequencing and browse mode
+   * @param {Array<string>} availableNavigation - Available navigation types from SN service
+   */
+  async updateSidebarVisibilityFromNavigation(availableNavigation) {
+    try {
+      const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+      const choiceAvailable = Array.isArray(availableNavigation) && availableNavigation.includes('choice');
+
+      // Determine if sidebar should be visible
+      let shouldShowSidebar = false;
+
+      if (browseMode) {
+        // Browse mode: always show sidebar (unrestricted navigation)
+        shouldShowSidebar = true;
+        this.logger.debug('AppManager: Sidebar visible - browse mode enabled');
+      } else if (choiceAvailable) {
+        // Learner mode with choice: show sidebar (course allows menu navigation)
+        shouldShowSidebar = true;
+        this.logger.debug('AppManager: Sidebar visible - choice navigation allowed by course');
+      } else {
+        // Learner mode without choice: hide sidebar (sequential navigation only)
+        shouldShowSidebar = false;
+        this.logger.debug('AppManager: Sidebar hidden - sequential navigation only');
+      }
+
+      // Only update if pending course load or if visibility needs to change
+      const currentVisibility = this.uiState?.getState('ui.sidebarVisible');
+      if (this._pendingCourseLoadedSidebarUpdate || currentVisibility !== shouldShowSidebar) {
+        this._pendingCourseLoadedSidebarUpdate = false;
+        await this.handleMenuToggle({ visible: shouldShowSidebar });
+        this.logger.info('AppManager: Sidebar visibility updated based on course sequencing', {
+          browseMode,
+          choiceAvailable,
+          shouldShowSidebar
+        });
+      }
+    } catch (error) {
+      try {
+        this.logger.error('AppManager: Failed to update sidebar visibility from navigation', error?.message || error);
+      } catch (_) {}
+    }
+  }
+
+  /**
    * Check if application is initialized
    */
   isInitialized() {
@@ -1734,9 +1795,12 @@ class AppManager {
           canNavigateNext: true,
           _fromComponent: true
         });
+        // Show sidebar in browse mode (unrestricted navigation)
+        await this.updateSidebarVisibilityFromNavigation(['choice', 'continue', 'previous']);
       } else {
         // In normal mode, refresh from SN service
         await this.refreshNavigationFromSNService();
+        // Sidebar visibility will be updated by refreshNavigationFromSNService
       }
 
       return { success: true, browseMode: this.browseMode };
@@ -1784,7 +1848,16 @@ class AppManager {
       const state = await snBridge.getSequencingState();
       if (state && state.success && Array.isArray(state.availableNavigation)) {
         const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
-        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+        const presentation = state.presentation || null;
+        const hiddenControls = state.hiddenControls || [];
+        this.uiState.updateNavigation({
+          ...normalized,
+          presentation,
+          hiddenControls,
+          _fromComponent: true
+        });
+        // Update sidebar visibility based on navigation availability
+        await this.updateSidebarVisibilityFromNavigation(state.availableNavigation);
       }
     } catch (error) {
       this.logger.warn('AppManager: Failed to refresh navigation from SN service', error);
@@ -2025,7 +2098,14 @@ class AppManager {
     try {
       if (result && result.availableNavigation) {
         const normalized = this.normalizeAvailableNavigation(result.availableNavigation);
-        this.uiState.updateNavigation({ ...normalized, _fromComponent: true });
+        const presentation = result.presentation || null;
+        const hiddenControls = result.hiddenControls || [];
+        this.uiState.updateNavigation({
+          ...normalized,
+          presentation,
+          hiddenControls,
+          _fromComponent: true
+        });
       }
     } catch (error) {
       this.logger.warn('AppManager: Failed to update navigation state from result', error);

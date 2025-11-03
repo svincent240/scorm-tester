@@ -265,8 +265,22 @@ class InspectorPanel extends BaseComponent {
       if (!n || typeof n !== 'object') return '';
       const title = this._esc(n.title || n.identifier || n.id || 'node');
       const status = n.status ? ` <small>(${this._esc(String(n.status))})</small>` : '';
+
+      // Show sequencing control modes if available
+      let controlModes = '';
+      if (n.details?.sequencingDefinition) {
+        const seq = n.details.sequencingDefinition;
+        const modes = [];
+        if (seq.choice !== undefined) modes.push(`choice: ${seq.choice}`);
+        if (seq.flow !== undefined) modes.push(`flow: ${seq.flow}`);
+        if (seq.forwardOnly !== undefined) modes.push(`forwardOnly: ${seq.forwardOnly}`);
+        if (modes.length > 0) {
+          controlModes = ` <small style="color: #666;">[${modes.join(', ')}]</small>`;
+        }
+      }
+
       const children = Array.isArray(n.children) ? n.children.map(renderNode).join('') : '';
-      return `<li>${title}${status}${children ? `<ul>${children}</ul>` : ''}</li>`;
+      return `<li>${title}${status}${controlModes}${children ? `<ul>${children}</ul>` : ''}</li>`;
     };
     const body = tree && tree.root ? renderNode(tree.root) : (tree?.children ? tree.children.map(renderNode).join('') : '');
     el.innerHTML = `<div class="tab-section"><h4>Activity Tree</h4><ul class="activity-tree">${body || '<li><em>No activity tree available</em></li>'}</ul></div>`;

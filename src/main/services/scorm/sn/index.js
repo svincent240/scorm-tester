@@ -774,12 +774,27 @@ class ScormSNService {
         identifier: currentActivity.identifier,
         title: currentActivity.title,
         state: currentActivity.activityState,
-        attemptCount: currentActivity.attemptCount
+        attemptCount: currentActivity.attemptCount,
+        presentation: currentActivity.presentation || null
       } : null,
       availableNavigation: this.navigationHandler.getAvailableNavigation(),
+      presentation: currentActivity?.presentation || null,
+      hiddenControls: this.getHiddenControlsForCurrentActivity(),
       globalObjectives: this.rollupManager.getAllGlobalObjectives(),
       activityTreeStats: this.activityTreeManager.getTreeStats()
     };
+  }
+
+  /**
+   * Get hidden LMS UI controls for current activity
+   * @returns {Array<string>} Array of hidden control names
+   */
+  getHiddenControlsForCurrentActivity() {
+    const currentActivity = this.activityTreeManager.currentActivity;
+    if (!currentActivity?.presentation?.navigationInterface?.hideLMSUI) {
+      return [];
+    }
+    return currentActivity.presentation.navigationInterface.hideLMSUI;
   }
 
   /**

@@ -196,6 +196,7 @@ export interface Item {
   parameters?: string;
   children: Item[];
   sequencing?: SequencingDefinition;
+  presentation?: PresentationDefinition;
   metadata?: ItemMetadata;
   timeLimitAction?: 'exit,message' | 'exit,no message' | 'continue,message' | 'continue,no message';
   dataFromLMS?: string;
@@ -239,6 +240,17 @@ export interface ResourceMetadata {
   adlcp?: {
     scormType?: string;
   };
+}
+
+// Presentation Types (ADL Navigation)
+export type HideLMSUIControl = 'continue' | 'previous' | 'exit' | 'abandon' | 'suspendAll' | 'exitAll' | 'abandonAll';
+
+export interface NavigationInterface {
+  hideLMSUI?: HideLMSUIControl[];
+}
+
+export interface PresentationDefinition {
+  navigationInterface?: NavigationInterface;
 }
 
 // Sequencing Types
@@ -510,6 +522,8 @@ export interface NavigationState {
   currentItem?: string;
   isFlowOnly: boolean;
   menuVisible: boolean;
+  presentation?: PresentationDefinition;
+  hiddenControls?: HideLMSUIControl[];
 }
 
 // LMS Profile Types

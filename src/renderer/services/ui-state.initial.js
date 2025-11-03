@@ -24,7 +24,9 @@ export function getInitialUIState() {
       canNavigateNext: false,
       currentItem: null,
       isFlowOnly: false,
-      menuVisible: false
+      menuVisible: false,
+      presentation: null,
+      hiddenControls: []
     },
 
     // Progress state
@@ -43,7 +45,7 @@ export function getInitialUIState() {
     ui: {
       theme: 'default',
       sidebarCollapsed: false,
-      sidebarVisible: true,
+      sidebarVisible: false,
       courseOutlineVisible: false,
       devModeEnabled: false,
       loading: false,

@@ -603,6 +603,7 @@ class ManifestParser {
         title: this.getElementText(itemElement, 'title'),
         children: this.parseItems(itemElement, basePath),
         sequencing: this.parseSequencing(itemElement),
+        presentation: this.parsePresentation(itemElement),
         metadata: this.parseMetadata(itemElement, basePath)
       });
     }
@@ -630,6 +631,65 @@ class ManifestParser {
       randomizationControls: this.parseRandomizationControls(sequencingElement),
       deliveryControls: this.parseDeliveryControls(sequencingElement)
     };
+  }
+
+  /**
+   * Parse presentation information (ADL Navigation)
+   * @param {Element} element - Parent element (item)
+   * @returns {Object|null} Presentation information
+   */
+  parsePresentation(element) {
+    // Namespace-aware lookup for adlnav:presentation
+    const presentationElement = this.getChildElement(element, 'adlnav:presentation')
+      || this.getChildElement(element, 'presentation');
+    if (!presentationElement) return null;
+
+    const navigationInterface = this.parseNavigationInterface(presentationElement);
+    if (!navigationInterface) return null;
+
+    return {
+      navigationInterface
+    };
+  }
+
+  /**
+   * Parse navigationInterface element
+   * @param {Element} presentationElement - Presentation element
+   * @returns {Object|null} Navigation interface information
+   */
+  parseNavigationInterface(presentationElement) {
+    const navInterfaceElement = this.getChildElement(presentationElement, 'adlnav:navigationInterface')
+      || this.getChildElement(presentationElement, 'navigationInterface');
+    if (!navInterfaceElement) return null;
+
+    const hideLMSUI = this.parseHideLMSUI(navInterfaceElement);
+    if (!hideLMSUI || hideLMSUI.length === 0) return null;
+
+    return {
+      hideLMSUI
+    };
+  }
+
+  /**
+   * Parse hideLMSUI elements
+   * @param {Element} navInterfaceElement - Navigation interface element
+   * @returns {Array<string>} Array of hideLMSUI control values
+   */
+  parseHideLMSUI(navInterfaceElement) {
+    const hideLMSUIElements = this.getChildElements(navInterfaceElement, 'adlnav:hideLMSUI')
+      .concat(this.getChildElements(navInterfaceElement, 'hideLMSUI'));
+
+    const validControls = ['continue', 'previous', 'exit', 'abandon', 'suspendAll', 'exitAll', 'abandonAll'];
+    const controlsSet = new Set();
+
+    for (const element of hideLMSUIElements) {
+      const value = element.textContent?.trim();
+      if (value && validControls.includes(value)) {
+        controlsSet.add(value);
+      }
+    }
+
+    return Array.from(controlsSet);
   }
 
   /**

@@ -9,6 +9,10 @@ class AppStateService extends BaseService {
     this.appState = {
       ui: {
         theme: 'default',
+        sidebarVisible: false,
+        sidebarCollapsed: false,
+        debugPanelVisible: false,
+        devModeEnabled: false
       },
     };
   }

@@ -478,4 +478,139 @@ describe('ManifestParser', () => {
         .toBe('Test & Special "Chars" <Title>');
     });
   });
+
+  describe('Presentation Parsing (ADL Navigation)', () => {
+    test('should parse hideLMSUI settings from manifest', () => {
+      const manifestWithPresentation = `<?xml version="1.0" encoding="UTF-8"?>
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+                  xmlns:adlnav="http://www.adlnet.org/xsd/adlnav_v1p3"
+                  identifier="TEST-MANIFEST" version="1.0">
+          <organizations default="ORG-1">
+            <organization identifier="ORG-1">
+              <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+                <adlnav:presentation>
+                  <adlnav:navigationInterface>
+                    <adlnav:hideLMSUI>previous</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>continue</adlnav:hideLMSUI>
+                  </adlnav:navigationInterface>
+                </adlnav:presentation>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
+        </manifest>`;
+
+      const result = manifestParser.parseManifestXML(manifestWithPresentation);
+
+      expect(result.organizations.organizations[0].items).toHaveLength(1);
+      const item = result.organizations.organizations[0].items[0];
+      expect(item.presentation).toBeDefined();
+      expect(item.presentation.navigationInterface).toBeDefined();
+      expect(item.presentation.navigationInterface.hideLMSUI).toEqual(['previous', 'continue']);
+    });
+
+    test('should handle items without presentation settings', () => {
+      const manifestWithoutPresentation = `<?xml version="1.0" encoding="UTF-8"?>
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+                  identifier="TEST-MANIFEST" version="1.0">
+          <organizations default="ORG-1">
+            <organization identifier="ORG-1">
+              <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
+        </manifest>`;
+
+      const result = manifestParser.parseManifestXML(manifestWithoutPresentation);
+
+      const item = result.organizations.organizations[0].items[0];
+      expect(item.presentation).toBeNull();
+    });
+
+    test('should filter invalid hideLMSUI values', () => {
+      const manifestWithInvalidValues = `<?xml version="1.0" encoding="UTF-8"?>
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+                  xmlns:adlnav="http://www.adlnet.org/xsd/adlnav_v1p3"
+                  identifier="TEST-MANIFEST" version="1.0">
+          <organizations default="ORG-1">
+            <organization identifier="ORG-1">
+              <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+                <adlnav:presentation>
+                  <adlnav:navigationInterface>
+                    <adlnav:hideLMSUI>previous</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>invalid-value</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>continue</adlnav:hideLMSUI>
+                  </adlnav:navigationInterface>
+                </adlnav:presentation>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
+        </manifest>`;
+
+      const result = manifestParser.parseManifestXML(manifestWithInvalidValues);
+
+      const item = result.organizations.organizations[0].items[0];
+      expect(item.presentation.navigationInterface.hideLMSUI).toEqual(['previous', 'continue']);
+      expect(item.presentation.navigationInterface.hideLMSUI).not.toContain('invalid-value');
+    });
+
+    test('should handle all valid hideLMSUI values', () => {
+      const manifestWithAllValues = `<?xml version="1.0" encoding="UTF-8"?>
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+                  xmlns:adlnav="http://www.adlnet.org/xsd/adlnav_v1p3"
+                  identifier="TEST-MANIFEST" version="1.0">
+          <organizations default="ORG-1">
+            <organization identifier="ORG-1">
+              <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+                <adlnav:presentation>
+                  <adlnav:navigationInterface>
+                    <adlnav:hideLMSUI>continue</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>previous</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>exit</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>abandon</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>suspendAll</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>exitAll</adlnav:hideLMSUI>
+                    <adlnav:hideLMSUI>abandonAll</adlnav:hideLMSUI>
+                  </adlnav:navigationInterface>
+                </adlnav:presentation>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
+        </manifest>`;
+
+      const result = manifestParser.parseManifestXML(manifestWithAllValues);
+
+      const item = result.organizations.organizations[0].items[0];
+      expect(item.presentation.navigationInterface.hideLMSUI).toEqual([
+        'continue', 'previous', 'exit', 'abandon', 'suspendAll', 'exitAll', 'abandonAll'
+      ]);
+    });
+  });
 });
