@@ -171,18 +171,20 @@ export class ConsoleMonitor {
     // Filter out known safe/expected errors
     const criticalErrors = errors.filter(error => {
       const text = error.text.toLowerCase();
-      
+
       // Known safe errors to ignore
       const safeErrors = [
         'failed to load resource', // Common for missing favicon, etc.
         'net::err_file_not_found', // Expected for some file operations
         'violates the following content security policy', // Expected CSP warnings
         'refused to evaluate a string as javascript', // Expected CSP restriction
+        'iframe which has both allow-scripts and allow-same-origin', // Expected Chromium iframe sandboxing warning
+        'can remove its sandboxing', // Part of iframe sandboxing warning
         'test helpers available', // Our own test logging
         'loading sample course', // Our test messages
         'testloadcourse result' // Our test messages
       ];
-      
+
       return !safeErrors.some(safe => text.includes(safe));
     });
 

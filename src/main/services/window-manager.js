@@ -337,13 +337,21 @@ class WindowManager extends BaseService {
 
       try {
         const msgStr = String(message || '');
+
         // Demote known benign CSP violations from embedded SCORM content to warnings
         if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
           logLevel = 'warn';
         }
 
-        // Broadcast errors and warnings to renderer UI for visibility
-        if (logLevel === 'error' || logLevel === 'warn') {
+        // Filter out benign Chromium warnings that should not be surfaced to UI
+        const isBenignWarning = logLevel === 'warn' && (
+          // Iframe sandboxing warning - expected when loading SCORM content
+          msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
+          msgStr.includes("can remove its sandboxing")
+        );
+
+        // Broadcast errors and warnings to renderer UI for visibility (except benign warnings)
+        if ((logLevel === 'error' || logLevel === 'warn') && !isBenignWarning) {
           shouldBroadcastToUI = true;
         }
       } catch (_) { /* no-op */ }
