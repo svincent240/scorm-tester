@@ -268,7 +268,7 @@ class ContentViewer extends BaseComponent {
    * @param {string} url - Content URL
    * @param {Object} options - Loading options
    */
-  loadContent(url, options = {}) {
+  async loadContent(url, options = {}) {
     if (!url) {
       this.showError('Invalid content URL', 'A valid content URL must be provided.');
       return;
@@ -311,6 +311,28 @@ class ContentViewer extends BaseComponent {
       this.loadingTimeout = setTimeout(() => {
         this.handleLoadTimeout();
       }, this.options.loadingTimeout);
+
+      // CRITICAL FIX: Clear old content BEFORE tearing down APIs
+      //
+      // Problem: When reloading or resuming a course, the old content was still executing
+      // in the iframe when teardownScormAPIs() was called. This caused the old content's
+      // cached API references to become stubs, leading to "SCORM API not available" errors
+      // when the old content tried to make SCORM calls (e.g., recording interactions).
+      //
+      // Solution: Unload the old content first by setting iframe.src to 'about:blank',
+      // then wait briefly for unload handlers to complete before stubifying the APIs.
+      // This ensures a clean transition with no lingering content trying to use stubbed APIs.
+      //
+      // Timing: The 50ms delay allows the browser to:
+      // 1. Trigger the old content's beforeunload/unload events
+      // 2. Stop executing the old content's JavaScript
+      // 3. Clear the old content's window object
+      if (this.iframe && this.iframe.src && this.iframe.src !== 'about:blank') {
+        this.iframe.src = 'about:blank';
+        this.contentWindow = null;
+        // Small delay to allow old content's unload handlers to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
 
       // Detach any previous SCORM API bindings to avoid stray calls from the old content
       this.teardownScormAPIs();
@@ -570,11 +592,16 @@ class ContentViewer extends BaseComponent {
 
   /**
    * Teardown SCORM APIs to prevent stray calls from previous content during transitions
+   * - Resets scormClient to clear session state (isInitialized, sessionId, caches, timers)
    * - Detaches bridge from scormClient
    * - Mutates existing API objects to inert stubs that return "false" without emitting errors
    */
   teardownScormAPIs() {
     try {
+      // Reset scormClient to clear previous session state
+      // This ensures isInitialized is false so new content can call Initialize()
+      try { scormClient.reset(); } catch (_) {}
+
       // Detach bridge from client so any lingering calls do not reach scormClient
       try { scormAPIBridge.setScormClient(null); } catch (_) {}
 
@@ -1009,16 +1036,48 @@ class ContentViewer extends BaseComponent {
   handleScormError(data) {
     // Route user-visible error through notifications; no console logging
     const message = typeof data === 'string' ? data : (data?.message || 'SCORM error occurred');
+    const errorCode = data?.code || 'unknown';
+    const element = data?.element || null;
+    const source = data?.source || 'scorm-api';
+
+    // Build detailed error context with all available diagnostic information
+    const errorContext = {
+      source,
+      errorCode,
+      timestamp: new Date().toISOString()
+    };
+
+    // Add element if present
+    if (element) {
+      errorContext.element = element;
+    }
+
+    // Add session information if available
+    if (this.uiState?.state?.session) {
+      errorContext.sessionId = this.uiState.state.session.id;
+      errorContext.sessionState = this.uiState.state.session.connected ? 'connected' : 'disconnected';
+    }
+
+    // Build user-friendly error message with diagnostic details
+    let detailedMessage = `SCORM Error [${errorCode}]: ${message}`;
+
+    // Add element context if present
+    if (element) {
+      detailedMessage += `\nData Model Element: ${element}`;
+    }
+
+    // Add diagnostic hint based on error code
+    const diagnosticHint = this.getErrorDiagnosticHint(errorCode);
+    if (diagnosticHint) {
+      detailedMessage += `\n\nDiagnostic: ${diagnosticHint}`;
+    }
 
     // Add to error tracking system as non-catastrophic error
     if (this.uiState && typeof this.uiState.addNonCatastrophicError === 'function') {
       this.uiState.addNonCatastrophicError({
-        message: `SCORM Error: ${message}`,
+        message: detailedMessage,
         stack: data?.stack || null,
-        context: {
-          source: 'scorm-api',
-          timestamp: new Date().toISOString()
-        },
+        context: errorContext,
         component: 'ContentViewer'
       });
     }
@@ -1026,9 +1085,35 @@ class ContentViewer extends BaseComponent {
     // Also show notification for immediate feedback
     this.uiState.showNotification({
       type: 'error',
-      message: `SCORM Error: ${message}`,
+      message: detailedMessage,
       duration: 0
     });
+  }
+
+  /**
+   * Get diagnostic hint for common SCORM error codes
+   * @param {string} errorCode - SCORM error code
+   * @returns {string|null} Diagnostic hint or null
+   */
+  getErrorDiagnosticHint(errorCode) {
+    const hints = {
+      '142': 'The content attempted to commit data before calling Initialize(). The SCORM session must be initialized first.',
+      '132': 'The content attempted to set data before calling Initialize(). The SCORM session must be initialized first.',
+      '122': 'The content attempted to retrieve data before calling Initialize(). The SCORM session must be initialized first.',
+      '143': 'The content attempted to commit data after calling Terminate(). No further API calls are allowed after termination.',
+      '133': 'The content attempted to set data after calling Terminate(). No further API calls are allowed after termination.',
+      '123': 'The content attempted to retrieve data after calling Terminate(). No further API calls are allowed after termination.',
+      '103': 'The content called Initialize() when the session was already initialized. Initialize() can only be called once.',
+      '112': 'The content called Terminate() before calling Initialize(). The session must be initialized first.',
+      '113': 'The content called Terminate() when the session was already terminated. Terminate() can only be called once.',
+      '404': 'The requested data model element does not exist or is not supported by this LMS.',
+      '407': 'The content attempted to write to a read-only data model element.',
+      '408': 'The content attempted to read from a write-only data model element.',
+      '409': 'The value provided does not match the expected data type for this element.',
+      '410': 'The value provided is outside the allowed range for this element.'
+    };
+
+    return hints[errorCode] || null;
   }
 
   /**

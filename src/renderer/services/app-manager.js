@@ -481,6 +481,14 @@ class AppManager {
       this.handleExitSummaryClosed(data);
     });
 
+    eventBus.on('course:loadStart', () => {
+      // Clear all errors when starting to load a new course
+      if (this.uiState && typeof this.uiState.clearAllErrors === 'function') {
+        this.uiState.clearAllErrors();
+        try { this.logger.info('AppManager: Cleared all errors for course load start'); } catch (_) {}
+      }
+    });
+
     eventBus.on('course:loadingStateChanged', (stateData) => {
       if (stateData.loading) {
         this.showLoading('Loading course...');
@@ -528,6 +536,20 @@ class AppManager {
         const source = errorData.source || 'unknown';
         const line = errorData.line || 0;
         const level = errorData.level || 'error';
+
+        // Filter out SCORM API stub errors during course reload/load transitions
+        // These occur when old course content tries to call SCORM APIs after teardown
+        // The stubbed APIs return "false" which the course logs as errors
+        if (message.includes('[SCORM Commit] Error false:') ||
+            message.includes('[SCORM Terminate] Error false:') ||
+            message.includes('[SCORM Initialize] Error false:') ||
+            message.includes('[SCORM SetValue] Error false:') ||
+            message.includes('[SCORM GetValue] Error false:') ||
+            message.includes('Error false: false. false')) {
+          // Log but don't add to error tracking - these are expected during transitions
+          this.logger.debug('AppManager: Suppressed SCORM stub error during transition', message);
+          return;
+        }
 
         // Format source location for display
         const sourceLocation = line > 0 ? `${source}:${line}` : source;
@@ -901,6 +923,12 @@ class AppManager {
   async handleCourseReload() {
     try {
       this.logger.info('AppManager: Course reload requested');
+
+      // Clear all errors when reloading a course
+      if (this.uiState && typeof this.uiState.clearAllErrors === 'function') {
+        this.uiState.clearAllErrors();
+        this.logger.info('AppManager: Cleared all errors for course reload');
+      }
 
       // Get current course data
       const courseLoader = this.services.get('courseLoader');

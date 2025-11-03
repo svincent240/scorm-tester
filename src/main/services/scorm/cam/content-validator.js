@@ -238,14 +238,15 @@ class ContentValidator {
       });
 
       if (!fileExists) {
-        this.addError(`File not found: ${resource.href} (Resource: ${resource.identifier})`);
+        this.addError(this.buildFileNotFoundError(resource.href, filePath, resourceBase, resource.identifier, true));
       }
     }
 
     // Validate all listed files
     if (resource.files) {
       for (const file of resource.files) {
-        const filePath = PathUtils.join(resourceBase, file.href || file);
+        const fileName = file.href || file;
+        const filePath = PathUtils.join(resourceBase, fileName);
         const fileExists = PathUtils.fileExists(filePath);
 
         this.logger?.debug && this.logger.debug('ContentValidator: File validation result', {
@@ -257,7 +258,7 @@ class ContentValidator {
         });
 
         if (!fileExists) {
-          this.addError(`File not found: ${file.href || file} (Resource: ${resource.identifier})`);
+          this.addError(this.buildFileNotFoundError(fileName, filePath, resourceBase, resource.identifier, false));
         }
       }
     }
@@ -267,6 +268,56 @@ class ContentValidator {
       resourceId: resource.identifier,
       phase: 'CAM_INTEGRATION'
     });
+  }
+
+  /**
+   * Build detailed file not found error message
+   * @param {string} fileName - Original file name from manifest
+   * @param {string} fullPath - Full resolved path that was searched
+   * @param {string} searchDir - Directory that was searched
+   * @param {string} resourceId - Resource identifier
+   * @param {boolean} isMainResource - Whether this is the main resource file (href) or a dependency
+   * @returns {string} Detailed error message
+   */
+  buildFileNotFoundError(fileName, fullPath, searchDir, resourceId, isMainResource) {
+    const fileType = isMainResource ? 'Main resource file' : 'Dependency file';
+
+    // Get list of files in the search directory
+    let availableFiles = [];
+    try {
+      if (fsSync.existsSync(searchDir)) {
+        availableFiles = fsSync.readdirSync(searchDir);
+      }
+    } catch (err) {
+      // If we can't read the directory, just note that
+      this.logger?.warn('ContentValidator: Could not read directory for file listing', {
+        directory: searchDir,
+        error: err.message
+      });
+    }
+
+    // Build the error message with all diagnostic information
+    let errorMsg = `File not found: ${fileName}\n`;
+    errorMsg += `  Resource: ${resourceId}\n`;
+    errorMsg += `  Type: ${fileType}\n`;
+    errorMsg += `  Full path searched: ${fullPath}\n`;
+    errorMsg += `  Search directory: ${searchDir}\n`;
+
+    if (availableFiles.length > 0) {
+      errorMsg += `  Files in directory (${availableFiles.length} total):\n`;
+      // Show first 10 files to avoid overwhelming the error message
+      const filesToShow = availableFiles.slice(0, 10);
+      filesToShow.forEach(file => {
+        errorMsg += `    - ${file}\n`;
+      });
+      if (availableFiles.length > 10) {
+        errorMsg += `    ... and ${availableFiles.length - 10} more files\n`;
+      }
+    } else {
+      errorMsg += `  Directory is empty or does not exist\n`;
+    }
+
+    return errorMsg;
   }
 
   /**
