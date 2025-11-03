@@ -331,8 +331,11 @@ export class CourseExitSummary extends BaseComponent {
         rendererLogger.error('CourseExitSummary: eventBus missing; cannot emit course:test-resume', { sessionId });
       }
 
-      // Close the dialog
-      this.close();
+      // DO NOT close the dialog here - it triggers cleanup which deletes the RTE instance
+      // The dialog will be closed automatically when the course loads
+      // Just hide it for now
+      this._dialogVisible = false;
+      this.render();
     } catch (error) {
       rendererLogger.error('CourseExitSummary: Test resume failed', error);
     }
