@@ -3,20 +3,33 @@
 .inspector-panel {
   position: relative;
   background: var(--bg-primary);
-  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
   z-index: var(--z-inspector, 10);
   /* Ensure panel doesn't take space when hidden */
+  min-width: 0;
   min-height: 0;
+  flex-shrink: 0;
+  width: 0;  /* Start hidden */
+  max-width: 50vw;  /* Don't take more than half the screen */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width var(--transition-fast) ease;
+}
+
+/* When panel is visible, show it with proper width */
+.inspector-panel.inspector-panel--visible {
+  width: 400px;  /* Default width when visible */
 }
 
 .inspector-panel__resize-handle {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  height: 6px;
+  bottom: 0;
+  width: 6px;
   background: transparent;
-  cursor: ns-resize;
+  cursor: ew-resize;
   z-index: 100;
   transition: background var(--transition-fast) ease;
 }
@@ -28,27 +41,24 @@
 .inspector-panel__resize-handle::before {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40px;
-  height: 2px;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 40px;
   background: var(--border-color);
   border-radius: 2px;
 }
 
 .inspector-panel__container {
-  display: block;
+  display: flex;
+  flex-direction: column;
   padding: var(--spacing-sm) var(--spacing-md);
   /* Smooth transitions for show/hide */
   transition: opacity var(--transition-fast) ease-in-out;
-}
-
-/* Hidden state - use display:none for complete removal from layout */
-.inspector-panel__container[style*="display: none"],
-.inspector-panel__container[style*="display:none"] {
-  opacity: 0;
-  pointer-events: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .inspector-panel__header {
@@ -57,6 +67,7 @@
   justify-content: space-between;
   padding-bottom: var(--spacing-sm);
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .inspector-panel__header-actions {
@@ -70,7 +81,7 @@
   color: var(--text-color);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  padding: var(--spacing-xxs) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-sm);
   cursor: pointer;
   transition: all var(--transition-fast) ease;
@@ -97,6 +108,7 @@
   display: flex;
   gap: var(--spacing-xs);
   padding: var(--spacing-sm) 0;
+  flex-shrink: 0;
 }
 
 .inspector-panel__tabs button[data-tab] {
@@ -112,9 +124,12 @@
 
 .inspector-panel__body {
   padding-top: var(--spacing-sm);
-  max-height: min(40vh, 480px);
-  overflow: auto;
-  overscroll-behavior: contain;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
 }
 
 .inspector-panel__summary {
@@ -125,6 +140,14 @@
   padding: 0 0 var(--spacing-sm) 0;
   border-bottom: 1px dashed var(--border-color);
   margin-bottom: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.inspector-tab {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .summary__item b { color: var(--text-color); }
@@ -361,6 +384,40 @@
   background: var(--bg-secondary);
 }
 
+/* Tab section structure: fixed header + scrollable content */
+.tab-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tab-section__header {
+  flex-shrink: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.tab-section__header h4 {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: var(--font-size-md);
+}
+
+/* Controls in header (API controls, JSON viewer controls) */
+.tab-section__header .api-controls,
+.tab-section__header .json-viewer-controls {
+  margin-top: var(--spacing-xs);
+}
+
+.tab-section__content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* Legacy support for tabs without header/content structure */
 .tab-section h4 {
   margin: var(--spacing-sm) 0;
   font-size: var(--font-size-md);

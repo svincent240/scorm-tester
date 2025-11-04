@@ -1,1 +1,13 @@
-{"ts":1762278671911,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1762286459292,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1762286463301,"level":"error","msg":"EventBus: Detected repeating cycle 'progress:updated' <-> 'ui:scorm:dataRefreshed', dropping 'ui:scorm:dataRefreshed'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463313,"level":"error","msg":"EventBus: Detected repeating cycle 'ui:scorm:dataRefreshed' <-> 'progress:updated', dropping 'progress:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463325,"level":"error","msg":"EventBus: Detected repeating cycle 'progress:updated' <-> 'ui:scorm:dataRefreshed', dropping 'ui:scorm:dataRefreshed'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466723,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466734,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466743,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468814,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468825,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468835,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471721,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471731,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471741,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}

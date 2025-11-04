@@ -1,0 +1,249 @@
+/* JSON Viewer Component Styles */
+
+.json-viewer {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  background: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: var(--border-radius, 4px);
+  padding: var(--spacing-sm, 8px);
+  margin-bottom: var(--spacing-sm);
+}
+
+.json-viewer-controls {
+  display: flex;
+  gap: var(--spacing-xs, 4px);
+  margin-bottom: var(--spacing-sm, 8px);
+  padding-bottom: var(--spacing-xs, 4px);
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.json-viewer-controls button {
+  padding: var(--spacing-xxs, 4px) var(--spacing-xs, 8px);
+  font-size: var(--font-size-xs, 12px);
+  background: var(--bg-secondary, #f5f5f5);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: var(--border-radius-sm, 3px);
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s) ease;
+}
+
+.json-viewer-controls button:hover {
+  background: var(--bg-hover, #e8e8e8);
+}
+
+.json-viewer-controls button:active {
+  background: var(--bg-active, #d8d8d8);
+}
+
+.json-viewer-content {
+  /* Content area for JSON tree */
+}
+
+/* JSON value types */
+.json-null {
+  color: #808080;
+  font-style: italic;
+}
+
+.json-undefined {
+  color: #808080;
+  font-style: italic;
+}
+
+.json-boolean {
+  color: #0000ff;
+  font-weight: 600;
+}
+
+.json-number {
+  color: #098658;
+  font-weight: 600;
+}
+
+.json-string {
+  color: #a31515;
+}
+
+.json-empty {
+  color: #808080;
+  font-style: italic;
+}
+
+.json-other {
+  color: #666666;
+}
+
+/* JSON structure */
+.json-object,
+.json-array {
+  position: relative;
+  margin-left: var(--spacing-md, 16px);
+}
+
+.json-toggle {
+  display: inline-block;
+  width: 16px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary, #666666);
+  font-size: 10px;
+  margin-right: var(--spacing-xxs, 4px);
+  transition: transform 0.15s ease;
+}
+
+.json-toggle:hover {
+  color: var(--primary-color, #007acc);
+}
+
+.json-bracket {
+  color: var(--text-secondary, #666666);
+  font-weight: 600;
+}
+
+.json-count {
+  color: var(--text-muted, #999999);
+  font-size: var(--font-size-xs, 11px);
+  margin-left: var(--spacing-xs, 4px);
+  font-style: italic;
+}
+
+/* Collapsed state */
+.json-collapsed > .json-content {
+  display: none;
+}
+
+.json-collapsed > .json-bracket:last-child {
+  display: inline;
+  margin-left: var(--spacing-xs, 4px);
+}
+
+/* Expanded state */
+.json-expanded > .json-content {
+  display: block;
+  margin-left: var(--spacing-md, 16px);
+  margin-top: var(--spacing-xxs, 2px);
+  margin-bottom: var(--spacing-xxs, 2px);
+}
+
+.json-expanded > .json-bracket:last-child {
+  display: block;
+  margin-left: 0;
+}
+
+/* Properties and items */
+.json-property {
+  margin: var(--spacing-xxs, 2px) 0;
+  padding-left: var(--spacing-xs, 4px);
+}
+
+.json-property:hover {
+  background: var(--bg-hover, rgba(0, 122, 204, 0.05));
+  border-radius: var(--border-radius-sm, 2px);
+}
+
+.json-key {
+  color: #001080;
+  font-weight: 600;
+}
+
+.json-array-item {
+  margin: var(--spacing-xxs, 2px) 0;
+  padding-left: var(--spacing-xs, 4px);
+}
+
+.json-array-item:hover {
+  background: var(--bg-hover, rgba(0, 122, 204, 0.05));
+  border-radius: var(--border-radius-sm, 2px);
+}
+
+.json-index {
+  color: var(--text-muted, #999999);
+  font-size: var(--font-size-xs, 11px);
+  min-width: 20px;
+  display: inline-block;
+  text-align: right;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .json-viewer {
+    background: var(--bg-primary, #1e1e1e);
+    border-color: var(--border-color, #3e3e3e);
+  }
+
+  .json-viewer-controls button {
+    background: var(--bg-secondary, #2d2d2d);
+    border-color: var(--border-color, #3e3e3e);
+    color: var(--text-primary, #cccccc);
+  }
+
+  .json-viewer-controls button:hover {
+    background: var(--bg-hover, #3e3e3e);
+  }
+
+  .json-null,
+  .json-undefined,
+  .json-empty {
+    color: #808080;
+  }
+
+  .json-boolean {
+    color: #569cd6;
+  }
+
+  .json-number {
+    color: #b5cea8;
+  }
+
+  .json-string {
+    color: #ce9178;
+  }
+
+  .json-key {
+    color: #9cdcfe;
+  }
+
+  .json-bracket {
+    color: #d4d4d4;
+  }
+
+  .json-count {
+    color: #858585;
+  }
+
+  .json-index {
+    color: #858585;
+  }
+
+  .json-toggle {
+    color: #858585;
+  }
+
+  .json-toggle:hover {
+    color: var(--primary-color, #4fc3f7);
+  }
+
+  .json-property:hover,
+  .json-array-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Compact mode for smaller displays */
+@media (max-width: 768px) {
+  .json-viewer {
+    font-size: var(--font-size-xs, 12px);
+  }
+
+  .json-object,
+  .json-array {
+    margin-left: var(--spacing-sm, 8px);
+  }
+
+  .json-expanded > .json-content {
+    margin-left: var(--spacing-sm, 8px);
+  }
+}
+

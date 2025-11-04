@@ -1,146 +1,540 @@
-{"ts":1762278671911,"event":"LOG_START","process":"browser"}
-{"ts":1762278671949,"level":"info","msg":"SCORM Tester: Log file path: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671956,"level":"info","msg":"SCORM Tester: process.env.LOG_LEVEL: undefined","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671963,"level":"info","msg":"SCORM Tester: Logger logLevel: info","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671970,"level":"info","msg":"SCORM Tester Log File: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671977,"level":"info","msg":"Check this file for detailed debugging information","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671984,"level":"debug","msg":"SCORM error codes initialized from shared constants:","args":[59],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671990,"level":"debug","msg":"ScormErrorHandler initialized with all SCORM error codes","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278671998,"level":"info","msg":"SCORM Tester: Core dependencies initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672004,"level":"info","msg":"SCORM Tester: Initializing services","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672010,"level":"debug","msg":"WindowManager base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672016,"level":"info","msg":"Initializing WindowManager service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672022,"level":"debug","msg":"WindowManager state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672036,"level":"info","msg":"WindowManager: Custom protocol \"scorm-app://\" registered successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672042,"level":"info","msg":"WindowManager: Storage-capable origin feature is active","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672050,"level":"debug","msg":"WindowManager state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672058,"level":"info","msg":"WindowManager service initialized successfully in 33ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672064,"level":"debug","msg":"FileManager base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672070,"level":"info","msg":"Initializing FileManager service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672076,"level":"debug","msg":"FileManager state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672084,"level":"debug","msg":"FileManager: Starting initialization","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672091,"level":"debug","msg":"FileManager: Ensuring temp directory exists: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672097,"level":"debug","msg":"FileManager: No leftover temp files to clean up","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672103,"level":"debug","msg":"FileManager: Initialization completed","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672111,"level":"debug","msg":"FileManager state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672117,"level":"info","msg":"FileManager service initialized successfully in 40ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672123,"level":"debug","msg":"WindowManager: TelemetryStore instance set.","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672129,"level":"debug","msg":"[ScormInspectorTelemetryStore] Window manager reference set","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672136,"level":"debug","msg":"ScormService base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672143,"level":"info","msg":"Initializing ScormService service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672150,"level":"debug","msg":"ScormService state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672157,"level":"debug","msg":"ScormService: Starting initialization","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672164,"level":"debug","msg":"ScormCAMService initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672171,"level":"debug","msg":"BrowseModeService initialized","args":[{"0":{"defaultTimeout":1800000,"maxSessions":10}}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672178,"level":"debug","msg":"ActivityTreeManager initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672185,"level":"debug","msg":"SequencingEngine initialized","args":[{"browseModeSupport":true}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672192,"level":"debug","msg":"NavigationHandler initialized","args":[{"browseModeSupport":true}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672199,"level":"debug","msg":"RollupManager initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672206,"level":"debug","msg":"ScormSNService initialized","args":[{"browseModeSupport":true}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672213,"level":"debug","msg":"ScormService: SCORM service components initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672220,"level":"debug","msg":"ScormService: Initialization completed","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672227,"level":"debug","msg":"ScormService state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672234,"level":"info","msg":"ScormService service initialized successfully in 84ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672241,"level":"info","msg":"[SNSnapshotService] Started polling SN status","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672248,"level":"info","msg":"SCORM Tester: SNSnapshotService wired to ScormService and started","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672255,"level":"debug","msg":"RecentCoursesService base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672262,"level":"debug","msg":"RecentCoursesService: Constructor - userData path:","args":["/Users/seth/Library/Application Support/scorm-tester"],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672270,"level":"debug","msg":"RecentCoursesService: Constructor - recents file path:","args":["/Users/seth/Library/Application Support/scorm-tester/recents.json"],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672278,"level":"info","msg":"Initializing RecentCoursesService service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672286,"level":"debug","msg":"RecentCoursesService state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672294,"level":"debug","msg":"RecentCoursesService: Starting initialization","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672310,"level":"info","msg":"RecentCoursesService: Loaded 5 recent courses from file.","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672318,"level":"debug","msg":"RecentCoursesService: Initialization completed","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672326,"level":"debug","msg":"RecentCoursesService state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672334,"level":"info","msg":"RecentCoursesService service initialized successfully in 48ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672342,"level":"debug","msg":"AppStateService base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672350,"level":"info","msg":"Initializing AppStateService service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672358,"level":"debug","msg":"AppStateService state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672365,"level":"info","msg":"AppStateService initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672371,"level":"debug","msg":"AppStateService state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672378,"level":"info","msg":"AppStateService service initialized successfully in 22ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672386,"level":"debug","msg":"IpcHandler base service created","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672394,"level":"info","msg":"Initializing IpcHandler service","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672402,"level":"debug","msg":"IpcHandler state changed: not_initialized -> initializing","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672411,"level":"info","msg":"[ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672422,"level":"debug","msg":"IpcHandler state changed: initializing -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672430,"level":"info","msg":"IpcHandler service initialized successfully in 28ms","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672438,"level":"info","msg":"SCORM Tester: 6 services initialized successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672453,"level":"debug","msg":"SCORM Tester: Application event handlers set up","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672461,"level":"info","msg":"WindowManager: Creating main window","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672469,"level":"debug","msg":"WindowManager: main window state: closed -> creating","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672478,"level":"info","msg":"WindowManager: Screen work area: 1710x1005","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672571,"level":"info","msg":"Preload script is loading...","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672579,"level":"debug","msg":"contextBridge exists:","args":[true],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672587,"level":"debug","msg":"ipcRenderer exists:","args":[true],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672595,"level":"info","msg":"[PRELOAD] Attempting to expose electronAPI via contextBridge...","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672603,"level":"info","msg":"[PRELOAD] electronAPI successfully exposed via contextBridge","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672611,"level":"info","msg":"Preload script loaded; electronAPI exposed","args":[{"0":"rendererBaseUrl","1":"selectScormPackage","2":"selectScormFolder","3":"extractScorm","4":"saveTemporaryFile","5":"getCourseInfo","6":"getCourseManifest","7":"findScormEntry","8":"processScormManifest","9":"scormInitialize"}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672629,"level":"info","msg":"[Renderer] DOM ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672637,"level":"info","msg":"[Renderer] Page finished loading","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672646,"level":"debug","msg":"MenuBuilder: Application menu created successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672666,"level":"debug","msg":"WindowManager: main window state: creating -> ready","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672674,"level":"info","msg":"WindowManager: Main window created successfully (ID: 1)","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672682,"level":"info","msg":"SCORM Tester: Main window created (ID: 1)","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672689,"level":"info","msg":"SCORM Tester: Main process initialization completed successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672710,"level":"debug","msg":"WindowManager: main window state: ready -> focused","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672727,"level":"info","msg":"ipc-events-forwarder: initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672747,"level":"info","msg":"SCORM event forwarding initialized successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672757,"level":"info","msg":"Test helpers available:","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672765,"level":"info","msg":"  window.testLoadCourse(path) - Load course from path","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672773,"level":"info","msg":"  window.loadSampleCourse() - Load the sample SL360 course","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672783,"level":"info","msg":"[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)","args":[{"persistenceKey":"scorm-tester-ui-state"}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672790,"level":"debug","msg":"AppManager - uiState resolved","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672796,"level":"info","msg":"RENDERER_COALESCE_WINDOW_START","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672803,"level":"warn","msg":"RENDERER_COALESCED_DUPLICATES","args":[{"dropped":1}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672816,"level":"info","msg":"CourseLoader: Electron API availability check:","args":[{"available":true,"windowDefined":true,"electronAPIType":"object"}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672823,"level":"info","msg":"CourseLoader: Using IpcClient for file selection and prep","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672831,"level":"info","msg":"CourseLoader: All required Electron API methods available","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672839,"level":"info","msg":"AppManager: Initializing components...","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672846,"level":"info","msg":"CourseLoader: Logger initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672860,"level":"debug","msg":"AppManager: progress-tracking mount point not found; skipping component import","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672867,"level":"debug","msg":"AppManager: Found DOM element 'content-viewer' for component mounting","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672872,"level":"debug","msg":"AppManager: Found DOM element 'navigation-controls' for component mounting","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672880,"level":"debug","msg":"AppManager: Found DOM element 'footer-progress' for component mounting","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672888,"level":"debug","msg":"AppManager: Found DOM element 'footer-status' for component mounting","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672895,"level":"debug","msg":"AppManager: Found DOM element 'course-outline' for component mounting","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672903,"level":"debug","msg":"AppManager: Creating component 'headerControls' with elementId='header-controls'","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672910,"level":"debug","msg":"AppManager: Component 'headerControls' initialize() resolved","args":[{"elementId":"header-controls","className":"HeaderControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":1,"subscriptionCount":4}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672918,"level":"info","msg":"AppManager: headerControls initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672924,"level":"debug","msg":"AppManager: Creating component 'contentViewer' with elementId='content-viewer'","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672931,"level":"debug","msg":"[ContentViewer] Starting component initialization","args":[null],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672938,"level":"warn","msg":"[Renderer Console] An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can remove its sandboxing. (scorm-app://app/src/renderer/components/scorm/content-viewer.js:83)","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672945,"level":"debug","msg":"[ContentViewer] Component initialization completed","args":[null],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672956,"level":"debug","msg":"AppManager: Component 'contentViewer' initialize() resolved","args":[{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672963,"level":"info","msg":"AppManager: contentViewer initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672970,"level":"debug","msg":"AppManager: Creating component 'navigationControls' with elementId='navigation-controls'","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672977,"level":"debug","msg":"NavigationControls: Button states updated","args":[{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false,"hidePrevious":false,"hideNext":false,"hiddenControls":[]}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672984,"level":"debug","msg":"NavigationControls: Navigation state updated","args":[{"snServiceAvailable":false,"snServiceError":null}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672991,"level":"debug","msg":"NavigationControls: Button states updated","args":[{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false,"hidePrevious":false,"hideNext":false,"hiddenControls":[]}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278672998,"level":"debug","msg":"[NavigationControls] Component initialization completed","args":[null],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673006,"level":"debug","msg":"AppManager: Component 'navigationControls' initialize() resolved","args":[{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":16}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673014,"level":"info","msg":"AppManager: navigationControls initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673021,"level":"debug","msg":"AppManager: Creating component 'footerProgressBar' with elementId='footer-progress'","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673028,"level":"warn","msg":"RENDERER_DEBUG_RATE_LIMIT","args":[{"windowMs":400,"max":20}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673035,"level":"info","msg":"AppManager: footerProgressBar initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673042,"level":"info","msg":"AppManager: footerStatusDisplay initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673049,"level":"info","msg":"CourseOutline: constructor initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673057,"level":"info","msg":"CourseOutline.setup: uiState resolved","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673065,"level":"info","msg":"CourseOutline: HTML structure created successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673073,"level":"info","msg":"CourseOutline: Empty state displayed","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673080,"level":"info","msg":"CourseOutline.setup: Initial component state","args":[{"hasScormStates":false,"scormStatesLoaded":false,"availableNavigation":[],"browseModeEnabled":false,"courseStructureItems":0}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673088,"level":"info","msg":"CourseOutline: HTML structure created successfully","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673096,"level":"info","msg":"AppManager: courseOutline initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673104,"level":"info","msg":"AppManager: inspectorPanel initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673112,"level":"info","msg":"AppManager: notificationContainer initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673120,"level":"info","msg":"AppManager: errorDialog initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673128,"level":"info","msg":"AppManager: errorBadge initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673136,"level":"info","msg":"AppManager: errorListPanel initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673144,"level":"info","msg":"AppManager: courseExitSummary initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673152,"level":"info","msg":"AppManager: Post-init component status snapshot","args":[{"courseOutline":{"elementId":"course-outline","className":"CourseOutline","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":39},"navigationControls":{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":16},"contentViewer":{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673160,"level":"info","msg":"AppManager: All components initialized","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673172,"level":"info","msg":"AppManager: Menu visibility changed","args":[{"visible":false}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673180,"level":"debug","msg":"Browse mode status:","args":[{"enabled":false,"currentSession":null,"totalSessions":0,"navigationOverrides":{"ignoreSequencingRules":true,"allowUnrestrictedChoice":true,"ignoreAttemptLimits":true,"ignorePrerequisites":true}}],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673188,"level":"info","msg":"EventBus: Debug mode disabled","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278673199,"level":"info","msg":"RecentCoursesStore: Loaded 5 recent courses from main process.","args":[],"context":{},"pid":32862,"process":"browser"}
-{"ts":1762278674181,"level":"info","msg":"[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)","args":[{"persistenceKey":"scorm-tester-ui-state"}],"context":{},"pid":32862,"process":"browser"}
+{"ts":1762286459292,"event":"LOG_START","process":"browser"}
+{"ts":1762286459338,"level":"info","msg":"SCORM Tester: Log file path: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459343,"level":"info","msg":"SCORM Tester: process.env.LOG_LEVEL: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459349,"level":"info","msg":"SCORM Tester: Logger logLevel: info","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459356,"level":"info","msg":"SCORM Tester Log File: /Users/seth/Documents/GitHub/scorm-tester/logs/app.log","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459362,"level":"info","msg":"Check this file for detailed debugging information","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459370,"level":"debug","msg":"SCORM error codes initialized from shared constants:","args":[59],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459377,"level":"debug","msg":"ScormErrorHandler initialized with all SCORM error codes","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459382,"level":"info","msg":"SCORM Tester: Core dependencies initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459389,"level":"info","msg":"SCORM Tester: Initializing services","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459397,"level":"debug","msg":"WindowManager base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459404,"level":"info","msg":"Initializing WindowManager service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459410,"level":"debug","msg":"WindowManager state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459428,"level":"info","msg":"WindowManager: Custom protocol \"scorm-app://\" registered successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459434,"level":"info","msg":"WindowManager: Storage-capable origin feature is active","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459442,"level":"debug","msg":"WindowManager state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459448,"level":"info","msg":"WindowManager service initialized successfully in 38ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459454,"level":"debug","msg":"FileManager base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459460,"level":"info","msg":"Initializing FileManager service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459468,"level":"debug","msg":"FileManager state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459474,"level":"debug","msg":"FileManager: Starting initialization","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459480,"level":"debug","msg":"FileManager: Ensuring temp directory exists: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459497,"level":"debug","msg":"FileManager: Cleaned up leftover temp entry: scorm_1762285841162","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459503,"level":"info","msg":"FileManager: Cleaned up 1 leftover temp entries from previous sessions","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459512,"level":"debug","msg":"FileManager: Initialization completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459518,"level":"debug","msg":"FileManager state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459524,"level":"info","msg":"FileManager service initialized successfully in 58ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459531,"level":"debug","msg":"WindowManager: TelemetryStore instance set.","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459538,"level":"debug","msg":"[ScormInspectorTelemetryStore] Window manager reference set","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459545,"level":"debug","msg":"ScormService base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459552,"level":"info","msg":"Initializing ScormService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459559,"level":"debug","msg":"ScormService state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459566,"level":"debug","msg":"ScormService: Starting initialization","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459578,"level":"debug","msg":"ScormCAMService initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459586,"level":"debug","msg":"BrowseModeService initialized","args":[{"0":{"defaultTimeout":1800000,"maxSessions":10}}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459598,"level":"debug","msg":"ActivityTreeManager initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459606,"level":"debug","msg":"SequencingEngine initialized","args":[{"browseModeSupport":true}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459614,"level":"debug","msg":"NavigationHandler initialized","args":[{"browseModeSupport":true}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459621,"level":"debug","msg":"RollupManager initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459628,"level":"debug","msg":"ScormSNService initialized","args":[{"browseModeSupport":true}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459635,"level":"debug","msg":"ScormService: SCORM service components initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459642,"level":"debug","msg":"ScormService: Initialization completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459649,"level":"debug","msg":"ScormService state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459657,"level":"info","msg":"ScormService service initialized successfully in 97ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459665,"level":"info","msg":"[SNSnapshotService] Started polling SN status","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459672,"level":"info","msg":"SCORM Tester: SNSnapshotService wired to ScormService and started","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459678,"level":"debug","msg":"RecentCoursesService base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459685,"level":"debug","msg":"RecentCoursesService: Constructor - userData path:","args":["/Users/seth/Library/Application Support/scorm-tester"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459695,"level":"debug","msg":"RecentCoursesService: Constructor - recents file path:","args":["/Users/seth/Library/Application Support/scorm-tester/recents.json"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459705,"level":"info","msg":"Initializing RecentCoursesService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459713,"level":"debug","msg":"RecentCoursesService state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459721,"level":"debug","msg":"RecentCoursesService: Starting initialization","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459744,"level":"info","msg":"RecentCoursesService: Loaded 5 recent courses from file.","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459752,"level":"debug","msg":"RecentCoursesService: Initialization completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459762,"level":"debug","msg":"RecentCoursesService state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459769,"level":"info","msg":"RecentCoursesService service initialized successfully in 55ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459777,"level":"debug","msg":"AppStateService base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459785,"level":"info","msg":"Initializing AppStateService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459794,"level":"debug","msg":"AppStateService state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459805,"level":"info","msg":"AppStateService initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459813,"level":"debug","msg":"AppStateService state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459822,"level":"info","msg":"AppStateService service initialized successfully in 28ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459830,"level":"debug","msg":"IpcHandler base service created","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459838,"level":"info","msg":"Initializing IpcHandler service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459846,"level":"debug","msg":"IpcHandler state changed: not_initialized -> initializing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459855,"level":"info","msg":"[ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459868,"level":"debug","msg":"IpcHandler state changed: initializing -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459876,"level":"info","msg":"IpcHandler service initialized successfully in 30ms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459884,"level":"info","msg":"SCORM Tester: 6 services initialized successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459893,"level":"debug","msg":"SCORM Tester: Application event handlers set up","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459902,"level":"info","msg":"WindowManager: Creating main window","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459910,"level":"debug","msg":"WindowManager: main window state: closed -> creating","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286459920,"level":"info","msg":"WindowManager: Screen work area: 1710x1005","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460022,"level":"info","msg":"Preload script is loading...","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460030,"level":"debug","msg":"contextBridge exists:","args":[true],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460038,"level":"debug","msg":"ipcRenderer exists:","args":[true],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460046,"level":"info","msg":"[PRELOAD] Attempting to expose electronAPI via contextBridge...","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460054,"level":"info","msg":"[PRELOAD] electronAPI successfully exposed via contextBridge","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460062,"level":"info","msg":"Preload script loaded; electronAPI exposed","args":[{"0":"rendererBaseUrl","1":"selectScormPackage","2":"selectScormFolder","3":"extractScorm","4":"saveTemporaryFile","5":"getCourseInfo","6":"getCourseManifest","7":"findScormEntry","8":"processScormManifest","9":"scormInitialize"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460080,"level":"info","msg":"[Renderer] DOM ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460088,"level":"info","msg":"[Renderer] Page finished loading","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460097,"level":"debug","msg":"MenuBuilder: Application menu created successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460111,"level":"debug","msg":"WindowManager: main window state: creating -> ready","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460119,"level":"info","msg":"WindowManager: Main window created successfully (ID: 1)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460128,"level":"info","msg":"SCORM Tester: Main window created (ID: 1)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460135,"level":"info","msg":"SCORM Tester: Main process initialization completed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460211,"level":"debug","msg":"WindowManager: main window state: ready -> focused","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460247,"level":"info","msg":"ipc-events-forwarder: initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460254,"level":"info","msg":"SCORM event forwarding initialized successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460265,"level":"info","msg":"Test helpers available:","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460272,"level":"info","msg":"  window.testLoadCourse(path) - Load course from path","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460280,"level":"info","msg":"  window.loadSampleCourse() - Load the sample SL360 course","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460291,"level":"info","msg":"[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)","args":[{"persistenceKey":"scorm-tester-ui-state"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460298,"level":"debug","msg":"AppManager - uiState resolved","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460306,"level":"info","msg":"RENDERER_COALESCE_WINDOW_START","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460313,"level":"warn","msg":"RENDERER_COALESCED_DUPLICATES","args":[{"dropped":1}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460327,"level":"info","msg":"CourseLoader: Electron API availability check:","args":[{"available":true,"windowDefined":true,"electronAPIType":"object"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460334,"level":"info","msg":"CourseLoader: Using IpcClient for file selection and prep","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460341,"level":"info","msg":"CourseLoader: All required Electron API methods available","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460349,"level":"info","msg":"AppManager: Initializing components...","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460357,"level":"info","msg":"CourseLoader: Logger initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460381,"level":"debug","msg":"AppManager: progress-tracking mount point not found; skipping component import","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460388,"level":"debug","msg":"AppManager: Found DOM element 'content-viewer' for component mounting","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460408,"level":"debug","msg":"AppManager: Found DOM element 'navigation-controls' for component mounting","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460415,"level":"debug","msg":"AppManager: Found DOM element 'footer-progress' for component mounting","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460422,"level":"debug","msg":"AppManager: Found DOM element 'footer-status' for component mounting","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460429,"level":"debug","msg":"AppManager: Found DOM element 'course-outline' for component mounting","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460437,"level":"debug","msg":"AppManager: Creating component 'headerControls' with elementId='header-controls'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460444,"level":"debug","msg":"AppManager: Component 'headerControls' initialize() resolved","args":[{"elementId":"header-controls","className":"HeaderControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":1,"subscriptionCount":4}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460451,"level":"info","msg":"AppManager: headerControls initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460458,"level":"debug","msg":"AppManager: Creating component 'contentViewer' with elementId='content-viewer'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460465,"level":"debug","msg":"[ContentViewer] Starting component initialization","args":[null],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460472,"level":"warn","msg":"[Renderer Console] An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can remove its sandboxing. (scorm-app://app/src/renderer/components/scorm/content-viewer.js:83)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460479,"level":"debug","msg":"[ContentViewer] Component initialization completed","args":[null],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460486,"level":"debug","msg":"AppManager: Component 'contentViewer' initialize() resolved","args":[{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460493,"level":"info","msg":"AppManager: contentViewer initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460500,"level":"debug","msg":"AppManager: Creating component 'navigationControls' with elementId='navigation-controls'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460507,"level":"debug","msg":"NavigationControls: Button states updated","args":[{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false,"hidePrevious":false,"hideNext":false,"hiddenControls":[]}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460514,"level":"debug","msg":"NavigationControls: Navigation state updated","args":[{"snServiceAvailable":false,"snServiceError":null}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460521,"level":"debug","msg":"NavigationControls: Button states updated","args":[{"canNavigatePrevious":false,"canNavigateNext":false,"browseMode":false,"hidePrevious":false,"hideNext":false,"hiddenControls":[]}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460528,"level":"debug","msg":"[NavigationControls] Component initialization completed","args":[null],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460535,"level":"debug","msg":"AppManager: Component 'navigationControls' initialize() resolved","args":[{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":16}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460542,"level":"info","msg":"AppManager: navigationControls initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460549,"level":"debug","msg":"AppManager: Creating component 'footerProgressBar' with elementId='footer-progress'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460556,"level":"warn","msg":"RENDERER_DEBUG_RATE_LIMIT","args":[{"windowMs":400,"max":20}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460563,"level":"info","msg":"AppManager: footerProgressBar initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460570,"level":"info","msg":"AppManager: footerStatusDisplay initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460578,"level":"info","msg":"CourseOutline: constructor initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460586,"level":"info","msg":"CourseOutline.setup: uiState resolved","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460594,"level":"info","msg":"CourseOutline: HTML structure created successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460602,"level":"info","msg":"CourseOutline: Empty state displayed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460610,"level":"info","msg":"CourseOutline.setup: Initial component state","args":[{"hasScormStates":false,"scormStatesLoaded":false,"availableNavigation":[],"browseModeEnabled":false,"courseStructureItems":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460618,"level":"info","msg":"CourseOutline: HTML structure created successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460626,"level":"info","msg":"AppManager: courseOutline initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460634,"level":"info","msg":"AppManager: inspectorPanel initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460642,"level":"info","msg":"AppManager: notificationContainer initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460650,"level":"info","msg":"AppManager: errorDialog initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460658,"level":"info","msg":"AppManager: errorBadge initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460666,"level":"info","msg":"AppManager: errorListPanel initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460674,"level":"info","msg":"AppManager: courseExitSummary initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460682,"level":"info","msg":"AppManager: Post-init component status snapshot","args":[{"courseOutline":{"elementId":"course-outline","className":"CourseOutline","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":39},"navigationControls":{"elementId":"navigation-controls","className":"NavigationControls","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":16},"contentViewer":{"elementId":"content-viewer","className":"ContentViewer","isInitialized":true,"isDestroyed":false,"isVisible":true,"hasElement":true,"childCount":0,"eventListenerCount":0,"subscriptionCount":14}}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460690,"level":"info","msg":"AppManager: All components initialized","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460704,"level":"info","msg":"RENDERER_DEBUG_SUPPRESSED_SUMMARY","args":[{"suppressed":19}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460712,"level":"info","msg":"AppManager: Menu visibility changed","args":[{"visible":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460720,"level":"debug","msg":"Browse mode status:","args":[{"enabled":false,"currentSession":null,"totalSessions":0,"navigationOverrides":{"ignoreSequencingRules":true,"allowUnrestrictedChoice":true,"ignoreAttemptLimits":true,"ignorePrerequisites":true}}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460728,"level":"info","msg":"RENDERER_DEBUG_SUPPRESSED_SUMMARY","args":[{"suppressed":19}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460736,"level":"info","msg":"EventBus: Debug mode disabled","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460744,"level":"debug","msg":"AppManager: Menu toggled","args":[{"visible":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460752,"level":"debug","msg":"AppManager - setLoading(false)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286460763,"level":"info","msg":"RecentCoursesStore: Loaded 5 recent courses from main process.","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461708,"level":"info","msg":"[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)","args":[{"persistenceKey":"scorm-tester-ui-state"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461958,"level":"debug","msg":"UIState.updateUI: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461966,"level":"info","msg":"AppManager: Cleared all errors for course load start","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461975,"level":"info","msg":"FileManager: Checking manifest path: /Users/seth/Documents/GitHub/SCORM/scorm_trc_template/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461983,"level":"info","msg":"FileManager: Folder exists: true","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286461992,"level":"info","msg":"FileManager: Directory contents: [\".DS_Store\",\"ASSESSMENT_RESULTS_IMPLEMENTATION.md\",\"README.md\",\"XMLSchema.dtd\",\"adlcp_v1p3.xsd\",\"adlnav_v1p3.xsd\",\"adlseq_v1p3.xsd\",\"common\",\"content\",\"datatypes.dtd\",\"docs\",\"ims_xml.xsd\",\"imscp_v1p1.xsd\",\"imsmanifest.xml\",\"imsss_v1p0.xsd\",\"imsss_v1p0auxresource.xsd\",\"imsss_v1p0control.xsd\",\"imsss_v1p0delivery.xsd\",\"imsss_v1p0limit.xsd\",\"imsss_v1p0objective.xsd\",\"imsss_v1p0random.xsd\",\"imsss_v1p0rollup.xsd\",\"imsss_v1p0seqrule.xsd\",\"imsss_v1p0util.xsd\",\"lom.xsd\",\"lomCustom.xsd\",\"lomLoose.xsd\",\"lomStrict.xsd\",\"test-assessment-results.html\",\"test-assessment.html\",\"xml.xsd\"]","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462000,"level":"info","msg":"FileManager: Found manifest at package root: /Users/seth/Documents/GitHub/SCORM/scorm_trc_template/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462045,"level":"info","msg":"FileManager: Checking manifest path: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462052,"level":"info","msg":"FileManager: Folder exists: true","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462060,"level":"info","msg":"FileManager: Directory contents: [\".DS_Store\",\"ASSESSMENT_RESULTS_IMPLEMENTATION.md\",\"README.md\",\"XMLSchema.dtd\",\"adlcp_v1p3.xsd\",\"adlnav_v1p3.xsd\",\"adlseq_v1p3.xsd\",\"common\",\"content\",\"datatypes.dtd\",\"docs\",\"ims_xml.xsd\",\"imscp_v1p1.xsd\",\"imsmanifest.xml\",\"imsss_v1p0.xsd\",\"imsss_v1p0auxresource.xsd\",\"imsss_v1p0control.xsd\",\"imsss_v1p0delivery.xsd\",\"imsss_v1p0limit.xsd\",\"imsss_v1p0objective.xsd\",\"imsss_v1p0random.xsd\",\"imsss_v1p0rollup.xsd\",\"imsss_v1p0seqrule.xsd\",\"imsss_v1p0util.xsd\",\"lom.xsd\",\"lomCustom.xsd\",\"lomLoose.xsd\",\"lomStrict.xsd\",\"test-assessment-results.html\",\"test-assessment.html\",\"xml.xsd\"]","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462067,"level":"info","msg":"FileManager: Found manifest at package root: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462075,"level":"info","msg":"FileManager: Getting manifest info from scorm_1762286462004","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462082,"level":"info","msg":"FileManager: Checking manifest path: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462089,"level":"info","msg":"FileManager: Folder exists: true","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462096,"level":"info","msg":"FileManager: Directory contents: [\".DS_Store\",\"ASSESSMENT_RESULTS_IMPLEMENTATION.md\",\"README.md\",\"XMLSchema.dtd\",\"adlcp_v1p3.xsd\",\"adlnav_v1p3.xsd\",\"adlseq_v1p3.xsd\",\"common\",\"content\",\"datatypes.dtd\",\"docs\",\"ims_xml.xsd\",\"imscp_v1p1.xsd\",\"imsmanifest.xml\",\"imsss_v1p0.xsd\",\"imsss_v1p0auxresource.xsd\",\"imsss_v1p0control.xsd\",\"imsss_v1p0delivery.xsd\",\"imsss_v1p0limit.xsd\",\"imsss_v1p0objective.xsd\",\"imsss_v1p0random.xsd\",\"imsss_v1p0rollup.xsd\",\"imsss_v1p0seqrule.xsd\",\"imsss_v1p0util.xsd\",\"lom.xsd\",\"lomCustom.xsd\",\"lomLoose.xsd\",\"lomStrict.xsd\",\"test-assessment-results.html\",\"test-assessment.html\",\"xml.xsd\"]","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462103,"level":"info","msg":"FileManager: Found manifest at package root: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/imsmanifest.xml","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462111,"level":"info","msg":"FileManager: Manifest content retrieved","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462120,"level":"info","msg":"ScormService: Processing SCORM manifest for /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462128,"level":"info","msg":"ScormCAMService: Starting package processing for /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462135,"level":"info","msg":"ScormCAMService: manifestContent type: string, length: 17719","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462142,"level":"info","msg":"ScormCAMService: packagePath: /var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462149,"level":"info","msg":"ScormCAMService: About to parse manifest XML","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462157,"level":"info","msg":"ManifestParser: start","args":[{"phase":"CAM_PARSE","basePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","inputType":"string","len":17719}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462164,"level":"debug","msg":"ManifestParser: xml preview","args":[{"phase":"CAM_PARSE","preview":"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- SCORM 2004 4th Edition manifest for scorm_trc_template\n     Base profile: Single-SCO (simple starting template)\n     See references/spec_guide_2.md for CAM/"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462180,"level":"debug","msg":"ManifestParser: Path resolution result","args":[{"originalPath":"content/shared/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/shared","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462188,"level":"debug","msg":"ManifestParser: Path resolution result","args":[{"originalPath":"content/framework/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/framework","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462196,"level":"debug","msg":"ManifestParser: Path resolution result","args":[{"originalPath":"content/course/","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/course","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462204,"level":"debug","msg":"ManifestParser: Path resolution result","args":[{"originalPath":"","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","success":true,"usedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462212,"level":"info","msg":"ManifestParser: success","args":[{"phase":"CAM_PARSE","code":"PARSE_SUCCESS","message":"Manifest parsed successfully","manifestId":"MANIFEST-TEMPLATE2","defaultOrgId":"org-1","stats":{"orgCount":1,"topCount":1},"severity":"INFO"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462219,"level":"info","msg":"ScormCAMService: Manifest parsing completed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462226,"level":"debug","msg":"ScormCAMService: Parsed manifest structure:","args":[{"hasIdentifier":true,"hasOrganizations":true,"hasResources":true,"manifestType":"object"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462233,"level":"info","msg":"ScormCAMService: Parser snapshot","args":[{"phase":"CAM_PARSE","code":"PARSE_VALIDATION_ERROR","message":"Parser defaultOrg top-level snapshot","detail":{"topIds":["item-1"]},"manifestId":"MANIFEST-TEMPLATE2","defaultOrgId":"org-1","stats":{"orgCount":1,"topCount":1},"packagePath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","severity":"info"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462240,"level":"info","msg":"ScormCAMService: Starting package validation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462248,"level":"debug","msg":"ContentValidator: Starting manifest structure validation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462255,"level":"debug","msg":"ContentValidator: manifest type:","args":["object"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462262,"level":"debug","msg":"ContentValidator: manifest is null/undefined:","args":[false],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462269,"level":"debug","msg":"ContentValidator: Manifest structure:","args":[{"hasIdentifier":true,"identifierValue":"MANIFEST-TEMPLATE2","hasOrganizations":true,"hasResources":true,"hasMetadata":true}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462276,"level":"debug","msg":"ContentValidator: Identifier found:","args":["MANIFEST-TEMPLATE2"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462283,"level":"debug","msg":"ContentValidator: Organizations found","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462290,"level":"debug","msg":"ContentValidator: Resources found, count:","args":[4],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462297,"level":"debug","msg":"ContentValidator: Required elements check completed, hasRequiredElements:","args":[true],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462304,"level":"debug","msg":"ContentValidator: Validating metadata structure","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462311,"level":"debug","msg":"ContentValidator: Metadata validation completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462318,"level":"debug","msg":"ContentValidator: Valid version found:","args":["1.0.0"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462325,"level":"debug","msg":"ContentValidator: Manifest structure validation completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462348,"level":"info","msg":"ScormCAMService: Package validation completed","args":[{"isValid":true}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462356,"level":"info","msg":"ScormCAMService: Starting package analysis","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462365,"level":"debug","msg":"PathUtils: content resolution result","args":[{"operation":"contentResolution","success":true,"originalPath":"content/sco1/index.html","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/sco1/index.html","url":"scorm-app://app/scorm_1762286462004/content/sco1/index.html","usedBase":"tempRoot","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462373,"level":"debug","msg":"PackageAnalyzer: Starting synchronous compliance check","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462381,"level":"debug","msg":"PackageAnalyzer: packagePath:","args":["/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462389,"level":"debug","msg":"PackageAnalyzer: manifest type:","args":["object"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462397,"level":"debug","msg":"PackageAnalyzer: manifest is null/undefined:","args":[false],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462405,"level":"debug","msg":"PackageAnalyzer: Synchronous compliance check completed:","args":[{"hasRequiredElements":true,"validScormTypes":true,"validIdentifiers":true,"sequencingCompliance":true,"metadataCompliance":true,"overallCompliance":true,"isValid":true,"errors":[],"warnings":[]}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462412,"level":"info","msg":"ScormCAMService: Package analysis completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462421,"level":"debug","msg":"PathUtils: content resolution result","args":[{"operation":"contentResolution","success":true,"originalPath":"content/sco1/index.html","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/sco1/index.html","url":"scorm-app://app/scorm_1762286462004/content/sco1/index.html","usedBase":"tempRoot","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462430,"level":"info","msg":"ScormCAMService: Starting metadata extraction","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462439,"level":"info","msg":"ScormCAMService: Metadata extraction completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462448,"level":"debug","msg":"ScormCAMService: Manifest cleaned and normalized for serialization","args":[{"orgCount":1,"resCount":4}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462463,"level":"info","msg":"ScormCAMService: Cleaned manifest shapes","args":[{"hasOrganizations":true,"hasResources":true,"orgKeyType":"organization[]","resKeyType":"resource[]","orgCount":1,"resCount":4}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462471,"level":"info","msg":"ScormCAMService: Package processing completed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462479,"level":"info","msg":"Initializing SN service with manifest","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462487,"level":"info","msg":"SN.init: manifest.organizations structure","args":[{"hasOrganizations":true,"orgKeys":["default","organization"],"hasOrgProperty":true,"hasOrgsProperty":false,"orgPropertyType":"array","orgsPropertyType":"undefined"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462495,"level":"info","msg":"SN.init: CAM manifest summary","args":[{"orgs":1,"items":1,"explicitSequencing":true,"defaultOrg":"org-1"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462504,"level":"info","msg":"Activity tree built with 2 activities","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462513,"level":"info","msg":"SN service initialized successfully","args":[{"totalActivities":2,"leafActivities":1,"launchableActivities":1,"maxDepth":1,"globalObjectives":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462521,"level":"info","msg":"ScormService: SN service initialized with manifest","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462529,"level":"info","msg":"[ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462538,"level":"debug","msg":"Broadcasted course-loaded event to all windows","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462546,"level":"info","msg":"ScormService: Emitted sn:initialized event to renderer","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462555,"level":"debug","msg":"ipc-events-forwarder: course-loaded IPC event received (not forwarded to EventBus)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462563,"level":"info","msg":"[ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462571,"level":"info","msg":"IpcHandler: SCORM Inspector data cleared","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462579,"level":"info","msg":"[ScormInspectorTelemetryStore] Cleared 0 API calls and 0 errors","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462587,"level":"info","msg":"IpcHandler: SCORM Inspector data cleared","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462595,"level":"debug","msg":"UIState.updateUI: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462604,"level":"info","msg":"RENDERER_COALESCE_WINDOW_START","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462612,"level":"warn","msg":"RENDERER_COALESCED_DUPLICATES","args":[{"dropped":1}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462621,"level":"info","msg":"CourseOutline: event course:loaded received","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462629,"level":"info","msg":"CourseOutline.handleCourseLoaded: received","args":[{"hasStructure":true,"hasItems":true,"itemCount":1,"currentScormStatesCount":0,"scormStatesLoaded":false,"browseModeEnabled":false,"hasManifest":false,"courseTitle":"unknown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462637,"level":"info","msg":"CourseOutline.setCourseStructure: top-level IDs","args":[{"count":1,"ids":["item-1"]}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462645,"level":"info","msg":"CourseOutline.setCourseStructure: structure set","args":[{"hasItems":true,"itemCount":1}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462653,"level":"info","msg":"CourseOutline: SCORM states reset, fetching new states for course load","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462661,"level":"info","msg":"CourseOutline: Waiting for SCORM states before initial render","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462669,"level":"warn","msg":"CourseOutline: getCourseOutlineActivityTree not available via snBridge","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462677,"level":"debug","msg":"CourseOutline: duplicate course:loaded ignored","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462685,"level":"info","msg":"AppManager: Course loaded event received","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462693,"level":"debug","msg":"AppManager - handleCourseLoaded invoked","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462701,"level":"debug","msg":"AppManager: Instructing ContentViewer.loadContent with launchUrl","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462709,"level":"debug","msg":"UIState.updateUI: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462718,"level":"info","msg":"AppManager: Relying on CourseOutline event subscription for course:loaded","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462726,"level":"info","msg":"CourseOutline: SCORM states loaded, performing initial render with validation","args":[{"stateCount":0,"scormStatesLoaded":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462735,"level":"info","msg":"AppManager: SN polling paused","args":[{"reason":"content-load"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462744,"level":"debug","msg":"RecentCoursesService: _saveRecents - Save already in progress, skipping","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462752,"level":"info","msg":"RecentCoursesService: Added/updated recent course","args":[{"type":"folder","path":"/Users/seth/Documents/GitHub/SCORM/scorm_trc_template"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462763,"level":"debug","msg":"RecentCoursesStore: touch","args":[{"type":"folder","path":"/Users/seth/Documents/GitHub/SCORM/scorm_trc_template"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462772,"level":"debug","msg":"RecentCoursesService: _saveRecents - Directory exists after mkdir:","args":[true],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462783,"level":"info","msg":"RecentCoursesService: Added/updated recent course","args":[{"type":"folder","path":"/Users/seth/Documents/GitHub/SCORM/scorm_trc_template"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462792,"level":"warn","msg":"[Renderer Console] An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can remove its sandboxing. (scorm-app://app/scorm_1762286462004/content/sco1/index.html:0)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462799,"level":"info","msg":"RecentCoursesStore: addOrUpdate","args":[{"type":"folder","path":"/Users/seth/Documents/GitHub/SCORM/scorm_trc_template"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462813,"level":"info","msg":"[Renderer Console] [CourseInit] Starting initialization... (scorm-app://app/scorm_1762286462004/content/sco1/index.html:179)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462823,"level":"info","msg":"[Renderer Console] [CourseInit] Document ready state: loading (scorm-app://app/scorm_1762286462004/content/sco1/index.html:429)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462831,"level":"info","msg":"[Renderer Console] [CourseInit] Waiting for DOMContentLoaded (scorm-app://app/scorm_1762286462004/content/sco1/index.html:431)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462838,"level":"info","msg":"[Renderer Console] [CourseInit] Checking for Course module... (scorm-app://app/scorm_1762286462004/content/sco1/index.html:418)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462846,"level":"info","msg":"[Renderer Console] [CourseInit] Course API ready, initializing... (scorm-app://app/scorm_1762286462004/content/sco1/index.html:420)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462854,"level":"info","msg":"[Renderer Console] [CourseInit] Initializing course modules... (scorm-app://app/scorm_1762286462004/content/sco1/index.html:186)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462862,"level":"info","msg":"[Renderer Console] [CourseInit] Initializing SCORM connection... (scorm-app://app/scorm_1762286462004/content/sco1/index.html:207)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462870,"level":"info","msg":"[Renderer Console] [SCORM Init] Attempting to initialize SCORM (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:38)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462878,"level":"info","msg":"ScormService: Initializing SCORM session: session_1762286462817","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462889,"level":"debug","msg":"SCORM error codes initialized from shared constants:","args":[59],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462897,"level":"debug","msg":"ScormErrorHandler initialized with all SCORM error codes","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462905,"level":"debug","msg":"Data model initialized with all SCORM 2004 4th Edition elements","args":[{"launchMode":"normal"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462913,"level":"debug","msg":"ScormDataModel initialized","args":[{"launchMode":"normal","memoryOnlyStorage":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462921,"level":"debug","msg":"ScormApiHandler initialized","args":[{"launchMode":"normal","memoryOnlyStorage":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462930,"level":"debug","msg":"Learner information set","args":[{"id":"unknown","name":"Learner"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462936,"level":"debug","msg":"Session data initialized","args":[{"launchMode":"normal","entryMode":"ab-initio"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462943,"level":"info","msg":"SCORM session initialized: scorm_1762286462925_kfuylxxvl","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462951,"level":"debug","msg":"Processing navigation request: start","args":[{"targetActivityId":null}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462958,"level":"debug","msg":"Processing navigation request: start","args":[{"targetActivityId":null,"browseMode":false,"navigationSessionState":{"hasCurrentActivity":false,"availableNavigation":[]},"activityTreeState":{"hasRoot":true,"totalActivities":2}}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462965,"level":"debug","msg":"Navigation request processed:","args":[{"success":true,"reason":"Start navigation processed","targetActivity":{"identifier":"item-1","title":"Interactive Assessment","parent":{"identifier":"org-1","title":"SCORM TRC Template — Base Course","parent":null,"children":["[Circular]"],"resource":null,"activityState":"inactive","attemptState":"not_attempted","attemptCount":0,"suspended":false,"location":"","sequencing":{},"presentation":null,"isVisible":true,"parameters":"","objectives":{},"primaryObjective":null,"deliveryStarted":false,"deliveryCompleted":false,"createdAt":"2025-11-04T20:01:02.500Z","lastAccessedAt":null},"children":[],"resource":{"identifier":"res-1","type":"webcontent","scormType":"sco","href":"content/sco1/index.html","xmlBase":"","resolvedBase":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004","files":[{"href":"content/sco1/index.html","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/sco1/index.html"}],"dependencies":[{"identifierref":"res-shared"},{"identifierref":"res-framework"},{"identifierref":"res-course"}],"metadata":null},"activityState":"inactive","attemptState":"not_attempted","attemptCount":0,"suspended":false,"location":"","sequencing":{"controlMode":{"choice":false,"flow":true,"forwardOnly":false,"choiceExit":true,"flowExit":false,"trackLMS":false,"trackSCO":false,"useCurrentAttemptObjectiveInfo":false,"useCurrentAttemptProgressInfo":false},"sequencingRules":{"preConditionRules":[{"conditions":{"conditionCombination":"any","conditions":[{"condition":"objectiveSatisfied","operator":"not","measureThreshold":null,"referencedObjective":null},{"condition":"attemptLimitExceeded","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"not","measureThreshold":null,"referencedObjective":null},{"condition":"attemptLimitExceeded","operator":"noOp","measureThreshold":null,"referencedObjective":null}]},"actions":null},{"conditions":{"conditionCombination":"all","conditions":[{"condition":"objectiveStatusKnown","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveStatusKnown","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"noOp","measureThreshold":null,"referencedObjective":null}]},"actions":null}],"postConditionRules":[{"conditions":{"conditionCombination":"all","conditions":[{"condition":"objectiveSatisfied","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"noOp","measureThreshold":null,"referencedObjective":null}]},"actions":null},{"conditions":{"conditionCombination":"all","conditions":[{"condition":"objectiveStatusKnown","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"not","measureThreshold":null,"referencedObjective":null},{"condition":"attemptLimitExceeded","operator":"not","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveStatusKnown","operator":"noOp","measureThreshold":null,"referencedObjective":null},{"condition":"objectiveSatisfied","operator":"not","measureThreshold":null,"referencedObjective":null},{"condition":"attemptLimitExceeded","operator":"not","measureThreshold":null,"referencedObjective":null}]},"actions":null}],"exitConditionRules":[]},"limitConditions":null,"rollupRules":{"rollupObjectiveSatisfied":true,"rollupProgressCompletion":true,"rollupTrackingAttempts":false,"rollupSuccess":null,"rollupProgress":null,"rollupConsiderations":null,"rollupRules":[{"conditions":null,"actions":null}]},"objectives":{"primaryObjective":{"satisfiedByMeasure":false,"objectiveID":"primary-objective","minNormalizedMeasure":null,"mapInfo":{"targetObjectiveID":"obj-global-completion","readSatisfiedStatus":true,"readNormalizedMeasure":false,"writeSatisfiedStatus":true,"writeNormalizedMeasure":false}},"objectives":[null]},"randomizationControls":null,"deliveryControls":{"tracked":true,"completionSetByContent":true,"objectiveSetByContent":true}},"presentation":null,"isVisible":true,"parameters":"","objectives":{},"primaryObjective":{"objectiveID":"primary-objective","satisfied":false,"measure":null,"mapInfo":"[Circular]"},"deliveryStarted":false,"deliveryCompleted":false,"createdAt":"2025-11-04T20:01:02.500Z","lastAccessedAt":null},"action":"launch"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462973,"level":"debug","msg":"Pre-condition rule triggered: undefined for item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462981,"level":"debug","msg":"Current activity set to: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462989,"level":"debug","msg":"Starting rollup process for activity: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286462997,"level":"debug","msg":"Global objective updated: obj-global-completion.satisfied = false","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463005,"level":"debug","msg":"PathUtils: content resolution result","args":[{"operation":"contentResolution","success":true,"originalPath":"content/sco1/index.html","resolvedPath":"/var/folders/8g/hsprg9qn3nv4fh5m24_hghcw0000gn/T/scorm-tester/scorm_1762286462004/content/sco1/index.html","url":"scorm-app://app/scorm_1762286462004/content/sco1/index.html","usedBase":"tempRoot","duration":0}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463013,"level":"info","msg":"ScormService: Set default current activity in SN service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463021,"level":"info","msg":"ScormService: Session session_1762286462817 initialized successfully","args":[{"launchMode":"normal","browseMode":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463029,"level":"info","msg":"[Renderer Console] [SCORM Init] Initialization result: true Connected: true (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:45)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463037,"level":"info","msg":"[Renderer Console] [SCORM Init] initialized flag: true (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:46)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463046,"level":"info","msg":"[Renderer Console] [SCORM Init] Current completion status:  (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:50)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463054,"level":"info","msg":"[Renderer Console] [SCORM Init] Set completion status to incomplete (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:53)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463062,"level":"info","msg":"[Renderer Console] [CourseInit] SCORM connection: SUCCESS (scorm-app://app/scorm_1762286462004/content/sco1/index.html:209)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463071,"level":"info","msg":"[Renderer Console] [CourseInit] Restoring from SCORM suspend data: [object Object] (scorm-app://app/scorm_1762286462004/content/sco1/index.html:214)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463079,"level":"info","msg":"[Renderer Console] [CourseInit] Restoring bookmark location: null (scorm-app://app/scorm_1762286462004/content/sco1/index.html:215)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463087,"level":"info","msg":"[Renderer Console] [CourseInit] Final initial state: [object Object] (scorm-app://app/scorm_1762286462004/content/sco1/index.html:243)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463095,"level":"info","msg":"[Renderer Console] [CourseInit] StateManager created (scorm-app://app/scorm_1762286462004/content/sco1/index.html:250)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463103,"level":"info","msg":"[Renderer Console] [CourseInit] CourseRuntime created (scorm-app://app/scorm_1762286462004/content/sco1/index.html:254)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463111,"level":"info","msg":"[Renderer Console] [CourseInit] AccessibilityManager created (scorm-app://app/scorm_1762286462004/content/sco1/index.html:258)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463119,"level":"info","msg":"[Renderer Console] [CourseRuntime] Initializing... (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:52)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463128,"level":"info","msg":"[Renderer Console] [CourseRuntime] Updating navigation buttons. Current state: [object Object] (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:612)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463136,"level":"info","msg":"[Renderer Console] [CourseRuntime] Navigation availability: [object Object] (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:623)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463145,"level":"warn","msg":"Cannot update activity tree state: SN service access not available through telemetry store","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463154,"level":"debug","msg":"ScormService: Updating SN activity progress for item-1 with cmi.completion_status=incomplete","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463162,"level":"debug","msg":"Starting rollup process for activity: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463170,"level":"debug","msg":"Global objective updated: obj-global-completion.satisfied = false","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463178,"level":"debug","msg":"Post-condition rule triggered: undefined for item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463186,"level":"debug","msg":"Activity progress updated: item-1","args":[{"completed":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463196,"level":"debug","msg":"ScormService: Updating SN activity progress for item-1 with cmi.progress_measure=0.16666666666666666","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463204,"level":"debug","msg":"Starting rollup process for activity: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463212,"level":"debug","msg":"Global objective updated: obj-global-completion.satisfied = false","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463220,"level":"debug","msg":"Post-condition rule triggered: undefined for item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463228,"level":"debug","msg":"Activity progress updated: item-1","args":[{"measure":0.16666666666666666}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463236,"level":"debug","msg":"SN Service: Updated location for activity item-1 to 0","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463243,"level":"info","msg":"AppManager: SN polling resumed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463251,"level":"info","msg":"[Renderer Console] [CourseRuntime] Initialization complete (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:77)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463260,"level":"info","msg":"[Renderer Console] [AccessibilityManager] Initialized (scorm-app://app/scorm_1762286462004/content/framework/accessibility-manager.js:69)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463268,"level":"info","msg":"[Renderer Console] [CourseInit] Initialization complete (scorm-app://app/scorm_1762286462004/content/sco1/index.html:279)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463276,"level":"info","msg":"CourseOutline: Immediate SCORM state refresh completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463284,"level":"info","msg":"CourseOutline: Refreshing SCORM states","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463292,"level":"info","msg":"CourseOutline: SCORM states refreshed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463301,"level":"error","msg":"EventBus: Detected repeating cycle 'progress:updated' <-> 'ui:scorm:dataRefreshed', dropping 'ui:scorm:dataRefreshed'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463313,"level":"error","msg":"EventBus: Detected repeating cycle 'ui:scorm:dataRefreshed' <-> 'progress:updated', dropping 'progress:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463325,"level":"error","msg":"EventBus: Detected repeating cycle 'progress:updated' <-> 'ui:scorm:dataRefreshed', dropping 'ui:scorm:dataRefreshed'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463336,"level":"debug","msg":"IpcHandler: handleScormInspectorGetHistory called with limit: undefined, offset: undefined, sinceTs: undefined, methodFilter: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463343,"level":"debug","msg":"[ScormInspectorTelemetryStore] getHistory called. Current history size: 73, options: {}","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463351,"level":"debug","msg":"[ScormInspectorTelemetryStore] getHistory returning 73 entries","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463359,"level":"debug","msg":"getCurrentDataModel: Found 1 sessions","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463367,"level":"debug","msg":"getCurrentDataModel: Most recent session ID: session_1762286462817","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463375,"level":"debug","msg":"getCurrentDataModel: Retrieved data model with 43 core data items","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463383,"level":"debug","msg":"getCurrentDataModel: Missing SCORM elements: cmi.completion_threshold, cmi.max_time_allowed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463391,"level":"debug","msg":"IpcHandler: getCurrentDataModel returned object with keys: coreData,interactions,objectives,commentsFromLearner,commentsFromLms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463399,"level":"debug","msg":"IpcHandler: handleScormInspectorGetActivityTree called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463408,"level":"debug","msg":"IpcHandler: handleScormInspectorGetNavigationRequests called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463415,"level":"debug","msg":"IpcHandler: handleScormInspectorGetGlobalObjectives called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463424,"level":"debug","msg":"IpcHandler: handleScormInspectorGetSSPBuckets called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463432,"level":"debug","msg":"IpcHandler: handleScormInspectorGetHistory called with limit: undefined, offset: undefined, sinceTs: undefined, methodFilter: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463439,"level":"debug","msg":"[ScormInspectorTelemetryStore] getHistory called. Current history size: 73, options: {}","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463446,"level":"debug","msg":"[ScormInspectorTelemetryStore] getHistory returning 73 entries","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463454,"level":"debug","msg":"getCurrentDataModel: Found 1 sessions","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463462,"level":"debug","msg":"getCurrentDataModel: Most recent session ID: session_1762286462817","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463470,"level":"debug","msg":"getCurrentDataModel: Retrieved data model with 43 core data items","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463478,"level":"debug","msg":"getCurrentDataModel: Missing SCORM elements: cmi.completion_threshold, cmi.max_time_allowed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463485,"level":"debug","msg":"IpcHandler: getCurrentDataModel returned object with keys: coreData,interactions,objectives,commentsFromLearner,commentsFromLms","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463493,"level":"debug","msg":"IpcHandler: handleScormInspectorGetActivityTree called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463501,"level":"debug","msg":"IpcHandler: handleScormInspectorGetNavigationRequests called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463510,"level":"debug","msg":"IpcHandler: handleScormInspectorGetGlobalObjectives called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463519,"level":"debug","msg":"IpcHandler: handleScormInspectorGetSSPBuckets called with sessionId: undefined","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463528,"level":"debug","msg":"UIState.updateProgress: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463537,"level":"info","msg":"RENDERER_COALESCE_WINDOW_START","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463543,"level":"debug","msg":"CourseOutline: Activity progress updated, refreshing SCORM states","args":[{"activityId":"session_1762286462817","element":"cmi.completion_status","value":"incomplete","completionStatus":"incomplete","successStatus":"unknown","timestamp":1762286463149}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463552,"level":"warn","msg":"RENDERER_COALESCED_DUPLICATES","args":[{"dropped":1}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463561,"level":"info","msg":"CourseOutline: Refreshing SCORM states","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463569,"level":"warn","msg":"CourseOutline: getCourseOutlineActivityTree not available via snBridge","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463577,"level":"info","msg":"CourseOutline: SCORM states refreshed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463585,"level":"debug","msg":"AppManager: Menu toggled","args":[{"visible":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463592,"level":"info","msg":"AppManager: Menu visibility changed","args":[{"visible":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463599,"level":"info","msg":"AppManager: Sidebar visibility updated based on course sequencing","args":[{"browseMode":false,"choiceAvailable":false,"shouldShowSidebar":false}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463629,"level":"info","msg":"[Renderer Console] [SCORM Init] Attempting to initialize SCORM (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:38)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463637,"level":"info","msg":"[Renderer Console] [SCORM Init] Already connected (scorm-app://app/scorm_1762286462004/content/framework/runtime.js:40)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463644,"level":"debug","msg":"UIState.updateProgress: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463652,"level":"info","msg":"RENDERER_COALESCE_WINDOW_START","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463660,"level":"debug","msg":"ScormService: Updating SN activity progress for item-1 with cmi.progress_measure=0.16666666666666666","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463668,"level":"debug","msg":"Starting rollup process for activity: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463676,"level":"debug","msg":"Global objective updated: obj-global-completion.satisfied = false","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463685,"level":"debug","msg":"Post-condition rule triggered: undefined for item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463693,"level":"debug","msg":"Activity progress updated: item-1","args":[{"measure":0.16666666666666666}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463701,"level":"debug","msg":"SN Service: Updated location for activity item-1 to 0","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463710,"level":"warn","msg":"RENDERER_COALESCED_DUPLICATES","args":[{"dropped":1}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463718,"level":"info","msg":"[Renderer Console] [CourseRuntime] Updating navigation buttons. Current state: [object Object] (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:612)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463725,"level":"info","msg":"[Renderer Console] [CourseRuntime] Navigation availability: [object Object] (scorm-app://app/scorm_1762286462004/content/framework/course-runtime.js:623)","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463733,"level":"debug","msg":"ScormService: Updating SN activity progress for item-1 with cmi.progress_measure=0.16666666666666666","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463741,"level":"debug","msg":"Starting rollup process for activity: item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463749,"level":"debug","msg":"Global objective updated: obj-global-completion.satisfied = false","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463757,"level":"debug","msg":"Post-condition rule triggered: undefined for item-1","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463765,"level":"debug","msg":"Activity progress updated: item-1","args":[{"measure":0.16666666666666666}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463773,"level":"debug","msg":"SN Service: Updated location for activity item-1 to 0","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463781,"level":"info","msg":"CourseOutline: Immediate SCORM state refresh completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463789,"level":"debug","msg":"UIState.updateUI: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463796,"level":"debug","msg":"UIState.updateProgress: no-op (no diff); emit skipped","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463946,"level":"info","msg":"CourseOutline: Refreshing SCORM states","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463954,"level":"warn","msg":"CourseOutline: getCourseOutlineActivityTree not available via snBridge","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286463962,"level":"info","msg":"CourseOutline: SCORM states refreshed successfully","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286464476,"level":"debug","msg":"AppManager: SN polling tick","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286464483,"level":"info","msg":"AppManager: SN polling backoff applied","args":[{"backoffMs":1200}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286464634,"level":"info","msg":"[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)","args":[{"persistenceKey":"scorm-tester-ui-state"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286465676,"level":"debug","msg":"AppManager: SN polling tick","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286465683,"level":"info","msg":"AppManager: SN polling backoff applied","args":[{"backoffMs":2100}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466692,"level":"info","msg":"AppManager: Toggled integrated Inspector panel","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466723,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466734,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286466743,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286467777,"level":"debug","msg":"AppManager: SN polling tick","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286467786,"level":"info","msg":"AppManager: SN polling backoff applied","args":[{"backoffMs":3675}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468806,"level":"info","msg":"AppManager: Toggled integrated Inspector panel","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468814,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468825,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286468835,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471453,"level":"debug","msg":"AppManager: SN polling tick","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471461,"level":"info","msg":"AppManager: SN polling backoff applied","args":[{"backoffMs":6431}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471705,"level":"info","msg":"AppManager: Toggled integrated Inspector panel","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471721,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471731,"level":"error","msg":"EventBus: Detected repeating cycle 'inspectorpanel:visibilityChanged' <-> 'inspector:state:updated', dropping 'inspector:state:updated'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286471741,"level":"error","msg":"EventBus: Detected repeating cycle 'inspector:state:updated' <-> 'inspectorpanel:visibilityChanged', dropping 'inspectorpanel:visibilityChanged'","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286477885,"level":"debug","msg":"AppManager: SN polling tick","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286477894,"level":"info","msg":"AppManager: SN polling backoff applied","args":[{"backoffMs":8000}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480334,"level":"info","msg":"MenuBuilder: Exit menu clicked","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480341,"level":"info","msg":"MenuBuilder: Exit requested, calling app.quit()","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480349,"level":"info","msg":"SCORM Tester: before-quit event received","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480356,"level":"info","msg":"SCORM Tester: Starting graceful shutdown from before-quit","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480363,"level":"info","msg":"SCORM Tester: Starting graceful shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480370,"level":"debug","msg":"SCORM Tester: Broadcasted app-quit signal to all windows","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480377,"level":"debug","msg":"SCORM Tester: Shutting down ipcHandler","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480384,"level":"info","msg":"Shutting down IpcHandler service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480391,"level":"debug","msg":"IpcHandler state changed: ready -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480398,"level":"debug","msg":"Service ipcHandler state changed:","args":[{"serviceName":"IpcHandler","oldState":"ready","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480405,"level":"info","msg":"[SNSnapshotService] Stopped polling SN status","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480412,"level":"info","msg":"Shutting down ScormService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480420,"level":"debug","msg":"ScormService state changed: ready -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480428,"level":"debug","msg":"Service scormService state changed:","args":[{"serviceName":"ScormService","oldState":"ready","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480436,"level":"debug","msg":"ScormService: Starting shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480444,"level":"info","msg":"ScormService: Active sessions at shutdown: [session_1762286462817]","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480454,"level":"debug","msg":"Terminate called with parameter:","args":[""],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480462,"level":"debug","msg":"Session time calculated:","args":["PT0H0M17S"],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480470,"level":"info","msg":"SCORM session terminated: session_1762286462817","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480478,"level":"debug","msg":"ScormService: No navigation request set for session session_1762286462817","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480485,"level":"info","msg":"ScormService: Emitting course:exited event for session session_1762286462817","args":[{"completionStatus":"incomplete","successStatus":"unknown","exitType":"","navigationRequest":"_none_"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480493,"level":"info","msg":"ScormService: Session session_1762286462817 terminated (prevState=initialized), RTE and data preserved for resume testing","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480501,"level":"debug","msg":"Activity tree reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480510,"level":"debug","msg":"RollupManager reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480517,"level":"debug","msg":"SN service reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480525,"level":"debug","msg":"ScormService: Shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480534,"level":"debug","msg":"ScormService state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480540,"level":"debug","msg":"Service scormService state changed:","args":[{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480546,"level":"info","msg":"ScormService service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480554,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-initialize","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480562,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-get-value","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480569,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-set-value","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480578,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-set-values-batch","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480585,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-commit","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480591,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-terminate","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480598,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm:resume-session","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480606,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm:cleanup-terminated-session","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480615,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-get-progress-snapshot","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480623,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: ui-settings:get","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480631,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: ui-settings:set","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480637,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: browse-mode-enable","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480647,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: browse-mode-disable","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480657,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: browse-mode-status","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480667,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: browse-mode-create-session","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480676,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: select-scorm-package","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480684,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: select-scorm-folder","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480693,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: extract-scorm","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480701,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: prepare-course-source","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480709,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: save-temporary-file","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480716,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: find-scorm-entry","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480724,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-course-info","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480731,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-course-manifest","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480740,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: recent:get","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480748,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: recent:addOrUpdate","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480756,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: recent:remove","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480764,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: recent:clear","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480771,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: validate-scorm-compliance","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480779,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: analyze-scorm-content","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480787,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-app-version","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480795,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-app-path","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480803,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-session-data","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480811,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: reset-session","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480819,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-all-sessions","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480827,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: process-scorm-manifest","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480835,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:getStatus","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480843,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:getSequencingState","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480851,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:initialize","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480859,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:processNavigation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480867,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:refreshNavigation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480875,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:updateActivityProgress","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480883,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480891,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:handleActivityExit","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480899,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: sn:updateActivityLocation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480907,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: apply-lms-profile","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480915,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-lms-profiles","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480922,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: run-test-scenario","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480930,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: open-external","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480940,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: path-to-file-url","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480948,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-app-root","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480956,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: path-normalize","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480964,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: path-join","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480972,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-history","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480980,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-activity-tree","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480988,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-navigation-requests","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286480995,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-global-objectives","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481003,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-ssp-buckets","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481011,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-data-model","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481019,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-get-sn-state","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481027,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: scorm-inspector-clear","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481035,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: course-outline-get-activity-tree","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481043,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: course-outline-validate-choice","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481051,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: course-outline-get-available-navigation","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481059,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: load-shared-logger-adapter","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481067,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: quit-app","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481075,"level":"debug","msg":"IpcHandler: Unregistered handler for channel: get-error-logs","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481083,"level":"info","msg":"IpcHandler: All handlers unregistered","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481090,"level":"debug","msg":"IpcHandler state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481098,"level":"debug","msg":"Service ipcHandler state changed:","args":[{"serviceName":"IpcHandler","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481105,"level":"info","msg":"IpcHandler service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481114,"level":"debug","msg":"SCORM Tester: Shutting down scormService","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481122,"level":"info","msg":"Shutting down ScormService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481130,"level":"debug","msg":"ScormService state changed: shutdown -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481138,"level":"debug","msg":"Service scormService state changed:","args":[{"serviceName":"ScormService","oldState":"shutdown","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481146,"level":"debug","msg":"ScormService: Starting shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481154,"level":"info","msg":"ScormService: Active sessions at shutdown: []","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481162,"level":"debug","msg":"Activity tree reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481170,"level":"debug","msg":"RollupManager reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481177,"level":"debug","msg":"SN service reset","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481185,"level":"debug","msg":"ScormService: Shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481193,"level":"debug","msg":"ScormService state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481202,"level":"debug","msg":"Service scormService state changed:","args":[{"serviceName":"ScormService","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481209,"level":"info","msg":"ScormService service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481216,"level":"debug","msg":"SCORM Tester: Shutting down recentCoursesService","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481224,"level":"info","msg":"Shutting down RecentCoursesService service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481232,"level":"debug","msg":"RecentCoursesService state changed: ready -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481240,"level":"debug","msg":"Service recentCoursesService state changed:","args":[{"serviceName":"RecentCoursesService","oldState":"ready","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481248,"level":"debug","msg":"RecentCoursesService: Starting shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481256,"level":"debug","msg":"RecentCoursesService: Shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481264,"level":"debug","msg":"RecentCoursesService state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481272,"level":"debug","msg":"Service recentCoursesService state changed:","args":[{"serviceName":"RecentCoursesService","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481280,"level":"info","msg":"RecentCoursesService service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481288,"level":"debug","msg":"SCORM Tester: Shutting down fileManager","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481295,"level":"info","msg":"Shutting down FileManager service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481304,"level":"debug","msg":"FileManager state changed: ready -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481312,"level":"debug","msg":"Service fileManager state changed:","args":[{"serviceName":"FileManager","oldState":"ready","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481320,"level":"debug","msg":"FileManager: Starting shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481328,"level":"debug","msg":"FileManager: Shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481336,"level":"debug","msg":"FileManager state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481344,"level":"debug","msg":"Service fileManager state changed:","args":[{"serviceName":"FileManager","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481352,"level":"info","msg":"FileManager service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481360,"level":"debug","msg":"SCORM Tester: Shutting down windowManager","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481367,"level":"info","msg":"Shutting down WindowManager service","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481376,"level":"debug","msg":"WindowManager state changed: ready -> shutting_down","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481384,"level":"debug","msg":"Service windowManager state changed:","args":[{"serviceName":"WindowManager","oldState":"ready","newState":"shutting_down"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481392,"level":"debug","msg":"WindowManager: Starting shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481400,"level":"debug","msg":"WindowManager: Closing main window","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481411,"level":"debug","msg":"WindowManager: Shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481419,"level":"debug","msg":"WindowManager state changed: shutting_down -> shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481427,"level":"debug","msg":"Service windowManager state changed:","args":[{"serviceName":"WindowManager","oldState":"shutting_down","newState":"shutdown"}],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481435,"level":"info","msg":"WindowManager service shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481443,"level":"info","msg":"SCORM Tester: Graceful shutdown completed","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481456,"level":"info","msg":"SCORM Tester: Calling app.quit() after shutdown","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481463,"level":"info","msg":"SCORM Tester: before-quit event received","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481471,"level":"info","msg":"SCORM Tester: Already shutting down, allowing quit","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481489,"level":"info","msg":"[PRELOAD] App quit signal received, setting shutdown flag","args":[],"context":{},"pid":91807,"process":"browser"}
+{"ts":1762286481501,"level":"debug","msg":"WindowManager: main window state: undefined -> closed","args":[],"context":{},"pid":91807,"process":"browser"}

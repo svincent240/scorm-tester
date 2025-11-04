@@ -7,6 +7,7 @@
 // @ts-check
 import { BaseComponent } from '../base-component.js';
 import { snBridge } from '../../services/sn-bridge.js';
+import { createJsonViewer } from '../../utils/json-viewer.js';
 
 class InspectorPanel extends BaseComponent {
   constructor(elementId, options = {}) {
@@ -104,24 +105,22 @@ class InspectorPanel extends BaseComponent {
 
       resizeHandle.addEventListener('mousedown', (e) => {
         isResizing = true;
-        startY = e.clientY;
-        const bodyEl = this.element.querySelector('.inspector-panel__body');
-        if (bodyEl) {
-          startHeight = bodyEl.offsetHeight;
+        startY = e.clientX;  // Changed to clientX for horizontal resizing
+        if (this.element) {
+          startHeight = this.element.offsetWidth;  // Changed to offsetWidth
         }
-        document.body.style.cursor = 'ns-resize';
+        document.body.style.cursor = 'ew-resize';  // Changed to ew-resize
         document.body.style.userSelect = 'none';
         e.preventDefault();
       });
 
       document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
-        const bodyEl = this.element.querySelector('.inspector-panel__body');
-        if (!bodyEl) return;
+        if (!this.element) return;
 
-        const deltaY = startY - e.clientY; // Inverted because panel grows upward
-        const newHeight = Math.max(100, Math.min(800, startHeight + deltaY));
-        bodyEl.style.maxHeight = `${newHeight}px`;
+        const deltaX = startY - e.clientX;  // Changed to clientX, inverted because panel grows leftward
+        const newWidth = Math.max(300, Math.min(window.innerWidth * 0.5, startHeight + deltaX));
+        this.element.style.width = `${newWidth}px`;
       });
 
       document.addEventListener('mouseup', () => {
@@ -333,7 +332,17 @@ class InspectorPanel extends BaseComponent {
       ? `<div class="tab-section"><h4>Errors (${this.state.errors.length})</h4><ul class="api-errors">${this.state.errors.slice(0,100).map(e=>`<li>${this._esc(e?.message||String(e))}</li>`).join('')}</ul></div>`
       : '';
 
-    el.innerHTML = `<div class="tab-section"><h4>API Calls</h4>${controls}${list}</div>${errorsBlock}`;
+    el.innerHTML = `
+      <div class="tab-section">
+        <div class="tab-section__header">
+          <h4>API Calls</h4>
+          ${controls}
+        </div>
+        <div class="tab-section__content">
+          ${list}
+        </div>
+      </div>
+      ${errorsBlock}`;
   }
 
   renderActivityTree() {
@@ -382,20 +391,55 @@ class InspectorPanel extends BaseComponent {
   renderDataModel() {
     const el = this.tabEls?.model; if (!el) return;
     const dm = this.state.dataModel || {};
-    const dmJson = JSON.stringify(dm, null, 2);
-    const body = `<pre class="dm-json">${this._esc(dmJson)}</pre>`;
-    const header = `<div style="display: flex; justify-content: space-between; align-items: center;">
-      <h4>Data Model</h4>
-      <button class="js-copy-data-model" title="Copy data model to clipboard">📋 Copy JSON</button>
-    </div>`;
-    el.innerHTML = `<div class="tab-section">${header}${body}</div>`;
+
+    const { html, controlsHtml, setup } = createJsonViewer(dm, {
+      showControls: true,
+      showCopy: true,
+      title: 'Data Model',
+      expanded: false,
+      maxDepth: 2
+    });
+
+    el.innerHTML = `
+      <div class="tab-section">
+        <div class="tab-section__header">
+          <h4>Data Model</h4>
+          ${controlsHtml}
+        </div>
+        <div class="tab-section__content">
+          ${html}
+        </div>
+      </div>`;
+
+    // Setup event handlers for the JSON viewer
+    setup(el);
   }
 
   renderSnState() {
     const el = this.tabEls?.sn; if (!el) return;
     const sn = this.state.sn || {};
-    const body = `<pre class="sn-json">${this._esc(JSON.stringify(sn, null, 2))}</pre>`;
-    el.innerHTML = `<div class="tab-section"><h4>SN State</h4>${body}</div>`;
+
+    const { html, controlsHtml, setup } = createJsonViewer(sn, {
+      showControls: true,
+      showCopy: true,
+      title: 'Sequencing State',
+      expanded: false,
+      maxDepth: 2
+    });
+
+    el.innerHTML = `
+      <div class="tab-section">
+        <div class="tab-section__header">
+          <h4>SN State</h4>
+          ${controlsHtml}
+        </div>
+        <div class="tab-section__content">
+          ${html}
+        </div>
+      </div>`;
+
+    // Setup event handlers for the JSON viewer
+    setup(el);
   }
 
 
@@ -480,26 +524,6 @@ class InspectorPanel extends BaseComponent {
       }
     } catch (_) {}
 
-    // Data model tab copy button
-    try {
-      const modelTab = this.tabEls?.model;
-      if (modelTab) {
-        modelTab.addEventListener('click', async (e) => {
-          if (e.target?.classList?.contains('js-copy-data-model')) {
-            const dm = this.state.dataModel || {};
-            const dmJson = JSON.stringify(dm, null, 2);
-            try {
-              await navigator.clipboard.writeText(dmJson);
-              e.target.textContent = '✓ Copied';
-              setTimeout(() => { e.target.textContent = '📋 Copy JSON'; }, 1000);
-            } catch (err) {
-              console.error('Failed to copy data model:', err);
-            }
-          }
-        });
-      }
-    } catch (_) {}
-
     // Subscribe to course-loaded event to clear and refresh inspector
     try {
       const offCourseLoaded = snBridge.onCourseLoaded(async () => {
@@ -553,6 +577,7 @@ class InspectorPanel extends BaseComponent {
   show() {
     this.visible = true;
     if (this.container) this.container.style.display = 'block';
+    if (this.element) this.element.classList.add('inspector-panel--visible');
     if (!this.loaded) this.loadInitialData();
     try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) {}
     try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) {}
@@ -562,6 +587,11 @@ class InspectorPanel extends BaseComponent {
   hide() {
     this.visible = false;
     if (this.container) this.container.style.display = 'none';
+    if (this.element) {
+      this.element.classList.remove('inspector-panel--visible');
+      // Clear inline width style to allow CSS transition to collapse the panel
+      this.element.style.width = '';
+    }
     try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) {}
     try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) {}
     this.emit('visibilityChanged', { visible: false });
@@ -574,12 +604,13 @@ class InspectorPanel extends BaseComponent {
 
   async loadInitialData() {
     try {
-      const [hist, tree, nav, obj, ssp] = await Promise.all([
+      const [hist, tree, nav, obj, ssp, sn] = await Promise.all([
         snBridge.getScormInspectorHistory(),
         snBridge.getActivityTree(),
         snBridge.getNavigationRequests(),
         snBridge.getGlobalObjectives(),
-        snBridge.getSSPBuckets()
+        snBridge.getSSPBuckets(),
+        snBridge.getSnState()
       ]);
 
       if (hist?.success && hist.data) {
@@ -591,6 +622,7 @@ class InspectorPanel extends BaseComponent {
       if (nav?.success) this.state.navigation = nav.data || [];
       if (obj?.success) this.state.objectives = obj.data || [];
       if (ssp?.success) this.state.ssp = ssp.data || [];
+      if (sn?.success) this.state.sn = sn;
 
       this.updateSummaryCounts();
       this.loaded = true;
