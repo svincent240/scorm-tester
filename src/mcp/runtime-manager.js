@@ -65,6 +65,9 @@ async function resolveEntryPathFromManifest(workspace) {
 // Persistent runtime registry keyed by session_id
 const _persistentBySession = new Map();
 
+// Per-session network request buffers
+const _networkRequestsBySession = new Map();
+
 /**
  * Map Chromium console level to logger level
  * @param {number} level - Chromium console level (0-3)
@@ -83,6 +86,7 @@ function mapConsoleLevel(level) {
 /**
  * Set up console logging capture for a BrowserWindow
  * Captures all browser console messages and logs them to the unified logging system
+ * Browser console logs are accessible via system_get_logs MCP tool
  * @param {BrowserWindow} win - The BrowserWindow to monitor
  */
 function setupConsoleLogging(win) {
@@ -108,7 +112,7 @@ function setupConsoleLogging(win) {
         msgStr.includes("can remove its sandboxing")
       );
 
-      // Log all non-benign messages to unified logging system
+      // Log all non-benign messages to unified logging system (accessible via system_get_logs)
       if (!isBenignWarning) {
         logger?.[logLevel](`[Browser Console] ${message}`, { source, line });
       }
@@ -124,6 +128,70 @@ function setupConsoleLogging(win) {
   win.webContents.on('crashed', (event, killed) => {
     logger?.error(`[Browser Crash] Renderer process crashed`, { killed });
   });
+}
+
+/**
+ * Set up network request monitoring for a BrowserWindow
+ * Captures all network requests made by SCORM content for debugging
+ * @param {BrowserWindow} win - The BrowserWindow to monitor
+ * @param {string} session_id - Optional session ID for per-session request capture
+ */
+function setupNetworkMonitoring(win, session_id = null) {
+  if (!win || !win.webContents) return;
+
+  // Initialize per-session network request buffer if session_id provided
+  if (session_id && !_networkRequestsBySession.has(session_id)) {
+    _networkRequestsBySession.set(session_id, []);
+  }
+
+  // Capture network requests via webRequest API
+  try {
+    const { session } = win.webContents;
+    if (!session || !session.webRequest) return;
+
+    // Track request details
+    session.webRequest.onBeforeRequest((details, callback) => {
+      if (session_id && _networkRequestsBySession.has(session_id)) {
+        _networkRequestsBySession.get(session_id).push({
+          id: details.id,
+          timestamp: Date.now(),
+          method: details.method,
+          url: details.url,
+          resourceType: details.resourceType,
+          uploadData: details.uploadData || null
+        });
+      }
+      callback({});
+    });
+
+    // Track response details
+    session.webRequest.onCompleted((details) => {
+      if (session_id && _networkRequestsBySession.has(session_id)) {
+        const requests = _networkRequestsBySession.get(session_id);
+        const req = requests.find(r => r.id === details.id);
+        if (req) {
+          req.statusCode = details.statusCode;
+          req.statusLine = details.statusLine;
+          req.responseHeaders = details.responseHeaders;
+          req.completedAt = Date.now();
+        }
+      }
+    });
+
+    // Track errors
+    session.webRequest.onErrorOccurred((details) => {
+      if (session_id && _networkRequestsBySession.has(session_id)) {
+        const requests = _networkRequestsBySession.get(session_id);
+        const req = requests.find(r => r.id === details.id);
+        if (req) {
+          req.error = details.error;
+          req.errorAt = Date.now();
+        }
+      }
+    });
+  } catch (err) {
+    logger?.warn('Failed to set up network monitoring', { error: err.message });
+  }
 }
 
 class RuntimeManager {
@@ -218,7 +286,16 @@ class RuntimeManager {
     await this.closePersistent(session_id);
     const win = await this.openPage({ entryPath, viewport, adapterOptions });
     _persistentBySession.set(session_id, win);
-    try { win.on('closed', () => { try { _persistentBySession.delete(session_id); } catch (_) {} }); } catch (_) {}
+
+    // Set up per-session network monitoring
+    setupNetworkMonitoring(win, session_id);
+
+    try { win.on('closed', () => {
+      try {
+        _persistentBySession.delete(session_id);
+        _networkRequestsBySession.delete(session_id);
+      } catch (_) {}
+    }); } catch (_) {}
     return win;
   }
 
@@ -327,6 +404,34 @@ class RuntimeManager {
 
   static async close(win) {
     try { win?.destroy(); } catch (_) {}
+  }
+
+  /**
+   * Get network requests for a specific session
+   * @param {string} session_id - Session ID
+   * @param {object} options - Filter options (resource_types, since_ts, max_count)
+   * @returns {Array} Array of network request entries
+   */
+  static getNetworkRequests(session_id, options = {}) {
+    const requests = _networkRequestsBySession.get(session_id) || [];
+    let filtered = requests;
+
+    // Filter by resource types if specified
+    if (Array.isArray(options.resource_types) && options.resource_types.length > 0) {
+      filtered = filtered.filter(req => options.resource_types.includes(req.resourceType));
+    }
+
+    // Filter by timestamp if specified
+    if (options.since_ts) {
+      filtered = filtered.filter(req => req.timestamp >= options.since_ts);
+    }
+
+    // Limit count if specified
+    if (options.max_count && options.max_count > 0) {
+      filtered = filtered.slice(-options.max_count);
+    }
+
+    return filtered;
   }
 
   /**

@@ -1197,7 +1197,6 @@ class ScormService extends BaseService {
           errorCode,
           timestamp: logEntry.timestamp
         });
-        this.logger?.debug('ScormService: API call published to telemetryStore');
         return;
       }
     } catch (e) {
@@ -1617,24 +1616,24 @@ class ScormService extends BaseService {
       // Get the most recent/active session
       const sessions = this.getAllSessions();
       this.logger?.debug(`getCurrentDataModel: Found ${sessions ? sessions.length : 0} sessions`);
-      
+
       if (!sessions || sessions.length === 0) {
         this.logger?.debug('getCurrentDataModel: No sessions available, returning empty object');
         return {};
       }
-      
-      // BUG-009 FIX: Use correct property names and RTE access patterns
+
+      // BUG FIX: Session object has 'id' property, not 'sessionId'
       // Find the most recently used session using correct property name
       const mostRecentSession = sessions.reduce((latest, current) => {
         const latestTime = latest.lastActivity || 0;
         const currentTime = current.lastActivity || 0;
         return currentTime > latestTime ? current : latest;
       });
-      
-      this.logger?.debug(`getCurrentDataModel: Most recent session ID: ${mostRecentSession?.sessionId || 'unknown'}`);
-      
+
+      this.logger?.debug(`getCurrentDataModel: Most recent session ID: ${mostRecentSession?.id || 'unknown'}`);
+
       // Get RTE instance from this.rteInstances.get(sessionId) - correct access pattern
-      const sessionId = mostRecentSession?.sessionId;
+      const sessionId = mostRecentSession?.id;
       if (sessionId) {
         const rte = this.rteInstances.get(sessionId);
         

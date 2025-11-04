@@ -11,7 +11,8 @@ const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
 const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
-const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing } = require("./tools/runtime");
+const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_network_requests } = require("./tools/runtime");
+const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type } = require("./tools/dom");
 
 const getLogger = require('../shared/utils/logger.js');
 const fs = require('fs');
@@ -51,6 +52,13 @@ const TOOL_META = new Map([
   ["scorm_debug_api_calls", { description: "Capture and summarize SCORM API calls (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, filter_methods: { type: "array", items: { type: "string" } }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_trace_sequencing", { description: "Trace SCORM SN structure and environment", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, trace_level: { type: "string", enum: ["basic", "detailed", "verbose"] }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_report", { description: "Generate a compliance report (JSON or HTML)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, format: { type: "string", enum: ["json", "html"] } }, required: ["workspace_path"] } }],
+  ["scorm_get_network_requests", { description: "Get network requests made by SCORM content for debugging", inputSchema: { type: "object", properties: { session_id: { type: "string" }, options: { type: "object", properties: { resource_types: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, max_count: { type: "number" } } } }, required: ["session_id"] } }],
+  ["scorm_dom_click", { description: "Click a DOM element by selector in SCORM content", inputSchema: { type: "object", properties: { session_id: { type: "string" }, selector: { type: "string" }, options: { type: "object", properties: { click_type: { type: "string", enum: ["single", "double", "right"] }, wait_for_selector: { type: "boolean" }, wait_timeout_ms: { type: "number" } } } }, required: ["session_id", "selector"] } }],
+  ["scorm_dom_fill", { description: "Fill a form input element by selector (text, select, checkbox, radio)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, selector: { type: "string" }, value: { type: ["string", "boolean", "number"] }, options: { type: "object", properties: { wait_for_selector: { type: "boolean" }, wait_timeout_ms: { type: "number" }, trigger_events: { type: "boolean" } } } }, required: ["session_id", "selector", "value"] } }],
+  ["scorm_dom_query", { description: "Query DOM element state (text, attributes, visibility, styles, value)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, selector: { type: "string" }, query_type: { type: "string", enum: ["all", "text", "attributes", "visibility", "styles", "value"] } }, required: ["session_id", "selector"] } }],
+  ["scorm_dom_evaluate", { description: "Execute JavaScript in browser context and return serializable results", inputSchema: { type: "object", properties: { session_id: { type: "string" }, expression: { type: "string" }, return_by_value: { type: "boolean" } }, required: ["session_id", "expression"] } }],
+  ["scorm_dom_wait_for", { description: "Wait for a DOM condition to be met (element visible, text appears, etc.)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, condition: { type: "object", properties: { selector: { type: "string" }, visible: { type: "boolean" }, text: { type: "string" }, attribute: { type: "string" }, attribute_value: { type: "string" }, expression: { type: "string" } } }, timeout_ms: { type: "number" } }, required: ["session_id", "condition"] } }],
+  ["scorm_keyboard_type", { description: "Simulate keyboard typing in a focused element", inputSchema: { type: "object", properties: { session_id: { type: "string" }, text: { type: "string" }, options: { type: "object", properties: { selector: { type: "string" }, delay_ms: { type: "number" } } } }, required: ["session_id", "text"] } }],
   ["system_get_logs", { description: "Get recent log entries including browser console errors, warnings, and all application logs (NDJSON format)", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
   ["system_set_log_level", { description: "Set log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
 ]);
@@ -84,6 +92,14 @@ async function system_get_logs(params = {}) {
   const { tail = 200, levels = [], since_ts = 0, component = null } = params;
   const file = (logger && logger.ndjsonFile) ? logger.ndjsonFile : (logger && logger.logFile);
   if (!file) return { logs: [], note: 'No log file available' };
+
+  const logDir = logger && logger.ndjsonFile ? path.dirname(logger.ndjsonFile) : null;
+  const allLogFiles = logDir ? {
+    ndjson: logger.ndjsonFile,
+    errors: logger.errorsFile,
+    human_readable: logger.logFile
+  } : null;
+
   try {
     const text = fs.readFileSync(file, 'utf8');
     const lines = text.split('\n').filter(Boolean);
@@ -105,11 +121,25 @@ async function system_get_logs(params = {}) {
     }
     return {
       logs: out,
-      note: 'Includes browser console errors/warnings from SCORM content, application logs, and all MCP operations',
-      log_file: file
+      log_count: out.length,
+      total_lines: lines.length,
+      log_directory: logDir,
+      log_files: allLogFiles,
+      note: 'Includes browser console errors/warnings from SCORM content, application logs, and all MCP operations. Logs are flushed immediately to disk.',
+      filters_applied: {
+        tail,
+        levels: levels.length > 0 ? levels : 'all',
+        since_ts: since_ts || 'none',
+        component: component || 'all'
+      }
     };
   } catch (e) {
-    return { logs: [], error: e.message };
+    return {
+      logs: [],
+      error: e.message,
+      log_directory: logDir,
+      log_files: allLogFiles
+    };
   }
 }
 
@@ -137,6 +167,13 @@ router.register("scorm_test_navigation_flow", scorm_test_navigation_flow);
 router.register("scorm_debug_api_calls", scorm_debug_api_calls);
 router.register("scorm_trace_sequencing", scorm_trace_sequencing);
 router.register("scorm_report", scorm_report);
+router.register("scorm_get_network_requests", scorm_get_network_requests);
+router.register("scorm_dom_click", scorm_dom_click);
+router.register("scorm_dom_fill", scorm_dom_fill);
+router.register("scorm_dom_query", scorm_dom_query);
+router.register("scorm_dom_evaluate", scorm_dom_evaluate);
+router.register("scorm_dom_wait_for", scorm_dom_wait_for);
+router.register("scorm_keyboard_type", scorm_keyboard_type);
 
 function writeMessage(msg) {
   try {

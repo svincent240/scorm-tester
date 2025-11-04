@@ -158,7 +158,6 @@ class ScormDataModel {
         this.logBrowseOperation('setValue', { element, value });
       }
 
-      this.logger?.debug(`Set ${element} = ${value}`);
       this.errorHandler.clearError();
       return true;
       
@@ -199,7 +198,6 @@ class ScormDataModel {
 
       // Directly set the value, bypassing read-only check
       this.data.set(element, value);
-      this.logger?.debug(`_setInternalValue: Set ${element} = ${value} (internal)`);
       this.errorHandler.clearError(); // Clear any previous error from this operation
       return true;
     } catch (error) {
@@ -247,7 +245,6 @@ class ScormDataModel {
         return '';
       }
 
-      this.logger?.debug(`_getInternalValue: Get ${element} = ${value} (internal)`);
       this.errorHandler.clearError(); // Clear any previous error from this operation
       return String(value);
     } catch (error) {

@@ -240,10 +240,10 @@ class NavigationControls extends BaseComponent {
     
     // BUG-022 FIX: Subscribe to navigation state updates
     this.subscribe('navigation:state:updated', this.handleNavigationStateUpdate);
-    
-    // CRITICAL FIX: Subscribe to navigation availability updates from main process
-    // This enables navigation buttons after activity completion
-    this.subscribe('navigation:availability:updated', this.handleNavigationAvailabilityUpdated);
+
+    // NOTE: navigation:availability:updated is handled via UIState subscription in setup()
+    // AppManager receives IPC events and updates UIState, which notifies this component
+    // No need to subscribe to EventBus here - that would cause duplicate processing
 
     // Reflect sidebar visibility updates for button state (unified only)
     this.subscribe('ui:menu:visibility-changed', (payload) => {

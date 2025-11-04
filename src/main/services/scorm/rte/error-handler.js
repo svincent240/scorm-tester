@@ -175,7 +175,6 @@ class ScormErrorHandler {
   clearError() {
     this.lastError = COMMON_ERRORS.NO_ERROR;
     this.lastDiagnostic = '';
-    this.logger?.debug('Error state cleared');
   }
 
   /**
@@ -249,8 +248,6 @@ class ScormErrorHandler {
     
     const oldState = this.sessionState;
     this.sessionState = newState;
-    
-    this.logger?.debug(`Session state changed: ${oldState} -> ${newState}`);
   }
 
   /**

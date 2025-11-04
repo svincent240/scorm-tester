@@ -97,7 +97,21 @@ class Logger {
       let serialized = '';
       try {
         const norm = args.map(normalize);
-        serialized = norm.length ? JSON.stringify(norm) : '';
+        if (norm.length) {
+          // Use circular reference protection to prevent massive log entries
+          const seen = new WeakSet();
+          serialized = JSON.stringify(norm, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) {
+                return '[Circular]';
+              }
+              seen.add(value);
+            }
+            return value;
+          });
+        } else {
+          serialized = '';
+        }
       } catch (_) {
         serialized = args.length ? String(args[0]) : '';
       }
@@ -111,7 +125,10 @@ class Logger {
 
       // Human-readable log
       try {
-        fs.appendFileSync(this.logFile, formattedMessage);
+        const fd = fs.openSync(this.logFile, 'a');
+        fs.writeSync(fd, formattedMessage);
+        fs.fsyncSync(fd); // Force immediate flush to disk
+        fs.closeSync(fd);
       } catch (error) {
         try { console.error('Failed to write to log file:', error); } catch (_) {}
       }
@@ -126,15 +143,29 @@ class Logger {
         pid: (typeof process !== 'undefined' && process.pid) ? process.pid : null,
         process: this.processType
       };
-      try { fs.appendFileSync(this.ndjsonFile, JSON.stringify(entry) + '\n'); } catch (_) {}
+      try {
+        const fd = fs.openSync(this.ndjsonFile, 'a');
+        fs.writeSync(fd, JSON.stringify(entry) + '\n');
+        fs.fsyncSync(fd); // Force immediate flush to disk
+        fs.closeSync(fd);
+      } catch (_) {}
       if (level === 'error') {
-        try { fs.appendFileSync(this.errorsFile, JSON.stringify(entry) + '\n'); } catch (_) {}
+        try {
+          const fd = fs.openSync(this.errorsFile, 'a');
+          fs.writeSync(fd, JSON.stringify(entry) + '\n');
+          fs.fsyncSync(fd); // Force immediate flush to disk
+          fs.closeSync(fd);
+        } catch (_) {}
       }
 
       if (process.env.NODE_ENV === 'development') {
         try {
           // Direct dev console output to STDERR to avoid polluting STDOUT (e.g., MCP JSON-RPC channel)
-          console.error(`[${level.toUpperCase()}]`, message, ...args);
+          // Only log WARN and ERROR to console to prevent spam from thousands of INFO/DEBUG entries
+          // when SCORM courses make hundreds of API calls per second. All logs are still written to files.
+          if (level === 'warn' || level === 'error') {
+            console.error(`[${level.toUpperCase()}]`, message, ...args);
+          }
         } catch (_) {
           // ignore console failure
         }

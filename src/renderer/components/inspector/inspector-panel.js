@@ -46,6 +46,7 @@ class InspectorPanel extends BaseComponent {
   renderContent() {
     // Shell with tabs, controls, summary, and per-tab containers
     this.element.innerHTML = `
+      <div class="inspector-panel__resize-handle" title="Drag to resize"></div>
       <div class="inspector-panel__container" style="display:none">
         <div class="inspector-panel__header">
           <strong>SCORM Inspector (Integrated)</strong>
@@ -93,6 +94,44 @@ class InspectorPanel extends BaseComponent {
     if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
     const refreshBtn = this.element.querySelector('.js-refresh-tab');
     if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshActiveTab());
+
+    // Setup resize handle
+    const resizeHandle = this.element.querySelector('.inspector-panel__resize-handle');
+    if (resizeHandle) {
+      let isResizing = false;
+      let startY = 0;
+      let startHeight = 0;
+
+      resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        const bodyEl = this.element.querySelector('.inspector-panel__body');
+        if (bodyEl) {
+          startHeight = bodyEl.offsetHeight;
+        }
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const bodyEl = this.element.querySelector('.inspector-panel__body');
+        if (!bodyEl) return;
+
+        const deltaY = startY - e.clientY; // Inverted because panel grows upward
+        const newHeight = Math.max(100, Math.min(800, startHeight + deltaY));
+        bodyEl.style.maxHeight = `${newHeight}px`;
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isResizing) {
+          isResizing = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+    }
 
     this._summary = {
       api: this.element.querySelector('.js-api-count'),
@@ -227,7 +266,10 @@ class InspectorPanel extends BaseComponent {
   renderApiLog() {
     const el = this.tabEls?.api; if (!el) return;
     const all = Array.isArray(this.state.history) ? this.state.history : [];
-    const filtered = this._applyApiFilters(all);
+
+    // REVERSE ORDER: Show newest first
+    const reversed = [...all].reverse();
+    const filtered = this._applyApiFilters(reversed);
     const { slice, page, pages, total, pageSize } = this._paginate(filtered);
 
     const methodOptions = ['<option value="all">All methods</option>', ...this._getMethods().map(m => `<option value="${this._esc(m)}" ${this.filters?.method===m?'selected':''}>${this._esc(m)}</option>`)].join('');
@@ -236,19 +278,55 @@ class InspectorPanel extends BaseComponent {
       <div class="api-controls">
         <label>Method <select class="js-api-filter">${methodOptions}</select></label>
         <label><input type="checkbox" class="js-api-errors" ${this.filters?.errorsOnly?'checked':''}/> Errors only</label>
-        <span class="api-paging">Page ${page}/${pages} • ${total} items</span>
+        <button class="js-clear-api-log" title="Clear API log">Clear Log</button>
+        <span class="api-paging">Page ${page}/${pages} • ${total} items (newest first)</span>
         <div class="api-paging__buttons">
           <button class="js-page-prev" ${page<=1?'disabled':''}>Prev</button>
           <button class="js-page-next" ${page>=pages?'disabled':''}>Next</button>
         </div>
       </div>`;
 
-    const list = ['<ul class="api-log">',
-      ...slice.map((it) => `<li><code>${this._esc(it?.method || it?.name || 'unknown')}</code>`+
-        `${it?.timestamp ? ` <small>${this._esc(String(it.timestamp))}</small>` : ''}`+
-        `${it?.args ? ` <small>${this._esc(JSON.stringify(it.args))}</small>` : ''}`+
-        `${it?.error ? ` <small class="error">${this._esc(String(it.error))}</small>` : ''}`+
-      `</li>`),
+    // Enhanced API log with all captured data
+    const list = ['<ul class="api-log api-log--enhanced">',
+      ...slice.map((it) => {
+        const hasError = it?.errorCode && it.errorCode !== '0';
+        const method = this._esc(it?.method || it?.name || 'unknown');
+        const timestamp = it?.timestamp ? new Date(it.timestamp).toLocaleTimeString() : '';
+        const params = it?.parameters || it?.args;
+        const result = it?.result;
+        const errorCode = it?.errorCode;
+        const errorMessage = it?.errorMessage;
+        const durationMs = it?.durationMs;
+        const sessionId = it?.sessionId;
+
+        // Color-code by method type
+        let methodClass = 'method-default';
+        if (method.includes('Initialize')) methodClass = 'method-init';
+        else if (method.includes('Terminate')) methodClass = 'method-terminate';
+        else if (method.includes('GetValue')) methodClass = 'method-get';
+        else if (method.includes('SetValue')) methodClass = 'method-set';
+        else if (method.includes('Commit')) methodClass = 'method-commit';
+        else if (method.includes('GetLastError')) methodClass = 'method-error';
+
+        const errorClass = hasError ? 'api-call-error' : '';
+
+        const recordData = JSON.stringify(it, null, 2);
+
+        return `<li class="api-call ${errorClass}" data-record='${this._esc(recordData)}'>
+          <div class="api-call__header">
+            <code class="api-call__method ${methodClass}">${method}</code>
+            ${timestamp ? `<span class="api-call__timestamp">${this._esc(timestamp)}</span>` : ''}
+            ${durationMs != null ? `<span class="api-call__duration">${this._esc(String(durationMs))}ms</span>` : ''}
+            <button class="api-call__copy js-copy-record" title="Copy record to clipboard">📋</button>
+          </div>
+          <div class="api-call__details">
+            ${params != null ? `<div class="api-call__params"><strong>Params:</strong> <code>${this._esc(JSON.stringify(params))}</code></div>` : ''}
+            ${result != null ? `<div class="api-call__result"><strong>Result:</strong> <code>${this._esc(JSON.stringify(result))}</code></div>` : ''}
+            ${hasError ? `<div class="api-call__error"><strong>Error ${this._esc(errorCode)}:</strong> ${this._esc(errorMessage || 'Unknown error')}</div>` : ''}
+            ${sessionId ? `<div class="api-call__session"><strong>Session:</strong> ${this._esc(sessionId)}</div>` : ''}
+          </div>
+        </li>`;
+      }),
       '</ul>'].join('');
 
     const errorsBlock = this.state.errors?.length && this.filters?.errorsOnly
@@ -304,8 +382,13 @@ class InspectorPanel extends BaseComponent {
   renderDataModel() {
     const el = this.tabEls?.model; if (!el) return;
     const dm = this.state.dataModel || {};
-    const body = `<pre class="dm-json">${this._esc(JSON.stringify(dm, null, 2))}</pre>`;
-    el.innerHTML = `<div class="tab-section"><h4>Data Model</h4>${body}</div>`;
+    const dmJson = JSON.stringify(dm, null, 2);
+    const body = `<pre class="dm-json">${this._esc(dmJson)}</pre>`;
+    const header = `<div style="display: flex; justify-content: space-between; align-items: center;">
+      <h4>Data Model</h4>
+      <button class="js-copy-data-model" title="Copy data model to clipboard">📋 Copy JSON</button>
+    </div>`;
+    el.innerHTML = `<div class="tab-section">${header}${body}</div>`;
   }
 
   renderSnState() {
@@ -359,7 +442,7 @@ class InspectorPanel extends BaseComponent {
             this.renderApiLog();
           }
         });
-        apiTab.addEventListener('click', (e) => {
+        apiTab.addEventListener('click', async (e) => {
           const t = e.target;
           if (t?.classList?.contains('js-page-prev')) {
             this.filters.page = Math.max(1, (this.filters.page||1)-1);
@@ -367,15 +450,80 @@ class InspectorPanel extends BaseComponent {
           } else if (t?.classList?.contains('js-page-next')) {
             this.filters.page = (this.filters.page||1)+1;
             this.renderApiLog();
+          } else if (t?.classList?.contains('js-clear-api-log')) {
+            // Clear API log
+            try {
+              const result = await snBridge.clearScormInspector();
+              if (result?.success) {
+                this.state.history = [];
+                this.state.errors = [];
+                this.updateSummaryCounts();
+                this.renderApiLog();
+              }
+            } catch (err) {
+              console.error('Failed to clear API log:', err);
+            }
+          } else if (t?.classList?.contains('js-copy-record')) {
+            // Copy individual API record
+            const record = t.closest('.api-call')?.dataset?.record;
+            if (record) {
+              try {
+                await navigator.clipboard.writeText(record);
+                t.textContent = '✓';
+                setTimeout(() => { t.textContent = '📋'; }, 1000);
+              } catch (err) {
+                console.error('Failed to copy record:', err);
+              }
+            }
           }
         });
       }
     } catch (_) {}
 
+    // Data model tab copy button
+    try {
+      const modelTab = this.tabEls?.model;
+      if (modelTab) {
+        modelTab.addEventListener('click', async (e) => {
+          if (e.target?.classList?.contains('js-copy-data-model')) {
+            const dm = this.state.dataModel || {};
+            const dmJson = JSON.stringify(dm, null, 2);
+            try {
+              await navigator.clipboard.writeText(dmJson);
+              e.target.textContent = '✓ Copied';
+              setTimeout(() => { e.target.textContent = '📋 Copy JSON'; }, 1000);
+            } catch (err) {
+              console.error('Failed to copy data model:', err);
+            }
+          }
+        });
+      }
+    } catch (_) {}
+
+    // Subscribe to course-loaded event to clear and refresh inspector
+    try {
+      const offCourseLoaded = snBridge.onCourseLoaded(async () => {
+        try {
+          // Clear inspector data
+          await snBridge.clearScormInspector();
+          this.state.history = [];
+          this.state.errors = [];
+          this.state.dataModel = {};
+          this.updateSummaryCounts();
+          // Refresh after a short delay to allow course to initialize
+          setTimeout(() => {
+            this.loadInitialData();
+          }, 500);
+        } catch (err) {
+          console.error('Failed to clear inspector on course load:', err);
+        }
+      });
+      this._unsubs.push(offCourseLoaded);
+    } catch (_) {}
+
     // Subscribe to main-pushed inspector updates
     try {
       const off = snBridge.onScormInspectorDataUpdated((payload) => {
-
           try {
             if (payload?.history) this.state.history = payload.history;
             if (payload?.errors) this.state.errors = payload.errors;
@@ -385,6 +533,20 @@ class InspectorPanel extends BaseComponent {
           } catch (_) {}
         });
         this._unsubs.push(off);
+    } catch (_) {}
+
+    // Subscribe to data model updates
+    try {
+      const offDataModel = snBridge.onScormDataModelUpdated((dataModel) => {
+          try {
+            this.state.dataModel = dataModel || {};
+            this.updateSummaryCounts();
+            if (this.activeTab === 'model') {
+              this.renderDataModel();
+            }
+          } catch (_) {}
+        });
+        this._unsubs.push(offDataModel);
     } catch (_) {}
   }
 

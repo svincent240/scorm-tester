@@ -203,16 +203,6 @@ class RecentCoursesService extends BaseService {
 
     try {
       const dir = PathUtils.dirname(this.recentsFilePath);
-      this.logger?.debug('RecentCoursesService: _saveRecents - Directory path:', dir);
-      this.logger?.debug('RecentCoursesService: _saveRecents - Full file path:', this.recentsFilePath);
-
-      // Check if directory exists before mkdir
-      try {
-        const dirStats = await fs.stat(dir);
-        this.logger?.debug('RecentCoursesService: _saveRecents - Directory exists before mkdir:', dirStats.isDirectory());
-      } catch (statErr) {
-        this.logger?.debug('RecentCoursesService: _saveRecents - Directory does not exist before mkdir:', statErr.code);
-      }
 
       await fs.mkdir(dir, { recursive: true });
 
@@ -228,25 +218,8 @@ class RecentCoursesService extends BaseService {
       // Use shorter random string for Windows compatibility and to avoid long path issues
       const randomId = Math.random().toString(36).substr(2, 6);
       const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}.${randomId}`;
-      this.logger?.debug('RecentCoursesService: _saveRecents - Temp file path:', tempPath);
 
       await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');
-
-      // Check if temp file exists before rename
-      try {
-        const tempStats = await fs.stat(tempPath);
-        this.logger?.debug('RecentCoursesService: _saveRecents - Temp file exists before rename:', tempStats.size, 'bytes');
-      } catch (statErr) {
-        this.logger?.debug('RecentCoursesService: _saveRecents - Temp file does not exist before rename:', statErr.code);
-      }
-
-      // Check permissions on directory
-      try {
-        const dirStats = await fs.stat(dir);
-        this.logger?.debug('RecentCoursesService: _saveRecents - Directory permissions:', process.platform === 'win32' ? 'Windows' : dirStats.mode?.toString(8));
-      } catch (statErr) {
-        this.logger?.debug('RecentCoursesService: _saveRecents - Cannot check directory permissions:', statErr.code);
-      }
 
       try {
         await fs.rename(tempPath, this.recentsFilePath);
@@ -277,8 +250,6 @@ class RecentCoursesService extends BaseService {
           throw renameErr;
         }
       }
-
-      this.logger?.debug('RecentCoursesService: Saved recent courses to file (atomic write).');
     } catch (error) {
       this.errorHandler?.setError(
         MAIN_PROCESS_ERRORS.FILE_SYSTEM_OPERATION_FAILED,

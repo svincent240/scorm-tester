@@ -412,16 +412,6 @@ class ManifestParser {
     const hrefAttr = getAttr(resourceElement, 'href', nsMap);
     const identifier = getAttr(resourceElement, 'identifier', nsMap);
 
-    // Debug logging for xml:base resolution with PathUtils integration
-    logger.info('ManifestParser: Starting PathUtils integration for xml:base resolution', {
-      operation: 'xmlBaseResolution',
-      resourceId: identifier,
-      xmlBase: xmlBase || null,
-      href: hrefAttr || null,
-      basePath,
-      phase: 'CAM_INTEGRATION'
-    });
-
     logger.debug('ManifestParser: Path resolution result', {
       originalPath: xmlBase,
       resolvedPath: resolvedBase,

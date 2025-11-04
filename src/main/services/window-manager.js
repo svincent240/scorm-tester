@@ -206,7 +206,6 @@ class WindowManager extends BaseService {
       }
     }
 
-    this.logger?.debug(`Broadcasted message on channel '${channel}' to ${successCount} windows`);
     return successCount;
   }
 

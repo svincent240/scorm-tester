@@ -47,8 +47,12 @@ class BrowseModeService extends EventEmitter {
       ignoreAttemptLimits: true,
       ignorePrerequisites: true
     };
-    
-    this.logger?.debug('BrowseModeService initialized', this.options);
+
+    // Log initialization without circular references (scormService reference would serialize entire object tree)
+    this.logger?.debug('BrowseModeService initialized', [{
+      defaultTimeout: this.options.defaultTimeout,
+      maxSessions: this.options.maxSessions
+    }]);
   }
 
   /**

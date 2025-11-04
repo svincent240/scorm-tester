@@ -312,6 +312,36 @@ class SNBridge {
     return () => {};
   }
 
+  /** Subscribe to data model updates */
+  onScormDataModelUpdated(handler) {
+    try {
+      if (typeof handler === 'function') {
+        return ipcClient.onScormDataModelUpdated(handler);
+      }
+    } catch (_) {}
+    return () => {};
+  }
+
+  /** Clear SCORM Inspector data */
+  async clearScormInspector() {
+    try {
+      return await ipcClient.clearScormInspector();
+    } catch (error) {
+      console.error('[SNBridge] clearScormInspector failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /** Subscribe to course loaded events */
+  onCourseLoaded(handler) {
+    try {
+      if (typeof handler === 'function') {
+        return ipcClient.onCourseLoaded(handler);
+      }
+    } catch (_) {}
+    return () => {};
+  }
+
 }
 
 // Create and export singleton instance

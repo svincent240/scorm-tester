@@ -848,26 +848,13 @@ class AppManager {
     try {
       ipcClient.onNavigationAvailabilityUpdated((data) => {
         try {
-          this.logger.info('AppManager: RECEIVED navigation:availability:updated event via preload bridge', {
-            data,
-            hasAvailableNavigation: Array.isArray(data?.availableNavigation),
-            availableNavigation: data?.availableNavigation
-          });
-
           const { availableNavigation, presentation, hiddenControls } = data || {};
           if (Array.isArray(availableNavigation)) {
             const normalized = this.normalizeAvailableNavigation(availableNavigation);
 
-            this.logger.debug('AppManager: Normalized navigation data', {
-              availableNavigation,
-              normalized,
-              canNavigateNext: normalized.canNavigateNext,
-              canNavigatePrevious: normalized.canNavigatePrevious,
-              presentation,
-              hiddenControls
-            });
-
             // Update UI state for other components
+            // UIState will notify all subscribers (NavigationControls, etc.) automatically
+            // No need to re-emit to EventBus - that would cause duplicate processing
             this.uiState.updateNavigation({
               ...normalized,
               presentation: presentation || null,
@@ -877,18 +864,6 @@ class AppManager {
 
             // Update sidebar visibility based on course sequencing (learner mode only)
             this.updateSidebarVisibilityFromNavigation(availableNavigation);
-
-            // Rewrite: Broadcast availability update via EventBus for decoupled components
-            const eventBus = this.services.get('eventBus');
-            try {
-              eventBus?.emit('navigation:availability:updated', data);
-            } catch (_) {}
-
-            this.logger.info('AppManager: Navigation availability update processing complete', {
-              availableNavigation,
-              normalized,
-              directNotification: false
-            });
           } else {
             this.logger.warn('AppManager: Invalid availableNavigation data received', {
               data,
@@ -1643,15 +1618,12 @@ class AppManager {
       if (browseMode) {
         // Browse mode: always show sidebar (unrestricted navigation)
         shouldShowSidebar = true;
-        this.logger.debug('AppManager: Sidebar visible - browse mode enabled');
       } else if (choiceAvailable) {
         // Learner mode with choice: show sidebar (course allows menu navigation)
         shouldShowSidebar = true;
-        this.logger.debug('AppManager: Sidebar visible - choice navigation allowed by course');
       } else {
         // Learner mode without choice: hide sidebar (sequential navigation only)
         shouldShowSidebar = false;
-        this.logger.debug('AppManager: Sidebar hidden - sequential navigation only');
       }
 
       // Only update if pending course load or if visibility needs to change

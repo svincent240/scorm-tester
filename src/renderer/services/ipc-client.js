@@ -164,6 +164,22 @@ class IpcClient {
     return api.onScormInspectorDataUpdated(handler);
   }
 
+  onScormDataModelUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormDataModelUpdated !== 'function') {
+      throw new Error('electronAPI.onScormDataModelUpdated not available');
+    }
+    return api.onScormDataModelUpdated(handler);
+  }
+
+  clearScormInspector() {
+    const api = this._ensureAPI();
+    if (typeof api.invoke !== 'function') {
+      throw new Error('electronAPI.invoke not available');
+    }
+    return api.invoke('scorm-inspector-clear');
+  }
+
   onNavigationAvailabilityUpdated(handler) {
     const api = this._ensureAPI();
     if (typeof api.onNavigationAvailabilityUpdated !== 'function') {

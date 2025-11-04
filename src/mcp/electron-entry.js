@@ -28,13 +28,27 @@ async function main() {
       if (!process.env.SCORM_TESTER_LOG_DIR) {
         const path = require('path');
         const fs = require('fs');
-        const logDir = path.join(process.cwd(), 'sessions', `mcp-${Date.now()}-${process.pid}`, 'logs');
+        const os = require('os');
+        // Use OS temp directory with a scorm-mcp subdirectory
+        const logDir = path.join(os.tmpdir(), 'scorm-mcp', `session-${Date.now()}-${process.pid}`);
         fs.mkdirSync(logDir, { recursive: true });
         process.env.SCORM_TESTER_LOG_DIR = logDir;
       }
       const getLogger = require('../shared/utils/logger.js');
       const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
-      logger.info('MCP Electron entry initialized', { logDir: process.env.SCORM_TESTER_LOG_DIR });
+      logger.info('=== SCORM MCP Server Started ===', {
+        logDir: process.env.SCORM_TESTER_LOG_DIR,
+        logFile: logger.ndjsonFile,
+        pid: process.pid,
+        note: 'Use system_get_logs tool to retrieve logs'
+      });
+      // Also write to stderr for immediate visibility during startup
+      try {
+        process.stderr.write(`\n=== SCORM MCP Server Started ===\n`);
+        process.stderr.write(`Log Directory: ${process.env.SCORM_TESTER_LOG_DIR}\n`);
+        process.stderr.write(`Log File: ${logger.ndjsonFile}\n`);
+        process.stderr.write(`Use system_get_logs MCP tool to retrieve logs\n\n`);
+      } catch (_) {}
     } catch (_) {}
 
     // Start the MCP stdio server (reads newline-delimited JSON from stdin) ASAP to keep stdout responsive

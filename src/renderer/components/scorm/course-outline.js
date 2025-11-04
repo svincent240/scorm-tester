@@ -185,7 +185,6 @@ class CourseOutline extends BaseComponent {
       this.handleNavigationUpdated(data);
     });
     this.subscribe('progress:updated', (data) => {
-      rendererLogger.debug('CourseOutline: event progress:updated', data);
       this.handleProgressUpdated(data);
     });
     // Removed duplicate ui:scorm:dataChanged subscription - handled below with proper filtering
@@ -246,11 +245,8 @@ class CourseOutline extends BaseComponent {
         element.includes('objectives') ||
         element.includes('progress_measure')
       )) {
-        rendererLogger.debug('CourseOutline: Key SCORM data changed, refreshing states', element);
-
         // For completion/success status changes, refresh immediately without debounce
         if (element.includes('completion_status') || element.includes('success_status')) {
-          rendererLogger.info('CourseOutline: Activity status changed, immediate refresh', element);
           this.fetchScormStates().then(() => {
             if (this.courseStructure) {
               this.renderCourseStructure();
@@ -282,7 +278,6 @@ class CourseOutline extends BaseComponent {
 
     // Listen for objectives updates to refresh states
     this.subscribe('objectives:updated', (data) => {
-      rendererLogger.debug('CourseOutline: Objectives updated, refreshing SCORM states', data);
       this.refreshScormStates();
     });
 
@@ -341,8 +336,6 @@ class CourseOutline extends BaseComponent {
 
     this.contentArea.innerHTML = html;
     this.bindItemEvents();
-
-    rendererLogger.info('CourseOutline: Course structure rendered successfully', { itemCount: items.length });
   }
 
   renderItems(items, depth = 0) {
@@ -384,20 +377,7 @@ class CourseOutline extends BaseComponent {
             : 'Sequencing disallows choice')
     };
 
-    // Log render state for debugging
-    rendererLogger.info('CourseOutline: renderItem', item.identifier, {
-      renderPhase: this.scormStatesLoaded ? 'with-states' : 'initial',
-      scormStatesLoaded: this.scormStatesLoaded,
-      hasScormState: !!scormState,
-      browseModeEnabled: this.browseModeEnabled,
-      itemType: item.type,
-      hasChildren: hasChildren,
-      isVisible: scormState?.isVisible,
-      isHidden,
-      isDisabled,
-      isSuspended,
-      attemptLimitReached
-    });
+
 
     // Debug logging for SCORM state changes
     if (scormState) {
@@ -609,12 +589,6 @@ class CourseOutline extends BaseComponent {
   }
 
   bindItemEvents() {
-    rendererLogger.info('CourseOutline: bindItemEvents called', {
-      toggleElements: this.findAll('.outline-item__toggle').length,
-      titleElements: this.findAll('.outline-item__title').length,
-      enableNavigation: this.options.enableNavigation
-    });
-
     this.findAll('.outline-item__toggle').forEach(toggle => {
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -939,12 +913,6 @@ class CourseOutline extends BaseComponent {
 
   handleProgressUpdated(data) {
     const progressData = data.data || data;
-    rendererLogger.debug('CourseOutline: handleProgressUpdated called', {
-      currentItem: this.currentItem,
-      progressData: progressData,
-      hasCompletionStatus: !!progressData?.completionStatus,
-      hasSuccessStatus: !!progressData?.successStatus
-    });
 
     if (this.currentItem && progressData) {
       this.updateItemProgress(this.currentItem, progressData);
@@ -1119,12 +1087,6 @@ class CourseOutline extends BaseComponent {
   async fetchScormStates() {
     try {
       const snb = this.snBridge;
-      rendererLogger.info('CourseOutline: fetchScormStates called', {
-        currentScormStatesCount: this.scormStates.size,
-        scormStatesLoaded: this.scormStatesLoaded,
-        browseModeEnabled: this.browseModeEnabled,
-        hasGetCourseOutlineActivityTree: !!(snb && typeof snb.getCourseOutlineActivityTree === 'function')
-      });
 
       if (!snb || typeof snb.getCourseOutlineActivityTree !== 'function') {
         rendererLogger.warn('CourseOutline: getCourseOutlineActivityTree not available via snBridge');

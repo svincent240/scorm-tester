@@ -205,7 +205,6 @@ module.exports = {
         }
 
         const duration = Date.now() - startTime;
-        ctx.logger?.info(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'success' }`);
         if (typeof ctx.recordOperation === 'function') {
           ctx.recordOperation(`${channel}:success`, true);
         }

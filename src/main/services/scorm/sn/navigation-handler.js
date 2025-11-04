@@ -555,10 +555,6 @@ class NavigationHandler {
    */
   refreshNavigationAvailability() {
     this.updateAvailableNavigation();
-    this.logger?.debug('NavigationHandler: Navigation availability refreshed', {
-      browseMode: this.isBrowseModeEnabled(),
-      availableNavigation: this.getAvailableNavigation()
-    });
   }
 
   /**

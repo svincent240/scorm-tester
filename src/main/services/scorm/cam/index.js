@@ -228,15 +228,7 @@ class ScormCAMService {
 
           resById.set(id, { href: effectiveHref || '', scormType: st || '' });
 
-          // Debug logging for xml:base resolution
-          this.logger?.info('CAM: inline resource href resolved', {
-            resourceId: id,
-            xmlBaseContainer: containerBase || null,
-            xmlBaseResource: localBase || null,
-            hrefOriginal: resHref || null,
-            hrefEffective: effectiveHref || null,
-            scormType: st || null
-          });
+
         }
 
         // 3) Traverse defaultOrg.item[] with item.children[] only; never mix alternative axes
@@ -671,16 +663,6 @@ class ScormCAMService {
           hrefOriginal: resHref,
           hrefEffective: effectiveHref
         }
-      });
-
-      // Diagnostic log for each resource resolution
-      this.logger?.info('CAM: resource href resolved', {
-        resourceId: id,
-        xmlBaseContainer: containerBase || null,
-        xmlBaseResource: localBase || null,
-        hrefOriginal: resHref || null,
-        hrefEffective: effectiveHref || null,
-        scormType: scormType || null
       });
     }
  

@@ -742,6 +742,43 @@ module.exports = {
   scorm_take_screenshot,
   scorm_test_navigation_flow,
   scorm_debug_api_calls,
-  scorm_trace_sequencing
+  scorm_trace_sequencing,
+  scorm_get_network_requests
 };
+
+/**
+ * Get network requests made by SCORM content
+ * Returns all HTTP requests captured during content execution
+ */
+async function scorm_get_network_requests(params = {}) {
+  const session_id = params.session_id;
+  const options = params.options || {};
+  const filterOptions = {
+    resource_types: options.resource_types || null,
+    since_ts: options.since_ts || null,
+    max_count: options.max_count || null
+  };
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Check if runtime is open
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const requests = RuntimeManager.getNetworkRequests(session_id, filterOptions) || [];
+
+  return {
+    session_id,
+    request_count: requests.length,
+    requests
+  };
+}
 

@@ -216,26 +216,10 @@ class ContentValidator {
   async validateResourceFiles(packagePath, resource) {
     const resourceBase = resource.resolvedBase || packagePath;
 
-    // Log PathUtils integration start
-    this.logger?.info('ContentValidator: Starting PathUtils integration for file validation', {
-      operation: 'fileValidation',
-      resourceId: resource.identifier,
-      resourceBase,
-      phase: 'CAM_INTEGRATION'
-    });
-
     // Validate main resource file (href)
     if (resource.href) {
       const filePath = PathUtils.join(resourceBase, resource.href);
       const fileExists = PathUtils.fileExists(filePath);
-
-      this.logger?.debug && this.logger.debug('ContentValidator: File validation result', {
-        operation: 'fileValidation',
-        resourceId: resource.identifier,
-        filePath,
-        fileExists,
-        success: fileExists
-      });
 
       if (!fileExists) {
         this.addError(this.buildFileNotFoundError(resource.href, filePath, resourceBase, resource.identifier, true));
@@ -249,25 +233,11 @@ class ContentValidator {
         const filePath = PathUtils.join(resourceBase, fileName);
         const fileExists = PathUtils.fileExists(filePath);
 
-        this.logger?.debug && this.logger.debug('ContentValidator: File validation result', {
-          operation: 'fileValidation',
-          resourceId: resource.identifier,
-          filePath,
-          fileExists,
-          success: fileExists
-        });
-
         if (!fileExists) {
           this.addError(this.buildFileNotFoundError(fileName, filePath, resourceBase, resource.identifier, false));
         }
       }
     }
-
-    this.logger?.info('ContentValidator: PathUtils integration completed for file validation', {
-      operation: 'fileValidation',
-      resourceId: resource.identifier,
-      phase: 'CAM_INTEGRATION'
-    });
   }
 
   /**
@@ -568,8 +538,6 @@ class ContentValidator {
    */
   async validateParentDOMAccess(packagePath) {
     try {
-      this.logger?.debug && this.logger.debug('ContentValidator: Starting parent DOM access validation');
-
       const result = await scorm_lint_parent_dom_access({ workspace_path: packagePath });
 
       if (result.violations && result.violations.length > 0) {
@@ -596,8 +564,6 @@ class ContentValidator {
             this.addWarning(detailedError);
           }
         }
-      } else {
-        this.logger?.debug && this.logger.debug('ContentValidator: No parent DOM access violations found');
       }
     } catch (error) {
       this.logger?.error && this.logger.error('ContentValidator: Parent DOM validation failed', error);

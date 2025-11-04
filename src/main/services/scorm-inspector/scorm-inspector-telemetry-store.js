@@ -72,21 +72,17 @@ class ScormInspectorTelemetryStore {
       }
       
       // Immediately broadcast to all windows
-      // Debug: Log entry type and method
-      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Broadcasting entry type: ${typeof entry}, method: ${entry?.method}, id: ${entry?.id}`);
       this.broadcastToAllWindows('scorm-inspector-data-updated', entry);
-      
+
       // Update performance stats
       const endTime = performance.now();
       this.performanceStats.totalStoreTime += (endTime - startTime);
       this.performanceStats.storeCallCount++;
-      
+
       // Monitor memory usage periodically
       if (this.performanceStats.storeCallCount % 100 === 0) {
         this.checkMemoryUsage();
       }
-      
-      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Stored API call ${data.method} (total=${this.scormApiHistory.length})`);
       
     } catch (e) {
       // Never throw from telemetry store; log and continue
@@ -115,8 +111,6 @@ class ScormInspectorTelemetryStore {
       
       // Broadcast error specifically to SCORM Inspector
       this.broadcastToAllWindows('scorm-inspector-error-updated', errorEntry);
-      
-      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Stored SCORM error ${entry.errorCode}`);
       
     } catch (e) {
       try { 
@@ -251,8 +245,6 @@ class ScormInspectorTelemetryStore {
       const endTime = performance.now();
       this.performanceStats.totalBroadcastTime += (endTime - startTime);
       this.performanceStats.broadcastCount++;
-      
-      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Broadcasted ${channel} to ${broadcastCount} windows`);
       
     } catch (error) {
       this.logger?.error && this.logger.error('[ScormInspectorTelemetryStore] Broadcast failed', error?.message || error);

@@ -661,15 +661,6 @@ class PackageAnalyzer {
               const manifestPath = PathUtils.join(packagePath, 'imsmanifest.xml');
               const appRoot = PathUtils.getAppRoot(__dirname);
 
-              // Log PathUtils integration start
-              this.logger?.info('PackageAnalyzer: Starting PathUtils integration for SCO URL resolution', {
-                operation: 'xmlBaseResolution',
-                resourceId: resource.identifier,
-                xmlBase: resource.xmlBase,
-                href: resource.href,
-                phase: 'CAM_INTEGRATION'
-              });
-
               const resolutionResult = PathUtils.resolveScormContentUrl(
                 contentPath,
                 packagePath,
@@ -681,14 +672,6 @@ class PackageAnalyzer {
               if (resolutionResult.success) {
                 // Use final scorm-app:// URL from centralized resolution
                 fullHref = resolutionResult.url;
-
-                // Log successful resolution
-                this.logger?.info('PackageAnalyzer: PathUtils integration completed successfully', {
-                  operation: 'xmlBaseResolution',
-                  resourceId: resource.identifier,
-                  resolvedPath: resolutionResult.resolvedPath,
-                  phase: 'CAM_INTEGRATION'
-                });
               } else {
                 // Use ParserError for consistent error handling
                 const parserError = new ParserError({

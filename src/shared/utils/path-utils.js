@@ -102,14 +102,6 @@ class PathUtils {
       // Always use a fixed host ('app') so all pages share the same origin
       const protocolUrl = `scorm-app://app/${relativePath}`;
 
-      this.logger?.info('PathUtils: toScormProtocolUrl success', {
-        operation: 'toScormProtocolUrl',
-        duration: Date.now() - startTime,
-        filePath: normalizedPath,
-        appRoot: normalizedRoot,
-        url: protocolUrl
-      });
-
       return protocolUrl;
     } catch (error) {
       this.logger?.error('PathUtils: toScormProtocolUrl failed', {
@@ -135,14 +127,6 @@ class PathUtils {
     let encodedFilePath, queryString, filePath;
 
     try {
-      this.logger?.info('PathUtils: Starting content resolution', {
-        operation: 'contentResolution',
-        contentPath,
-        extractionPath,
-        manifestPath,
-        phase: 'CAM_INTEGRATION'
-      });
-
       if (!contentPath || !extractionPath || !manifestPath || !appRoot) {
         throw new Error('Content path, extraction path, manifest path, and app root are required');
       }
@@ -300,10 +284,6 @@ class PathUtils {
   static handleProtocolRequest(protocolUrl, appRoot) {
     const startTime = Date.now();
     try {
-      this.logger?.info('PathUtils: handleProtocolRequest start', {
-        operation: 'protocolRequest',
-        url: protocolUrl
-      });
       // Defensive guard
       if (!protocolUrl || typeof protocolUrl !== 'string') {
         return { success: false, error: 'Invalid protocol URL', requestedPath: protocolUrl };

@@ -394,7 +394,168 @@ Launch interactive development session with advanced SCORM Inspector.
 - `available_tools` (array): Available development tools in GUI
 
 
-### 5. Session Management Tools
+### 5. DOM Interaction & Browser Testing Tools
+
+These tools enable AI agents to interact with SCORM content in the browser context, essential for testing interactive courses, filling assessments, and debugging user interaction flows.
+
+#### `scorm_dom_click`
+Click DOM elements by CSS selector to simulate user interactions.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `selector` (string, required): CSS selector for target element
+- `options` (object, optional):
+  - `click_type` (enum): single|double|right (default: single)
+  - `wait_for_selector` (boolean): Wait for element to appear (default: true)
+  - `wait_timeout_ms` (number): Maximum wait time in milliseconds (default: 5000)
+
+**Response:**
+- `success` (boolean): Whether click was successful
+- `element` (object): Clicked element metadata (tagName, id, className, textContent)
+
+**Use Cases:**
+- Navigate course slides by clicking "Next" buttons
+- Submit assessment answers
+- Trigger interactive elements
+- Test navigation controls
+
+#### `scorm_dom_fill`
+Fill form inputs, select dropdowns, checkboxes, and radio buttons.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `selector` (string, required): CSS selector for input element
+- `value` (string|boolean|number, required): Value to fill
+- `options` (object, optional):
+  - `wait_for_selector` (boolean): Wait for element (default: true)
+  - `wait_timeout_ms` (number): Maximum wait time (default: 5000)
+  - `trigger_events` (boolean): Fire input/change events (default: true)
+
+**Response:**
+- `success` (boolean): Whether fill was successful
+- `element` (object): Filled element metadata (tagName, type, value, checked)
+
+**Use Cases:**
+- Fill assessment text inputs
+- Select dropdown options
+- Check/uncheck checkboxes
+- Select radio buttons
+
+#### `scorm_dom_query`
+Query DOM element state for verification and debugging.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `selector` (string, required): CSS selector for element
+- `query_type` (enum, optional): all|text|attributes|visibility|styles|value (default: all)
+
+**Response:**
+- `found` (boolean): Whether element exists
+- `selector` (string): Queried selector
+- `textContent` (string): Element text content (if query_type includes text)
+- `attributes` (object): Element attributes (if query_type includes attributes)
+- `visible` (boolean): Element visibility state (if query_type includes visibility)
+- `computedStyles` (object): Computed CSS styles (if query_type includes styles)
+- `value` (any): Form element value (if query_type includes value)
+
+**Use Cases:**
+- Verify content rendering
+- Check element visibility
+- Read assessment state
+- Debug layout issues
+
+#### `scorm_dom_evaluate`
+Execute arbitrary JavaScript in the browser context and return serializable results.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `expression` (string, required): JavaScript expression to evaluate
+- `return_by_value` (boolean, optional): Return by value vs reference (default: true)
+
+**Response:**
+- `result` (any): Evaluation result (must be JSON-serializable)
+
+**Use Cases:**
+- Custom DOM queries
+- Complex state inspection
+- Advanced debugging scenarios
+- SCORM API state verification
+
+#### `scorm_dom_wait_for`
+Wait for DOM conditions to be met before proceeding.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `condition` (object, required): Condition to wait for
+  - `selector` (string): CSS selector to wait for
+  - `visible` (boolean): Wait for visibility state
+  - `text` (string): Wait for text content to include string
+  - `attribute` (string): Attribute name to check
+  - `attribute_value` (string): Expected attribute value
+  - `expression` (string): Custom JavaScript expression
+- `timeout_ms` (number, optional): Maximum wait time (default: 10000)
+
+**Response:**
+- `success` (boolean): Whether condition was met
+- `elapsed_ms` (number): Time taken to meet condition
+
+**Use Cases:**
+- Wait for dynamic content to load
+- Synchronize test steps with animations
+- Wait for SCORM API initialization
+- Handle async course behavior
+
+#### `scorm_keyboard_type`
+Simulate keyboard typing in focused elements.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `text` (string, required): Text to type
+- `options` (object, optional):
+  - `selector` (string): Element to focus before typing
+  - `delay_ms` (number): Delay between keystrokes (default: 0)
+
+**Response:**
+- `success` (boolean): Whether typing was successful
+- `characters_typed` (number): Number of characters typed
+- `element` (object): Target element metadata
+
+**Use Cases:**
+- Fill text inputs with realistic typing
+- Test keyboard event handlers
+- Simulate user text entry
+
+#### `scorm_get_network_requests`
+Get network requests made by SCORM content for debugging resource loading and API calls.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `options` (object, optional):
+  - `resource_types` (array): Filter by resource types (document, script, xhr, fetch, etc.)
+  - `since_ts` (number): Only return requests after this timestamp
+  - `max_count` (number): Maximum number of requests to return (default: 100)
+
+**Response:**
+- `session_id` (string): Session ID
+- `request_count` (number): Total number of requests
+- `requests` (array): Network request details
+  - `id` (number): Request ID
+  - `timestamp` (number): Request start time
+  - `method` (string): HTTP method
+  - `url` (string): Request URL
+  - `resourceType` (string): Resource type
+  - `statusCode` (number): HTTP status code (if completed)
+  - `error` (string): Error message (if failed)
+
+**Use Cases:**
+- Debug resource loading failures
+- Monitor SCORM API HTTP calls
+- Track external dependencies
+- Identify network-related issues
+
+**Note:** Browser console logs are available via the existing `system_get_logs` tool, which captures all browser console messages along with application logs.
+
+### 6. Session Management Tools
 
 Stateful tools require an explicit session to isolate resources, enable progress reporting, and manage artifacts.
 #### Terminology: MCP session vs SCORM RTE session

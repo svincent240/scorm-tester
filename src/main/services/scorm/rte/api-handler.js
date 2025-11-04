@@ -92,8 +92,6 @@ class ScormApiHandler {
     let errorMessage = `Initialize failed: Unknown error`;
 
     try {
-      this.logger?.debug('Initialize called with parameter:', parameter);
-
       // Validate parameter (must be empty string)
       if (parameter !== "") {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
@@ -274,8 +272,6 @@ class ScormApiHandler {
     let errorMessage = `GetValue failed: Unknown error`;
 
     try {
-      this.logger?.debug('GetValue called for element:', element);
-
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'GetValue')) {
@@ -305,7 +301,6 @@ class ScormApiHandler {
       if (!this.errorHandler.hasError()) {
         errorCode = "0"; // No error
         errorMessage = "";
-        this.logger?.debug(`GetValue: ${element} = ${value}`);
       } else {
         errorCode = this.errorHandler.getLastError();
         errorMessage = this.errorHandler.getErrorString(errorCode);
@@ -339,8 +334,6 @@ class ScormApiHandler {
     let errorMessage = `SetValue failed: Unknown error`;
 
     try {
-      this.logger?.debug('SetValue called:', { element, value });
-
       // Check session state
       if (!this.errorHandler.validateSessionState(
         SCORM_CONSTANTS.SESSION_STATES.RUNNING, 'SetValue')) {
@@ -368,7 +361,6 @@ class ScormApiHandler {
       const success = this.dataModel.setValue(element, value);
 
       if (success) {
-        this.logger?.debug(`SetValue successful: ${element} = ${value}`);
         result = "true";
         errorCode = "0"; // No error
         errorMessage = "";
@@ -436,8 +428,6 @@ class ScormApiHandler {
     let errorMessage = `Commit failed: Unknown error`;
 
     try {
-      this.logger?.debug('Commit called with parameter:', parameter);
-
       // Validate parameter (must be empty string)
       if (parameter !== "") {
         this.errorHandler.setError(COMMON_ERRORS.GENERAL_EXCEPTION,
@@ -466,7 +456,6 @@ class ScormApiHandler {
       const success = this.performCommit();
 
       if (success) {
-        this.logger?.debug('Commit successful');
         this.errorHandler.clearError();
         result = "true";
         errorCode = "0"; // No error
@@ -506,7 +495,6 @@ class ScormApiHandler {
       result = this.errorHandler.getLastError();
       errorCode = result; // The result of GetLastError is the errorCode
       errorMessage = this.errorHandler.getErrorString(errorCode);
-      this.logger?.debug('GetLastError returned:', result);
       return result;
     } finally {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
@@ -796,7 +784,6 @@ class ScormApiHandler {
     if (this.telemetryStore && typeof this.telemetryStore.storeApiCall === 'function') {
       try {
         this.telemetryStore.storeApiCall(payload);
-        this.logger?.debug(`SCORM API call stored in inspector: ${method}`);
       } catch (error) {
         this.logger?.warn(`Failed to store API call in telemetry: ${error.message}`);
         // Continue with fallback event emission
@@ -805,8 +792,6 @@ class ScormApiHandler {
 
     // Maintain backwards compatibility with event emitter
     this.eventEmitter.emit('scorm-api-call-logged', payload);
-    this.logger?.info(`SCORM API Call [Session: ${payload.sessionId}]: ${method}(${parameters.map(p => JSON.stringify(p)).join(', ')}) -> Result: ${result}, ErrorCode: ${errorCode}, ErrorMessage: "${errorMessage}" (Duration: ${durationMs}ms)`);
-    this.logger?.debug(`Emitted scorm-api-call-logged event for ${method}`, payload);
   }
 
   /**
@@ -818,7 +803,6 @@ class ScormApiHandler {
      if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
        const dataModel = this.dataModel.getAllData();
        this.telemetryStore.broadcastToAllWindows('scorm-data-model-updated', dataModel);
-       this.logger?.debug('Broadcasted data model update to inspector windows');
      }
    } catch (error) {
      this.logger?.warn('Failed to broadcast data model update:', error.message);
@@ -843,7 +827,6 @@ class ScormApiHandler {
          timestamp: Date.now()
        };
        this.telemetryStore.broadcastToAllWindows('activity:progress:updated', progressData);
-       this.logger?.debug('Emitted activity progress update event for course outline');
      }
    } catch (error) {
      this.logger?.warn('Failed to emit progress update event:', error.message);
@@ -863,7 +846,6 @@ class ScormApiHandler {
          timestamp: Date.now()
        };
        this.telemetryStore.broadcastToAllWindows('objectives:updated', objectiveData);
-       this.logger?.debug('Emitted objectives update event for course outline');
      }
    } catch (error) {
      this.logger?.warn('Failed to emit objectives update event:', error.message);
@@ -881,7 +863,6 @@ class ScormApiHandler {
          reason: 'completion_status_changed',
          timestamp: Date.now()
        });
-       this.logger?.debug('Emitted course outline refresh event for prerequisite re-evaluation');
      }
    } catch (error) {
      this.logger?.warn('Failed to emit course outline refresh event:', error.message);
@@ -908,12 +889,8 @@ class ScormApiHandler {
       this.logger?.warn('Cannot update activity tree state: SN service access not available through telemetry store');
 
       // Activity tree updates are disabled until proper SN service injection is implemented
-      // For now, we only handle navigation availability refresh
-      if (element === 'cmi.completion_status' || element === 'cmi.success_status') {
-        // CRITICAL FIX: Refresh navigation availability after completion/success status changes
-        // This ensures the UI components (course outline and navigation controls) get updated
-        this._refreshNavigationAvailabilityAfterStateChange(activityId);
-      }
+      // Navigation availability refresh is handled in SetValue() after this method returns
+      // (see lines 385-394 and 398-407) - no need to duplicate the call here
 
     } catch (error) {
       this.logger?.warn('Failed to update activity tree state:', error.message);
@@ -939,11 +916,6 @@ class ScormApiHandler {
       const sequencingState = snService.getSequencingState();
       const availableNavigation = sequencingState.availableNavigation || [];
 
-      this.logger?.debug('Navigation availability refreshed after state change', {
-        activityId,
-        availableNavigation
-      });
-
       // Broadcast updated navigation availability to renderer components
       if (this.telemetryStore?.broadcastToAllWindows) {
         // Emit navigation:availability:updated for immediate UI refresh
@@ -954,17 +926,10 @@ class ScormApiHandler {
           timestamp: Date.now()
         });
 
-        // Also emit navigation:completed for components expecting this event
-        this.telemetryStore.broadcastToAllWindows('navigation:completed', {
-          activityId,
-          navigationRequest: 'state_change',
-          result: { success: true, availableNavigation }
-        });
-
-        this.logger?.info('Broadcasted navigation availability update to renderer', {
-          activityId,
-          availableNavigation
-        });
+        // NOTE: Do NOT emit navigation:completed here - it creates an event loop with CourseOutline
+        // CourseOutline subscribes to navigation:completed and calls refreshScormStates()
+        // which triggers objectives:updated, which triggers navigation:completed again
+        // navigation:availability:updated is sufficient for UI updates
       } else {
         this.logger?.warn('Cannot broadcast navigation availability: telemetry store broadcast method not available');
       }

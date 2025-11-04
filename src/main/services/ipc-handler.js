@@ -108,19 +108,13 @@ class IpcHandler extends BaseService {
     } catch (_) {}
 
 
-    // Subscribe to scorm-api-call-logged events from ScormService
+    // NOTE: SCORM API call broadcasting is handled by ScormInspectorTelemetryStore.storeApiCall()
+    // which is called directly from api-handler.js. No need to subscribe to events here to avoid
+    // duplicate broadcasts that cause excessive logging and performance issues.
+
+    // Subscribe to course:loaded and session:reset events from ScormService
     try {
       const scormService = this.getDependency('scormService');
-
-      if (scormService && typeof scormService.onScormApiCallLogged === 'function') {
-        scormService.onScormApiCallLogged((payload) => {
-          this.broadcastScormApiCallLogged(payload);
-        });
-      } else {
-        this.logger?.warn('[IPC Handler] ScormService or onScormApiCallLogged not available; cannot subscribe to API call events.');
-      }
-
-      // Subscribe to course:loaded and session:reset events from ScormService
       if (scormService && typeof scormService.eventEmitter === 'object' && typeof scormService.eventEmitter.on === 'function') {
         scormService.eventEmitter.on('course:loaded', (payload) => {
           if (this.telemetryStore) {
@@ -355,6 +349,7 @@ class IpcHandler extends BaseService {
       // Additional Inspector endpoints
       this.registerHandler('scorm-inspector-get-data-model', this.handleScormInspectorGetDataModel?.bind(this) || this.handleScormInspectorGetDataModel);
       this.registerHandler('scorm-inspector-get-sn-state', this.handleSNGetSequencingState.bind(this));
+      this.registerHandler('scorm-inspector-clear', this.handleScormInspectorClear.bind(this));
 
 
       // Course Outline Navigation handlers
@@ -470,9 +465,7 @@ class IpcHandler extends BaseService {
         const result = await handler(event, ...args);
 
         const duration = Date.now() - startTime;
-        this.logger?.info(`IPC_ENVELOPE { channel: ${channel}, requestId: ${requestId}, durationMs: ${duration}, status: 'success' }`);
         this.recordOperation(`${channel}:success`, true);
-        this.logger?.debug(`IpcHandler: ${channel} request ${requestId} completed in ${duration}ms`);
 
         return result;
 
@@ -1724,6 +1717,23 @@ class IpcHandler extends BaseService {
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorGetDataModel failed: ${error.message}`);
       return { success: false, error: error.message, data: {} };
+    }
+  }
+
+  /**
+   * Clear SCORM Inspector telemetry data
+   */
+  async handleScormInspectorClear(event) {
+    try {
+      if (this.telemetryStore && typeof this.telemetryStore.clear === 'function') {
+        this.telemetryStore.clear();
+        this.logger?.info('IpcHandler: SCORM Inspector data cleared');
+        return { success: true };
+      }
+      return { success: false, error: 'Telemetry store not available' };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorClear failed: ${error.message}`);
+      return { success: false, error: error.message };
     }
   }
 

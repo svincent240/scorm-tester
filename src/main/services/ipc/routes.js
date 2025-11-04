@@ -484,6 +484,14 @@ module.exports = [
       useIpcResult: true
     }
   },
+  {
+    channel: 'scorm-inspector-clear',
+    handlerName: 'handleScormInspectorClear',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
 
   {
     channel: 'validate-scorm-compliance',
