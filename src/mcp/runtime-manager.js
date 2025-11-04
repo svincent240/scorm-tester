@@ -87,10 +87,76 @@ function mapConsoleLevel(level) {
  * Set up console logging capture for a BrowserWindow
  * Captures all browser console messages and logs them to the unified logging system
  * Browser console logs are accessible via system_get_logs MCP tool
+ * Also stores messages in browser context for scorm_get_console_errors
  * @param {BrowserWindow} win - The BrowserWindow to monitor
  */
 function setupConsoleLogging(win) {
   if (!win || !win.webContents) return;
+
+  // Initialize console message storage in browser context
+  win.webContents.executeJavaScript(`
+    if (!window.__scormConsoleMessages) {
+      window.__scormConsoleMessages = [];
+
+      // Override console methods to capture messages
+      const originalConsole = {
+        log: console.log,
+        warn: console.warn,
+        error: console.error,
+        info: console.info
+      };
+
+      ['log', 'warn', 'error', 'info'].forEach(method => {
+        console[method] = function(...args) {
+          const message = args.map(arg => {
+            if (typeof arg === 'object') {
+              try { return JSON.stringify(arg); } catch { return String(arg); }
+            }
+            return String(arg);
+          }).join(' ');
+
+          window.__scormConsoleMessages.push({
+            level: method === 'log' ? 'info' : method,
+            message: message,
+            timestamp: Date.now(),
+            source: 'console.' + method
+          });
+
+          // Keep only last 500 messages to prevent memory issues
+          if (window.__scormConsoleMessages.length > 500) {
+            window.__scormConsoleMessages.shift();
+          }
+
+          // Call original console method
+          originalConsole[method].apply(console, args);
+        };
+      });
+
+      // Capture uncaught errors
+      window.addEventListener('error', (event) => {
+        window.__scormConsoleMessages.push({
+          level: 'error',
+          message: event.message || String(event.error),
+          timestamp: Date.now(),
+          source: event.filename ? event.filename + ':' + event.lineno : 'unknown',
+          stack_trace: event.error?.stack || null
+        });
+      });
+
+      // Capture unhandled promise rejections
+      window.addEventListener('unhandledrejection', (event) => {
+        window.__scormConsoleMessages.push({
+          level: 'error',
+          message: 'Unhandled Promise Rejection: ' + (event.reason?.message || String(event.reason)),
+          timestamp: Date.now(),
+          source: 'promise-rejection',
+          stack_trace: event.reason?.stack || null
+        });
+      });
+    }
+  `).catch(() => {
+    // Ignore errors during initialization
+  });
 
   // Capture all console messages from renderer process
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {

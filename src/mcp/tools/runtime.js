@@ -260,6 +260,9 @@ async function scorm_test_navigation_flow(params = {}) {
 async function scorm_debug_api_calls(params = {}) {
   const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
   const session_id = params.session_id || null;
+  const detect_anomalies = !!params.detect_anomalies;
+  const include_data_model_state = !!params.include_data_model_state;
+
   if (!workspace) {
     const e = new Error("workspace_path is required");
     e.code = "MCP_INVALID_PARAMS";
@@ -283,6 +286,22 @@ async function scorm_debug_api_calls(params = {}) {
     if (filterMethods && filterMethods.length) {
       calls = calls.filter(c => filterMethods.includes(String(c?.method)));
     }
+
+    // Enhance calls with data model state if requested
+    if (include_data_model_state && calls && calls.length > 0) {
+      for (const call of calls) {
+        if (call.method === 'SetValue' && call.args && call.args.length >= 2) {
+          const element = call.args[0];
+          try {
+            const currentValue = await RuntimeManager.callAPI(win, 'GetValue', [element]);
+            call.data_model_state = { [element]: currentValue };
+          } catch (_) {
+            // Ignore errors reading state
+          }
+        }
+      }
+    }
+
     const metrics = { total_calls: Array.isArray(calls) ? calls.length : 0, by_method: {}, first_ts: null, last_ts: null, duration_ms: 0, methods: [] };
     for (const c of (calls || [])) {
       const m = String(c?.method || '');
@@ -295,8 +314,20 @@ async function scorm_debug_api_calls(params = {}) {
     }
     if (metrics.first_ts != null && metrics.last_ts != null) metrics.duration_ms = Math.max(0, metrics.last_ts - metrics.first_ts);
     metrics.methods = Object.keys(metrics.by_method);
+
+    // Detect anomalies if requested
+    let anomalies = undefined;
+    if (detect_anomalies) {
+      anomalies = detectApiAnomalies(calls, win);
+    }
+
     sessions.emit && session_id && sessions.emit({ session_id, type: 'debug:api_session_end', payload: { count: metrics.total_calls } });
-    return { supported: true, entry_found: true, calls, metrics };
+
+    const result = { supported: true, entry_found: true, calls, metrics };
+    if (anomalies) {
+      result.anomalies = anomalies;
+    }
+    return result;
   } catch (error) {
     const e = new Error(error?.message || String(error));
     e.code = 'DEBUG_API_ERROR';
@@ -307,6 +338,115 @@ async function scorm_debug_api_calls(params = {}) {
   } finally {
     if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
   }
+}
+
+/**
+ * Detect common API usage anomalies
+ * @private
+ */
+function detectApiAnomalies(calls, win) {
+  const anomalies = [];
+
+  if (!calls || calls.length === 0) {
+    return anomalies;
+  }
+
+  // Track SetValue calls without subsequent Commit
+  const setValueIndices = [];
+  const commitIndices = [];
+
+  calls.forEach((call, idx) => {
+    if (call.method === 'SetValue') {
+      setValueIndices.push(idx);
+    } else if (call.method === 'Commit') {
+      commitIndices.push(idx);
+    }
+  });
+
+  // Check for SetValue without Commit
+  if (setValueIndices.length > 0 && commitIndices.length === 0) {
+    anomalies.push({
+      type: 'missing_commit',
+      severity: 'warning',
+      description: `${setValueIndices.length} SetValue call(s) made but Commit never called`,
+      affected_calls: setValueIndices,
+      recommendation: 'Add Commit() after SetValue calls to persist data to the LMS'
+    });
+  } else if (setValueIndices.length > commitIndices.length * 5) {
+    // More than 5 SetValues per Commit might indicate inefficiency
+    anomalies.push({
+      type: 'infrequent_commit',
+      severity: 'info',
+      description: `${setValueIndices.length} SetValue calls but only ${commitIndices.length} Commit calls`,
+      recommendation: 'Consider batching SetValue calls followed by a single Commit for better performance'
+    });
+  }
+
+  // Check for Initialize/Terminate pairing
+  const initializeCalls = calls.filter(c => c.method === 'Initialize');
+  const terminateCalls = calls.filter(c => c.method === 'Terminate');
+
+  if (initializeCalls.length === 0) {
+    anomalies.push({
+      type: 'missing_initialize',
+      severity: 'error',
+      description: 'No Initialize() call detected',
+      recommendation: 'Call Initialize() before any other SCORM API methods'
+    });
+  }
+
+  if (initializeCalls.length > 1) {
+    anomalies.push({
+      type: 'multiple_initialize',
+      severity: 'warning',
+      description: `Initialize() called ${initializeCalls.length} times`,
+      recommendation: 'Initialize() should only be called once per session'
+    });
+  }
+
+  if (terminateCalls.length === 0 && initializeCalls.length > 0) {
+    anomalies.push({
+      type: 'missing_terminate',
+      severity: 'warning',
+      description: 'Initialize() called but Terminate() never called',
+      recommendation: 'Call Terminate() when the learner exits the content'
+    });
+  }
+
+  // Check for API calls before Initialize
+  const firstInitIdx = calls.findIndex(c => c.method === 'Initialize');
+  if (firstInitIdx > 0) {
+    const callsBeforeInit = calls.slice(0, firstInitIdx).filter(c =>
+      c.method !== 'GetLastError' && c.method !== 'GetErrorString' && c.method !== 'GetDiagnostic'
+    );
+    if (callsBeforeInit.length > 0) {
+      anomalies.push({
+        type: 'calls_before_initialize',
+        severity: 'error',
+        description: `${callsBeforeInit.length} API call(s) made before Initialize()`,
+        affected_calls: callsBeforeInit.map((_, idx) => idx),
+        recommendation: 'Call Initialize() before any GetValue or SetValue calls'
+      });
+    }
+  }
+
+  // Check for GetValue/SetValue after Terminate
+  const firstTerminateIdx = calls.findIndex(c => c.method === 'Terminate');
+  if (firstTerminateIdx >= 0 && firstTerminateIdx < calls.length - 1) {
+    const callsAfterTerminate = calls.slice(firstTerminateIdx + 1).filter(c =>
+      c.method === 'GetValue' || c.method === 'SetValue'
+    );
+    if (callsAfterTerminate.length > 0) {
+      anomalies.push({
+        type: 'calls_after_terminate',
+        severity: 'error',
+        description: `${callsAfterTerminate.length} GetValue/SetValue call(s) made after Terminate()`,
+        recommendation: 'Do not call GetValue or SetValue after Terminate()'
+      });
+    }
+  }
+
+  return anomalies;
 }
 
 async function scorm_trace_sequencing(params = {}) {
@@ -507,6 +647,154 @@ async function scorm_api_call(params = {}) {
   if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const res = await RuntimeManager.callAPI(win, method, args);
   return { result: String(res || '') };
+}
+
+/**
+ * Get multiple data model elements in one call
+ * Supports wildcards for bulk reading (e.g., "cmi.interactions.*")
+ */
+async function scorm_data_model_get(params = {}) {
+  const session_id = params.session_id;
+  const elements = params.elements || [];
+  const patterns = params.patterns || [];
+  const include_metadata = !!params.include_metadata;
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  // Collect all elements to fetch
+  const elementsToFetch = new Set([...elements]);
+
+  // Expand patterns into specific elements
+  for (const pattern of patterns) {
+    const expanded = await expandDataModelPattern(win, pattern);
+    expanded.forEach(el => elementsToFetch.add(el));
+  }
+
+  // Fetch all values
+  const data = {};
+  const metadata = {};
+  const errors = [];
+
+  for (const element of elementsToFetch) {
+    try {
+      const value = await RuntimeManager.callAPI(win, 'GetValue', [element]);
+      data[element] = value;
+
+      if (include_metadata) {
+        const lastError = await RuntimeManager.callAPI(win, 'GetLastError', []);
+        metadata[element] = {
+          error_code: lastError,
+          fetched_at: Date.now()
+        };
+      }
+    } catch (err) {
+      errors.push({
+        element,
+        error: err.message || String(err)
+      });
+    }
+  }
+
+  return {
+    data,
+    metadata: include_metadata ? metadata : undefined,
+    errors: errors.length > 0 ? errors : undefined,
+    element_count: Object.keys(data).length
+  };
+}
+
+/**
+ * Expand a data model pattern (with wildcards) into specific elements
+ * @private
+ */
+async function expandDataModelPattern(win, pattern) {
+  const elements = [];
+
+  // Handle wildcard patterns
+  if (pattern.includes('*')) {
+    // cmi.interactions.* -> expand based on _count
+    if (pattern.startsWith('cmi.interactions.')) {
+      const count = await RuntimeManager.callAPI(win, 'GetValue', ['cmi.interactions._count']);
+      const n = parseInt(count, 10) || 0;
+
+      if (pattern === 'cmi.interactions.*') {
+        // Get all interaction fields
+        for (let i = 0; i < n; i++) {
+          elements.push(
+            `cmi.interactions.${i}.id`,
+            `cmi.interactions.${i}.type`,
+            `cmi.interactions.${i}.timestamp`,
+            `cmi.interactions.${i}.correct_responses._count`,
+            `cmi.interactions.${i}.weighting`,
+            `cmi.interactions.${i}.learner_response`,
+            `cmi.interactions.${i}.result`,
+            `cmi.interactions.${i}.latency`,
+            `cmi.interactions.${i}.description`
+          );
+        }
+      } else {
+        // Pattern like cmi.interactions.*.learner_response
+        const suffix = pattern.substring('cmi.interactions.*.'.length);
+        for (let i = 0; i < n; i++) {
+          elements.push(`cmi.interactions.${i}.${suffix}`);
+        }
+      }
+    }
+    // cmi.objectives.* -> expand based on _count
+    else if (pattern.startsWith('cmi.objectives.')) {
+      const count = await RuntimeManager.callAPI(win, 'GetValue', ['cmi.objectives._count']);
+      const n = parseInt(count, 10) || 0;
+
+      if (pattern === 'cmi.objectives.*') {
+        for (let i = 0; i < n; i++) {
+          elements.push(
+            `cmi.objectives.${i}.id`,
+            `cmi.objectives.${i}.score.scaled`,
+            `cmi.objectives.${i}.score.raw`,
+            `cmi.objectives.${i}.score.min`,
+            `cmi.objectives.${i}.score.max`,
+            `cmi.objectives.${i}.success_status`,
+            `cmi.objectives.${i}.completion_status`,
+            `cmi.objectives.${i}.description`
+          );
+        }
+      } else {
+        const suffix = pattern.substring('cmi.objectives.*.'.length);
+        for (let i = 0; i < n; i++) {
+          elements.push(`cmi.objectives.${i}.${suffix}`);
+        }
+      }
+    }
+    // cmi.score.* -> expand to all score fields
+    else if (pattern === 'cmi.score.*') {
+      elements.push('cmi.score.scaled', 'cmi.score.raw', 'cmi.score.min', 'cmi.score.max');
+    }
+    // cmi.learner_preference.* -> expand to all preference fields
+    else if (pattern === 'cmi.learner_preference.*') {
+      elements.push(
+        'cmi.learner_preference.audio_level',
+        'cmi.learner_preference.language',
+        'cmi.learner_preference.delivery_speed',
+        'cmi.learner_preference.audio_captioning'
+      );
+    }
+  } else {
+    // No wildcard, just add the element
+    elements.push(pattern);
+  }
+
+  return elements;
 }
 
 /**
@@ -724,6 +1012,661 @@ async function scorm_capture_screenshot(params = {}) {
   return { artifact_path: artifactPath, screenshot_data: base64 };
 }
 
+/**
+ * Trace assessment interactions with DOM actions, API calls, and data model state
+ * Provides complete before/after correlation for debugging assessment issues
+ */
+async function scorm_assessment_interaction_trace(params = {}) {
+  const session_id = params.session_id;
+  const actions = params.actions || [];
+  const capture_mode = params.capture_mode || 'standard'; // 'standard' or 'detailed'
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (!Array.isArray(actions) || actions.length === 0) {
+    const e = new Error('actions array is required and must not be empty');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const steps = [];
+  const issues_detected = [];
+
+  // Get initial API call count
+  const initialCalls = await RuntimeManager.getCapturedCalls(win);
+  const initialCallCount = initialCalls ? initialCalls.length : 0;
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    const step = {
+      action_index: i,
+      action: action,
+      dom_state_before: null,
+      dom_state_after: null,
+      api_calls_triggered: [],
+      data_model_changes: {},
+      timestamp: Date.now()
+    };
+
+    try {
+      // Capture DOM state before (if detailed mode and selector provided)
+      if (capture_mode === 'detailed' && action.selector) {
+        try {
+          const beforeState = await win.webContents.executeJavaScript(`
+            (() => {
+              const el = document.querySelector(${JSON.stringify(action.selector)});
+              if (!el) return null;
+              return {
+                tagName: el.tagName,
+                type: el.type,
+                value: el.value,
+                checked: el.checked,
+                textContent: el.textContent?.substring(0, 100),
+                classList: Array.from(el.classList)
+              };
+            })()
+          `);
+          step.dom_state_before = beforeState;
+        } catch (_) {
+          // Ignore DOM query errors
+        }
+      }
+
+      // Get API call count before action
+      const callsBefore = await RuntimeManager.getCapturedCalls(win);
+      const callCountBefore = callsBefore ? callsBefore.length : 0;
+
+      // Execute the action
+      if (action.type === 'click' && action.selector) {
+        await win.webContents.executeJavaScript(`
+          (() => {
+            const el = document.querySelector(${JSON.stringify(action.selector)});
+            if (el) el.click();
+          })()
+        `);
+      } else if (action.type === 'fill' && action.selector && action.value !== undefined) {
+        await win.webContents.executeJavaScript(`
+          (() => {
+            const el = document.querySelector(${JSON.stringify(action.selector)});
+            if (el) {
+              el.value = ${JSON.stringify(action.value)};
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          })()
+        `);
+      } else if (action.type === 'wait' && action.ms) {
+        await new Promise(resolve => setTimeout(resolve, action.ms));
+      }
+
+      // Small delay to allow API calls to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Capture DOM state after
+      if (capture_mode === 'detailed' && action.selector) {
+        try {
+          const afterState = await win.webContents.executeJavaScript(`
+            (() => {
+              const el = document.querySelector(${JSON.stringify(action.selector)});
+              if (!el) return null;
+              return {
+                tagName: el.tagName,
+                type: el.type,
+                value: el.value,
+                checked: el.checked,
+                textContent: el.textContent?.substring(0, 100),
+                classList: Array.from(el.classList)
+              };
+            })()
+          `);
+          step.dom_state_after = afterState;
+        } catch (_) {
+          // Ignore DOM query errors
+        }
+      }
+
+      // Get API calls triggered by this action
+      const callsAfter = await RuntimeManager.getCapturedCalls(win);
+      const callCountAfter = callsAfter ? callsAfter.length : 0;
+
+      if (callCountAfter > callCountBefore) {
+        const newCalls = callsAfter.slice(callCountBefore);
+        step.api_calls_triggered = newCalls.map(call => ({
+          method: call.method,
+          args: call.args,
+          result: call.result,
+          error_code: call.error_code,
+          timestamp: call.ts
+        }));
+
+        // Track data model changes from SetValue calls
+        for (const call of newCalls) {
+          if (call.method === 'SetValue' && call.args && call.args.length >= 2) {
+            const element = call.args[0];
+            const value = call.args[1];
+            step.data_model_changes[element] = {
+              new_value: value,
+              set_result: call.result
+            };
+          }
+        }
+      }
+
+      steps.push(step);
+
+    } catch (error) {
+      step.error = error.message || String(error);
+      steps.push(step);
+      issues_detected.push({
+        step_index: i,
+        severity: 'error',
+        description: `Action failed: ${error.message || String(error)}`,
+        action: action
+      });
+    }
+  }
+
+  // Analyze for common issues
+  const allApiCalls = steps.flatMap(s => s.api_calls_triggered);
+  const setValueCalls = allApiCalls.filter(c => c.method === 'SetValue');
+  const commitCalls = allApiCalls.filter(c => c.method === 'Commit');
+
+  if (setValueCalls.length > 0 && commitCalls.length === 0) {
+    issues_detected.push({
+      severity: 'warning',
+      type: 'missing_commit',
+      description: `${setValueCalls.length} SetValue call(s) made but Commit never invoked`,
+      recommendation: 'Add Commit() after SetValue calls to persist data'
+    });
+  }
+
+  // Check for incomplete interaction data
+  const interactionElements = Object.keys(steps.flatMap(s => s.data_model_changes))
+    .filter(el => el.startsWith('cmi.interactions.'));
+
+  if (interactionElements.length > 0) {
+    // Group by interaction index
+    const interactionIndices = new Set();
+    interactionElements.forEach(el => {
+      const match = el.match(/cmi\.interactions\.(\d+)\./);
+      if (match) interactionIndices.add(match[1]);
+    });
+
+    for (const idx of interactionIndices) {
+      const hasResponse = interactionElements.some(el => el === `cmi.interactions.${idx}.learner_response`);
+      const hasResult = interactionElements.some(el => el === `cmi.interactions.${idx}.result`);
+
+      if (hasResult && !hasResponse) {
+        issues_detected.push({
+          severity: 'warning',
+          type: 'incomplete_interaction',
+          description: `Interaction ${idx} has result set but learner_response is missing`,
+          recommendation: 'Set learner_response before setting result'
+        });
+      }
+    }
+  }
+
+  return {
+    steps,
+    issues_detected,
+    summary: {
+      total_actions: actions.length,
+      successful_actions: steps.filter(s => !s.error).length,
+      total_api_calls: allApiCalls.length,
+      data_model_elements_changed: Object.keys(steps.flatMap(s => Object.keys(s.data_model_changes))).length
+    }
+  };
+}
+
+/**
+ * Validate current data model state against expected values
+ */
+async function scorm_validate_data_model_state(params = {}) {
+  const session_id = params.session_id;
+  const expected = params.expected || {};
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (typeof expected !== 'object' || Object.keys(expected).length === 0) {
+    const e = new Error('expected object is required and must not be empty');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const issues = [];
+  const matches = [];
+
+  for (const [element, expectedValue] of Object.entries(expected)) {
+    try {
+      const actualValue = await RuntimeManager.callAPI(win, 'GetValue', [element]);
+
+      if (actualValue === expectedValue) {
+        matches.push({ element, expected: expectedValue, actual: actualValue });
+      } else {
+        const issue = {
+          element,
+          expected: expectedValue,
+          actual: actualValue,
+          severity: 'error'
+        };
+
+        // Add helpful hints based on common issues
+        if (actualValue === '' || actualValue === null || actualValue === undefined) {
+          issue.hint = `Element "${element}" was never set - check if SetValue was called`;
+        } else if (typeof expectedValue !== typeof actualValue) {
+          issue.hint = `Type mismatch: expected ${typeof expectedValue} but got ${typeof actualValue}`;
+        } else {
+          issue.hint = `Value mismatch: expected "${expectedValue}" but got "${actualValue}"`;
+        }
+
+        issues.push(issue);
+      }
+    } catch (error) {
+      issues.push({
+        element,
+        expected: expectedValue,
+        actual: undefined,
+        severity: 'error',
+        error: error.message || String(error),
+        hint: `Failed to read element - it may not exist in the data model`
+      });
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    total_elements: Object.keys(expected).length,
+    matches: matches.length,
+    issues: issues.length > 0 ? issues : undefined,
+    matched_elements: matches
+  };
+}
+
+/**
+ * Get browser console errors from SCORM content
+ */
+async function scorm_get_console_errors(params = {}) {
+  const session_id = params.session_id;
+  const since_ts = params.since_ts || 0;
+  const severity = params.severity || ['error', 'warning'];
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  try {
+    // Get console messages from the browser context
+    const consoleMessages = await win.webContents.executeJavaScript(`
+      (() => {
+        // Access stored console messages if available
+        if (window.__scormConsoleMessages) {
+          return window.__scormConsoleMessages;
+        }
+        return [];
+      })()
+    `);
+
+    // Filter by severity and timestamp
+    const severitySet = new Set(Array.isArray(severity) ? severity : [severity]);
+    const filtered = consoleMessages.filter(msg => {
+      if (msg.timestamp < since_ts) return false;
+      if (!severitySet.has(msg.level)) return false;
+      return true;
+    });
+
+    // Categorize errors
+    const categorized = filtered.map(msg => {
+      let category = 'runtime';
+      const message = msg.message || '';
+
+      if (message.includes('API') || message.includes('SCORM')) {
+        category = 'scorm_api';
+      } else if (message.includes('SyntaxError')) {
+        category = 'syntax';
+      } else if (message.includes('network') || message.includes('fetch') || message.includes('XMLHttpRequest')) {
+        category = 'network';
+      } else if (message.includes('TypeError') || message.includes('ReferenceError')) {
+        category = 'runtime';
+      }
+
+      return {
+        ...msg,
+        category
+      };
+    });
+
+    return {
+      session_id,
+      error_count: categorized.length,
+      errors: categorized,
+      categories: {
+        scorm_api: categorized.filter(e => e.category === 'scorm_api').length,
+        syntax: categorized.filter(e => e.category === 'syntax').length,
+        runtime: categorized.filter(e => e.category === 'runtime').length,
+        network: categorized.filter(e => e.category === 'network').length
+      }
+    };
+  } catch (error) {
+    const e = new Error(error?.message || String(error));
+    e.code = 'CONSOLE_ERROR_FETCH_FAILED';
+    throw e;
+  }
+}
+
+/**
+ * Compare two data model snapshots and return detailed diff
+ */
+async function scorm_compare_data_model_snapshots(params = {}) {
+  const before = params.before || {};
+  const after = params.after || {};
+
+  if (typeof before !== 'object' || typeof after !== 'object') {
+    const e = new Error('before and after must be objects');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const added = [];
+  const changed = [];
+  const unchanged = [];
+  const removed = [];
+
+  // Find all unique keys
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+
+  for (const key of allKeys) {
+    const beforeValue = before[key];
+    const afterValue = after[key];
+
+    if (!(key in before) && (key in after)) {
+      // Added
+      added.push({ element: key, value: afterValue });
+    } else if ((key in before) && !(key in after)) {
+      // Removed
+      removed.push({ element: key, value: beforeValue });
+    } else if (beforeValue !== afterValue) {
+      // Changed
+      changed.push({ element: key, before: beforeValue, after: afterValue });
+    } else {
+      // Unchanged
+      unchanged.push({ element: key, value: beforeValue });
+    }
+  }
+
+  return {
+    summary: {
+      total_elements: allKeys.size,
+      added: added.length,
+      changed: changed.length,
+      unchanged: unchanged.length,
+      removed: removed.length
+    },
+    added,
+    changed,
+    unchanged,
+    removed
+  };
+}
+
+/**
+ * Wait for a specific SCORM API call to occur
+ */
+async function scorm_wait_for_api_call(params = {}) {
+  const session_id = params.session_id;
+  const method = params.method;
+  const timeout_ms = params.timeout_ms || 5000;
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (!method || typeof method !== 'string') {
+    const e = new Error('method is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const startTime = Date.now();
+  const initialCalls = await RuntimeManager.getCapturedCalls(win);
+  const initialCount = initialCalls ? initialCalls.length : 0;
+
+  // Poll for the API call
+  while (Date.now() - startTime < timeout_ms) {
+    const currentCalls = await RuntimeManager.getCapturedCalls(win);
+    const currentCount = currentCalls ? currentCalls.length : 0;
+
+    if (currentCount > initialCount) {
+      // Check if any new calls match the method
+      const newCalls = currentCalls.slice(initialCount);
+      const matchingCall = newCalls.find(call => call.method === method);
+
+      if (matchingCall) {
+        return {
+          found: true,
+          call: {
+            method: matchingCall.method,
+            args: matchingCall.args,
+            result: matchingCall.result,
+            error_code: matchingCall.error_code,
+            timestamp: matchingCall.ts
+          },
+          elapsed_ms: Date.now() - startTime
+        };
+      }
+    }
+
+    // Wait a bit before polling again
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  // Timeout
+  const e = new Error(`Timeout waiting for API call: ${method}`);
+  e.code = 'WAIT_TIMEOUT';
+  throw e;
+}
+
+/**
+ * Get current page context and navigation state
+ */
+async function scorm_get_current_page_context(params = {}) {
+  const session_id = params.session_id;
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  try {
+    const context = await win.webContents.executeJavaScript(`
+      (() => {
+        const context = {
+          page_type: 'unknown',
+          slide_number: null,
+          total_slides: null,
+          section_title: null,
+          progress_percent: null,
+          navigation_available: {
+            next: false,
+            previous: false,
+            menu: false
+          },
+          page_title: document.title || null,
+          url: window.location.href
+        };
+
+        // Try to detect slide number from common patterns
+        const slideIndicators = document.querySelectorAll('[class*="slide-number"], [id*="slide-number"], [class*="page-number"]');
+        if (slideIndicators.length > 0) {
+          const text = slideIndicators[0].textContent.trim();
+          const match = text.match(/(\\d+)\\s*\\/\\s*(\\d+)/);
+          if (match) {
+            context.slide_number = parseInt(match[1]);
+            context.total_slides = parseInt(match[2]);
+            context.progress_percent = Math.round((context.slide_number / context.total_slides) * 100);
+          }
+        }
+
+        // Try to detect section title
+        const titleElements = document.querySelectorAll('h1, h2, [class*="section-title"], [class*="module-title"]');
+        if (titleElements.length > 0) {
+          context.section_title = titleElements[0].textContent.trim();
+        }
+
+        // Detect page type based on content
+        if (document.querySelector('[class*="question"], [id*="question"], [class*="quiz"], [class*="assessment"]')) {
+          context.page_type = 'assessment';
+        } else if (document.querySelector('[class*="intro"], [class*="welcome"]')) {
+          context.page_type = 'intro';
+        } else if (document.querySelector('[class*="summary"], [class*="conclusion"]')) {
+          context.page_type = 'summary';
+        } else {
+          context.page_type = 'content';
+        }
+
+        // Check navigation availability
+        const nextBtn = document.querySelector('[class*="next"], [id*="next"], button:has-text("Next")');
+        const prevBtn = document.querySelector('[class*="prev"], [class*="back"], [id*="prev"], button:has-text("Previous")');
+        const menuBtn = document.querySelector('[class*="menu"], [id*="menu"], button:has-text("Menu")');
+
+        context.navigation_available.next = nextBtn && !nextBtn.disabled;
+        context.navigation_available.previous = prevBtn && !prevBtn.disabled;
+        context.navigation_available.menu = menuBtn && !menuBtn.disabled;
+
+        return context;
+      })()
+    `);
+
+    return context;
+  } catch (error) {
+    const e = new Error(error?.message || String(error));
+    e.code = 'PAGE_CONTEXT_ERROR';
+    throw e;
+  }
+}
+
+/**
+ * Replay a sequence of API calls to reproduce behavior
+ */
+async function scorm_replay_api_calls(params = {}) {
+  const session_id = params.session_id;
+  const calls = params.calls || [];
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (!Array.isArray(calls) || calls.length === 0) {
+    const e = new Error('calls array is required and must not be empty');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const results = [];
+  let failed_at_index = null;
+  let error_details = null;
+
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    try {
+      const result = await RuntimeManager.callAPI(win, call.method, call.args || []);
+
+      results.push({
+        index: i,
+        method: call.method,
+        args: call.args,
+        result: result,
+        success: true
+      });
+    } catch (error) {
+      failed_at_index = i;
+      error_details = {
+        method: call.method,
+        args: call.args,
+        error: error.message || String(error),
+        error_code: error.code
+      };
+
+      results.push({
+        index: i,
+        method: call.method,
+        args: call.args,
+        success: false,
+        error: error.message || String(error),
+        error_code: error.code
+      });
+
+      break; // Stop on first failure
+    }
+  }
+
+  return {
+    success: failed_at_index === null,
+    total_calls: calls.length,
+    executed_calls: results.length,
+    failed_at_index,
+    error: error_details,
+    results
+  };
+}
+
 module.exports = {
   scorm_runtime_open,
   scorm_runtime_status,
@@ -731,6 +1674,7 @@ module.exports = {
   scorm_attempt_initialize,
   scorm_attempt_terminate,
   scorm_api_call,
+  scorm_data_model_get,
   scorm_nav_get_state,
   scorm_nav_next,
   scorm_nav_previous,
@@ -743,7 +1687,14 @@ module.exports = {
   scorm_test_navigation_flow,
   scorm_debug_api_calls,
   scorm_trace_sequencing,
-  scorm_get_network_requests
+  scorm_get_network_requests,
+  scorm_assessment_interaction_trace,
+  scorm_validate_data_model_state,
+  scorm_get_console_errors,
+  scorm_compare_data_model_snapshots,
+  scorm_wait_for_api_call,
+  scorm_get_current_page_context,
+  scorm_replay_api_calls
 };
 
 /**

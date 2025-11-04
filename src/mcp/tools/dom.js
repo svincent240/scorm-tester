@@ -575,12 +575,277 @@ async function scorm_keyboard_type(params = {}) {
   }
 }
 
+/**
+ * Discover all interactive elements on the current page
+ * Returns structured data about forms, buttons, inputs, assessments
+ */
+async function scorm_dom_find_interactive_elements(params = {}) {
+  const session_id = params.session_id;
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  try {
+    const result = await win.webContents.executeJavaScript(`
+      (() => {
+        const result = {
+          forms: [],
+          buttons: [],
+          inputs: [],
+          assessments: [],
+          navigation: [],
+          interactive_elements: []
+        };
+
+        // Find all forms
+        document.querySelectorAll('form').forEach((form, formIndex) => {
+          const formData = {
+            selector: form.id ? '#' + form.id : 'form:nth-of-type(' + (formIndex + 1) + ')',
+            id: form.id || null,
+            name: form.name || null,
+            action: form.action || null,
+            method: form.method || null,
+            inputs: [],
+            submit_button: null
+          };
+
+          // Find inputs within this form
+          form.querySelectorAll('input, select, textarea').forEach(input => {
+            const inputData = {
+              selector: input.id ? '#' + input.id : null,
+              type: input.type || input.tagName.toLowerCase(),
+              name: input.name || null,
+              id: input.id || null,
+              value: input.value || null,
+              checked: input.checked || null,
+              label: null,
+              placeholder: input.placeholder || null,
+              required: input.required || false
+            };
+
+            // Try to find associated label
+            if (input.id) {
+              const label = document.querySelector('label[for="' + input.id + '"]');
+              if (label) inputData.label = label.textContent.trim();
+            }
+            if (!inputData.label) {
+              const parentLabel = input.closest('label');
+              if (parentLabel) inputData.label = parentLabel.textContent.trim();
+            }
+
+            formData.inputs.push(inputData);
+          });
+
+          // Find submit button
+          const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+          if (submitBtn) {
+            formData.submit_button = {
+              selector: submitBtn.id ? '#' + submitBtn.id : null,
+              text: submitBtn.textContent?.trim() || submitBtn.value || 'Submit',
+              type: submitBtn.type
+            };
+          }
+
+          result.forms.push(formData);
+        });
+
+        // Find standalone buttons (not in forms)
+        document.querySelectorAll('button:not(form button), input[type="button"], a[role="button"]').forEach(btn => {
+          const text = btn.textContent?.trim() || btn.value || btn.getAttribute('aria-label') || '';
+          const btnData = {
+            selector: btn.id ? '#' + btn.id : null,
+            text: text,
+            type: btn.type || 'button',
+            purpose: null,
+            disabled: btn.disabled || false
+          };
+
+          // Infer purpose from text/class
+          const lowerText = text.toLowerCase();
+          const className = btn.className || '';
+          if (lowerText.includes('next') || className.includes('next')) {
+            btnData.purpose = 'navigation_next';
+          } else if (lowerText.includes('prev') || lowerText.includes('back') || className.includes('prev')) {
+            btnData.purpose = 'navigation_previous';
+          } else if (lowerText.includes('submit') || className.includes('submit')) {
+            btnData.purpose = 'submit';
+          } else if (lowerText.includes('menu') || className.includes('menu')) {
+            btnData.purpose = 'menu';
+          }
+
+          result.buttons.push(btnData);
+        });
+
+        // Find all standalone inputs (not in forms)
+        document.querySelectorAll('input:not(form input), select:not(form select), textarea:not(form textarea)').forEach(input => {
+          const inputData = {
+            selector: input.id ? '#' + input.id : null,
+            type: input.type || input.tagName.toLowerCase(),
+            name: input.name || null,
+            id: input.id || null,
+            value: input.value || null,
+            label: null
+          };
+
+          if (input.id) {
+            const label = document.querySelector('label[for="' + input.id + '"]');
+            if (label) inputData.label = label.textContent.trim();
+          }
+
+          result.inputs.push(inputData);
+        });
+
+        // Try to detect assessment patterns
+        const questionContainers = document.querySelectorAll('[class*="question"], [id*="question"], [data-question]');
+        questionContainers.forEach((container, idx) => {
+          const assessment = {
+            type: null,
+            question_text: null,
+            question_id: container.id || 'question-' + idx,
+            answers: [],
+            container_selector: container.id ? '#' + container.id : null
+          };
+
+          // Extract question text
+          const questionText = container.querySelector('[class*="question-text"], [class*="prompt"], h3, h4, p');
+          if (questionText) {
+            assessment.question_text = questionText.textContent.trim();
+          }
+
+          // Find answer options
+          const radioInputs = container.querySelectorAll('input[type="radio"]');
+          const checkboxInputs = container.querySelectorAll('input[type="checkbox"]');
+
+          if (radioInputs.length > 0) {
+            assessment.type = 'multiple_choice';
+            radioInputs.forEach(radio => {
+              const label = document.querySelector('label[for="' + radio.id + '"]') || radio.closest('label');
+              assessment.answers.push({
+                selector: radio.id ? '#' + radio.id : null,
+                value: radio.value,
+                label: label ? label.textContent.trim() : null,
+                name: radio.name
+              });
+            });
+          } else if (checkboxInputs.length > 0) {
+            assessment.type = 'multiple_select';
+            checkboxInputs.forEach(checkbox => {
+              const label = document.querySelector('label[for="' + checkbox.id + '"]') || checkbox.closest('label');
+              assessment.answers.push({
+                selector: checkbox.id ? '#' + checkbox.id : null,
+                value: checkbox.value,
+                label: label ? label.textContent.trim() : null,
+                name: checkbox.name
+              });
+            });
+          }
+
+          if (assessment.answers.length > 0) {
+            result.assessments.push(assessment);
+          }
+        });
+
+        return result;
+      })()
+    `);
+
+    return result;
+  } catch (error) {
+    const e = new Error(error?.message || String(error));
+    e.code = 'DOM_FIND_ERROR';
+    throw e;
+  }
+}
+
+/**
+ * Fill multiple form fields in a single batch operation
+ */
+async function scorm_dom_fill_form_batch(params = {}) {
+  const session_id = params.session_id;
+  const fields = params.fields || [];
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (!Array.isArray(fields) || fields.length === 0) {
+    const e = new Error('fields array is required and must not be empty');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const win = RuntimeManager.getPersistent(session_id);
+  if (!win) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    try {
+      // Use existing scorm_dom_fill for each field
+      await scorm_dom_fill({
+        session_id,
+        selector: field.selector,
+        value: field.value,
+        options: field.options || {}
+      });
+
+      results.push({
+        index: i,
+        selector: field.selector,
+        success: true
+      });
+    } catch (error) {
+      errors.push({
+        index: i,
+        selector: field.selector,
+        error: error.message || String(error),
+        error_code: error.code
+      });
+
+      results.push({
+        index: i,
+        selector: field.selector,
+        success: false,
+        error: error.message || String(error)
+      });
+    }
+  }
+
+  return {
+    total_fields: fields.length,
+    successful: results.filter(r => r.success).length,
+    failed: errors.length,
+    results,
+    errors: errors.length > 0 ? errors : undefined
+  };
+}
+
 module.exports = {
   scorm_dom_click,
   scorm_dom_fill,
   scorm_dom_query,
   scorm_dom_evaluate,
   scorm_dom_wait_for,
-  scorm_keyboard_type
+  scorm_keyboard_type,
+  scorm_dom_find_interactive_elements,
+  scorm_dom_fill_form_batch
 };
 

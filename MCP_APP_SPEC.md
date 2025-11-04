@@ -634,6 +634,12 @@ Notes:
   - result.data: { result: string }
   - errors: RUNTIME_NOT_OPEN, INVALID_SCORM_METHOD, SCORM_API_ERROR
 
+- scorm_data_model_get
+  - params: { session_id: string, elements?: string[], patterns?: string[], include_metadata?: boolean }
+  - result.data: { data: object, metadata?: object, errors?: array, element_count: number }
+  - errors: RUNTIME_NOT_OPEN
+  - description: Get multiple data model elements in one call. Supports wildcards (e.g., "cmi.interactions.*") for bulk reading. Patterns are expanded based on _count values.
+
 ### Sequencing & Navigation (SN)
 
 - scorm_nav_get_state
@@ -742,14 +748,69 @@ Shut down resources, close offscreen contexts, and finalize artifacts.
   - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, NAV_FLOW_ERROR
 
 - scorm_debug_api_calls
-  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, filter_methods?: string[] }
-  - result.data: { supported: true, entry_found: true, calls: any[], metrics: { total_calls: number, by_method: Record<string, number>, first_ts: number|null, last_ts: number|null, duration_ms: number, methods: string[] } }
+  - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, filter_methods?: string[], detect_anomalies?: boolean, include_data_model_state?: boolean }
+  - result.data: { supported: true, entry_found: true, calls: any[], metrics: { total_calls: number, by_method: Record<string, number>, first_ts: number|null, last_ts: number|null, duration_ms: number, methods: string[] }, anomalies?: array }
   - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, DEBUG_API_ERROR
+  - description: Enhanced with anomaly detection (missing Initialize/Terminate/Commit, calls before Initialize, etc.) and optional data model state tracking after each SetValue call.
 
 - scorm_trace_sequencing
   - params: { workspace_path: string, session_id?: string, viewport?: { device?: "desktop"|"tablet"|"mobile", width?: number, height?: number, scale?: number }, trace_level?: "basic"|"detailed"|"verbose" }
   - result.data: { supported: true, entry_found: true, trace: any[], trace_level: "basic"|"detailed"|"verbose", sequencing_active: boolean }
   - errors: ELECTRON_REQUIRED, MANIFEST_LAUNCH_NOT_FOUND, TRACE_SEQUENCING_ERROR
+
+- scorm_assessment_interaction_trace
+  - params: { session_id: string, actions: array<{ type: "click"|"fill"|"wait", selector?: string, value?: any, ms?: number }>, capture_mode?: "standard"|"detailed" }
+  - result.data: { steps: array, issues_detected: array, summary: { total_actions: number, successful_actions: number, total_api_calls: number, data_model_elements_changed: number } }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN
+  - description: Trace assessment interactions with complete before/after correlation. Each step includes DOM state changes, API calls triggered, and data model changes. Automatically detects common issues like missing Commit, incomplete interaction data, etc. Ideal for debugging why assessments aren't updating the data model correctly.
+
+- scorm_dom_find_interactive_elements
+  - params: { session_id: string }
+  - result.data: { forms: array, buttons: array, inputs: array, assessments: array, navigation: array, interactive_elements: array }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN, DOM_FIND_ERROR
+  - description: Discover all interactive elements on the current page. Returns structured data about forms (with inputs and submit buttons), standalone buttons (with inferred purpose), assessments (with question text and answer options), and navigation controls. Reduces 10+ exploratory queries to 1 call.
+
+- scorm_dom_fill_form_batch
+  - params: { session_id: string, fields: array<{ selector: string, value: any, options?: object }> }
+  - result.data: { total_fields: number, successful: number, failed: number, results: array, errors?: array }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN
+  - description: Fill multiple form fields in a single batch operation. Automatically handles different input types (text, radio, checkbox, select) and triggers appropriate events. Reduces 10+ scorm_dom_fill calls to 1 for assessment completion.
+
+- scorm_validate_data_model_state
+  - params: { session_id: string, expected: object }
+  - result.data: { valid: boolean, total_elements: number, matches: number, issues?: array, matched_elements: array }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN
+  - description: Validate current data model state against expected values. Returns detailed diff with helpful hints for mismatches (e.g., "Element was never set - check if SetValue was called"). Instant validation instead of manual comparison.
+
+- scorm_get_console_errors
+  - params: { session_id: string, since_ts?: number, severity?: array<"error"|"warning"|"info"> }
+  - result.data: { session_id: string, error_count: number, errors: array, categories: { scorm_api: number, syntax: number, runtime: number, network: number } }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN, CONSOLE_ERROR_FETCH_FAILED
+  - description: Get browser console errors/warnings from SCORM content. Filters out app-generated messages and categorizes errors by type. Provides stack traces and source locations. Critical for debugging JavaScript errors that cause silent failures.
+
+- scorm_compare_data_model_snapshots
+  - params: { before: object, after: object }
+  - result.data: { summary: { total_elements: number, added: number, changed: number, unchanged: number, removed: number }, added: array, changed: array, unchanged: array, removed: array }
+  - errors: MCP_INVALID_PARAMS
+  - description: Compare two data model snapshots and return detailed diff. Shows what changed, what didn't change (but should have), and what's missing. Useful for comparing expected vs actual state after interactions.
+
+- scorm_wait_for_api_call
+  - params: { session_id: string, method: string, timeout_ms?: number }
+  - result.data: { found: boolean, call: { method: string, args: array, result: string, error_code: string, timestamp: number }, elapsed_ms: number }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN, WAIT_TIMEOUT
+  - description: Wait for a specific SCORM API call to occur. Returns immediately when the call happens or throws timeout error. Eliminates arbitrary wait delays and polling loops.
+
+- scorm_get_current_page_context
+  - params: { session_id: string }
+  - result.data: { page_type: string, slide_number: number, total_slides: number, section_title: string, progress_percent: number, navigation_available: { next: boolean, previous: boolean, menu: boolean }, page_title: string, url: string }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN, PAGE_CONTEXT_ERROR
+  - description: Get semantic information about current page. Extracts slide number, section title, progress indicators, and identifies page type (intro, content, assessment, summary). Enables intelligent navigation decisions.
+
+- scorm_replay_api_calls
+  - params: { session_id: string, calls: array<{ method: string, args?: array }> }
+  - result.data: { success: boolean, total_calls: number, executed_calls: number, failed_at_index?: number, error?: object, results: array }
+  - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN
+  - description: Replay a sequence of API calls to reproduce behavior. Shows which call fails and why. Useful for debugging and testing API call sequences.
 
 - Parameters: `session_id` (string)
 - Response: `{ success: boolean, artifacts_manifest_path }`
