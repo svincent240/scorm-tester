@@ -68,8 +68,15 @@ describe('MCP complete navigation workflow on real course', () => {
     expect(snInitData.success).toBe(true);
 
     // Get initial state
+    console.log('[TEST] Getting initial navigation state...');
     const state1 = await rpc('tools/call', { name: 'scorm_nav_get_state', arguments: { session_id } }, id++);
+    console.log('[TEST] State1 response:', JSON.stringify(state1, null, 2));
     const state1Data = parseMcpResponse(state1);
+    console.log('[TEST] Parsed state1 data:', JSON.stringify(state1Data, null, 2));
+    if (!state1Data || !state1Data.currentActivity) {
+      console.error('[TEST] ERROR: state1Data is missing or has no currentActivity property!');
+      console.error('[TEST] Full response:', JSON.stringify(state1, null, 2));
+    }
     expect(state1Data.sn_available).toBe(true);
     expect(state1Data.currentActivity).toBeDefined();
 
@@ -153,8 +160,15 @@ describe('MCP complete navigation workflow on real course', () => {
     expect(snResetData.success).toBe(true);
 
     // Get state after reset
+    console.log('[TEST] Getting navigation state after reset...');
     const stateAfter = await rpc('tools/call', { name: 'scorm_nav_get_state', arguments: { session_id } }, id++);
+    console.log('[TEST] StateAfter response:', JSON.stringify(stateAfter, null, 2));
     const stateAfterData = parseMcpResponse(stateAfter);
+    console.log('[TEST] Parsed stateAfter data:', JSON.stringify(stateAfterData, null, 2));
+    if (!stateAfterData || !stateAfterData.currentActivity) {
+      console.error('[TEST] ERROR: stateAfterData is missing or has no currentActivity property!');
+      console.error('[TEST] Full response:', JSON.stringify(stateAfter, null, 2));
+    }
     expect(stateAfterData.sn_available).toBe(true);
     // After reset, should be back to initial state
     expect(stateAfterData.currentActivity).toBeDefined();

@@ -1,1 +1,3 @@
-{"ts":1762376145540,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762386442919,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762386453057,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":3,"method":"scorm_runtime_open","error_code":"UNKNOWN_ERROR","message":"Electron child startup timeout"}],"context":{},"pid":66504,"process":"node"}
+{"ts":1762386463099,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":4,"method":"scorm_sn_init","error_code":"UNKNOWN_ERROR","message":"Electron child startup timeout"}],"context":{},"pid":66504,"process":"node"}

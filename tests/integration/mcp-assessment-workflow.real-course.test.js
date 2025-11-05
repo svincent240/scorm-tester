@@ -51,24 +51,36 @@ describe('MCP assessment workflow on real course', () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
 
+    console.log('[TEST] Initializing MCP for interactive elements test...');
     const initRes = await rpc('initialize', {}, id++);
     expect(initRes && !initRes.error).toBe(true);
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
 
+    console.log('[TEST] Opening session for interactive elements test...');
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
     const openData = parseMcpResponse(openSession);
     const session_id = openData.session_id;
+    console.log('[TEST] Session ID:', session_id);
 
+    console.log('[TEST] Opening runtime...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+    console.log('[TEST] Initializing attempt...');
     await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Discover interactive elements
-    const findElements = await rpc('tools/call', { 
-      name: 'scorm_dom_find_interactive_elements', 
-      arguments: { session_id } 
+    console.log('[TEST] Discovering interactive elements...');
+    const findElements = await rpc('tools/call', {
+      name: 'scorm_dom_find_interactive_elements',
+      arguments: { session_id }
     }, id++);
+    console.log('[TEST] Find elements response:', JSON.stringify(findElements, null, 2));
     const elementsData = parseMcpResponse(findElements);
+    console.log('[TEST] Parsed elements data:', JSON.stringify(elementsData, null, 2));
+    if (!elementsData) {
+      console.error('[TEST] ERROR: elementsData is null or undefined!');
+      console.error('[TEST] Full findElements response:', JSON.stringify(findElements, null, 2));
+    }
     expect(elementsData).toBeDefined();
     expect(elementsData.forms).toBeDefined();
     expect(elementsData.buttons).toBeDefined();
@@ -116,9 +128,15 @@ describe('MCP assessment workflow on real course', () => {
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
     const openData = parseMcpResponse(openSession);
     const session_id = openData.session_id;
+    console.log('[TEST] Session opened, ID:', session_id);
 
-    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
+    const runtimeOpenRes = await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+    console.log('[TEST] Runtime open response:', JSON.stringify(runtimeOpenRes, null, 2));
+    const runtimeOpenData = parseMcpResponse(runtimeOpenRes);
+    console.log('[TEST] Runtime open data:', JSON.stringify(runtimeOpenData, null, 2));
+
+    const attemptInitRes = await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
+    console.log('[TEST] Initialize response:', JSON.stringify(attemptInitRes, null, 2));
 
     // Trace assessment interactions with simple actions
     const trace = await rpc('tools/call', { 
@@ -132,6 +150,9 @@ describe('MCP assessment workflow on real course', () => {
       } 
     }, id++);
     const traceData = parseMcpResponse(trace);
+    console.log('[TEST] Trace response:', JSON.stringify(trace, null, 2));
+    console.log('[TEST] Parsed traceData:', JSON.stringify(traceData, null, 2));
+    console.log('[TEST] traceData keys:', traceData ? Object.keys(traceData) : 'undefined');
     expect(traceData.steps).toBeDefined();
     expect(Array.isArray(traceData.steps)).toBe(true);
     expect(traceData.summary).toBeDefined();
@@ -182,6 +203,9 @@ describe('MCP assessment workflow on real course', () => {
       } 
     }, id++);
     const validateData = parseMcpResponse(validate);
+    console.log('[TEST] Validate response:', JSON.stringify(validate, null, 2));
+    console.log('[TEST] Parsed validateData:', JSON.stringify(validateData, null, 2));
+    console.log('[TEST] validateData keys:', validateData ? Object.keys(validateData) : 'undefined');
     expect(validateData.valid).toBe(true);
     expect(validateData.matches).toBeGreaterThanOrEqual(1);
     expect(validateData.matched_elements).toContain('cmi.location');

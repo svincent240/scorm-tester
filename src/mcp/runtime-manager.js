@@ -613,7 +613,21 @@ class RuntimeManager {
     }
   }
 
-  static async getCapturedCalls(win) {
+  static async getCapturedCalls(win, session_id = null) {
+    // If session_id is provided, use IPC bridge (Node.js -> Electron child)
+    if (session_id) {
+      if (global.__electronBridge && global.__electronBridge.sendMessage) {
+        const result = await global.__electronBridge.sendMessage({
+          id: Date.now(),
+          type: 'runtime_getCapturedCalls',
+          params: { session_id }
+        });
+        return result.calls || [];
+      }
+      throw new Error("Electron bridge not available");
+    }
+
+    // Direct window access (when called from Electron child)
     const script = `(() => {
       try {
         if (Array.isArray(window.__scorm_calls)) return window.__scorm_calls;
@@ -685,6 +699,33 @@ class RuntimeManager {
 
     // Invoke using window directly
     return this._snInvokeImplementation(win, method, payload);
+  }
+
+  /**
+   * Execute JavaScript in the browser context
+   * @param {BrowserWindow|null} win - Window object (only used when called from Electron child)
+   * @param {string} script - JavaScript code to execute
+   * @param {string|null} session_id - Session ID (used when called from Node.js parent via IPC)
+   * @returns {Promise<any>} Result of the JavaScript execution
+   */
+  static async executeJS(win, script, session_id = null) {
+    if (session_id) {
+      if (global.__electronBridge && global.__electronBridge.sendMessage) {
+        const result = await global.__electronBridge.sendMessage({
+          id: Date.now(),
+          type: 'runtime_executeJS',
+          params: { session_id, script }
+        });
+        return result.result;
+      }
+      throw new Error("Electron bridge not available");
+    }
+
+    // Direct execution when called from Electron child
+    if (!win || !win.webContents) {
+      throw new Error("Runtime not open");
+    }
+    return await win.webContents.executeJavaScript(script, true);
   }
 
   static async close(win) {

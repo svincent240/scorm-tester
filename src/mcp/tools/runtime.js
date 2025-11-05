@@ -5,8 +5,12 @@ const fs = require("fs");
 const ManifestParser = require("../../main/services/scorm/cam/manifest-parser");
 const sessions = require("../session");
 const { RuntimeManager, resolveEntryPathFromManifest } = require("../runtime-manager");
+const getLogger = require('../../shared/utils/logger.js');
 let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
+
+// Initialize logger
+const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
 
 function ensureManifestPath(workspacePath) {
   const manifestPath = path.join(path.resolve(workspacePath), "imsmanifest.xml");
@@ -655,15 +659,20 @@ async function scorm_data_model_get(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
 
   // Collect all elements to fetch
   const elementsToFetch = new Set([...elements]);
 
   // Expand patterns into specific elements
   for (const pattern of patterns) {
-    const expanded = await expandDataModelPattern(win, pattern);
+    const expanded = await expandDataModelPattern(session_id, pattern);
     expanded.forEach(el => elementsToFetch.add(el));
   }
 
@@ -674,11 +683,11 @@ async function scorm_data_model_get(params = {}) {
 
   for (const element of elementsToFetch) {
     try {
-      const value = await RuntimeManager.callAPI(win, 'GetValue', [element]);
+      const value = await RuntimeManager.callAPI(null, 'GetValue', [element], session_id);
       data[element] = value;
 
       if (include_metadata) {
-        const lastError = await RuntimeManager.callAPI(win, 'GetLastError', []);
+        const lastError = await RuntimeManager.callAPI(null, 'GetLastError', [], session_id);
         metadata[element] = {
           error_code: lastError,
           fetched_at: Date.now()
@@ -704,14 +713,14 @@ async function scorm_data_model_get(params = {}) {
  * Expand a data model pattern (with wildcards) into specific elements
  * @private
  */
-async function expandDataModelPattern(win, pattern) {
+async function expandDataModelPattern(session_id, pattern) {
   const elements = [];
 
   // Handle wildcard patterns
   if (pattern.includes('*')) {
     // cmi.interactions.* -> expand based on _count
     if (pattern.startsWith('cmi.interactions.')) {
-      const count = await RuntimeManager.callAPI(win, 'GetValue', ['cmi.interactions._count']);
+      const count = await RuntimeManager.callAPI(null, 'GetValue', ['cmi.interactions._count'], session_id);
       const n = parseInt(count, 10) || 0;
 
       if (pattern === 'cmi.interactions.*') {
@@ -739,7 +748,7 @@ async function expandDataModelPattern(win, pattern) {
     }
     // cmi.objectives.* -> expand based on _count
     else if (pattern.startsWith('cmi.objectives.')) {
-      const count = await RuntimeManager.callAPI(win, 'GetValue', ['cmi.objectives._count']);
+      const count = await RuntimeManager.callAPI(null, 'GetValue', ['cmi.objectives._count'], session_id);
       const n = parseInt(count, 10) || 0;
 
       if (pattern === 'cmi.objectives.*') {
@@ -796,13 +805,39 @@ async function expandDataModelPattern(win, pattern) {
  */
 async function scorm_nav_get_state(params = {}) {
   const session_id = params.session_id;
-  if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
+
+  logger?.debug && logger.debug('[scorm_nav_get_state] Starting', { session_id });
+
+  if (!session_id || typeof session_id !== 'string') {
+    logger?.error && logger.error('[scorm_nav_get_state] Invalid session_id', { session_id });
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  logger?.debug && logger.debug('[scorm_nav_get_state] Invoking SN status');
+
   const statusRes = await RuntimeManager.snInvoke(null, 'status', undefined, session_id);
-  if (statusRes == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
+
+  logger?.debug && logger.debug('[scorm_nav_get_state] SN status response', {
+    isNull: statusRes == null,
+    success: statusRes?.success,
+    error: statusRes?.error,
+    hasStatus: !!(statusRes && statusRes.status),
+    statusKeys: statusRes?.status ? Object.keys(statusRes.status) : []
+  });
+
+  if (statusRes == null) {
+    logger?.error && logger.error('[scorm_nav_get_state] SN bridge unavailable');
+    const e = new Error('SN bridge unavailable');
+    e.code = 'SN_BRIDGE_UNAVAILABLE';
+    throw e;
+  }
 
   // SN_NOT_INITIALIZED is expected when scorm_sn_init has not been called (e.g., single-SCO courses)
   // Return success with sn_available: false instead of throwing
   if (!statusRes.success && statusRes.error === 'SN_NOT_INITIALIZED') {
+    logger?.debug && logger.debug('[scorm_nav_get_state] SN not initialized (expected for single-SCO)');
     return {
       sn_available: false,
       reason: 'SN_NOT_INITIALIZED',
@@ -812,15 +847,24 @@ async function scorm_nav_get_state(params = {}) {
 
   // Other errors are real failures - throw them
   if (!statusRes.success) {
+    logger?.error && logger.error('[scorm_nav_get_state] SN bridge error', { error: statusRes.error });
     const e = new Error(statusRes.error || 'SN bridge error');
     e.code = 'SN_BRIDGE_ERROR';
     throw e;
   }
 
-  return {
+  const result = {
     sn_available: true,
     ...statusRes.status
   };
+
+  logger?.debug && logger.debug('[scorm_nav_get_state] Returning result', {
+    sn_available: result.sn_available,
+    hasCurrentActivity: !!result.currentActivity,
+    resultKeys: Object.keys(result)
+  });
+
+  return result;
 }
 
 /**
@@ -980,20 +1024,38 @@ async function scorm_assessment_interaction_trace(params = {}) {
   const actions = params.actions || [];
   const capture_mode = params.capture_mode || 'standard'; // 'standard' or 'detailed'
 
+  logger?.debug && logger.debug('[scorm_assessment_interaction_trace] Starting', {
+    session_id,
+    actionCount: actions.length,
+    capture_mode
+  });
+
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_assessment_interaction_trace] Invalid session_id', { session_id });
     throw e;
   }
 
   if (!Array.isArray(actions) || actions.length === 0) {
     const e = new Error('actions array is required and must not be empty');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_assessment_interaction_trace] Invalid actions', {
+      isArray: Array.isArray(actions),
+      length: actions ? actions.length : 0
+    });
     throw e;
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) {
+    logger?.error && logger.error('[scorm_assessment_interaction_trace] Runtime not open', { session_id });
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  logger?.debug && logger.debug('[scorm_assessment_interaction_trace] Runtime window found, starting trace');
 
   const steps = [];
   const issues_detected = [];
@@ -1173,7 +1235,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
     }
   }
 
-  return {
+  const result = {
     steps,
     issues_detected,
     summary: {
@@ -1183,6 +1245,16 @@ async function scorm_assessment_interaction_trace(params = {}) {
       data_model_elements_changed: Object.keys(steps.flatMap(s => Object.keys(s.data_model_changes))).length
     }
   };
+
+  logger?.debug && logger.debug('[scorm_assessment_interaction_trace] Returning result', {
+    resultKeys: Object.keys(result),
+    stepsCount: result.steps?.length || 0,
+    issuesCount: result.issues_detected?.length || 0,
+    hasSummary: !!result.summary,
+    summaryKeys: result.summary ? Object.keys(result.summary) : []
+  });
+
+  return result;
 }
 
 /**
@@ -1192,20 +1264,37 @@ async function scorm_validate_data_model_state(params = {}) {
   const session_id = params.session_id;
   const expected = params.expected || {};
 
+  logger?.debug && logger.debug('[scorm_validate_data_model_state] Starting', {
+    session_id,
+    expectedElementCount: Object.keys(expected).length
+  });
+
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_validate_data_model_state] Invalid session_id', { session_id });
     throw e;
   }
 
   if (typeof expected !== 'object' || Object.keys(expected).length === 0) {
     const e = new Error('expected object is required and must not be empty');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_validate_data_model_state] Invalid expected', {
+      isObject: typeof expected === 'object',
+      keyCount: expected ? Object.keys(expected).length : 0
+    });
     throw e;
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) {
+    logger?.error && logger.error('[scorm_validate_data_model_state] Runtime not open', { session_id });
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  logger?.debug && logger.debug('[scorm_validate_data_model_state] Runtime window found, validating elements');
 
   const issues = [];
   const matches = [];
@@ -1247,13 +1336,25 @@ async function scorm_validate_data_model_state(params = {}) {
     }
   }
 
-  return {
+  const result = {
     valid: issues.length === 0,
     total_elements: Object.keys(expected).length,
     matches: matches.length,
     issues: issues.length > 0 ? issues : undefined,
     matched_elements: matches
   };
+
+  logger?.debug && logger.debug('[scorm_validate_data_model_state] Returning result', {
+    resultKeys: Object.keys(result),
+    valid: result.valid,
+    total_elements: result.total_elements,
+    matches: result.matches,
+    issuesCount: issues.length,
+    hasIssues: !!result.issues,
+    matchedElementsCount: result.matched_elements?.length || 0
+  });
+
+  return result;
 }
 
 /**
@@ -1264,14 +1365,24 @@ async function scorm_get_console_errors(params = {}) {
   const since_ts = params.since_ts || 0;
   const severity = params.severity || ['error', 'warning'];
 
+  logger?.debug && logger.debug('[scorm_get_console_errors] Starting', { session_id, since_ts, severity });
+
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_get_console_errors] Invalid params', { session_id });
     throw e;
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) {
+    logger?.error && logger.error('[scorm_get_console_errors] Runtime not open', { session_id });
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  logger?.debug && logger.debug('[scorm_get_console_errors] Runtime window found, fetching console messages');
 
   try {
     // Get console messages from the browser context
@@ -1285,12 +1396,22 @@ async function scorm_get_console_errors(params = {}) {
       })()
     `);
 
+    logger?.debug && logger.debug('[scorm_get_console_errors] Console messages fetched', {
+      messageCount: consoleMessages ? consoleMessages.length : 0,
+      hasMessages: !!(consoleMessages && consoleMessages.length > 0)
+    });
+
     // Filter by severity and timestamp
     const severitySet = new Set(Array.isArray(severity) ? severity : [severity]);
     const filtered = consoleMessages.filter(msg => {
       if (msg.timestamp < since_ts) return false;
       if (!severitySet.has(msg.level)) return false;
       return true;
+    });
+
+    logger?.debug && logger.debug('[scorm_get_console_errors] Messages filtered', {
+      originalCount: consoleMessages.length,
+      filteredCount: filtered.length
     });
 
     // Categorize errors
@@ -1314,7 +1435,7 @@ async function scorm_get_console_errors(params = {}) {
       };
     });
 
-    return {
+    const result = {
       session_id,
       error_count: categorized.length,
       errors: categorized,
@@ -1325,7 +1446,21 @@ async function scorm_get_console_errors(params = {}) {
         network: categorized.filter(e => e.category === 'network').length
       }
     };
+
+    logger?.debug && logger.debug('[scorm_get_console_errors] Returning result', {
+      resultKeys: Object.keys(result),
+      session_id: result.session_id,
+      error_count: result.error_count,
+      hasCategories: !!result.categories,
+      categoriesKeys: result.categories ? Object.keys(result.categories) : []
+    });
+
+    return result;
   } catch (error) {
+    logger?.error && logger.error('[scorm_get_console_errors] Error fetching console messages', {
+      error: error?.message || String(error),
+      stack: error?.stack
+    });
     const e = new Error(error?.message || String(error));
     e.code = 'CONSOLE_ERROR_FETCH_FAILED';
     throw e;
@@ -1395,37 +1530,69 @@ async function scorm_wait_for_api_call(params = {}) {
   const method = params.method;
   const timeout_ms = params.timeout_ms || 5000;
 
+  logger?.debug && logger.debug('[scorm_wait_for_api_call] Starting', { session_id, method, timeout_ms });
+
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_wait_for_api_call] Invalid session_id', { session_id });
     throw e;
   }
 
   if (!method || typeof method !== 'string') {
     const e = new Error('method is required');
     e.code = 'MCP_INVALID_PARAMS';
+    logger?.error && logger.error('[scorm_wait_for_api_call] Invalid method', { method });
     throw e;
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) {
+    logger?.error && logger.error('[scorm_wait_for_api_call] Runtime not open', { session_id });
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
 
   const startTime = Date.now();
   const initialCalls = await RuntimeManager.getCapturedCalls(win);
   const initialCount = initialCalls ? initialCalls.length : 0;
 
+  logger?.debug && logger.debug('[scorm_wait_for_api_call] Initial state', {
+    initialCount,
+    hasCalls: !!(initialCalls && initialCalls.length > 0)
+  });
+
+  let pollCount = 0;
+
   // Poll for the API call
   while (Date.now() - startTime < timeout_ms) {
+    pollCount++;
     const currentCalls = await RuntimeManager.getCapturedCalls(win);
     const currentCount = currentCalls ? currentCalls.length : 0;
+
+    if (pollCount % 10 === 0) {
+      logger?.debug && logger.debug('[scorm_wait_for_api_call] Polling', {
+        pollCount,
+        currentCount,
+        initialCount,
+        elapsed: Date.now() - startTime
+      });
+    }
 
     if (currentCount > initialCount) {
       // Check if any new calls match the method
       const newCalls = currentCalls.slice(initialCount);
       const matchingCall = newCalls.find(call => call.method === method);
 
+      logger?.debug && logger.debug('[scorm_wait_for_api_call] New calls detected', {
+        newCallsCount: newCalls.length,
+        methods: newCalls.map(c => c.method),
+        foundMatch: !!matchingCall
+      });
+
       if (matchingCall) {
-        return {
+        const result = {
           found: true,
           call: {
             method: matchingCall.method,
@@ -1436,6 +1603,16 @@ async function scorm_wait_for_api_call(params = {}) {
           },
           elapsed_ms: Date.now() - startTime
         };
+
+        logger?.debug && logger.debug('[scorm_wait_for_api_call] Match found, returning result', {
+          resultKeys: Object.keys(result),
+          found: result.found,
+          hasCall: !!result.call,
+          callMethod: result.call?.method,
+          elapsed_ms: result.elapsed_ms
+        });
+
+        return result;
       }
     }
 
@@ -1444,6 +1621,14 @@ async function scorm_wait_for_api_call(params = {}) {
   }
 
   // Timeout
+  logger?.error && logger.error('[scorm_wait_for_api_call] Timeout waiting for API call', {
+    method,
+    timeout_ms,
+    pollCount,
+    elapsed: Date.now() - startTime,
+    initialCount,
+    finalCount: (await RuntimeManager.getCapturedCalls(win))?.length || 0
+  });
   const e = new Error(`Timeout waiting for API call: ${method}`);
   e.code = 'WAIT_TIMEOUT';
   throw e;

@@ -69,6 +69,9 @@ describe('MCP debugging and diagnostic tools on real course', () => {
       arguments: { session_id, severity: ['error', 'warning'] } 
     }, id++);
     const consoleData = parseMcpResponse(consoleErrors);
+    console.log('[TEST] Console errors response:', JSON.stringify(consoleErrors, null, 2));
+    console.log('[TEST] Parsed consoleData:', JSON.stringify(consoleData, null, 2));
+    console.log('[TEST] consoleData keys:', consoleData ? Object.keys(consoleData) : 'undefined');
     expect(consoleData.session_id).toBe(session_id);
     expect(consoleData.error_count).toBeDefined();
     expect(Array.isArray(consoleData.errors)).toBe(true);
@@ -132,6 +135,9 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     // Wait should complete
     const waitResult = await waitPromise;
     const waitData = parseMcpResponse(waitResult);
+    console.log('[TEST] Wait result response:', JSON.stringify(waitResult, null, 2));
+    console.log('[TEST] Parsed waitData:', JSON.stringify(waitData, null, 2));
+    console.log('[TEST] waitData keys:', waitData ? Object.keys(waitData) : 'undefined');
     expect(waitData.found).toBe(true);
     expect(waitData.call).toBeDefined();
     expect(waitData.call.method).toBe('Initialize');

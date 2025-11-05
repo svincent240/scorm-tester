@@ -24,8 +24,9 @@ async function scorm_dom_click(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -86,7 +87,7 @@ async function scorm_dom_click(params = {}) {
 
   try {
     sessions.emit && sessions.emit({ session_id, type: 'dom:click_start', payload: { selector, clickType } });
-    const result = await win.webContents.executeJavaScript(script, true);
+    const result = await RuntimeManager.executeJS(null, script, session_id);
     sessions.emit && sessions.emit({ session_id, type: 'dom:click_complete', payload: { selector } });
     return result;
   } catch (err) {
@@ -124,8 +125,9 @@ async function scorm_dom_fill(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -207,7 +209,7 @@ async function scorm_dom_fill(params = {}) {
 
   try {
     sessions.emit && sessions.emit({ session_id, type: 'dom:fill_start', payload: { selector, value } });
-    const result = await win.webContents.executeJavaScript(script, true);
+    const result = await RuntimeManager.executeJS(null, script, session_id);
     sessions.emit && sessions.emit({ session_id, type: 'dom:fill_complete', payload: { selector } });
     return result;
   } catch (err) {
@@ -238,8 +240,9 @@ async function scorm_dom_query(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -312,7 +315,7 @@ async function scorm_dom_query(params = {}) {
   `;
 
   try {
-    const result = await win.webContents.executeJavaScript(script, true);
+    const result = await RuntimeManager.executeJS(null, script, session_id);
     return result;
   } catch (err) {
     const e = new Error(`DOM query failed: ${err.message}`);
@@ -328,7 +331,6 @@ async function scorm_dom_query(params = {}) {
 async function scorm_dom_evaluate(params = {}) {
   const session_id = params.session_id;
   const expression = params.expression;
-  const return_by_value = params.return_by_value !== false; // default true
 
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
@@ -342,8 +344,9 @@ async function scorm_dom_evaluate(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -351,7 +354,7 @@ async function scorm_dom_evaluate(params = {}) {
 
   try {
     sessions.emit && sessions.emit({ session_id, type: 'dom:evaluate_start', payload: { expression: expression.substring(0, 100) } });
-    const result = await win.webContents.executeJavaScript(expression, return_by_value);
+    const result = await RuntimeManager.executeJS(null, expression, session_id);
     sessions.emit && sessions.emit({ session_id, type: 'dom:evaluate_complete', payload: {} });
     return { result };
   } catch (err) {
@@ -382,8 +385,9 @@ async function scorm_dom_wait_for(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -469,7 +473,7 @@ async function scorm_dom_wait_for(params = {}) {
 
   try {
     sessions.emit && sessions.emit({ session_id, type: 'dom:wait_start', payload: { condition } });
-    const result = await win.webContents.executeJavaScript(script, true);
+    const result = await RuntimeManager.executeJS(null, script, session_id);
     sessions.emit && sessions.emit({ session_id, type: 'dom:wait_complete', payload: { elapsed_ms: result.elapsed_ms } });
     return result;
   } catch (err) {
@@ -500,8 +504,9 @@ async function scorm_keyboard_type(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
@@ -565,7 +570,7 @@ async function scorm_keyboard_type(params = {}) {
 
   try {
     sessions.emit && sessions.emit({ session_id, type: 'keyboard:type_start', payload: { text: text.substring(0, 50) } });
-    const result = await win.webContents.executeJavaScript(script, true);
+    const result = await RuntimeManager.executeJS(null, script, session_id);
     sessions.emit && sessions.emit({ session_id, type: 'keyboard:type_complete', payload: { characters: result.characters_typed } });
     return result;
   } catch (err) {
@@ -588,15 +593,16 @@ async function scorm_dom_find_interactive_elements(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
   }
 
   try {
-    const result = await win.webContents.executeJavaScript(`
+    const result = await RuntimeManager.executeJS(null, `
       (() => {
         const result = {
           forms: [],
@@ -757,7 +763,7 @@ async function scorm_dom_find_interactive_elements(params = {}) {
 
         return result;
       })()
-    `);
+    `, session_id);
 
     return result;
   } catch (error) {
@@ -786,8 +792,9 @@ async function scorm_dom_fill_form_batch(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;

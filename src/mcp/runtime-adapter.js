@@ -92,8 +92,34 @@ function ensureIpcHandlers() {
       }
       if (action === 'status') {
         const sn = snByWC.get(id);
-        if (!sn) return { success: false, error: 'SN_NOT_INITIALIZED' };
-        return { success: true, status: sn.getStatus ? sn.getStatus() : {} };
+        if (!sn) {
+          mcpLogger?.debug && mcpLogger.debug('[MCP SN] status action: SN not initialized');
+          return { success: false, error: 'SN_NOT_INITIALIZED' };
+        }
+
+        // CRITICAL: Always use getSequencingState() to get full state including currentActivity
+        // getStatus() only returns version/capabilities, NOT navigation state
+        mcpLogger?.debug && mcpLogger.debug('[MCP SN] status action: checking SN methods', {
+          hasGetSequencingState: typeof sn.getSequencingState === 'function',
+          hasGetStatus: typeof sn.getStatus === 'function',
+          snType: sn.constructor?.name
+        });
+
+        if (typeof sn.getSequencingState !== 'function') {
+          mcpLogger?.error && mcpLogger.error('[MCP SN] status action: SN instance missing getSequencingState method!', {
+            availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(sn)).filter(m => typeof sn[m] === 'function')
+          });
+          return { success: false, error: 'SN_BRIDGE_ERROR: getSequencingState not available' };
+        }
+
+        const navState = sn.getSequencingState();
+        mcpLogger?.debug && mcpLogger.debug('[MCP SN] status action: got sequencing state', {
+          hasCurrentActivity: !!(navState && navState.currentActivity),
+          sessionState: navState?.sessionState,
+          navStateKeys: navState ? Object.keys(navState) : []
+        });
+
+        return { success: true, status: navState };
       }
       if (action === 'reset') {
         const sn = snByWC.get(id);
