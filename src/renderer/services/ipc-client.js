@@ -204,6 +204,14 @@ class IpcClient {
     return api.onCourseLoaded(handler);
   }
 
+  onCourseClosed(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onCourseClosed !== 'function') {
+      throw new Error('electronAPI.onCourseClosed not available');
+    }
+    return api.onCourseClosed(handler);
+  }
+
   onCourseExited(handler) {
     const api = this._ensureAPI();
     if (typeof api.onCourseExited !== 'function') {

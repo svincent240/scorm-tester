@@ -35,6 +35,12 @@ class MenuBuilder {
             click: () => this.sendMenuAction('menu-load-package')
           },
           {
+            label: 'Close SCORM Package',
+            accelerator: 'CmdOrCtrl+W',
+            click: () => this.sendMenuAction('menu-close-course')
+          },
+          { type: 'separator' },
+          {
             label: 'Export Session Data...',
             click: () => this.sendMenuAction('menu-export-session')
           },

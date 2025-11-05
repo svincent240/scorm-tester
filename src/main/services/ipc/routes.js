@@ -558,5 +558,13 @@ module.exports = [
       rateLimitProfile: 'default',
       useIpcResult: true
     }
+  },
+  {
+    channel: 'close-course',
+    handlerName: 'handleCloseCourse',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
   }
 ];

@@ -363,6 +363,9 @@ class IpcHandler extends BaseService {
       // App quit handler
       this.registerHandler('quit-app', this.handleQuitApp.bind(this));
 
+      // Course close handler
+      this.registerHandler('close-course', this.handleCloseCourse.bind(this));
+
       // Error log export handler
       this.registerHandler('get-error-logs', this.handleGetErrorLogs.bind(this));
 
@@ -1999,6 +2002,69 @@ class IpcHandler extends BaseService {
     } catch (error) {
       this.logger?.error('IpcHandler: Failed to quit app:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Handle close course request from renderer
+   * Terminates all active sessions and clears course state
+   */
+  async handleCloseCourse(event) {
+    try {
+      this.logger?.info('IpcHandler: Received close-course request from renderer');
+
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        this.logger?.error('IpcHandler: ScormService not available');
+        return IPC_RESULT.error('ScormService not available');
+      }
+
+      // Get all active sessions
+      const allSessions = scormService.getAllSessions();
+      const sessionIds = Object.keys(allSessions);
+
+      this.logger?.info(`IpcHandler: Closing ${sessionIds.length} active session(s)`);
+
+      // Terminate all active sessions
+      for (const sessionId of sessionIds) {
+        try {
+          await scormService.terminate(sessionId);
+          this.logger?.debug(`IpcHandler: Terminated session ${sessionId}`);
+        } catch (error) {
+          this.logger?.warn(`IpcHandler: Failed to terminate session ${sessionId}:`, error);
+        }
+      }
+
+      // Clear SCORM Inspector telemetry
+      const telemetryStore = this.getDependency('telemetryStore');
+      if (telemetryStore && typeof telemetryStore.clear === 'function') {
+        telemetryStore.clear();
+        this.logger?.debug('IpcHandler: Cleared telemetry store');
+      }
+
+      // Reset SN service state
+      const snSnapshotService = this.getDependency('snSnapshotService');
+      if (snSnapshotService && snSnapshotService.scormService) {
+        const snService = snSnapshotService.scormService.getSNService();
+        if (snService && typeof snService.reset === 'function') {
+          snService.reset();
+          this.logger?.debug('IpcHandler: Reset SN service');
+        }
+      }
+
+      // Broadcast course-closed event to renderer
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager && typeof windowManager.broadcastToAllWindows === 'function') {
+        windowManager.broadcastToAllWindows('course-closed');
+        this.logger?.debug('IpcHandler: Broadcasted course-closed event');
+      }
+
+      this.logger?.info('IpcHandler: Course closed successfully');
+      return IPC_RESULT.success({ closed: true });
+
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to close course:', error);
+      return IPC_RESULT.error(error.message);
     }
   }
 

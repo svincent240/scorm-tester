@@ -427,10 +427,32 @@ class AppManager {
       const action = (payload && payload.action) || payload;
       if (action === 'menu-load-package') {
         eventBus.emit('course:open-zip:request');
+      } else if (action === 'menu-close-course') {
+        eventBus.emit('course:close:request');
       } else if (action === 'menu-toggle-theme') {
         eventBus.emit('ui:theme:toggle-request');
       } else if (action === 'menu-toggle-error-log') {
         eventBus.emit('error-list:toggle');
+      }
+    });
+  } catch (_) {}
+
+  // Listen for course-closed broadcast from main process
+  try {
+    ipcClient.onCourseClosed(async () => {
+      try {
+        this.logger.info('AppManager: Received course-closed event from main process');
+
+        // Clear course loader state BEFORE emitting course:cleared
+        // to ensure UIState is clean when components react to the event
+        const courseLoader = this.services.get('courseLoader');
+        if (courseLoader && typeof courseLoader.clearCourse === 'function') {
+          await courseLoader.clearCourse();
+        }
+
+        eventBus.emit('course:cleared');
+      } catch (error) {
+        this.logger?.error('AppManager: Error handling course-closed event:', error);
       }
     });
   } catch (_) {}
@@ -620,6 +642,12 @@ class AppManager {
     eventBus.on('course:reload:request', () => {
       this.handleCourseReload().catch(error => {
         try { this.logger.error('AppManager: Course reload error (header intent)', error?.message || error); } catch (_) {}
+      });
+    });
+
+    eventBus.on('course:close:request', () => {
+      this.handleCourseClose().catch(error => {
+        try { this.logger.error('AppManager: Course close error (menu intent)', error?.message || error); } catch (_) {}
       });
     });
 
@@ -967,6 +995,31 @@ class AppManager {
         }
         reloadBtn.title = 'Reload Current Course';
       }
+    }
+  }
+
+  /**
+   * Handle course close request
+   */
+  async handleCourseClose() {
+    try {
+      this.logger.info('AppManager: Course close requested');
+
+      // Call IPC to close the course using the imported ipcClient module
+      // The main process will broadcast 'course-closed' which will trigger
+      // the cleanup in the onCourseClosed listener above
+      const result = await ipcClient.invoke('close-course');
+      if (result && result.success) {
+        this.logger.info('AppManager: Course close IPC call succeeded');
+        // Note: Actual cleanup happens in onCourseClosed broadcast listener
+      } else {
+        const errorMsg = (result && result.error) || 'Unknown error closing course';
+        this.logger.error('AppManager: Failed to close course:', errorMsg);
+        this.showError('Close Course Failed', errorMsg);
+      }
+    } catch (error) {
+      this.logger.error('AppManager: Error closing course:', error);
+      this.showError('Close Course Failed', error.message || 'Unknown error');
     }
   }
 

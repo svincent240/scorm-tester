@@ -166,6 +166,7 @@ const electronAPI = {
   // Event Listeners
   onMenuEvent: (callback) => safeOn('menu-event', callback),
   onCourseLoaded: (callback) => safeOn('course-loaded', callback),
+  onCourseClosed: (callback) => safeOn('course-closed', callback),
   onSessionStateChanged: (callback) => safeOn('session-state-changed', callback),
   onScormApiCallLogged: (callback) => safeOn('scorm-api-call-logged', callback),
   onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
