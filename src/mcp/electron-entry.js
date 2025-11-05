@@ -9,6 +9,15 @@ const { startServer } = require("./server");
 
 async function main() {
   try {
+    // Check if running in child mode (spawned by Node.js bridge)
+    const isChildMode = process.env.ELECTRON_CHILD_MODE === '1' || process.argv.includes('--child-mode');
+
+    if (isChildMode) {
+      // Child mode: Don't start stdio server, just provide runtime services via IPC
+      return await childMode();
+    }
+
+    // Legacy mode: Run as standalone MCP server with stdio (Mac/Linux only)
     // Do NOT enforce single-instance for MCP stdio server; CI/dev may spawn multiple for tests
     // (Keep desktop app single-instance behavior in main app entry, not here).
 
@@ -62,9 +71,38 @@ async function main() {
   }
 }
 
+async function childMode() {
+  // Child mode: Electron provides runtime services via IPC, no stdio MCP server
+  app.on("window-all-closed", (e) => {
+    try { e.preventDefault(); } catch (_) {}
+  });
+
+  await app.whenReady();
+
+  // Signal to parent (Node bridge) that we're ready
+  if (process.send) {
+    process.send({ type: 'ready' });
+  }
+
+  // Handle IPC messages from parent for runtime operations
+  process.on('message', async (message) => {
+    try {
+      const RuntimeManager = require('./runtime-manager');
+      const result = await RuntimeManager.handleIPCMessage(message);
+      if (process.send) {
+        process.send({ id: message.id, result });
+      }
+    } catch (error) {
+      if (process.send) {
+        process.send({ id: message.id, error: error.message });
+      }
+    }
+  });
+}
+
 if (require.main === module) {
   main();
 }
 
-module.exports = { main };
+module.exports = { main, childMode };
 

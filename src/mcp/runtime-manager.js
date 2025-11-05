@@ -5,6 +5,9 @@ const fs = require("fs");
 const ManifestParser = require("../main/services/scorm/cam/manifest-parser");
 let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
+
+// Check if running via Node.js bridge (global set by node-bridge.js)
+const isBridgeMode = typeof global.__electronBridge !== 'undefined';
 const PathUtils = require("../shared/utils/path-utils");
 const { getPreloadPath, installRealAdapterForWindow } = require("./runtime-adapter");
 const getLogger = require("../shared/utils/logger");
@@ -262,7 +265,23 @@ function setupNetworkMonitoring(win, session_id = null) {
 
 class RuntimeManager {
   static get isSupported() {
-    return !!(electron && electron.app && electron.BrowserWindow);
+    // Supported if we have electron directly OR via bridge
+    return !!(electron && electron.app && electron.BrowserWindow) || isBridgeMode;
+  }
+
+  // Handle IPC messages from Node bridge (when in child mode)
+  static async handleIPCMessage(message) {
+    switch (message.type) {
+      case 'openPage':
+        return await this.openPage(message.params);
+      case 'closePage':
+        return await this.closePage(message.params);
+      case 'screenshot':
+        return await this.captureScreenshot(message.params);
+      // Add other runtime operations as needed
+      default:
+        throw new Error(`Unknown IPC message type: ${message.type}`);
+    }
   }
 
   static async ensureAppReady() {

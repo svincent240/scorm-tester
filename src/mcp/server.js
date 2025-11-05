@@ -245,7 +245,7 @@ function writeMessage(msg) {
   function writeJSONRPCError(id, code, message, data) {
     const err = { code, message };
     if (data !== undefined) err.data = data;
-    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: err }) + "\n"); } catch (_) {}
+    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: id ?? null, error: err }) + "\n"); } catch (_) {}
   }
 
 
@@ -344,6 +344,14 @@ async function handleRequest(req) {
         logger?.info('MCP_DIRECT_RESULT', { id, method, ok: true });
         return writeJSONRPCResult(id, { data });
       } catch (err) {
+        // It's a notification if id is undefined.
+        const isNotification = id === undefined;
+        // If it's an unknown notification, just ignore it.
+        if (isNotification && !router.has(method)) {
+          logger?.warn('MCP_IGNORED_UNKNOWN_NOTIFICATION', { method });
+          return;
+        }
+
         // Standard JSON-RPC method not found if unknown
         if (!router.has(method)) {
           logger?.warn('MCP_DIRECT_UNKNOWN', { id, method });
@@ -366,6 +374,7 @@ function startServer() {
   // Read newline-delimited JSON from stdin
   let buffer = "";
   process.stdin.setEncoding("utf8");
+  process.stdin.resume(); // Keep stdin in flowing mode
 
   process.stdin.on("data", (chunk) => {
     buffer += chunk;
@@ -376,8 +385,12 @@ function startServer() {
       if (!line) continue;
       try {
         const msg = JSON.parse(line);
+        // Log incoming request to stderr for debugging
+        logger?.debug('MCP_REQUEST_RECEIVED', msg);
         handleRequest(msg);
       } catch (err) {
+        // Log parse error to stderr
+        logger?.error('MCP_PARSE_ERROR', { line: line.substring(0, 100), error: err.message });
         // Strict JSON-RPC 2.0: parse errors use -32700 and null id
         writeJSONRPCError(null, -32700, "Parse error");
       }
