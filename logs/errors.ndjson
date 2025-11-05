@@ -1,2 +1,1 @@
-{"ts":1762373253791,"event":"ERROR_LOG_START","process":"node"}
-{"ts":1762373273985,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":3,"method":"scorm_runtime_open","error_code":"UNKNOWN_ERROR","message":"Electron runtime is required"}],"context":{},"pid":31596,"process":"node"}
+{"ts":1762373927422,"event":"ERROR_LOG_START","process":"node"}

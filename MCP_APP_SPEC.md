@@ -103,16 +103,19 @@ npm run mcp
 - Headless CI (Linux): `xvfb-run -a npm run mcp`
 - Works out of the box for Claude Code / Kilo Code via JSON MCP config pointing to `npm run mcp`
 
-### Windows Architecture: Node.js Bridge
+### Architecture: Node.js MCP Server with Lazy Electron Child
 
-On Windows, Electron's direct stdio handling has reliability issues with JSON-RPC protocol communication. The MCP server uses a two-process architecture:
+The MCP server runs as a Node.js process (`node-bridge.js`) that spawns an Electron child process on-demand:
 
-- **Node.js Bridge** (`node-bridge.js`): Primary MCP stdio server handling JSON-RPC 2.0 protocol communication
-- **Electron Child** (`electron-entry.js`): Spawned on-demand via IPC when runtime features (screenshots, browser execution) are needed
-- **Communication**: IPC messages between Node bridge and Electron child; Electron stdout/stderr suppressed to avoid polluting MCP protocol
-- **Lazy Initialization**: Electron child only spawned when runtime tools are invoked, keeping validation-only workflows lightweight
+- **Node.js MCP Server** (`node-bridge.js`): Handles JSON-RPC 2.0 stdio protocol communication. This process **always** runs and **always** sets `global.__electronBridge` with IPC methods.
+- **Electron Child Process** (`electron-entry.js`): Spawned lazily via IPC when runtime features (screenshots, browser execution) are needed. Not started for validation-only workflows.
+- **Communication**: IPC messages between Node server and Electron child when spawned; Electron stdout/stderr suppressed to avoid polluting MCP protocol
+- **Lazy Initialization**: Electron child only spawned when runtime tools are invoked, keeping validation-only workflows lightweight (single process)
 
-This architecture ensures reliable stdio protocol handling on Windows while preserving full Electron runtime capabilities when needed.
+**Design Decision**: Bridge mode is the **only** execution mode. There is no "direct mode" or fallback behavior. The Node.js server always sets `global.__electronBridge`, and all runtime operations delegate to the Electron child via IPC. This ensures:
+- Reliable stdio protocol handling (Node.js handles stdio, not Electron)
+- Clean separation between MCP protocol (Node server) and browser runtime (Electron child)
+- Fail-fast behavior when runtime features are unavailable (no silent fallbacks)
 
 Example minimal MCP client config (conceptual):
 
