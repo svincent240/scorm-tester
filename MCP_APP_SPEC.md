@@ -103,6 +103,17 @@ npm run mcp
 - Headless CI (Linux): `xvfb-run -a npm run mcp`
 - Works out of the box for Claude Code / Kilo Code via JSON MCP config pointing to `npm run mcp`
 
+### Windows Architecture: Node.js Bridge
+
+On Windows, Electron's direct stdio handling has reliability issues with JSON-RPC protocol communication. The MCP server uses a two-process architecture:
+
+- **Node.js Bridge** (`node-bridge.js`): Primary MCP stdio server handling JSON-RPC 2.0 protocol communication
+- **Electron Child** (`electron-entry.js`): Spawned on-demand via IPC when runtime features (screenshots, browser execution) are needed
+- **Communication**: IPC messages between Node bridge and Electron child; Electron stdout/stderr suppressed to avoid polluting MCP protocol
+- **Lazy Initialization**: Electron child only spawned when runtime tools are invoked, keeping validation-only workflows lightweight
+
+This architecture ensures reliable stdio protocol handling on Windows while preserving full Electron runtime capabilities when needed.
+
 Example minimal MCP client config (conceptual):
 
 ```json
