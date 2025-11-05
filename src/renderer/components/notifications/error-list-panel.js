@@ -141,6 +141,9 @@ export class ErrorListPanel extends BaseComponent {
     const safeComponent = escapeHTML(error.component || 'unknown');
     const timestamp = new Date(error.timestamp).toLocaleString();
     const safeStack = error.stack ? escapeHTML(error.stack) : '';
+    const level = error.context?.level || 'error';
+    const levelClass = level === 'warn' ? 'warning' : 'error';
+    const levelLabel = level === 'warn' ? 'WARNING' : 'ERROR';
 
     // Check if this is a parent DOM violation with special formatting
     const isParentDomViolation = error.context?.type === 'parent_dom_violation';
@@ -210,9 +213,10 @@ export class ErrorListPanel extends BaseComponent {
     }
 
     return `
-      <div class="error-list-panel__item ${error.acknowledged ? 'error-list-panel__item--acknowledged' : ''}" data-error-id="${error.id}">
+      <div class="error-list-panel__item ${error.acknowledged ? 'error-list-panel__item--acknowledged' : ''} error-list-panel__item--${levelClass}" data-error-id="${error.id}">
         <div class="error-list-panel__item-header">
           <div class="error-list-panel__item-info">
+            <div class="error-list-panel__item-level-badge error-list-panel__item-level-badge--${levelClass}">${levelLabel}</div>
             <div class="error-list-panel__item-message">${safeMessage}</div>
             <div class="error-list-panel__item-meta">
               <span class="error-list-panel__item-component">${safeComponent}</span>

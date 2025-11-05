@@ -637,6 +637,14 @@
   border-left-color: var(--text-tertiary);
 }
 
+.error-list-panel__item--warning {
+  border-left-color: var(--warning-color);
+}
+
+.error-list-panel__item--error {
+  border-left-color: var(--danger-color);
+}
+
 .error-list-panel__item-header {
   display: flex;
   gap: var(--spacing-sm);
@@ -646,6 +654,27 @@
 .error-list-panel__item-info {
   flex: 1;
   min-width: 0;
+}
+
+.error-list-panel__item-level-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.error-list-panel__item-level-badge--error {
+  background: var(--danger-color);
+  color: white;
+}
+
+.error-list-panel__item-level-badge--warning {
+  background: var(--warning-color);
+  color: var(--text-color);
 }
 
 .error-list-panel__item-message {
