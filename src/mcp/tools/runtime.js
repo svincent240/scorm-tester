@@ -655,7 +655,7 @@ async function scorm_data_model_get(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   // Collect all elements to fetch
   const elementsToFetch = new Set([...elements]);
@@ -992,7 +992,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const steps = [];
   const issues_detected = [];
@@ -1204,7 +1204,7 @@ async function scorm_validate_data_model_state(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const issues = [];
   const matches = [];
@@ -1270,7 +1270,7 @@ async function scorm_get_console_errors(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   try {
     // Get console messages from the browser context
@@ -1407,7 +1407,7 @@ async function scorm_wait_for_api_call(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const startTime = Date.now();
   const initialCalls = await RuntimeManager.getCapturedCalls(win);
@@ -1461,7 +1461,7 @@ async function scorm_get_current_page_context(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   try {
     const context = await win.webContents.executeJavaScript(`
@@ -1551,7 +1551,7 @@ async function scorm_replay_api_calls(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const results = [];
   let failed_at_index = null;
@@ -1652,7 +1652,7 @@ async function scorm_get_network_requests(params = {}) {
 
   // Check if runtime is open
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const requests = RuntimeManager.getNetworkRequests(session_id, filterOptions) || [];
 

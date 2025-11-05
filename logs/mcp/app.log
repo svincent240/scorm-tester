@@ -1,10 +1,10 @@
-Log start 2025-11-05T19:54:23.968Z
-2025-11-05T19:54:24.010Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-05T19:54:24.017Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-05T19:54:24.023Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-05T19:54:24.029Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-05T19:54:24.035Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-05T19:54:24.224Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+Log start 2025-11-05T20:17:50.353Z
+2025-11-05T20:17:50.401Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-05T20:17:50.406Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-05T20:17:50.410Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-05T20:17:50.413Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-05T20:17:50.417Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-05T20:17:50.591Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
   Policy set or a policy with "unsafe-eval" enabled. This exposes users of
   this app to unnecessary security risks.
 
@@ -12,4 +12,4 @@ For more information and help, consult
 https://electronjs.org/docs/tutorial/security.
 This warning will not show up
 once the app is packaged. (node:electron/js2c/sandbox_bundle:2) 
-2025-11-05T19:54:24.270Z [DEBUG] Runtime final URL [{"finalURL":"file:///C:/Users/svincent/github/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing"}]
+2025-11-05T20:17:50.623Z [DEBUG] Runtime final URL [{"finalURL":"file:///C:/Users/svincent/GitHub/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing"}]
