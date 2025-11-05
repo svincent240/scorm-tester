@@ -602,13 +602,8 @@ async function scorm_runtime_open(params = {}) {
 async function scorm_runtime_status(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) return { open: false };
-  const url = RuntimeManager.getURL(win);
-  const initialize_state = await RuntimeManager.getInitializeState(win);
-  const calls = await RuntimeManager.getCapturedCalls(win);
-  const last = Array.isArray(calls) && calls.length ? calls[calls.length - 1] : null;
-  return { open: true, url, initialize_state, last_api_method: last ? String(last.method || '') : null, last_api_ts: last ? Number(last.ts || 0) : null };
+  // Use bridge-aware method that works in both modes
+  return await RuntimeManager.getRuntimeStatus(session_id);
 }
 
 async function scorm_runtime_close(params = {}) {
@@ -622,18 +617,14 @@ async function scorm_runtime_close(params = {}) {
 async function scorm_attempt_initialize(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.callAPI(win, 'Initialize', ['']);
+  const res = await RuntimeManager.callAPI(null, 'Initialize', [''], session_id);
   return { result: String(res || '') };
 }
 
 async function scorm_attempt_terminate(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.callAPI(win, 'Terminate', ['']);
+  const res = await RuntimeManager.callAPI(null, 'Terminate', [''], session_id);
   return { result: String(res || '') };
 }
 
@@ -643,9 +634,7 @@ async function scorm_api_call(params = {}) {
   const args = Array.isArray(params.args) ? params.args : (Array.isArray(params.arguments) ? params.arguments : []);
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
   if (!method || typeof method !== 'string') { const e = new Error('method is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.callAPI(win, method, args);
+  const res = await RuntimeManager.callAPI(null, method, args, session_id);
   return { result: String(res || '') };
 }
 
@@ -666,11 +655,7 @@ async function scorm_data_model_get(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   // Collect all elements to fetch
   const elementsToFetch = new Set([...elements]);
@@ -811,9 +796,7 @@ async function expandDataModelPattern(win, pattern) {
 async function scorm_nav_get_state(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const statusRes = await RuntimeManager.snInvoke(win, 'status');
+  const statusRes = await RuntimeManager.snInvoke(null, 'status', undefined, session_id);
   if (statusRes == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
 
   // SN_NOT_INITIALIZED is expected when scorm_sn_init has not been called (e.g., single-SCO courses)
@@ -848,9 +831,7 @@ async function scorm_nav_get_state(params = {}) {
 async function scorm_nav_next(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'continue' });
+  const res = await RuntimeManager.snInvoke(null, 'nav', { action: 'continue' }, session_id);
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
 
   // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
@@ -881,9 +862,7 @@ async function scorm_nav_next(params = {}) {
 async function scorm_nav_previous(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'previous' });
+  const res = await RuntimeManager.snInvoke(null, 'nav', { action: 'previous' }, session_id);
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
 
   // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
@@ -916,9 +895,7 @@ async function scorm_nav_choice(params = {}) {
   const targetId = params.targetId || params.target_id || params.activity_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
   if (!targetId || typeof targetId !== 'string') { const e = new Error('targetId is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.snInvoke(win, 'nav', { action: 'choice', targetId });
+  const res = await RuntimeManager.snInvoke(null, 'nav', { action: 'choice', targetId }, session_id);
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
 
   // SN_NOT_INITIALIZED means scorm_sn_init was never called - navigation not applicable
@@ -943,12 +920,10 @@ async function scorm_nav_choice(params = {}) {
 async function scorm_sn_init(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
   const s = sessions.sessions.get(session_id);
   if (!s) { const e = new Error(`Unknown session: ${session_id}`); e.code = 'MCP_UNKNOWN_SESSION'; throw e; }
   const manifestPath = ensureManifestPath(s.package_path);
-  const res = await RuntimeManager.snInvoke(win, 'init', { manifestPath, folderPath: s.package_path });
+  const res = await RuntimeManager.snInvoke(null, 'init', { manifestPath, folderPath: s.package_path }, session_id);
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
   if (!res.success) { const e = new Error(res.error || 'SN init failed'); e.code = 'SN_INIT_FAILED'; throw e; }
   return { success: true };
@@ -957,9 +932,7 @@ async function scorm_sn_init(params = {}) {
 async function scorm_sn_reset(params = {}) {
   const session_id = params.session_id;
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
-  const res = await RuntimeManager.snInvoke(win, 'reset');
+  const res = await RuntimeManager.snInvoke(null, 'reset', undefined, session_id);
   if (res == null) { const e = new Error('SN bridge unavailable'); e.code = 'SN_BRIDGE_UNAVAILABLE'; throw e; }
   if (!res.success) { const e = new Error(res.error || 'SN reset failed'); e.code = 'SN_RESET_FAILED'; throw e; }
   return { success: true };
@@ -969,42 +942,27 @@ async function scorm_capture_screenshot(params = {}) {
   const session_id = params.session_id;
   const capture_options = params.capture_options || {};
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
-  const delayMs = Number(capture_options.delay_ms || 0);
-  const waitForSelector = capture_options.wait_for_selector;
-  const waitTimeoutMs = Number(capture_options.wait_timeout_ms || 5000);
-
-  if (waitForSelector && win?.webContents?.executeJavaScript) {
-    const pollScript = `new Promise((resolve) => {
-      const sel = ${JSON.stringify(waitForSelector)};
-      const start = Date.now();
-      const tick = () => {
-        try {
-          const el = document.querySelector(sel);
-          if (el) return resolve(true);
-        } catch (e) {}
-        if (Date.now() - start > ${waitTimeoutMs}) return resolve(false);
-        setTimeout(tick, 100);
-      };
-      tick();
-    })`;
-    try { await win.webContents.executeJavaScript(pollScript, true); } catch (_) {}
+  // Bridge mode: delegate to Electron child
+  if (!global.__electronBridge || !global.__electronBridge.sendMessage) {
+    const e = new Error('Electron bridge not available');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
   }
 
-  if (delayMs > 0) {
-    await new Promise(r => setTimeout(r, delayMs));
-  }
+  const result = await global.__electronBridge.sendMessage({
+    id: Date.now(),
+    type: 'runtime_capture',
+    params: { session_id }
+  });
 
-  const pngBuffer = await RuntimeManager.capture(win);
-  const base64 = pngBuffer.length ? pngBuffer.toString('base64') : null;
-
+  const base64 = result.screenshot;
   let artifactPath = null;
   const s = sessions.sessions.get(session_id);
-  if (s && pngBuffer.length) {
+  if (s && base64) {
     const rel = `screenshot_${Date.now()}.png`;
     artifactPath = path.join(s.workspace, rel);
+    const pngBuffer = Buffer.from(base64, 'base64');
     fs.writeFileSync(artifactPath, pngBuffer);
     sessions.addArtifact({ session_id, artifact: { type: 'screenshot', path: artifactPath } });
   }
@@ -1034,11 +992,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const steps = [];
   const issues_detected = [];
@@ -1250,11 +1204,7 @@ async function scorm_validate_data_model_state(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const issues = [];
   const matches = [];
@@ -1320,11 +1270,7 @@ async function scorm_get_console_errors(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   try {
     // Get console messages from the browser context
@@ -1461,11 +1407,7 @@ async function scorm_wait_for_api_call(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const startTime = Date.now();
   const initialCalls = await RuntimeManager.getCapturedCalls(win);
@@ -1519,11 +1461,7 @@ async function scorm_get_current_page_context(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   try {
     const context = await win.webContents.executeJavaScript(`
@@ -1547,7 +1485,7 @@ async function scorm_get_current_page_context(params = {}) {
         const slideIndicators = document.querySelectorAll('[class*="slide-number"], [id*="slide-number"], [class*="page-number"]');
         if (slideIndicators.length > 0) {
           const text = slideIndicators[0].textContent.trim();
-          const match = text.match(/(\\d+)\\s*\\/\\s*(\\d+)/);
+          const match = text.match(/(\d+)\s*\/\s*(\d+)/);
           if (match) {
             context.slide_number = parseInt(match[1]);
             context.total_slides = parseInt(match[2]);
@@ -1613,11 +1551,7 @@ async function scorm_replay_api_calls(params = {}) {
   }
 
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const results = [];
   let failed_at_index = null;
@@ -1718,11 +1652,7 @@ async function scorm_get_network_requests(params = {}) {
 
   // Check if runtime is open
   const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
-    const e = new Error('Runtime not open');
-    e.code = 'RUNTIME_NOT_OPEN';
-    throw e;
-  }
+  if (!win && !RuntimeManager.isBridgeMode) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
 
   const requests = RuntimeManager.getNetworkRequests(session_id, filterOptions) || [];
 
@@ -1732,4 +1662,3 @@ async function scorm_get_network_requests(params = {}) {
     requests
   };
 }
-

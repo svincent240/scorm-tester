@@ -7,7 +7,11 @@ let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
 
 // Check if running via Node.js bridge (global set by node-bridge.js)
-const isBridgeMode = typeof global.__electronBridge !== 'undefined';
+// In the MCP context, bridge mode is ALWAYS active - this is the only supported mode
+// This must be a function, not a constant, because the global is set after module load
+function isBridgeMode() {
+  return typeof global.__electronBridge !== 'undefined';
+}
 const PathUtils = require("../shared/utils/path-utils");
 const { getPreloadPath, installRealAdapterForWindow } = require("./runtime-adapter");
 const getLogger = require("../shared/utils/logger");
@@ -265,20 +269,90 @@ function setupNetworkMonitoring(win, session_id = null) {
 
 class RuntimeManager {
   static get isSupported() {
-    // Supported if we have electron directly OR via bridge
-    return !!(electron && electron.app && electron.BrowserWindow) || isBridgeMode;
+    // In MCP context, bridge mode is always active
+    // Runtime is supported if bridge is available
+    return isBridgeMode();
+  }
+
+  static get isBridgeMode() {
+    return isBridgeMode();
   }
 
   // Handle IPC messages from Node bridge (when in child mode)
   static async handleIPCMessage(message) {
     switch (message.type) {
-      case 'openPage':
-        return await this.openPage(message.params);
-      case 'closePage':
-        return await this.closePage(message.params);
-      case 'screenshot':
-        return await this.captureScreenshot(message.params);
-      // Add other runtime operations as needed
+      case 'runtime_openPage':
+        // When called from IPC, we're in Electron child - create the window and return window ID
+        const win = await this.openPage(message.params);
+        // Store window reference by ID for later operations
+        const winId = win.webContents.id;
+        return { windowId: winId, success: true };
+
+      case 'runtime_openPersistent':
+        await this.openPersistent(message.params);
+        return { success: true };
+
+      case 'runtime_capture':
+        const session_id = message.params.session_id;
+        const persistentWin = this.getPersistent(session_id);
+        if (!persistentWin) throw new Error('Runtime not open');
+        const png = await this.capture(persistentWin);
+        return { screenshot: png.toString('base64'), success: true };
+
+      case 'runtime_callAPI':
+        const apiWin = this.getPersistent(message.params.session_id);
+        if (!apiWin) throw new Error('Runtime not open');
+        const result = await this.callAPI(apiWin, message.params.method, message.params.args || []);
+        return { result, success: true };
+
+      case 'runtime_getCapturedCalls':
+        const callsWin = this.getPersistent(message.params.session_id);
+        if (!callsWin) throw new Error('Runtime not open');
+        const calls = await this.getCapturedCalls(callsWin);
+        return { calls, success: true };
+
+      case 'runtime_executeJS':
+        const jsWin = this.getPersistent(message.params.session_id);
+        if (!jsWin) throw new Error('Runtime not open');
+        const jsResult = await jsWin.webContents.executeJavaScript(message.params.script, true);
+        return { result: jsResult, success: true };
+
+      case 'runtime_getURL':
+        const urlWin = this.getPersistent(message.params.session_id);
+        const url = urlWin ? this.getURL(urlWin) : null;
+        return { url, success: true };
+
+      case 'runtime_closePersistent':
+        const closed = await this.closePersistent(message.params.session_id);
+        return { success: closed };
+
+      case 'runtime_getStatus':
+        const statusWin = this.getPersistent(message.params.session_id);
+        if (!statusWin) return { open: false };
+        const statusUrl = this.getURL(statusWin);
+        const initState = await this.getInitializeState(statusWin);
+        const statusCalls = await this.getCapturedCalls(statusWin);
+        const lastCall = Array.isArray(statusCalls) && statusCalls.length ? statusCalls[statusCalls.length - 1] : null;
+        return {
+          open: true,
+          url: statusUrl,
+          initialize_state: initState,
+          last_api_method: lastCall ? String(lastCall.method || '') : null,
+          last_api_ts: lastCall ? Number(lastCall.ts || 0) : null
+        };
+
+      case 'runtime_getInitializeState':
+        const initWin = this.getPersistent(message.params.session_id);
+        if (!initWin) throw new Error('Runtime not open');
+        const state = await this.getInitializeState(initWin);
+        return { state };
+
+      case 'runtime_snInvoke':
+        const snWin = this.getPersistent(message.params.session_id);
+        if (!snWin) throw new Error('Runtime not open');
+        const snResult = await this._snInvokeImplementation(snWin, message.params.method, message.params.payload);
+        return { result: snResult, success: true };
+
       default:
         throw new Error(`Unknown IPC message type: ${message.type}`);
     }
@@ -286,102 +360,52 @@ class RuntimeManager {
 
   static async ensureAppReady() {
     if (!this.isSupported) return false;
-    const { app } = electron;
-    if (app.isReady()) return true;
-    try { await app.whenReady(); return true; } catch (_) { return false; }
+    // Bridge mode: Electron is running in child process and always ready
+    // Ensure Electron child is spawned
+    if (global.__electronBridge && global.__electronBridge.ensureChild) {
+      await global.__electronBridge.ensureChild();
+    }
+    return true;
   }
 
   static async openPage({ entryPath, viewport = { width: 1024, height: 768 }, adapterOptions = {} }) {
     if (!this.isSupported) { const e = new Error("Electron runtime is required"); e.code = "ELECTRON_REQUIRED"; throw e; }
     const ok = await this.ensureAppReady();
     if (!ok) { const e = new Error("Electron app not ready"); e.code = "ELECTRON_REQUIRED"; throw e; }
-    const { BrowserWindow } = electron;
-    const wp = { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, disableDialogs: true };
-    try { wp.preload = getPreloadPath(); } catch (_) {}
-    const win = new BrowserWindow({ show: false, webPreferences: wp });
-    // Strictly disable popups, unload prompts, and permissions to keep MCP headless
-    try { win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); } catch (_) {}
-    try { win.webContents.on('will-prevent-unload', (e) => { try { e.preventDefault(); } catch (_) {} }); } catch (_) {}
-    try { win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => { try { callback(false); } catch (_) {} }); } catch (_) {}
-    if (viewport?.width && viewport?.height) win.setSize(viewport.width, viewport.height);
-    const url = 'file://' + entryPath;
-    // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
-    try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) {}
-    // Capture browser console messages to unified log (accessible via system_get_logs)
-    this.setupConsoleLogging(win);
 
-    // Load the URL with explicit handling for Storyline-style redirect that triggers ERR_ABORTED
-    try {
-      await win.loadURL(url);
-    } catch (e) {
-      const msg = (e && e.message) ? String(e.message) : String(e);
-      if (msg.includes('ERR_ABORTED')) {
-        // Navigation was aborted (likely immediate redirect). Wait briefly for the new load to finish
-        const finished = await new Promise((resolve) => {
-          let done = false;
-          const cleanup = () => { if (!done) { done = true; resolve(true); } };
-          const fail = () => { if (!done) { done = true; resolve(false); } };
-          try {
-            win.webContents.once('did-finish-load', cleanup);
-            win.webContents.once('did-stop-loading', cleanup);
-            win.webContents.once('did-fail-load', fail);
-          } catch (_) { return resolve(false); }
-          setTimeout(() => { if (!done) resolve(false); }, 2000);
-        });
-        if (!finished) {
-          // Build enhanced, fail-fast error message with dir listing
-          const fs = require('fs');
-          const path = require('path');
-          let listing = [];
-          try {
-            const dir = path.dirname(entryPath);
-            listing = fs.readdirSync(dir).sort();
-          } catch (_) {}
-          const err = new Error(`ERR_ABORTED while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
-          err.code = 'ERR_ABORTED';
-          throw err;
-        }
-      } else {
-        const fs = require('fs');
-        const path = require('path');
-        let listing = [];
-        try {
-          const dir = path.dirname(entryPath);
-          listing = fs.readdirSync(dir).sort();
-        } catch (_) {}
-        const err = new Error(`${msg} while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
-        err.code = 'PAGE_LOAD_FAILED';
-        throw err;
-      }
+    // Bridge mode: delegate to Electron child process
+    if (!global.__electronBridge || !global.__electronBridge.sendMessage) {
+      const e = new Error("Electron bridge not available");
+      e.code = "ELECTRON_REQUIRED";
+      throw e;
     }
-
-    // Log final navigated URL for traceability (to log files, not stderr)
-    try {
-      const finalURL = win?.webContents?.getURL?.() || null;
-      if (finalURL) { logger?.debug('Runtime final URL', { finalURL }); }
-    } catch (_) {}
-
-    return win;
+    // Forward to Electron child via IPC
+    const result = await global.__electronBridge.sendMessage({
+      id: Date.now(),
+      type: 'runtime_openPage',
+      params: { entryPath, viewport, adapterOptions }
+    });
+    return result; // Returns window ID or proxy object
   }
 
   static async openPersistent({ session_id, entryPath, viewport = { width: 1024, height: 768 }, adapterOptions = {} }) {
     if (!this.isSupported) { const e = new Error("Electron runtime is required"); e.code = "ELECTRON_REQUIRED"; throw e; }
     if (!session_id) throw new Error("session_id required");
-    // Close any existing window first
-    await this.closePersistent(session_id);
-    const win = await this.openPage({ entryPath, viewport, adapterOptions });
-    _persistentBySession.set(session_id, win);
 
-    // Set up per-session network monitoring
-    setupNetworkMonitoring(win, session_id);
-
-    try { win.on('closed', () => {
-      try {
-        _persistentBySession.delete(session_id);
-        _networkRequestsBySession.delete(session_id);
-      } catch (_) {}
-    }); } catch (_) {}
-    return win;
+    // Bridge mode: delegate to Electron child process
+    if (!global.__electronBridge || !global.__electronBridge.sendMessage) {
+      const e = new Error("Electron bridge not available");
+      e.code = "ELECTRON_REQUIRED";
+      throw e;
+    }
+    // Forward to Electron child via IPC
+    const result = await global.__electronBridge.sendMessage({
+      id: Date.now(),
+      type: 'runtime_openPersistent',
+      params: { session_id, entryPath, viewport, adapterOptions }
+    });
+    // In bridge mode, we don't have actual window objects - child manages them
+    return { session_id, success: result.success };
   }
 
   static getPersistent(session_id) {
@@ -389,11 +413,14 @@ class RuntimeManager {
   }
 
   static async closePersistent(session_id) {
-    const win = _persistentBySession.get(session_id);
-    if (win) {
-      try { win.destroy(); } catch (_) {}
-      _persistentBySession.delete(session_id);
-      return true;
+    // Bridge mode: delegate to Electron child
+    if (global.__electronBridge && global.__electronBridge.sendMessage) {
+      const result = await global.__electronBridge.sendMessage({
+        id: Date.now(),
+        type: 'runtime_closePersistent',
+        params: { session_id }
+      });
+      return result.success;
     }
     return false;
   }
@@ -433,7 +460,21 @@ class RuntimeManager {
     }
   }
 
-  static async callAPI(win, method, args = []) {
+  static async callAPI(win, method, args = [], session_id = null) {
+    // Bridge mode with session_id: delegate to Electron child
+    if (session_id) {
+      if (global.__electronBridge && global.__electronBridge.sendMessage) {
+        const result = await global.__electronBridge.sendMessage({
+          id: Date.now(),
+          type: 'runtime_callAPI',
+          params: { session_id, method, args }
+        });
+        return result.result;
+      }
+      throw new Error("Electron bridge not available");
+    }
+
+    // Bridge mode without session_id (using window directly)
     const m = String(method || '');
     const arr = Array.isArray(args) ? args : [];
     try {
@@ -466,7 +507,21 @@ class RuntimeManager {
     try { return await win.webContents.executeJavaScript(script, true); } catch (_) { return []; }
   }
 
-  static async getInitializeState(win) {
+  static async getInitializeState(win, session_id = null) {
+    // Bridge mode with session_id: delegate to Electron child
+    if (session_id) {
+      if (global.__electronBridge && global.__electronBridge.sendMessage) {
+        const result = await global.__electronBridge.sendMessage({
+          id: Date.now(),
+          type: 'runtime_getInitializeState',
+          params: { session_id }
+        });
+        return result.state;
+      }
+      throw new Error("Electron bridge not available");
+    }
+
+    // Bridge mode without session_id (using window directly)
     const calls = await this.getCapturedCalls(win);
     let state = 'none';
     for (const c of (calls || [])) {
@@ -477,14 +532,45 @@ class RuntimeManager {
     return state;
   }
 
+  static async getRuntimeStatus(session_id) {
+    // Bridge mode: delegate to Electron child
+    if (global.__electronBridge && global.__electronBridge.sendMessage) {
+      const result = await global.__electronBridge.sendMessage({
+        id: Date.now(),
+        type: 'runtime_getStatus',
+        params: { session_id }
+      });
+      return result;
+    }
+    return { open: false };
+  }
+
   static async capture(win) {
     const image = await win.webContents.capturePage();
     return image.toPNG();
   }
 
-  static async snInvoke(win, method, payload) {
+  static async _snInvokeImplementation(win, method, payload) {
     const js = `window.SCORM_MCP && window.SCORM_MCP.snInvoke ? window.SCORM_MCP.snInvoke(${JSON.stringify(method)}, ${payload !== undefined ? JSON.stringify(payload) : 'undefined'}) : null`;
     try { return await win.webContents.executeJavaScript(js, true); } catch (_) { return null; }
+  }
+
+  static async snInvoke(win, method, payload, session_id = null) {
+    // Bridge mode with session_id: delegate to Electron child
+    if (session_id) {
+      if (global.__electronBridge && global.__electronBridge.sendMessage) {
+        const result = await global.__electronBridge.sendMessage({
+          id: Date.now(),
+          type: 'runtime_snInvoke',
+          params: { session_id, method, payload }
+        });
+        return result.result;
+      }
+      throw new Error("Electron bridge not available");
+    }
+
+    // Bridge mode without session_id (using window directly)
+    return this._snInvokeImplementation(win, method, payload);
   }
 
   static async close(win) {

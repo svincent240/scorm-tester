@@ -6,7 +6,7 @@ describe('MCP API flow (Initialize → Commit → Terminate) on persistent runti
   jest.setTimeout(90000);
 
   function rpcClient() {
-    const proc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'mcp'], {
+    const proc = spawn('node', [path.join(__dirname, '../../src/mcp/node-bridge.js')], {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'false' }

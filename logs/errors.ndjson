@@ -1,1 +1,2 @@
-{"ts":1762359201607,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762372463553,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762372464282,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":2,"method":"scorm_test_api_integration","error_code":"UNKNOWN_ERROR","message":"Cannot read properties of undefined (reading 'executeJavaScript')"}],"context":{},"pid":32656,"process":"node"}

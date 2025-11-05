@@ -6,7 +6,7 @@ describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
   jest.setTimeout(60000);
 
   function rpcClient() {
-    const proc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'mcp'], {
+    const proc = spawn('node', [path.join(__dirname, '../../src/mcp/node-bridge.js')], {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'false' }
