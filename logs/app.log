@@ -1,7 +1,7 @@
-Log start 2025-11-05T12:47:51.575Z
-2025-11-05T12:47:51.596Z [INFO] MCP Server module loaded [{"logFiles":{"ndjson":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.ndjson","errors":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\errors.ndjson","humanReadable":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.log"},"pid":51060,"note":"Use system_get_logs tool to retrieve logs"}]
-2025-11-05T12:47:51.605Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.33"}},"jsonrpc":"2.0","id":0}]
-2025-11-05T12:47:51.611Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"notifications/initialized","jsonrpc":"2.0"}]
-2025-11-05T12:47:51.615Z [INFO] MCP_DIRECT_CALL [{"method":"notifications/initialized","hasParams":true}]
-2025-11-05T12:47:51.618Z [WARN] MCP_IGNORED_UNKNOWN_NOTIFICATION [{"method":"notifications/initialized"}]
-2025-11-05T12:47:51.622Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"tools/list","jsonrpc":"2.0","id":1}]
+Log start 2025-11-05T12:50:26.516Z
+2025-11-05T12:50:26.548Z [INFO] MCP Server module loaded [{"logFiles":{"ndjson":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.ndjson","errors":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\errors.ndjson","humanReadable":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.log"},"pid":41856,"note":"Use system_get_logs tool to retrieve logs"}]
+2025-11-05T12:50:26.557Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.33"}},"jsonrpc":"2.0","id":0}]
+2025-11-05T12:50:26.567Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"notifications/initialized","jsonrpc":"2.0"}]
+2025-11-05T12:50:26.572Z [INFO] MCP_DIRECT_CALL [{"method":"notifications/initialized","hasParams":true}]
+2025-11-05T12:50:26.578Z [WARN] MCP_IGNORED_UNKNOWN_NOTIFICATION [{"method":"notifications/initialized"}]
+2025-11-05T12:50:26.586Z [DEBUG] MCP_REQUEST_RECEIVED [{"method":"tools/list","jsonrpc":"2.0","id":1}]

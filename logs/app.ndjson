@@ -1,7 +1,7 @@
-{"ts":1762346871576,"event":"LOG_START","process":"node"}
-{"ts":1762346871598,"level":"info","msg":"MCP Server module loaded","args":[{"logFiles":{"ndjson":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.ndjson","errors":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\errors.ndjson","humanReadable":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.log"},"pid":51060,"note":"Use system_get_logs tool to retrieve logs"}],"context":{},"pid":51060,"process":"node"}
-{"ts":1762346871607,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.33"}},"jsonrpc":"2.0","id":0}],"context":{},"pid":51060,"process":"node"}
-{"ts":1762346871613,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"notifications/initialized","jsonrpc":"2.0"}],"context":{},"pid":51060,"process":"node"}
-{"ts":1762346871616,"level":"info","msg":"MCP_DIRECT_CALL","args":[{"method":"notifications/initialized","hasParams":true}],"context":{},"pid":51060,"process":"node"}
-{"ts":1762346871620,"level":"warn","msg":"MCP_IGNORED_UNKNOWN_NOTIFICATION","args":[{"method":"notifications/initialized"}],"context":{},"pid":51060,"process":"node"}
-{"ts":1762346871623,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"tools/list","jsonrpc":"2.0","id":1}],"context":{},"pid":51060,"process":"node"}
+{"ts":1762347026518,"event":"LOG_START","process":"node"}
+{"ts":1762347026551,"level":"info","msg":"MCP Server module loaded","args":[{"logFiles":{"ndjson":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.ndjson","errors":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\errors.ndjson","humanReadable":"C:\\Users\\svincent\\GitHub\\scorm-tester\\logs\\app.log"},"pid":41856,"note":"Use system_get_logs tool to retrieve logs"}],"context":{},"pid":41856,"process":"node"}
+{"ts":1762347026561,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.33"}},"jsonrpc":"2.0","id":0}],"context":{},"pid":41856,"process":"node"}
+{"ts":1762347026569,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"notifications/initialized","jsonrpc":"2.0"}],"context":{},"pid":41856,"process":"node"}
+{"ts":1762347026575,"level":"info","msg":"MCP_DIRECT_CALL","args":[{"method":"notifications/initialized","hasParams":true}],"context":{},"pid":41856,"process":"node"}
+{"ts":1762347026581,"level":"warn","msg":"MCP_IGNORED_UNKNOWN_NOTIFICATION","args":[{"method":"notifications/initialized"}],"context":{},"pid":41856,"process":"node"}
+{"ts":1762347026588,"level":"debug","msg":"MCP_REQUEST_RECEIVED","args":[{"method":"tools/list","jsonrpc":"2.0","id":1}],"context":{},"pid":41856,"process":"node"}
