@@ -37,8 +37,6 @@ if (!process.env.SCORM_TESTER_LOG_DIR) {
   const logDir = path.join(projectRoot, 'logs', 'mcp');
   fs.mkdirSync(logDir, { recursive: true });
   process.env.SCORM_TESTER_LOG_DIR = logDir;
-  // Write to stderr for immediate visibility
-  process.stderr.write(`[Bridge] Log directory: ${logDir}\n`);
 }
 
 // Start the MCP stdio server
@@ -66,15 +64,12 @@ async function ensureElectronChild() {
   });
 
   electronChild.stderr.on('data', (data) => {
-    // Only log actual errors to our stderr
-    const msg = data.toString();
-    if (msg.includes('error') || msg.includes('Error') || msg.includes('ERROR')) {
-      process.stderr.write(`[Electron Error] ${msg}`);
-    }
+    // Silently consume stderr to avoid polluting MCP protocol channel
+    // All diagnostic info is logged to files via system_get_logs tool
   });
 
   electronChild.on('exit', (code) => {
-    process.stderr.write(`[Bridge] Electron child exited with code ${code}\n`);
+    // Silently handle exit - diagnostic info available via system_get_logs
     electronChild = null;
   });
 

@@ -355,10 +355,10 @@ class RuntimeManager {
       }
     }
 
-    // Log final navigated URL for traceability
+    // Log final navigated URL for traceability (to log files, not stderr)
     try {
       const finalURL = win?.webContents?.getURL?.() || null;
-      if (finalURL) { try { process.stderr.write(`DEBUG: Runtime final URL: ${finalURL}\n`); } catch (_) {} }
+      if (finalURL) { logger?.debug('Runtime final URL', { finalURL }); }
     } catch (_) {}
 
     return win;

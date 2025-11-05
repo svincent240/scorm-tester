@@ -58,13 +58,8 @@ async function main() {
         pid: process.pid,
         note: 'Use system_get_logs tool to retrieve logs'
       });
-      // Also write to stderr for immediate visibility during startup
-      try {
-        process.stderr.write(`\n=== SCORM MCP Server Started ===\n`);
-        process.stderr.write(`Log Directory: ${process.env.SCORM_TESTER_LOG_DIR}\n`);
-        process.stderr.write(`Log File: ${logger.ndjsonFile}\n`);
-        process.stderr.write(`Use system_get_logs MCP tool to retrieve logs\n\n`);
-      } catch (_) {}
+      // Note: stderr writes removed to avoid polluting MCP protocol channel
+      // All diagnostic info is available via system_get_logs tool
     } catch (_) {}
 
     // Start the MCP stdio server (reads newline-delimited JSON from stdin) ASAP to keep stdout responsive

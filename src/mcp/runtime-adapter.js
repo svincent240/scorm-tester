@@ -8,15 +8,9 @@ const ScormInspectorTelemetryStore = require("../main/services/scorm-inspector/s
 const { ScormSNService } = require("../main/services/scorm/sn");
 const ManifestParser = require("../main/services/scorm/cam/manifest-parser");
 
-// STDERR-only logger to avoid polluting MCP stdout channel
-// Provide a full console-like surface (including debug) because core code calls logger.debug()
-const mcpLogger = {
-  debug: (...args) => { try { process.stderr.write("DEBUG: " + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + "\n"); } catch (_) {} },
-  log:   (...args) => { try { process.stderr.write(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + "\n"); } catch (_) {} },
-  info:  (...args) => { try { process.stderr.write(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + "\n"); } catch (_) {} },
-  warn:  (...args) => { try { process.stderr.write("WARN: "  + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + "\n"); } catch (_) {} },
-  error: (...args) => { try { process.stderr.write("ERROR: " + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + "\n"); } catch (_) {} },
-};
+// Use the shared logger to write to log files (not stderr, to avoid polluting MCP protocol)
+const getLogger = require('../shared/utils/logger');
+const mcpLogger = getLogger();
 
 
 function getPreloadPath() {
