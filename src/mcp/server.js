@@ -18,7 +18,23 @@ const getLogger = require('../shared/utils/logger.js');
 const fs = require('fs');
 const path = require('path');
 
-const logger = getLogger();
+// Initialize logger with explicit log directory (set by node-bridge.js or electron-entry.js)
+const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
+
+// Log server startup for debugging (only once when module loads)
+if (logger && !global.__mcpServerLoggedStartup) {
+  global.__mcpServerLoggedStartup = true;
+  logger.info('MCP Server module loaded', {
+    logDir: process.env.SCORM_TESTER_LOG_DIR,
+    logFiles: {
+      ndjson: logger.ndjsonFile,
+      errors: logger.errorsFile,
+      humanReadable: logger.logFile
+    },
+    pid: process.pid,
+    note: 'Use system_get_logs tool to retrieve logs'
+  });
+}
 
 const router = new ToolRouter();
 

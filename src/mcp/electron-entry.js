@@ -37,9 +37,16 @@ async function main() {
       if (!process.env.SCORM_TESTER_LOG_DIR) {
         const path = require('path');
         const fs = require('fs');
-        const os = require('os');
-        // Use OS temp directory with a scorm-mcp subdirectory
-        const logDir = path.join(os.tmpdir(), 'scorm-mcp', `session-${Date.now()}-${process.pid}`);
+        // Find project root
+        let projectRoot = __dirname;
+        while (projectRoot !== path.dirname(projectRoot)) {
+          if (fs.existsSync(path.join(projectRoot, 'package.json'))) {
+            break;
+          }
+          projectRoot = path.dirname(projectRoot);
+        }
+        // Logs cleared on startup and overwrite previous session (matching main app behavior)
+        const logDir = path.join(projectRoot, 'logs', 'mcp');
         fs.mkdirSync(logDir, { recursive: true });
         process.env.SCORM_TESTER_LOG_DIR = logDir;
       }

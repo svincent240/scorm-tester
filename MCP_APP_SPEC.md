@@ -143,15 +143,16 @@ Example minimal MCP client config (conceptual):
   - `app.log` — human‑readable
   - `app.ndjson` — machine‑parsable NDJSON (one JSON object per line)
   - `errors.ndjson` — NDJSON containing only error‑level entries
-- Location (MCP runs): if `SCORM_TESTER_LOG_DIR` is set in the environment, logs go there. Otherwise, the MCP Electron entry sets a repo‑local directory: `./sessions/mcp-<timestamp>-<pid>/logs/`.
-- Behavior: logs are cleared at MCP start and truncated when they exceed `SCORM_TESTER_MAX_LOG_BYTES` (default 8MB). Only a single file of each type is retained (no rotations).
+- Location (MCP runs): if `SCORM_TESTER_LOG_DIR` is set in the environment, logs go there. Otherwise, the MCP server uses a repo‑local directory: `./logs/mcp/` (consistent path, no timestamps).
+- Behavior: logs are **cleared on MCP startup** (each run overwrites previous session) and truncated when they exceed `SCORM_TESTER_MAX_LOG_BYTES` (default 8MB). Only a single file of each type is retained (no rotations). This matches the main GUI app behavior.
 - Request correlation: every JSON‑RPC call is logged in `app.ndjson` with markers like `MCP_TOOLS_CALL`, `MCP_TOOLS_RESULT`, `MCP_TOOLS_ERROR` and includes the JSON‑RPC `id` and `method` for easy tracing.
 - Introspection tools:
   - `system_get_logs` (tools/call): `{ tail?: number, levels?: string[], since_ts?: number }` — returns recent NDJSON objects (filterable by levels/time)
   - `system_set_log_level` (tools/call): `{ level: "debug"|"info"|"warn"|"error" }`
 - Quick usage (examples):
-  - Tail errors only (repo‑local run): `tail -f ./sessions/mcp-*/logs/errors.ndjson`
-  - Parse NDJSON: `jq -c . ./sessions/mcp-*/logs/app.ndjson | head`
+  - Tail errors only: `tail -f ./logs/mcp/errors.ndjson`
+  - Parse NDJSON: `jq -c . ./logs/mcp/app.ndjson | head`
+  - View human-readable: `tail -f ./logs/mcp/app.log`
 
 ### Fail‑Fast, No Fallbacks, No Silent Errors (Critical)
 

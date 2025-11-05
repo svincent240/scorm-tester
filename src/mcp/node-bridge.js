@@ -15,10 +15,31 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { startServer } = require('./server');
 
 // Global reference to Electron child process
 let electronChild = null;
+
+// Initialize logger directory before starting server
+// This ensures logs are written to a consistent location for this MCP session
+// Logs are cleared on startup and overwrite previous session (no timestamps in path)
+if (!process.env.SCORM_TESTER_LOG_DIR) {
+  // Find project root
+  let projectRoot = __dirname;
+  while (projectRoot !== path.dirname(projectRoot)) {
+    if (fs.existsSync(path.join(projectRoot, 'package.json'))) {
+      break;
+    }
+    projectRoot = path.dirname(projectRoot);
+  }
+  const logDir = path.join(projectRoot, 'logs', 'mcp');
+  fs.mkdirSync(logDir, { recursive: true });
+  process.env.SCORM_TESTER_LOG_DIR = logDir;
+  // Write to stderr for immediate visibility
+  process.stderr.write(`[Bridge] Log directory: ${logDir}\n`);
+}
 
 // Start the MCP stdio server
 startServer();
