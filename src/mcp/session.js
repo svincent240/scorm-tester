@@ -131,7 +131,7 @@ class SessionManager {
     return { events: evs, next_event_id: s.next_event_id };
   }
 
-  close({ session_id }) {
+  async close({ session_id }) {
     const s = this.sessions.get(session_id);
     if (!s) {
       const e = new Error(`Unknown session: ${session_id}`);
@@ -141,6 +141,15 @@ class SessionManager {
     s.state = "closing";
     s.last_activity_at = this.getNow();
     this._emit(s, "session:close", {});
+
+    // Close persistent runtime window if open (prevent window leaks)
+    try {
+      const { RuntimeManager } = require('./runtime-manager');
+      await RuntimeManager.closePersistent(session_id);
+    } catch (_) {
+      // Best-effort cleanup - don't fail session close if runtime cleanup fails
+    }
+
     // We leave artifacts on disk for caller to collect; no deletion here.
     this.sessions.delete(session_id);
     return { success: true, artifacts_manifest_path: s.artifacts_manifest_path };

@@ -111,9 +111,46 @@ global.__electronBridge = {
   }
 };
 
-// Cleanup on exit
+// Cleanup on exit - close all persistent windows before killing Electron child
+async function cleanup() {
+  try {
+    // Close all persistent runtime windows to prevent leaks
+    if (electronChild && !electronChild.killed) {
+      // Send cleanup message to Electron child to close all windows
+      try {
+        electronChild.send({
+          id: Date.now(),
+          type: 'runtime_closeAll'
+        });
+        // Give Electron child a moment to clean up windows
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (_) {
+        // Best-effort cleanup
+      }
+      electronChild.kill();
+    }
+  } catch (_) {
+    // Ensure we kill the child even if cleanup fails
+    if (electronChild && !electronChild.killed) {
+      electronChild.kill();
+    }
+  }
+}
+
 process.on('exit', () => {
+  // Synchronous cleanup - kill child immediately
   if (electronChild && !electronChild.killed) {
     electronChild.kill();
   }
+});
+
+// Async cleanup on signals
+process.on('SIGINT', async () => {
+  await cleanup();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await cleanup();
+  process.exit(0);
 });

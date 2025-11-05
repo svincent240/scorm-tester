@@ -316,6 +316,14 @@ class ManifestParser {
           detail: { default: defaultOrg, orgIds: organizations.map(o => o.identifier) }
         });
       }
+      const defaultOrgObject = organizations.find(o => o.identifier === defaultOrg);
+      if (defaultOrgObject && (!defaultOrgObject.items || defaultOrgObject.items.length === 0)) {
+        throw new ParserError({
+          code: ParserErrorCode.PARSE_VALIDATION_ERROR,
+          message: `Default organization has no items: ${defaultOrg}`,
+          detail: { default: defaultOrg }
+        });
+      }
     }
 
     return {

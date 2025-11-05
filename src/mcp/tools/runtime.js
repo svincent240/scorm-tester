@@ -50,6 +50,7 @@ async function scorm_test_api_integration(params = {}) {
     schemaversion = parsed?.schemaversion || null;
     manifestOk = true;
   } catch (err) {
+    logger?.error('Manifest parsing failed', { error: err.message, code: err.code });
     manifestOk = false;
   }
 

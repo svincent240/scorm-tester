@@ -20,12 +20,13 @@ async function childMode() {
   }
 
   // Handle IPC messages from parent for runtime operations
+  const { RuntimeManager } = require('./runtime-manager');
+  if (!RuntimeManager) {
+    throw new Error('RuntimeManager module not loaded');
+  }
+
   process.on('message', async (message) => {
     try {
-      const { RuntimeManager } = require('./runtime-manager');
-      if (!RuntimeManager) {
-        throw new Error('RuntimeManager module not loaded');
-      }
       if (typeof RuntimeManager.handleIPCMessage !== 'function') {
         throw new Error('RuntimeManager.handleIPCMessage is not a function. Type: ' + typeof RuntimeManager.handleIPCMessage + ', Keys: ' + Object.keys(RuntimeManager).join(', '));
       }

@@ -343,6 +343,18 @@ class RuntimeManager {
         const snResult = await this._snInvokeImplementation(snWin, message.params.method, message.params.payload);
         return { result: snResult, success: true };
 
+      case 'runtime_closeAll':
+        // Close all persistent runtime windows (cleanup on MCP server exit)
+        const sessionIds = Array.from(_persistentBySession.keys());
+        for (const sid of sessionIds) {
+          try {
+            await this._closePersistentImpl(sid);
+          } catch (_) {
+            // Best-effort cleanup
+          }
+        }
+        return { success: true, closed_count: sessionIds.length };
+
       default:
         throw new Error(`Unknown IPC message type: ${message.type}`);
     }

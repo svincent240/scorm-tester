@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const path = require('path');
 
 /**
  * MCP stdout purity test
@@ -19,7 +20,7 @@ describe('MCP stdout purity', () => {
   }
 
   test('stdout emits only JSON-RPC 2.0 lines', async () => {
-    const proc = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', '-s', 'mcp'], {
+    const proc = spawn('node', [path.join(__dirname, '../../src/mcp/node-bridge.js')], {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'false' }
