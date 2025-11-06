@@ -1,10 +1,10 @@
-Log start 2025-11-06T02:23:56.994Z
-2025-11-06T02:23:57.042Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-06T02:23:57.050Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-06T02:23:57.059Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-06T02:23:57.065Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-06T02:23:57.073Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-06T02:23:57.123Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+Log start 2025-11-06T12:48:58.848Z
+2025-11-06T12:48:58.893Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-06T12:48:58.901Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-06T12:48:58.909Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-06T12:48:58.915Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-06T12:48:58.921Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-06T12:48:58.968Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
   Policy set or a policy with "unsafe-eval" enabled. This exposes users of
   this app to unnecessary security risks.
 
@@ -12,4 +12,7 @@ For more information and help, consult
 https://electronjs.org/docs/tutorial/security.
 This warning will not show up
 once the app is packaged. (node:electron/js2c/sandbox_bundle:2) 
-2025-11-06T02:23:57.138Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing"}]
+2025-11-06T12:48:58.984Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing"}]
+2025-11-06T12:48:59.016Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
+2025-11-06T12:48:59.022Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
+2025-11-06T12:48:59.028Z [INFO] SCORM session initialized: scorm_1762433339016_nz2oaczpv 

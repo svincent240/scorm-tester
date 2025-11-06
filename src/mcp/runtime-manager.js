@@ -14,6 +14,9 @@ const getLogger = require("../shared/utils/logger");
 // Get logger instance for browser console capture
 const logger = getLogger();
 
+// Atomic counter for IPC message IDs to avoid collisions with concurrent calls
+let _ipcMessageIdCounter = 0;
+
 async function resolveEntryPathFromManifest(workspace) {
   const manifestPath = path.join(workspace, "imsmanifest.xml");
   if (!fs.existsSync(manifestPath)) return null;
@@ -310,10 +313,11 @@ class RuntimeManager {
         // This provides detailed error information (name, message, stack, line/column numbers)
         // instead of Electron's generic "Script failed to execute" message
         // Use eval() to catch syntax errors that would otherwise fail during parsing
+        // Use JSON.stringify to safely embed the script without escaping issues
         const wrappedScript = `
           (() => {
             try {
-              const __result = eval(\`${message.params.script.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
+              const __result = eval(${JSON.stringify(message.params.script)});
               return { success: true, result: __result };
             } catch (__error) {
               return {
@@ -529,7 +533,7 @@ class RuntimeManager {
     }
     // Forward to Electron child via IPC
     const result = await global.__electronBridge.sendMessage({
-      id: Date.now(),
+      id: ++_ipcMessageIdCounter,
       type: 'runtime_openPage',
       params: { entryPath, viewport, adapterOptions }
     });
@@ -573,7 +577,7 @@ class RuntimeManager {
     }
     // Forward to Electron child via IPC
     const result = await global.__electronBridge.sendMessage({
-      id: Date.now(),
+      id: ++_ipcMessageIdCounter,
       type: 'runtime_openPersistent',
       params: { session_id, entryPath, viewport, adapterOptions }
     });
@@ -604,7 +608,7 @@ class RuntimeManager {
   static async closePersistent(session_id) {
     if (global.__electronBridge && global.__electronBridge.sendMessage) {
       const result = await global.__electronBridge.sendMessage({
-        id: Date.now(),
+        id: ++_ipcMessageIdCounter,
         type: 'runtime_closePersistent',
         params: { session_id }
       });
@@ -652,7 +656,7 @@ class RuntimeManager {
     if (session_id) {
       if (global.__electronBridge && global.__electronBridge.sendMessage) {
         const result = await global.__electronBridge.sendMessage({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_callAPI',
           params: { session_id, method, args }
         });
@@ -688,7 +692,7 @@ class RuntimeManager {
     if (session_id) {
       if (global.__electronBridge && global.__electronBridge.sendMessage) {
         const result = await global.__electronBridge.sendMessage({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_getCapturedCalls',
           params: { session_id }
         });
@@ -712,7 +716,7 @@ class RuntimeManager {
     if (session_id) {
       if (global.__electronBridge && global.__electronBridge.sendMessage) {
         const result = await global.__electronBridge.sendMessage({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_getInitializeState',
           params: { session_id }
         });
@@ -735,7 +739,7 @@ class RuntimeManager {
   static async getRuntimeStatus(session_id) {
     if (global.__electronBridge && global.__electronBridge.sendMessage) {
       const result = await global.__electronBridge.sendMessage({
-        id: Date.now(),
+        id: ++_ipcMessageIdCounter,
         type: 'runtime_getStatus',
         params: { session_id }
       });
@@ -762,7 +766,7 @@ class RuntimeManager {
     if (session_id) {
       if (global.__electronBridge && global.__electronBridge.sendMessage) {
         const result = await global.__electronBridge.sendMessage({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_snInvoke',
           params: { session_id, method, payload }
         });
@@ -787,7 +791,7 @@ class RuntimeManager {
     if (session_id) {
       if (global.__electronBridge && global.__electronBridge.sendMessage) {
         const result = await global.__electronBridge.sendMessage({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_executeJS',
           params: { session_id, script }
         });
@@ -804,10 +808,11 @@ class RuntimeManager {
 
     // Wrap script in try-catch to capture actual JavaScript errors
     // Use eval() to catch syntax errors that would otherwise fail during parsing
+    // Use JSON.stringify to safely embed the script without escaping issues
     const wrappedScript = `
       (() => {
         try {
-          const __result = eval(\`${script.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
+          const __result = eval(${JSON.stringify(script)});
           return { success: true, result: __result };
         } catch (__error) {
           return {

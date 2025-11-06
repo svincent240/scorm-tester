@@ -383,22 +383,7 @@ async function scorm_dom_evaluate(params = {}) {
       }
     }
 
-    // Try to fetch recent console errors to provide additional context
-    let consoleErrors = null;
-    try {
-      const { scorm_get_console_errors } = require('./runtime');
-      const recentErrors = await scorm_get_console_errors({
-        session_id,
-        severity: ['error'],
-        since_ts: Date.now() - 5000 // Last 5 seconds
-      });
-      if (recentErrors.errors && recentErrors.errors.length > 0) {
-        consoleErrors = recentErrors.errors.slice(0, 3); // Include last 3 errors
-      }
-    } catch (_) {
-      // Ignore errors fetching console errors
-    }
-
+    // Hint about console errors (avoid circular dependency with runtime.js)
     errorMessage += `\n\nHint: Use scorm_get_console_errors to see all browser console output, or system_get_logs for complete application logs.`;
 
     const e = new Error(errorMessage);
@@ -656,6 +641,7 @@ async function scorm_dom_find_interactive_elements(params = {}) {
     const result = await RuntimeManager.executeJS(null, `
       (() => {
         const result = {
+          session_id: ${JSON.stringify(session_id)},
           forms: [],
           buttons: [],
           inputs: [],

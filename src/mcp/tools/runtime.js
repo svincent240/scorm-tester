@@ -6,11 +6,15 @@ const ManifestParser = require("../../main/services/scorm/cam/manifest-parser");
 const sessions = require("../session");
 const { RuntimeManager, resolveEntryPathFromManifest } = require("../runtime-manager");
 const getLogger = require('../../shared/utils/logger.js');
+const { scorm_dom_find_interactive_elements } = require('./dom');
 let electron = null;
 try { electron = require("electron"); } catch (_) { electron = null; }
 
 // Initialize logger
 const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
+
+// Atomic counter for IPC message IDs to avoid collisions with concurrent calls
+let _ipcMessageIdCounter = 0;
 
 function ensureManifestPath(workspacePath) {
   const manifestPath = path.join(path.resolve(workspacePath), "imsmanifest.xml");
@@ -702,10 +706,12 @@ async function scorm_data_model_get(params = {}) {
   }
 
   return {
+    session_id,
     data,
     metadata: include_metadata ? metadata : undefined,
     errors: errors.length > 0 ? errors : undefined,
-    element_count: Object.keys(data).length
+    element_count: Object.keys(data).length,
+    elements: Object.keys(data)
   };
 }
 
@@ -1028,7 +1034,7 @@ async function scorm_capture_screenshot(params = {}) {
   }
 
   const result = await global.__electronBridge.sendMessage({
-    id: Date.now(),
+    id: ++_ipcMessageIdCounter,
     type: 'runtime_capture',
     params: { session_id, compress: true } // Request compressed screenshot
   });
@@ -1695,7 +1701,7 @@ async function scorm_get_current_page_context(params = {}) {
   }
 
   try {
-    const context = await RuntimeManager.executeJS(null, `
+    const script = `
       (() => {
         const context = {
           page_type: 'unknown',
@@ -1716,7 +1722,7 @@ async function scorm_get_current_page_context(params = {}) {
         const slideIndicators = document.querySelectorAll('[class*="slide-number"], [id*="slide-number"], [class*="page-number"]');
         if (slideIndicators.length > 0) {
           const text = slideIndicators[0].textContent.trim();
-          const match = text.match(/(\\d+)\\s*\\/\\s*(\\d+)/);
+          const match = text.match(new RegExp('(\\\\d+)\\\\s*\\\\/\\\\s*(\\\\d+)'));
           if (match) {
             context.slide_number = parseInt(match[1]);
             context.total_slides = parseInt(match[2]);
@@ -1755,10 +1761,19 @@ async function scorm_get_current_page_context(params = {}) {
 
         return context;
       })()
-    `, session_id);
+    `;
+
+    logger?.debug && logger.debug('[scorm_get_current_page_context] Executing script', { scriptLength: script.length });
+    const context = await RuntimeManager.executeJS(null, script, session_id);
+    logger?.debug && logger.debug('[scorm_get_current_page_context] Script executed successfully', { hasContext: !!context });
 
     return context;
   } catch (error) {
+    logger?.error && logger.error('[scorm_get_current_page_context] Script execution failed', {
+      errorMessage: error?.message,
+      errorCode: error?.code,
+      errorDetails: error?.details
+    });
     const e = new Error(error?.message || String(error));
     e.code = 'PAGE_CONTEXT_ERROR';
     throw e;
@@ -1868,6 +1883,8 @@ async function scorm_get_page_state(params = {}) {
     throw e;
   }
 
+  logger?.info && logger.info('[scorm_get_page_state] Starting with options', { include_options });
+
   // Parallel execution of all requested state queries
   // Build array of promises, filtering out null values
   const promises = [];
@@ -1876,30 +1893,41 @@ async function scorm_get_page_state(params = {}) {
   if (include_options.page_context) {
     promiseIndices.page_context = promises.length;
     promises.push(scorm_get_current_page_context({ session_id }));
+    logger?.info && logger.info('[scorm_get_page_state] Adding page_context at index', { index: promises.length - 1 });
   }
 
   if (include_options.interactive_elements) {
     promiseIndices.interactive_elements = promises.length;
-    const { scorm_dom_find_interactive_elements } = require('./dom');
     promises.push(scorm_dom_find_interactive_elements({ session_id }));
+    logger?.info && logger.info('[scorm_get_page_state] Adding interactive_elements at index', { index: promises.length - 1 });
   }
 
   if (include_options.data_model) {
     promiseIndices.data_model = promises.length;
     promises.push(scorm_data_model_get({ session_id, patterns: ['cmi.*'] }));
+    logger?.info && logger.info('[scorm_get_page_state] Adding data_model at index', { index: promises.length - 1 });
   }
 
   if (include_options.console_errors) {
     promiseIndices.console_errors = promises.length;
     promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warning'] }));
+    logger?.info && logger.info('[scorm_get_page_state] Adding console_errors at index', { index: promises.length - 1 });
   }
 
   if (include_options.network_requests) {
     promiseIndices.network_requests = promises.length;
     promises.push(scorm_get_network_requests({ session_id }));
+    logger?.info && logger.info('[scorm_get_page_state] Adding network_requests at index', { index: promises.length - 1 });
   }
 
+  logger?.info && logger.info('[scorm_get_page_state] Promise indices', { promiseIndices, promiseCount: promises.length });
+
   const results = await Promise.allSettled(promises);
+
+  logger?.debug && logger.debug('[scorm_get_page_state] Results', {
+    resultCount: results.length,
+    statuses: results.map((r, i) => ({ index: i, status: r.status, hasError: !!r.reason }))
+  });
 
   // Map results back to named fields
   const response = {
@@ -1916,13 +1944,25 @@ async function scorm_get_page_state(params = {}) {
   for (const [key, index] of Object.entries(promiseIndices)) {
     if (results[index].status === 'fulfilled') {
       response[key] = results[index].value;
+      const valueKeys = Object.keys(results[index].value || {}).slice(0, 5);
+      logger?.info && logger.info(`[scorm_get_page_state] ${key} fulfilled at index ${index}`, { valueKeys });
     } else {
       response.errors.push({
         field: key,
         error: results[index].reason?.message || 'Unknown error'
       });
+      logger?.error && logger.error(`[scorm_get_page_state] ${key} rejected at index ${index}`, { error: results[index].reason?.message });
     }
   }
+
+  logger?.debug && logger.debug('[scorm_get_page_state] Returning response', {
+    hasPageContext: !!response.page_context,
+    hasInteractiveElements: !!response.interactive_elements,
+    hasDataModel: !!response.data_model,
+    hasConsoleErrors: !!response.console_errors,
+    hasNetworkRequests: !!response.network_requests,
+    errorCount: response.errors.length
+  });
 
   return response;
 }

@@ -22,6 +22,9 @@ const { startServer } = require('./server');
 // Global reference to Electron child process
 let electronChild = null;
 
+// Atomic counter for IPC message IDs to avoid collisions with concurrent calls
+let _ipcMessageIdCounter = 0;
+
 // Initialize logger directory before starting server
 // This ensures logs are written to a consistent location for this MCP session
 // Logs are cleared on startup and overwrite previous session (no timestamps in path)
@@ -119,7 +122,7 @@ async function cleanup() {
       // Send cleanup message to Electron child to close all windows
       try {
         electronChild.send({
-          id: Date.now(),
+          id: ++_ipcMessageIdCounter,
           type: 'runtime_closeAll'
         });
         // Give Electron child a moment to clean up windows
