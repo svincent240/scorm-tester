@@ -45,7 +45,7 @@ describe('CourseOutline authoritative state gating', () => {
 
     const { CourseOutline } = await import('../../src/renderer/components/scorm/course-outline.js');
     const outline = new CourseOutline('outline-root', { autoRender: false });
-    await outline.initialize?.().catch(() => { /* intentionally empty */ }));
+    await outline.initialize?.().catch(() => { /* intentionally empty */ });
 
     // Set course structure but do NOT simulate scormStatesLoaded
     outline.renderContent();
@@ -63,4 +63,6 @@ describe('CourseOutline authoritative state gating', () => {
     expect(disabledEls.length).toBeGreaterThan(0);
   });
 });
+
+
 

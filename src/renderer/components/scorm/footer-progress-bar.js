@@ -45,7 +45,7 @@ class FooterProgressBar extends BaseComponent {
     if (!this.element) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterProgressBar: element not available for update');
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
       return;
     }
 
@@ -55,7 +55,7 @@ class FooterProgressBar extends BaseComponent {
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterProgressBar: #footer-progress-fill not found in DOM');
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
     }
 
     const footerProgressPercentage = this.element.querySelector('#footer-progress-percentage');
@@ -64,7 +64,7 @@ class FooterProgressBar extends BaseComponent {
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterProgressBar: #footer-progress-percentage not found in DOM');
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
     }
   }
 
@@ -85,9 +85,10 @@ class FooterProgressBar extends BaseComponent {
     } catch (error) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.error('FooterProgressBar: Error handling navigation state update', error);
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
     }
   }
 }
 
 export { FooterProgressBar };
+

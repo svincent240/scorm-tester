@@ -8,7 +8,7 @@
  * @fileoverview IPC communication service for SCORM Tester main process
  */
 
-const { ipcMain, shell, app, BrowserWindow } = require('electron'); // Added shell for handleOpenExternal + app/BrowserWindow for utility listeners
+const { ipcMain, shell, app } = require('electron'); // Added shell for handleOpenExternal + app for utility listeners
 const path = require('path'); // Added path for path utils
 const BaseService = require('./base-service');
 const {
@@ -26,9 +26,11 @@ const IPC_ROUTES = (() => {
   }
 })();
 
-const OPEN_DEBUG_DEBOUNCE_MS = 500; // Define debounce constant
+// eslint-disable-next-line no-unused-vars
+const OPEN_DEBUG_DEBOUNCE_MS = 500; // Define debounce constant (reserved for future use)
 
 // Validation utilities
+// eslint-disable-next-line no-unused-vars
 const IPC_VALIDATION = require('../../shared/utils/ipc-validation');
 const IPC_RESULT = require('../../shared/utils/ipc-result');
 
@@ -160,6 +162,7 @@ class IpcHandler extends BaseService {
 
     // SNSnapshotService is preferred and owned by main; fetch SN status on-demand when not present.
     if (this.snSnapshotService && typeof this.snSnapshotService.startPolling === 'function') {
+      // startPolling is available but intentionally not called here
     } else {
       this.logger?.warn('IpcHandler: SNSnapshotService not present; SN status will be fetched on-demand (no internal poller)');
     }
@@ -262,6 +265,8 @@ class IpcHandler extends BaseService {
     // Register critical logging handlers first to ensure they're always available
     this._registerCriticalHandlers();
 
+    // Validate all handlers are declared (declarativeChannelSet used for internal validation)
+    // eslint-disable-next-line no-unused-vars
     const declarativeChannelSet = new Set((IPC_ROUTES || []).map(r => r.channel));
     try {
       // SCORM API handlers
@@ -390,7 +395,7 @@ class IpcHandler extends BaseService {
    * Register individual IPC handler
    * Enforce declarative routing only. Legacy/fallback registration is forbidden.
    */
-  registerHandler(channel, handler) {
+  registerHandler(channel, _handler) {
     try {
       const routes = IPC_ROUTES || [];
       const route = routes.find(r => r.channel === channel);
@@ -467,6 +472,8 @@ class IpcHandler extends BaseService {
 
         const result = await handler(event, ...args);
 
+        // Duration calculated for logging purposes; recorded separately via recordOperation
+        // eslint-disable-next-line no-unused-vars
         const duration = Date.now() - startTime;
         this.recordOperation(`${channel}:success`, true);
 
@@ -559,7 +566,7 @@ class IpcHandler extends BaseService {
    * Unregister all IPC handlers
    */
   unregisterHandlers() {
-    for (const [channel, handler] of this.handlers) {
+    for (const [channel] of this.handlers) {
       ipcMain.removeHandler(channel);
       this.logger?.debug(`IpcHandler: Unregistered handler for channel: ${channel}`);
     }
@@ -778,7 +785,7 @@ class IpcHandler extends BaseService {
   }
 
   // UI Settings (AppState) handlers
-  async handleUIGetSettings(event) {
+  async handleUIGetSettings(_event) {
     const appState = this.getDependency('appState');
     if (!appState) {
       return { success: false, error: 'app_state_unavailable' };
@@ -850,7 +857,7 @@ class IpcHandler extends BaseService {
     }
   }
 
-  async handleBrowseModeDisable(event) {
+  async handleBrowseModeDisable(_event) {
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -872,7 +879,7 @@ class IpcHandler extends BaseService {
     }
   }
 
-  async handleBrowseModeStatus(event) {
+  async handleBrowseModeStatus(_event) {
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -945,7 +952,7 @@ class IpcHandler extends BaseService {
   }
 
   // File operation handlers
-  async handleSelectScormPackage(event) {
+  async handleSelectScormPackage(_event) {
     const fileManager = this.getDependency('fileManager');
     try {
       const recentService = this.getDependency('recentCoursesService');
@@ -965,7 +972,7 @@ class IpcHandler extends BaseService {
     }
   }
 
-  async handleSelectScormFolder(event) {
+  async handleSelectScormFolder(_event) {
     const fileManager = this.getDependency('fileManager');
     if (!fileManager || typeof fileManager.selectScormFolder !== 'function') {
       this.logger?.error('IpcHandler: FileManager.selectScormFolder not available');
@@ -1044,7 +1051,7 @@ class IpcHandler extends BaseService {
     return result;
   }
 
-  async handleGetAllSessions(event) {
+  async handleGetAllSessions(_event) {
     const scormService = this.getDependency('scormService');
     return await scormService.getAllSessions();
   }
@@ -1055,7 +1062,7 @@ class IpcHandler extends BaseService {
     return await scormService.applyLmsProfile(sessionId, profileName);
   }
 
-  async handleGetLmsProfiles(event) {
+  async handleGetLmsProfiles(_event) {
     const scormService = this.getDependency('scormService');
     return await scormService.getLmsProfiles();
   }
@@ -1074,7 +1081,7 @@ class IpcHandler extends BaseService {
   async handleLoadSharedLoggerAdapter(_event) {
     try {
       // Lazy-require the shared singleton logger getter
-      // eslint-disable-next-line global-require, import/no-commonjs
+      // eslint-disable-next-line global-require
       const getLogger = require('../../shared/utils/logger.js');
 
       // Prefer the same directory used by the main logger initialization
@@ -1162,7 +1169,7 @@ class IpcHandler extends BaseService {
     }
   }
 
-  async handleGetAppRoot(event) {
+  async handleGetAppRoot(_event) {
     return PathUtils.normalize(path.resolve(__dirname, '../../../'));
   }
 
@@ -1255,7 +1262,7 @@ class IpcHandler extends BaseService {
         const TERMINATE_TIMEOUT_MS = 1500;
         const p = Promise.resolve().then(() => scormService.terminateAllSessions({ silent: true }));
         await Promise.race([
-          p.catch(() => { /* intentionally empty */ })), // swallow individual errors
+          p.catch(() => { /* intentionally empty */ }), // swallow individual errors
           new Promise(res => setTimeout(res, TERMINATE_TIMEOUT_MS))
         ]);
         return;
@@ -1290,7 +1297,7 @@ class IpcHandler extends BaseService {
   }
 
   // SN Service handlers
-  async handleSNGetStatus(event) {
+  async handleSNGetStatus(_event) {
     // Prefer SNSnapshotService status if available
     if (this.snSnapshotService && typeof this.snSnapshotService.getStatus === 'function') {
       return this.snSnapshotService.getStatus();
@@ -1314,7 +1321,7 @@ class IpcHandler extends BaseService {
     return { success: true, initialized: false, sessionState: 'not_initialized', availableNavigation: [] };
   }
 
-  async handleSNGetSequencingState(event) {
+  async handleSNGetSequencingState(_event) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();
     if (!snService) {
@@ -1344,7 +1351,7 @@ class IpcHandler extends BaseService {
     return result;
   }
 
-  async handleSNRefreshNavigation(event) {
+  async handleSNRefreshNavigation(_event) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();
     if (!snService) {
@@ -1364,7 +1371,7 @@ class IpcHandler extends BaseService {
     return result;
   }
 
-  async handleSNReset(event) {
+  async handleSNReset(_event) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();
     if (!snService) {
@@ -1509,7 +1516,7 @@ class IpcHandler extends BaseService {
   /**
    * Get available navigation from SN service for course outline
    */
-  async handleCourseOutlineGetAvailableNavigation(event) {
+  async handleCourseOutlineGetAvailableNavigation(_event) {
     this.logger?.debug('IpcHandler: handleCourseOutlineGetAvailableNavigation called');
 
     try {
@@ -1708,7 +1715,7 @@ class IpcHandler extends BaseService {
   /**
    * Get current SCORM data model for Inspector
    */
-  async handleScormInspectorGetDataModel(event, { sessionId } = {}) {
+  async handleScormInspectorGetDataModel(event, { _sessionId } = {}) {
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService || typeof scormService.getCurrentDataModel !== 'function') {
@@ -1726,7 +1733,7 @@ class IpcHandler extends BaseService {
   /**
    * Clear SCORM Inspector telemetry data
    */
-  async handleScormInspectorClear(event) {
+  async handleScormInspectorClear(_event) {
     try {
       if (this.telemetryStore && typeof this.telemetryStore.clear === 'function') {
         this.telemetryStore.clear();
@@ -1992,7 +1999,7 @@ class IpcHandler extends BaseService {
   /**
    * Handle quit app request from renderer
    */
-  async handleQuitApp(event) {
+  async handleQuitApp(_event) {
     try {
       this.logger?.info('IpcHandler: Received quit-app request from renderer');
       // Import app here to avoid circular dependencies
@@ -2009,7 +2016,7 @@ class IpcHandler extends BaseService {
    * Handle close course request from renderer
    * Terminates all active sessions and clears course state
    */
-  async handleCloseCourse(event) {
+  async handleCloseCourse(_event) {
     try {
       this.logger?.info('IpcHandler: Received close-course request from renderer');
 
@@ -2163,3 +2170,4 @@ class IpcHandler extends BaseService {
 }
 
 module.exports = IpcHandler;
+

@@ -49,7 +49,7 @@ function resolveCreateEngine() {
             };
             const maybe = handler.initialize(manifestLike);
             if (maybe && typeof maybe.then === 'function') {
-              maybe.catch(() => { /* intentionally empty */ }));
+              maybe.catch(() => { /* intentionally empty */ });
             }
           }
         } catch (_) { /* intentionally empty */ }
@@ -170,3 +170,4 @@ describe('Contract: SN ↔ Navigation', () => {
     }
   });
 });
+

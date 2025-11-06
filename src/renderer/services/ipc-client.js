@@ -12,16 +12,16 @@ import { rendererLogger } from '../utils/renderer-logger.js';
 
 class IpcClient {
   _ensureAPI() {
-    if (typeof window === 'undefined' || !window.electronAPI) {
+    if (typeof window === 'undefined' || !/** @type {any} */(window).electronAPI) {
       const err = new Error('Electron API not available in renderer');
       try { rendererLogger.error('IpcClient: missing electronAPI'); } catch (_) { /* noop */ }
       throw err;
     }
-    return window.electronAPI;
+    return /** @type {any} */(window).electronAPI;
   }
 
   // Generic invoke
-  async invoke(channel, data = {}) {
+  async invoke(/** @type {string} */ channel, /** @type {any} */ data = {}) {
     const api = this._ensureAPI();
     if (typeof api.invoke !== 'function') {
       throw new Error('electronAPI.invoke not available');
@@ -38,7 +38,7 @@ class IpcClient {
     return api.ui.getSettings();
   }
 
-  async uiSetSettings(payload) {
+  async uiSetSettings(/** @type {any} */ payload) {
     const api = this._ensureAPI();
     if (!api.ui || typeof api.ui.setSettings !== 'function') {
       throw new Error('electronAPI.ui.setSettings not available');
@@ -64,7 +64,7 @@ class IpcClient {
   }
 
   // Path utils
-  async prepareCourseSource(desc) {
+  async prepareCourseSource(/** @type {any} */ desc) {
     const api = this._ensureAPI();
     if (!api.pathUtils || typeof api.pathUtils.prepareCourseSource !== 'function') {
       throw new Error('electronAPI.pathUtils.prepareCourseSource not available');
@@ -73,7 +73,7 @@ class IpcClient {
   }
 
   // File operations
-  async saveTemporaryFile(name, base64Data) {
+  async saveTemporaryFile(/** @type {string} */ name, /** @type {string} */ base64Data) {
     const api = this._ensureAPI();
     if (typeof api.saveTemporaryFile !== 'function') {
       throw new Error('electronAPI.saveTemporaryFile not available');
@@ -82,7 +82,7 @@ class IpcClient {
   }
 
   // SCORM manifest/CAM
-  async getCourseManifest(unifiedPath) {
+  async getCourseManifest(/** @type {string} */ unifiedPath) {
     const api = this._ensureAPI();
     if (typeof api.getCourseManifest !== 'function') {
       throw new Error('electronAPI.getCourseManifest not available');
@@ -90,7 +90,7 @@ class IpcClient {
     return api.getCourseManifest(unifiedPath);
   }
 
-  async processScormManifest(unifiedPath, manifestContent) {
+  async processScormManifest(/** @type {string} */ unifiedPath, /** @type {string} */ manifestContent) {
     const api = this._ensureAPI();
     if (typeof api.processScormManifest !== 'function') {
       throw new Error('electronAPI.processScormManifest not available');
@@ -107,7 +107,7 @@ class IpcClient {
     return api.recentCourses.get();
   }
 
-  async recentCoursesAddOrUpdate(item) {
+  async recentCoursesAddOrUpdate(/** @type {any} */ item) {
     const api = this._ensureAPI();
     if (!api.recentCourses || typeof api.recentCourses.addOrUpdate !== 'function') {
       throw new Error('electronAPI.recentCourses.addOrUpdate not available');
@@ -116,7 +116,7 @@ class IpcClient {
   }
 
   // Event subscriptions
-  onMenuEvent(handler) {
+  onMenuEvent(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onMenuEvent !== 'function') {
       throw new Error('electronAPI.onMenuEvent not available');
@@ -124,7 +124,7 @@ class IpcClient {
     return api.onMenuEvent(handler);
   }
 
-  onActivityProgressUpdated(handler) {
+  onActivityProgressUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onActivityProgressUpdated !== 'function') {
       throw new Error('electronAPI.onActivityProgressUpdated not available');
@@ -132,7 +132,7 @@ class IpcClient {
     return api.onActivityProgressUpdated(handler);
   }
 
-  onObjectivesUpdated(handler) {
+  onObjectivesUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onObjectivesUpdated !== 'function') {
       throw new Error('electronAPI.onObjectivesUpdated not available');
@@ -140,7 +140,7 @@ class IpcClient {
     return api.onObjectivesUpdated(handler);
   }
 
-  onNavigationCompleted(handler) {
+  onNavigationCompleted(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onNavigationCompleted !== 'function') {
       throw new Error('electronAPI.onNavigationCompleted not available');
@@ -148,7 +148,7 @@ class IpcClient {
     return api.onNavigationCompleted(handler);
   }
 
-  onScormApiCallLogged(handler) {
+  onScormApiCallLogged(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onScormApiCallLogged !== 'function') {
       throw new Error('electronAPI.onScormApiCallLogged not available');
@@ -156,7 +156,7 @@ class IpcClient {
     return api.onScormApiCallLogged(handler);
   }
 
-  onScormInspectorDataUpdated(handler) {
+  onScormInspectorDataUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onScormInspectorDataUpdated !== 'function') {
       throw new Error('electronAPI.onScormInspectorDataUpdated not available');

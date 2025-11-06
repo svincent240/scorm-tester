@@ -65,7 +65,7 @@ export function safePersistState(persistenceKey, uiSlice) {
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: localStorage unavailable', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => { /* intentionally empty */ }));
+          .catch(() => { /* intentionally empty */ });
       } catch (_) { /* intentionally empty */ }
       return;
     }
@@ -77,7 +77,7 @@ export function safePersistState(persistenceKey, uiSlice) {
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => { /* intentionally empty */ }));
+          .catch(() => { /* intentionally empty */ });
       } catch (_) { /* intentionally empty */ }
       return;
     }
@@ -108,7 +108,7 @@ export function safeLoadPersistedUI(persistenceKey) {
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: localStorage unavailable', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => { /* intentionally empty */ }));
+          .catch(() => { /* intentionally empty */ });
       } catch (_) { /* intentionally empty */ }
       return null;
     }
@@ -119,7 +119,7 @@ export function safeLoadPersistedUI(persistenceKey) {
           .then(({ rendererLogger }) => {
             try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => { /* intentionally empty */ }));
+          .catch(() => { /* intentionally empty */ });
       } catch (_) { /* intentionally empty */ }
       return null;
     }
@@ -146,9 +146,10 @@ export function safeLoadPersistedUI(persistenceKey) {
           .then(({ rendererLogger }) => {
             try { rendererLogger.warn('[UIStateHelpers] safeLoadPersistedUI failed to parse persisted data', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => { /* intentionally empty */ }));
+          .catch(() => { /* intentionally empty */ });
       }
     } catch (_) { /* intentionally empty */ }
     return null;
   }
 }
+

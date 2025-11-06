@@ -1087,7 +1087,7 @@ class AppManager {
         if (rc) {
           rc.style.removeProperty('display');
           // Re-render to reflect latest MRU
-          this.renderRecentCourses().catch(() => { /* intentionally empty */ }));
+          this.renderRecentCourses().catch(() => { /* intentionally empty */ });
         }
       } catch (_) { /* intentionally empty */ }
 
@@ -2508,3 +2508,5 @@ if (typeof window !== 'undefined') {
 }
 
 export { AppManager, appManager };
+
+

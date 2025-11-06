@@ -362,11 +362,11 @@ class NavigationControls extends BaseComponent {
       const nextVisible = !currentVisible;
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('ui:sidebar:toggle-request', { visible: nextVisible });
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
     } catch (error) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger?.error('NavigationControls: Menu toggle failed', error?.message || error);
-      }).catch(() => { /* intentionally empty */ }));
+      }).catch(() => { /* intentionally empty */ });
     }
   }
 
@@ -1250,3 +1250,5 @@ class NavigationControls extends BaseComponent {
 }
 
 export { NavigationControls };
+
+

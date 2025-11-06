@@ -48,7 +48,7 @@ describe('CourseOutline HTML escaping of item titles', () => {
     const expectedEscaped = escapeHTML(maliciousTitle);
 
     const outline = new CourseOutline('outline-root', { autoRender: false, enableNavigation: false });
-    await outline.initialize?.().catch(() => { /* intentionally empty */ }));
+    await outline.initialize?.().catch(() => { /* intentionally empty */ });
 
     outline.renderContent();
     outline.setCourseStructure({
@@ -71,4 +71,6 @@ describe('CourseOutline HTML escaping of item titles', () => {
     expect(titleEl.textContent.replace(/\s+/g, ' ').trim()).toContain(maliciousTitle);
   });
 });
+
+
 

@@ -70,7 +70,7 @@ class SNSnapshotService {
         // schedule next poll
         this.timer = setTimeout(() => {
           this.timer = null;
-          this._pollLoop().catch(() => { /* intentionally empty */ }));
+          this._pollLoop().catch(() => { /* intentionally empty */ });
         }, this.pollIntervalMs);
       }
     }
@@ -80,7 +80,7 @@ class SNSnapshotService {
     if (this._isPolling) return;
     this._isPolling = true;
     // Kick off immediate poll
-    this._pollLoop().catch(() => { /* intentionally empty */ }));
+    this._pollLoop().catch(() => { /* intentionally empty */ });
     this.logger?.info && this.logger.info('[SNSnapshotService] Started polling SN status');
   }
 
@@ -109,3 +109,4 @@ class SNSnapshotService {
 }
 
 module.exports = SNSnapshotService;
+
