@@ -55,7 +55,7 @@ describe('Real SCORM API adapter (always on)', () => {
       expect(methods.has('Commit')).toBe(true);
       expect(methods.has('Terminate')).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

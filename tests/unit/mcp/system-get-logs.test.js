@@ -43,7 +43,7 @@ describe('MCP system_get_logs', () => {
       
     } finally {
       // Clean up test log file
-      try { fs.unlinkSync(mockLogFile); } catch (_) {}
+      try { fs.unlinkSync(mockLogFile); } catch (_) { /* intentionally empty */ }
     }
   });
   

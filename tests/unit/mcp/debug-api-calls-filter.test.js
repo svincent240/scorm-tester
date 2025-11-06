@@ -52,7 +52,7 @@ describe('MCP scorm_debug_api_calls with filter_methods', () => {
       const methods = res.calls.map(c => c.method);
       expect(methods).toEqual(['Initialize', 'Commit']);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

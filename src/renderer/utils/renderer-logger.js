@@ -35,7 +35,7 @@ const getBridge = () => {
     if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.logger) {
       return window.electronAPI.logger;
     }
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   return null;
 };
 
@@ -86,7 +86,7 @@ const safeCall = async (method, args, isDebug = false) => {
           await bridge.warn('RENDERER_BACKOFF_ACTIVE', { until: backoffUntil });
         }
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
     return; // skip flooding but surface state once
   }
 
@@ -96,11 +96,11 @@ const safeCall = async (method, args, isDebug = false) => {
     if (now - coalesceWindowStart > COALESCE_WINDOW_MS) {
       coalesceWindowStart = now;
       coalesceDrops = 0;
-      try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_COALESCE_WINDOW_START'); } } catch (_) {}
+      try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_COALESCE_WINDOW_START'); } } catch (_) { /* intentionally empty */ }
     }
     coalesceDrops += 1;
     if (coalesceDrops === 1) {
-      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_COALESCED_DUPLICATES', { dropped: coalesceDrops }); } } catch (_) {}
+      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_COALESCED_DUPLICATES', { dropped: coalesceDrops }); } } catch (_) { /* intentionally empty */ }
     }
     return;
   }
@@ -110,7 +110,7 @@ const safeCall = async (method, args, isDebug = false) => {
     const now = Date.now();
     if (now - debugWindowStart > DEBUG_RATE_LIMIT.WINDOW_MS) {
       if (suppressedDebugCount > 0) {
-        try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_DEBUG_SUPPRESSED_SUMMARY', { suppressed: suppressedDebugCount }); } } catch (_) {}
+        try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_DEBUG_SUPPRESSED_SUMMARY', { suppressed: suppressedDebugCount }); } } catch (_) { /* intentionally empty */ }
         suppressedDebugCount = 0;
       }
       debugWindowStart = now;
@@ -119,7 +119,7 @@ const safeCall = async (method, args, isDebug = false) => {
     if (debugCount >= DEBUG_RATE_LIMIT.MAX_PER_WINDOW) {
       suppressedDebugCount += 1;
       if (suppressedDebugCount === 1) {
-        try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_DEBUG_RATE_LIMIT', { windowMs: DEBUG_RATE_LIMIT.WINDOW_MS, max: DEBUG_RATE_LIMIT.MAX_PER_WINDOW }); } } catch (_) {}
+        try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_DEBUG_RATE_LIMIT', { windowMs: DEBUG_RATE_LIMIT.WINDOW_MS, max: DEBUG_RATE_LIMIT.MAX_PER_WINDOW }); } } catch (_) { /* intentionally empty */ }
       }
       return; // drop but surfaced via WARN
     }
@@ -135,11 +135,11 @@ const safeCall = async (method, args, isDebug = false) => {
     // Enter non-silent backoff on any rate-limit indication
     if (msg.includes('Rate limit exceeded')) {
       backoffUntil = Date.now() + BACKOFF_MS;
-      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_BACKOFF_ENTER', { until: backoffUntil }); } } catch (_) {}
+      try { if (bridge && typeof bridge.warn === 'function') { await bridge.warn('RENDERER_BACKOFF_ENTER', { until: backoffUntil }); } } catch (_) { /* intentionally empty */ }
       return;
     }
     // For any other error, swallow but emit a single info for visibility
-    try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_LOG_SEND_ERROR', { error: msg }); } } catch (_) {}
+    try { if (bridge && typeof bridge.info === 'function') { await bridge.info('RENDERER_LOG_SEND_ERROR', { error: msg }); } } catch (_) { /* intentionally empty */ }
     return;
   }
 };

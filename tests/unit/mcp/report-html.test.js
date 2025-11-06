@@ -35,7 +35,7 @@ describe('MCP scorm_report (HTML variant)', () => {
       expect(res.report.toLowerCase()).toContain('<html');
       expect(typeof res.compliance_score).toBe('number');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -58,7 +58,7 @@ describe('MCP scorm_report (HTML variant)', () => {
       const hasReport = (doc.artifacts || []).some(a => a.type === 'report' && a.path === res.artifact_path);
       expect(hasReport).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

@@ -76,7 +76,7 @@ class CourseOutline extends BaseComponent {
     try {
       this.setupEventSubscriptions?.();
     } catch (e) {
-      try { rendererLogger.error('CourseOutline.setup: setupEventSubscriptions failed', e?.message || e); } catch (_) {}
+      try { rendererLogger.error('CourseOutline.setup: setupEventSubscriptions failed', e?.message || e); } catch (_) { /* intentionally empty */ }
     }
 
     // After subscriptions are in place, if a course is already present in state,
@@ -85,7 +85,7 @@ class CourseOutline extends BaseComponent {
       const existingStructure = this.uiState.getState('courseStructure');
       const existingInfo = this.uiState.getState('courseInfo');
       if (existingStructure && Array.isArray(existingStructure.items)) {
-        try { rendererLogger.info('CourseOutline.setup: emitting synthetic course:loaded for existing state'); } catch (_) {}
+        try { rendererLogger.info('CourseOutline.setup: emitting synthetic course:loaded for existing state'); } catch (_) { /* intentionally empty */ }
         const { eventBus } = await import('../../services/event-bus.js');
         eventBus.emit('course:loaded', { info: existingInfo || null, structure: existingStructure });
       } else {
@@ -94,7 +94,7 @@ class CourseOutline extends BaseComponent {
         this.showEmptyState();
       }
     } catch (e) {
-      try { rendererLogger.error('CourseOutline.setup: initial state check failed', e?.message || e); } catch (_) {}
+      try { rendererLogger.error('CourseOutline.setup: initial state check failed', e?.message || e); } catch (_) { /* intentionally empty */ }
       // Fallback to rendering base content to ensure component mounts
       this.renderContent();
       this.showEmptyState();
@@ -140,7 +140,7 @@ class CourseOutline extends BaseComponent {
     this.expandAllBtn = this.element.querySelector('.outline-btn--expand');
     this.collapseAllBtn = this.element.querySelector('.outline-btn--collapse');
 
-    try { rendererLogger.info('CourseOutline: HTML structure created successfully'); } catch (_) {}
+    try { rendererLogger.info('CourseOutline: HTML structure created successfully'); } catch (_) { /* intentionally empty */ }
   }
 
   setupEventSubscriptions() {
@@ -163,10 +163,10 @@ class CourseOutline extends BaseComponent {
           ic: Array.isArray(s?.items) ? s.items.length : 0,
           mi: m?.identifier || null
         });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       if (this._lastCourseLoadedSig === sig && (now - this._lastCourseLoadedAt) < this._COURSE_LOADED_DEDUPE_MS) {
-        try { rendererLogger.debug('CourseOutline: duplicate course:loaded ignored'); } catch (_) {}
+        try { rendererLogger.debug('CourseOutline: duplicate course:loaded ignored'); } catch (_) { /* intentionally empty */ }
         return;
       }
       this._lastCourseLoadedSig = sig;
@@ -807,7 +807,7 @@ class CourseOutline extends BaseComponent {
         count: topIds.length,
         ids: topIds
       });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     rendererLogger.info('CourseOutline.setCourseStructure: structure set', {
       hasItems: !!structure?.items,
@@ -844,11 +844,11 @@ class CourseOutline extends BaseComponent {
           return;
         }
         this._lastAppliedSig = sig;
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       this.setCourseStructure(courseData.structure);
       // Expand all by default on initial load to make nested items visible (test and UX expectation)
-      try { this.expandAll(); } catch (_) {}
+      try { this.expandAll(); } catch (_) { /* intentionally empty */ }
 
       // CRITICAL FIX: Reset SCORM states before fetching new ones
       this.scormStates.clear();
@@ -1040,7 +1040,7 @@ class CourseOutline extends BaseComponent {
    * @param {Object} courseData - Course data from course loader
    */
   updateWithCourse(courseData) {
-    try { rendererLogger.info('CourseOutline: updateWithCourse called with:', !!courseData ? '[object]' : 'null'); } catch (_) {}
+    try { rendererLogger.info('CourseOutline: updateWithCourse called with:', courseData ? '[object]' : 'null'); } catch (_) { /* intentionally empty */ }
 
     try {
       // Ensure base HTML exists before rendering items
@@ -1067,17 +1067,17 @@ class CourseOutline extends BaseComponent {
             return;
           }
           this._lastAppliedSig = sig;
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
 
         this.setCourseStructure(structure);
-        try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) {}
+        try { rendererLogger.info('CourseOutline: Course structure updated successfully'); } catch (_) { /* intentionally empty */ }
       } else {
-        try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) {}
+        try { rendererLogger.warn('CourseOutline: No valid structure found in course data'); } catch (_) { /* intentionally empty */ }
         this.showEmptyState();
       }
 
     } catch (error) {
-      try { rendererLogger.error('CourseOutline: Error updating with course data:', error?.message || error); } catch (_) {}
+      try { rendererLogger.error('CourseOutline: Error updating with course data:', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
 

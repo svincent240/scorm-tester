@@ -37,9 +37,9 @@ describe('Renderer import-time safety (Node env)', () => {
   });
 
   afterEach(() => {
-    try { jest.runOnlyPendingTimers(); } catch (_) {}
-    try { jest.clearAllTimers(); } catch (_) {}
-    try { jest.useRealTimers(); } catch (_) {}
+    try { jest.runOnlyPendingTimers(); } catch (_) { /* intentionally empty */ }
+    try { jest.clearAllTimers(); } catch (_) { /* intentionally empty */ }
+    try { jest.useRealTimers(); } catch (_) { /* intentionally empty */ }
     jest.resetModules();
     jest.clearAllMocks();
   });

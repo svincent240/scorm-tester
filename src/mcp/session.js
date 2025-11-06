@@ -43,7 +43,7 @@ class SessionManager {
       throw e;
     }
     const stat = fs.statSync(native);
-    let type = stat.isDirectory() ? "directory" : "file";
+    const type = stat.isDirectory() ? "directory" : "file";
     return { native, type };
   }
 
@@ -166,7 +166,7 @@ class SessionManager {
       const manifestPath = s.artifacts_manifest_path;
       let doc = { session_id: session_id, artifacts: [] };
       if (fs.existsSync(manifestPath)) {
-        try { doc = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch (_) {}
+        try { doc = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch (_) { /* intentionally empty */ }
       }
       if (!Array.isArray(doc.artifacts)) doc.artifacts = [];
       doc.artifacts.push(artifact);

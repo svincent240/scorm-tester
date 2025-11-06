@@ -14,7 +14,7 @@ function resolveCreateEngine() {
     const SN = require('../../../src/main/services/scorm/sn/index.js');
     if (SN && typeof SN.createEngine === 'function') return SN.createEngine;
     if (SN && SN.default && typeof SN.default.createEngine === 'function') return SN.default.createEngine;
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   try {
     const SNFacade = require('../../../src/main/services/scorm/sn');
     if (SNFacade && typeof SNFacade.createEngine === 'function') return SNFacade.createEngine;
@@ -49,10 +49,10 @@ function resolveCreateEngine() {
             };
             const maybe = handler.initialize(manifestLike);
             if (maybe && typeof maybe.then === 'function') {
-              maybe.catch(() => {});
+              maybe.catch(() => { /* intentionally empty */ }));
             }
           }
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
 
         // Provide a minimal engine facade matching expected methods
         return {
@@ -93,7 +93,7 @@ function resolveCreateEngine() {
                 const r = handler.processNavigation(String(req).toLowerCase());
                 return r || { success: true };
               }
-            } catch (_) {}
+            } catch (_) { /* intentionally empty */ }
             return { success: true };
           },
           processNavigation(req) {
@@ -102,19 +102,19 @@ function resolveCreateEngine() {
                 const r = handler.processNavigation(req);
                 return r || { success: true };
               }
-            } catch (_) {}
+            } catch (_) { /* intentionally empty */ }
             return { success: true };
           },
         };
       };
     }
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   try {
     // Direct engine module in some layouts
     const engine = require('../../../src/main/services/scorm/sn/engine');
     if (typeof engine === 'function') return engine;
     if (engine && typeof engine.createEngine === 'function') return engine.createEngine;
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   return undefined;
 }
 
@@ -155,9 +155,9 @@ describe('Contract: SN ↔ Navigation', () => {
     // Perform a Continue to move forward; ensure no error is thrown and state updates
     const prev = engine.getStateSnapshot();
     if (typeof engine.request === 'function') {
-      try { engine.request('Continue'); } catch (_) {}
+      try { engine.request('Continue'); } catch (_) { /* intentionally empty */ }
     } else if (typeof engine.processNavigation === 'function') {
-      try { engine.processNavigation('continue'); } catch (_) {}
+      try { engine.processNavigation('continue'); } catch (_) { /* intentionally empty */ }
     }
     const next = engine.getStateSnapshot();
     expect(next).toBeDefined();

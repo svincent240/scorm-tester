@@ -16,7 +16,7 @@
           const res = ipcRenderer.sendSync('scorm-mcp:api-sync', { method, args: Array.isArray(args) ? args : [] });
           return typeof res === 'string' ? res : String(res);
         } catch (e) {
-          try { ipcRenderer.send('renderer-log-error', '[MCP preload] apiInvokeSync failed', e && e.message ? e.message : String(e)); } catch (_) {}
+          try { ipcRenderer.send('renderer-log-error', '[MCP preload] apiInvokeSync failed', e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
           return 'false';
         }
       },
@@ -26,7 +26,7 @@
           const res = await ipcRenderer.invoke('scorm-mcp:api', { method, args: Array.isArray(args) ? args : [] });
           return typeof res === 'string' ? res : String(res);
         } catch (e) {
-          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] apiInvoke failed', e && e.message ? e.message : String(e)); } catch (_) {}
+          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] apiInvoke failed', e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
           return 'false';
         }
       },
@@ -35,7 +35,7 @@
           const res = await ipcRenderer.invoke('scorm-mcp:sn', { action, payload: payload || {} });
           return res;
         } catch (e) {
-          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] snInvoke failed', e && e.message ? e.message : String(e)); } catch (_) {}
+          try { ipcRenderer.invoke('renderer-log-error', '[MCP preload] snInvoke failed', e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
           return null;
         }
       },
@@ -65,7 +65,7 @@
           __calls.push({ ts, method, parameters: args, result });
           // eslint-disable-next-line no-undef
           if (Array.isArray(window.__scorm_calls)) window.__scorm_calls.push({ ts, method, parameters: args, result });
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
         return result;
       };
     }
@@ -88,7 +88,7 @@
       if (r) {
         r.invoke('renderer-log-error', '[MCP preload] Failed to initialize SCORM_MCP bridge', e && e.message ? e.message : String(e));
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 })();
 

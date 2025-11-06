@@ -81,7 +81,7 @@ class AppManager {
   async initialize() {
     // Prevent duplicate initialization and re-entrancy which can lead to double event handlers and dialogs
     if (this.initialized || this.initializing) {
-      try { this.logger.warn('AppManager.initialize called while already initialized/initializing; skipping'); } catch (_) {}
+      try { this.logger.warn('AppManager.initialize called while already initialized/initializing; skipping'); } catch (_) { /* intentionally empty */ }
       return;
     }
     this.initializing = true;
@@ -112,7 +112,7 @@ class AppManager {
       this.setupUIEventListeners();
 
       // Initialize UI settings from main AppState (theme, sidebar, etc.)
-      try { await this.initializeUiFromMain(); } catch (_) {}
+      try { await this.initializeUiFromMain(); } catch (_) { /* intentionally empty */ }
 
 
       // Step 5: Setup centralized SN status polling
@@ -126,17 +126,17 @@ class AppManager {
 
       // Clear any persistent loading states from previous sessions
       this.hideLoading();
-      try { this.logger.debug('AppManager - setLoading(false)'); } catch (_) {}
+      try { this.logger.debug('AppManager - setLoading(false)'); } catch (_) { /* intentionally empty */ }
       this.uiState.setLoading(false); // Use the resolved instance
 
       // Start syncing centralized UI settings to main AppState
-      try { this.setupUiSettingsSync(); } catch (_) {}
+      try { this.setupUiSettingsSync(); } catch (_) { /* intentionally empty */ }
 
       // Configure EventBus debug mode based on UIState (Step 8)
       try {
         const devEnabled = !!this.uiState.getState('ui.devModeEnabled');
         eventBus.setDebugMode(devEnabled);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Keep EventBus debug mode in sync with UIState changes
       try {
@@ -147,15 +147,15 @@ class AppManager {
             const current = !!(newState && newState.ui && newState.ui.devModeEnabled);
             if (current !== lastDev) {
               lastDev = current;
-              try { this.logger.info(`AppManager: UI devModeEnabled changed -> ${current}`); } catch (_) {}
+              try { this.logger.info(`AppManager: UI devModeEnabled changed -> ${current}`); } catch (_) { /* intentionally empty */ }
               eventBus.setDebugMode(current);
             }
           });
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Render recent courses on initial welcome screen if container exists
-      try { await this.renderRecentCourses(); } catch (e) { try { this.logger.error('AppManager: renderRecentCourses failed', e?.message || e); } catch (_) {} }
+      try { await this.renderRecentCourses(); } catch (e) { try { this.logger.error('AppManager: renderRecentCourses failed', e?.message || e); } catch (_) { /* intentionally empty */ } }
 
       // Display any startup errors that were captured
       this.displayStartupErrors();
@@ -167,7 +167,7 @@ class AppManager {
       try {
         this.logger.error('AppManager: Failed to initialize application', (error && (error.message || error)));
         if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       this.handleInitializationError(error);
       throw error;
     }
@@ -263,7 +263,7 @@ class AppManager {
    * Initialize all components
    */
   async initializeComponents() {
-    try { this.logger.info('AppManager: Initializing components...'); } catch (_) {}
+    try { this.logger.info('AppManager: Initializing components...'); } catch (_) { /* intentionally empty */ }
     // Ensure DOM skeleton exists for component mount points
     this.ensureDomSkeleton();
 
@@ -344,7 +344,7 @@ class AppManager {
           this.logger.debug(`AppManager: Found DOM element '${id}' for component mounting`);
         }
       });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     try {
       for (const config of componentConfigs) {
@@ -375,7 +375,7 @@ class AppManager {
      const contentViewer = this.components.get('contentViewer');
      if (navigationControls && typeof navigationControls.setContentViewer === 'function') {
        navigationControls.setContentViewer(contentViewer || null);
-       try { this.logger.debug('AppManager: navigationControls wired to contentViewer'); } catch (_) {}
+       try { this.logger.debug('AppManager: navigationControls wired to contentViewer'); } catch (_) { /* intentionally empty */ }
      }
 
      // DIAGNOSTIC: After init, log status snapshots for key components
@@ -388,11 +388,11 @@ class AppManager {
          navigationControls: nc?.getStatus?.() || null,
          contentViewer: cv?.getStatus?.() || null
        });
-     } catch (_) {}
+     } catch (_) { /* intentionally empty */ }
 
-     try { this.logger.info('AppManager: All components initialized'); } catch (_) {}
+     try { this.logger.info('AppManager: All components initialized'); } catch (_) { /* intentionally empty */ }
     } catch (error) {
-      try { this.logger.error('AppManager: Error initializing components', error?.message || error); } catch (_) {}
+      try { this.logger.error('AppManager: Error initializing components', error?.message || error); } catch (_) { /* intentionally empty */ }
       throw error;
     }
   }
@@ -405,11 +405,11 @@ class AppManager {
 
    // Idempotency guard to prevent duplicate registrations
    if (this._eventHandlersSetup) {
-     try { this.logger.warn('AppManager: setupEventHandlers called again; skipping duplicate registration'); } catch (_) {}
+     try { this.logger.warn('AppManager: setupEventHandlers called again; skipping duplicate registration'); } catch (_) { /* intentionally empty */ }
      return;
    }
 
-   try { this.logger.debug('AppManager: Registering core event handlers'); } catch (_) {}
+   try { this.logger.debug('AppManager: Registering core event handlers'); } catch (_) { /* intentionally empty */ }
 
    // Course loading events
    const eventBus = this.services.get('eventBus');
@@ -435,7 +435,7 @@ class AppManager {
         eventBus.emit('error-list:toggle');
       }
     });
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
 
   // Listen for course-closed broadcast from main process
   try {
@@ -455,11 +455,11 @@ class AppManager {
         this.logger?.error('AppManager: Error handling course-closed event:', error);
       }
     });
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
 
 
     eventBus.on('course:loadError', (errorData) => {
-      try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) {}
+      try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) { /* intentionally empty */ }
 
       // Course load failures are catastrophic - they prevent core functionality
       const errorMessage = (errorData && (errorData.error || errorData.message)) || 'Unknown error';
@@ -478,28 +478,28 @@ class AppManager {
     });
 
     eventBus.on('course:loaded', (courseData) => {
-      try { this.logger.info('AppManager: Course loaded event received'); } catch (_) {}
+      try { this.logger.info('AppManager: Course loaded event received'); } catch (_) { /* intentionally empty */ }
       this.handleCourseLoaded(courseData);
     });
 
     eventBus.on('course:cleared', () => {
-      try { this.logger.info('AppManager: Course cleared event received'); } catch (_) {}
+      try { this.logger.info('AppManager: Course cleared event received'); } catch (_) { /* intentionally empty */ }
       this.handleCourseCleared();
     });
 
     eventBus.on('course:exited', (exitData) => {
-      try { this.logger.info('AppManager: Course exited event received'); } catch (_) {}
+      try { this.logger.info('AppManager: Course exited event received'); } catch (_) { /* intentionally empty */ }
       this.handleCourseExit(exitData);
     });
 
     eventBus.on('course:test-resume', (data) => {
-      try { this.logger.info('AppManager: Test resume event received'); } catch (_) {}
-      try { rendererLogger.info('AppManager: [DIAG] course:test-resume received', { sessionId: data?.sessionId }); } catch (_) {}
+      try { this.logger.info('AppManager: Test resume event received'); } catch (_) { /* intentionally empty */ }
+      try { rendererLogger.info('AppManager: [DIAG] course:test-resume received', { sessionId: data?.sessionId }); } catch (_) { /* intentionally empty */ }
       this.handleTestResume(data);
     });
 
     eventBus.on('course:exit-summary-closed', (data) => {
-      try { this.logger.info('AppManager: Exit summary closed event received'); } catch (_) {}
+      try { this.logger.info('AppManager: Exit summary closed event received'); } catch (_) { /* intentionally empty */ }
       this.handleExitSummaryClosed(data);
     });
 
@@ -507,7 +507,7 @@ class AppManager {
       // Clear all errors when starting to load a new course
       if (this.uiState && typeof this.uiState.clearAllErrors === 'function') {
         this.uiState.clearAllErrors();
-        try { this.logger.info('AppManager: Cleared all errors for course load start'); } catch (_) {}
+        try { this.logger.info('AppManager: Cleared all errors for course load start'); } catch (_) { /* intentionally empty */ }
       }
     });
 
@@ -546,7 +546,7 @@ class AppManager {
         if (this.uiState) {
           this.uiState.addNonCatastrophicError(error);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     // Renderer console errors from main process (captured via window.webContents.on('console-message'))
@@ -591,7 +591,7 @@ class AppManager {
         if (this.uiState) {
           this.uiState.addNonCatastrophicError(error);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
 
@@ -605,7 +605,7 @@ class AppManager {
     eventBus.on('navigation:launch', (data) => {
       try {
         this.logger.info('AppManager: navigation:launch propagated', { activityId: data?.activity?.id || data?.activity?.identifier || null, source: data?.source });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     // Unified sidebar events (namespaced only)
@@ -620,34 +620,34 @@ class AppManager {
     eventBus.on('course:open-zip:request', () => {
       const courseLoader = this.services.get('courseLoader');
       if (!courseLoader) {
-        try { this.logger.error('AppManager: courseLoader service not available for open-zip'); } catch (_) {}
+        try { this.logger.error('AppManager: courseLoader service not available for open-zip'); } catch (_) { /* intentionally empty */ }
         return;
       }
       courseLoader.handleCourseLoad().catch(error => {
-        try { this.logger.error('AppManager: Course load error (open-zip)', error?.message || error); } catch (_) {}
+        try { this.logger.error('AppManager: Course load error (open-zip)', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
 
     eventBus.on('course:open-folder:request', () => {
       const courseLoader = this.services.get('courseLoader');
       if (!courseLoader) {
-        try { this.logger.error('AppManager: courseLoader service not available for open-folder'); } catch (_) {}
+        try { this.logger.error('AppManager: courseLoader service not available for open-folder'); } catch (_) { /* intentionally empty */ }
         return;
       }
       courseLoader.handleFolderLoad().catch(error => {
-        try { this.logger.error('AppManager: Folder load error (open-folder)', error?.message || error); } catch (_) {}
+        try { this.logger.error('AppManager: Folder load error (open-folder)', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
 
     eventBus.on('course:reload:request', () => {
       this.handleCourseReload().catch(error => {
-        try { this.logger.error('AppManager: Course reload error (header intent)', error?.message || error); } catch (_) {}
+        try { this.logger.error('AppManager: Course reload error (header intent)', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
 
     eventBus.on('course:close:request', () => {
       this.handleCourseClose().catch(error => {
-        try { this.logger.error('AppManager: Course close error (menu intent)', error?.message || error); } catch (_) {}
+        try { this.logger.error('AppManager: Course close error (menu intent)', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
 
@@ -703,13 +703,13 @@ class AppManager {
           this._SN_BACKOFF_MAX_MS
         );
       }
-      try { this.logger.info('AppManager: SN polling backoff applied', { backoffMs: this._snBackoffMs }); } catch (_) {}
+      try { this.logger.info('AppManager: SN polling backoff applied', { backoffMs: this._snBackoffMs }); } catch (_) { /* intentionally empty */ }
     };
 
     const resetBackoff = () => {
       if (this._snBackoffMs !== 0) {
         this._snBackoffMs = 0;
-        try { this.logger.info('AppManager: SN polling backoff reset'); } catch (_) {}
+        try { this.logger.info('AppManager: SN polling backoff reset'); } catch (_) { /* intentionally empty */ }
       }
     };
 
@@ -734,7 +734,7 @@ class AppManager {
 
 
       this._snLastTickAt = now;
-      try { this.logger.debug('AppManager: SN polling tick'); } catch (_) {}
+      try { this.logger.debug('AppManager: SN polling tick'); } catch (_) { /* intentionally empty */ }
 
       // Use scormAPIBridge if available, else scormClient as fallback
       let status = null;
@@ -757,7 +757,7 @@ class AppManager {
         // Handle rate limit or generic errors with backoff
         const msg = err && (err.message || String(err));
         const isRateLimit = /rate limit/i.test(msg || '') || /614/.test(msg || '');
-        try { this.logger.error('AppManager: SN polling error', { message: msg, isRateLimit }); } catch (_) {}
+        try { this.logger.error('AppManager: SN polling error', { message: msg, isRateLimit }); } catch (_) { /* intentionally empty */ }
         applyBackoff();
         scheduleNext(this._snBackoffMs);
         return;
@@ -779,7 +779,7 @@ class AppManager {
           _fromComponent: true
         });
       } catch (e) {
-        try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) {}
+        try { this.logger.warn('AppManager: Failed to apply SN status to UIState', e?.message || e); } catch (_) { /* intentionally empty */ }
       }
 
       // Schedule next
@@ -790,7 +790,7 @@ class AppManager {
     this.startSnPolling = () => {
       if (this._snPollingActive) return;
       this._snPollingActive = true;
-      try { this.logger.info('AppManager: SN polling started'); } catch (_) {}
+      try { this.logger.info('AppManager: SN polling started'); } catch (_) { /* intentionally empty */ }
       // First run after a small delay to allow init to settle
       scheduleNext(200);
     };
@@ -799,18 +799,18 @@ class AppManager {
       this._snPollingActive = false;
       clearTimeout(this._snPollTimer);
       this._snPollTimer = null;
-      try { this.logger.info('AppManager: SN polling stopped'); } catch (_) {}
+      try { this.logger.info('AppManager: SN polling stopped'); } catch (_) { /* intentionally empty */ }
     };
 
     this.pauseSnPolling = (reason = 'unknown') => {
       this._snPollingActive = false;
-      try { this.logger.info('AppManager: SN polling paused', { reason }); } catch (_) {}
+      try { this.logger.info('AppManager: SN polling paused', { reason }); } catch (_) { /* intentionally empty */ }
     };
 
     this.resumeSnPolling = () => {
       if (this._snPollingActive) return;
       this._snPollingActive = true;
-      try { this.logger.info('AppManager: SN polling resumed'); } catch (_) {}
+      try { this.logger.info('AppManager: SN polling resumed'); } catch (_) { /* intentionally empty */ }
       scheduleNext(this._snBackoffMs > 0 ? this._snBackoffMs : this._SN_MIN_INTERVAL_MS);
     };
 
@@ -907,7 +907,7 @@ class AppManager {
         }
       });
     } catch (err) {
-      try { this.logger?.warn('AppManager: Navigation availability preload bridge not available'); } catch (_) {}
+      try { this.logger?.warn('AppManager: Navigation availability preload bridge not available'); } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1027,7 +1027,7 @@ class AppManager {
    * Handle course loaded event
    */
   handleCourseLoaded(courseData) {
-    try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) {}
+    try { this.logger.debug('AppManager - handleCourseLoaded invoked'); } catch (_) { /* intentionally empty */ }
 
     try {
 
@@ -1048,7 +1048,7 @@ class AppManager {
       if (!courseOutline) {
         this.logger.error('AppManager: courseOutline component not found in components map at course:loaded');
       } else {
-        try { this.logger.info('AppManager: Relying on CourseOutline event subscription for course:loaded'); } catch (_) {}
+        try { this.logger.info('AppManager: Relying on CourseOutline event subscription for course:loaded'); } catch (_) { /* intentionally empty */ }
       }
 
       // Enable reload button since a course is now loaded
@@ -1061,7 +1061,7 @@ class AppManager {
 	      try {
 	        const rc = document.getElementById('recent-courses');
 	        if (rc) rc.style.display = 'none';
-	      } catch (_) {}
+	      } catch (_) { /* intentionally empty */ }
 
       }
 
@@ -1072,7 +1072,7 @@ class AppManager {
       // Success notification removed per user request - course loads should not show a notification
 
     } catch (error) {
-      try { this.logger.error('AppManager: Error handling course loaded', error?.message || error); } catch (_) {}
+      try { this.logger.error('AppManager: Error handling course loaded', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1087,9 +1087,9 @@ class AppManager {
         if (rc) {
           rc.style.removeProperty('display');
           // Re-render to reflect latest MRU
-          this.renderRecentCourses().catch(() => {});
+          this.renderRecentCourses().catch(() => { /* intentionally empty */ }));
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
     try {
       // Disable reload button since no course is loaded
@@ -1101,7 +1101,7 @@ class AppManager {
 
       this.logger.info('AppManager: Course cleared, reload button disabled');
     } catch (error) {
-      try { this.logger.error('AppManager: Error handling course cleared', error?.message || error); } catch (_) {}
+      try { this.logger.error('AppManager: Error handling course cleared', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1146,7 +1146,7 @@ class AppManager {
    */
   async handleTestResume(data) {
     try {
-      try { rendererLogger.info('AppManager: [DIAG] handleTestResume begin', { sessionId: data?.sessionId }); } catch (_) {}
+      try { rendererLogger.info('AppManager: [DIAG] handleTestResume begin', { sessionId: data?.sessionId }); } catch (_) { /* intentionally empty */ }
       this.logger.info('AppManager: Test resume requested', {
         sessionId: data.sessionId
       });
@@ -1162,14 +1162,14 @@ class AppManager {
         coursePath: currentCoursePath,
         sessionId: data.sessionId
       });
-      try { rendererLogger.info('AppManager: [DIAG] invoking scorm:resume-session', { coursePath: currentCoursePath, sessionId: data?.sessionId }); } catch (_) {}
+      try { rendererLogger.info('AppManager: [DIAG] invoking scorm:resume-session', { coursePath: currentCoursePath, sessionId: data?.sessionId }); } catch (_) { /* intentionally empty */ }
 
       // Request resume from main process
       const result = await ipcClient.invoke('scorm:resume-session', {
         coursePath: currentCoursePath,
         sessionId: data.sessionId
       });
-      try { rendererLogger.info('AppManager: [DIAG] scorm:resume-session result', { success: !!result?.success }); } catch (_) {}
+      try { rendererLogger.info('AppManager: [DIAG] scorm:resume-session result', { success: !!result?.success }); } catch (_) { /* intentionally empty */ }
 
       this.logger.info('AppManager: Resume result received', result);
 
@@ -1221,12 +1221,12 @@ class AppManager {
       try {
         this.logger.error('AppManager: Global error detected', (event && (event.error && event.error.message)) || event?.error || 'unknown');
         this.logger.error('AppManager: Error source', { file: event && event.filename, line: event && event.lineno });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     // Unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
-      try { this.logger.error('AppManager: Unhandled promise rejection', event?.reason?.message || event?.reason || 'unknown'); } catch (_) {}
+      try { this.logger.error('AppManager: Unhandled promise rejection', event?.reason?.message || event?.reason || 'unknown'); } catch (_) { /* intentionally empty */ }
     });
   }
 
@@ -1241,7 +1241,7 @@ class AppManager {
     try {
       this.logger.error('AppManager: Initialization error', (error && (error.message || error)));
       if (error && error.stack) this.logger.error('AppManager: Error details stack', error.stack);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Track startup error for diagnostics
     this.startupErrors.push({
@@ -1271,7 +1271,7 @@ class AppManager {
           duration: 0
         });
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Emit app error for any listeners (avoid re-emitting inside an app:error handling path)
     try {
@@ -1279,7 +1279,7 @@ class AppManager {
       if (eventBus) {
         eventBus.emit('app:error', { error });
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Allow future error handling after this tick
     setTimeout(() => { this._handlingInitError = false; }, 0);
@@ -1417,7 +1417,7 @@ class AppManager {
       const inspector = this.components?.get('inspectorPanel');
       if (inspector && typeof inspector.toggleVisibility === 'function') {
         inspector.toggleVisibility();
-        try { this.logger.info('AppManager: Toggled integrated Inspector panel'); } catch (_) {}
+        try { this.logger.info('AppManager: Toggled integrated Inspector panel'); } catch (_) { /* intentionally empty */ }
         return;
       }
 
@@ -1434,7 +1434,7 @@ class AppManager {
       const t = (theme === 'dark' || theme === 'system' || theme === 'default') ? theme : 'default';
       document.documentElement.setAttribute('data-theme', t);
       document.documentElement.className = document.documentElement.className.replace(/theme-\w+/, `theme-${t}`);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -1458,7 +1458,7 @@ class AppManager {
         this.uiState?.setState('ui.debugPanelVisible', ui.debugPanelVisible, true);
       }
     } catch (error) {
-      try { this.logger.warn('AppManager: Failed to initialize UI from main', error?.message || error); } catch (_) {}
+      try { this.logger.warn('AppManager: Failed to initialize UI from main', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1490,9 +1490,9 @@ class AppManager {
             await ipcClient.uiSetSettings({ ui: delta });
             last = { ...last, ...delta };
           }
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
       });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -1508,7 +1508,7 @@ class AppManager {
     try {
       await ipcClient.uiSetSettings({ ui: { theme: newTheme } });
     } catch (error) {
-      try { this.logger.warn('Failed to persist theme to main AppState', error?.message || error); } catch (_) {}
+      try { this.logger.warn('Failed to persist theme to main AppState', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1600,18 +1600,18 @@ class AppManager {
       }
       try {
         await ipcClient.uiSetSettings({ ui: { sidebarVisible: targetVisible } });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
 
     try {
       this.logger.debug('AppManager: Menu toggled', { visible: targetVisible });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Broadcast visibility change for other components (e.g., NavigationControls) to react
     try {
       const eventBus = this.services.get('eventBus');
       eventBus?.emit('ui:menu:visibility-changed', { visible: targetVisible });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -1653,7 +1653,7 @@ class AppManager {
 
     try {
       this.logger.info('AppManager: Menu visibility changed', { visible: isVisible });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -1693,7 +1693,7 @@ class AppManager {
     } catch (error) {
       try {
         this.logger.error('AppManager: Failed to update sidebar visibility from navigation', error?.message || error);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -1731,7 +1731,7 @@ class AppManager {
       // console.log('AppManager: Application shutdown complete'); // Removed debug log
 
     } catch (error) {
-      try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) {}
+      try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
   /**
@@ -2301,7 +2301,7 @@ class AppManager {
   async renderRecentCourses() {
     const container = document.getElementById('recent-courses');
     if (!container) {
-      try { this.logger.debug('AppManager: recent-courses container not found; skipping render'); } catch (_) {}
+      try { this.logger.debug('AppManager: recent-courses container not found; skipping render'); } catch (_) { /* intentionally empty */ }
       return;
     }
 
@@ -2359,7 +2359,7 @@ class AppManager {
             // refresh list to move to top
             await this.renderRecentCourses(); // Await render as it loads
           } catch (e) {
-            try { this.logger.error('AppManager: recent course load failed', e?.message || e); } catch (_) {}
+            try { this.logger.error('AppManager: recent course load failed', e?.message || e); } catch (_) { /* intentionally empty */ }
           }
         });
 
@@ -2490,21 +2490,21 @@ if (typeof window !== 'undefined') {
   // Add global test helper function
   window.testLoadCourse = async (coursePath, type = 'zip') => {
     const result = await appManager.testLoadCourse(coursePath, type);
-    try { rendererLogger.info('testLoadCourse result:', result); } catch (_) {}
+    try { rendererLogger.info('testLoadCourse result:', result); } catch (_) { /* intentionally empty */ }
     return result;
   };
 
   // Add helper to load the sample course for quick testing
   window.loadSampleCourse = async () => {
     const samplePath = 'references/real_course_examples/SL360_LMS_SCORM_2004.zip';
-    try { rendererLogger.info('Loading sample course from:', samplePath); } catch (_) {}
+    try { rendererLogger.info('Loading sample course from:', samplePath); } catch (_) { /* intentionally empty */ }
     return await window.testLoadCourse(samplePath);
   };
   try {
     rendererLogger.info('Test helpers available:');
     rendererLogger.info('  window.testLoadCourse(path) - Load course from path');
     rendererLogger.info('  window.loadSampleCourse() - Load the sample SL360 course');
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
 }
 
 export { AppManager, appManager };

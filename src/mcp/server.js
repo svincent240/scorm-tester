@@ -264,12 +264,12 @@ function writeMessage(msg) {
 
   // JSON-RPC helpers (for MCP-compatible clients like Kilo Code)
   function writeJSONRPCResult(id, result) {
-    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); } catch (_) {}
+    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); } catch (_) { /* intentionally empty */ }
   }
   function writeJSONRPCError(id, code, message, data) {
     const err = { code, message };
     if (data !== undefined) err.data = data;
-    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: id ?? null, error: err }) + "\n"); } catch (_) {}
+    try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: id ?? null, error: err }) + "\n"); } catch (_) { /* intentionally empty */ }
   }
 
 
@@ -315,7 +315,7 @@ async function handleRequest(req) {
             }
             tools.push(tool);
           }
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
         return writeJSONRPCResult(id, { tools });
       }
       if (method === "tools/call") {

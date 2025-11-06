@@ -54,10 +54,10 @@ function rimraf(dir) {
     if (stat.isDirectory()) {
       rimraf(full);
     } else {
-      try { fs.unlinkSync(full); } catch (_) {}
+      try { fs.unlinkSync(full); } catch (_) { /* intentionally empty */ }
     }
   }
-  try { fs.rmdirSync(dir); } catch (_) {}
+  try { fs.rmdirSync(dir); } catch (_) { /* intentionally empty */ }
 }
 
 // -------------------- Logger Test Sink --------------------

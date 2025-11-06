@@ -287,7 +287,7 @@ class ContentViewer extends BaseComponent {
       // Emit global error for AppManager gating
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('content:load:error', { url, error: error.message });
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
       return;
     }
 
@@ -301,7 +301,7 @@ class ContentViewer extends BaseComponent {
       // Notify AppManager that content load is starting
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('content:load:start', { url: processedUrl, options });
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
 
       // Set loading timeout
       if (this.loadingTimeout) {
@@ -342,7 +342,7 @@ class ContentViewer extends BaseComponent {
 
       // Pre-inject APIs into the iframe's current window synchronously (about:blank)
       if (this.iframe && this._syncInjectApiIntoWindow) {
-        try { this._syncInjectApiIntoWindow(this.iframe.contentWindow); } catch (_) {}
+        try { this._syncInjectApiIntoWindow(this.iframe.contentWindow); } catch (_) { /* intentionally empty */ }
       }
 
       // Load content directly in iframe
@@ -357,7 +357,7 @@ class ContentViewer extends BaseComponent {
       this.emit('contentLoadError', { url, error });
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('content:load:error', { url: processedUrl, error: error?.message || String(error) });
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
     }
   }
 
@@ -393,7 +393,7 @@ class ContentViewer extends BaseComponent {
       // Notify AppManager that content is ready
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('content:load:ready', { url: this.currentUrl });
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
 
       this.emit('contentLoaded', {
         url: this.currentUrl,
@@ -404,7 +404,7 @@ class ContentViewer extends BaseComponent {
       this.showError('Content initialization failed', error?.message || String(error));
       import('../../services/event-bus.js').then(({ eventBus }) => {
         eventBus.emit('content:load:error', { url: this.currentUrl, error: error?.message || String(error) });
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
     }
   }
 
@@ -484,7 +484,7 @@ class ContentViewer extends BaseComponent {
     this.emit('contentLoadError', { url: this.currentUrl });
     import('../../services/event-bus.js').then(({ eventBus }) => {
       eventBus.emit('content:load:error', { url: this.currentUrl, error: 'iframe error' });
-    }).catch(() => {});
+    }).catch(() => { /* intentionally empty */ }));
   }
 
 
@@ -583,7 +583,7 @@ class ContentViewer extends BaseComponent {
       try {
         import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
           rendererLogger.error('[ContentViewer] API setup error', error?.message || String(error));
-        }).catch(() => {});
+        }).catch(() => { /* intentionally empty */ }));
       } catch (error) {
         // Ignore logger import errors - logger is optional
       }
@@ -605,18 +605,18 @@ class ContentViewer extends BaseComponent {
     try {
       // Reset scormClient to clear previous session state
       // This ensures isInitialized is false so new content can call Initialize()
-      try { scormClient.reset(); } catch (_) {}
+      try { scormClient.reset(); } catch (_) { /* intentionally empty */ }
 
       // Detach bridge from client so any lingering calls do not reach scormClient
-      try { scormAPIBridge.setScormClient(null); } catch (_) {}
+      try { scormAPIBridge.setScormClient(null); } catch (_) { /* intentionally empty */ }
 
       const makeStub = (methodName) => {
         return (...args) => {
           try {
             import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
               rendererLogger.info('[ContentViewer] Ignored SCORM call during teardown', { method: methodName, argsCount: args?.length || 0 });
-            }).catch(() => {});
-          } catch (_) {}
+            }).catch(() => { /* intentionally empty */ }));
+          } catch (_) { /* intentionally empty */ }
           // SCORM API returns string values; return "false" to indicate failure without surfacing an error
           return 'false';
         };
@@ -632,13 +632,13 @@ class ContentViewer extends BaseComponent {
       stubify(this._api2004);
 
       // Replace globals on parent windows as well
-      try { window.API = this._api12 || { Initialize: makeStub('Initialize') }; } catch (_) {}
-      try { window.API_1484_11 = this._api2004 || { Initialize: makeStub('Initialize') }; } catch (_) {}
+      try { window.API = this._api12 || { Initialize: makeStub('Initialize') }; } catch (_) { /* intentionally empty */ }
+      try { window.API_1484_11 = this._api2004 || { Initialize: makeStub('Initialize') }; } catch (_) { /* intentionally empty */ }
 
       if (this.element && this.element.ownerDocument && this.element.ownerDocument.defaultView) {
         const docWindow = this.element.ownerDocument.defaultView;
-        try { docWindow.API = window.API; } catch (_) {}
-        try { docWindow.API_1484_11 = window.API_1484_11; } catch (_) {}
+        try { docWindow.API = window.API; } catch (_) { /* intentionally empty */ }
+        try { docWindow.API_1484_11 = window.API_1484_11; } catch (_) { /* intentionally empty */ }
       }
 
     } catch (_) {
@@ -1620,7 +1620,7 @@ class ContentViewer extends BaseComponent {
       this._mutationObserver = null;
     }
     // Ensure SCORM APIs are detached so no further calls are routed during teardown
-    try { this.teardownScormAPIs(); } catch (_) {}
+    try { this.teardownScormAPIs(); } catch (_) { /* intentionally empty */ }
 
 
     if (this._apiCheckTimeout) {

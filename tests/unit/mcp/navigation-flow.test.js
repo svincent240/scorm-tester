@@ -36,7 +36,7 @@ describe('MCP scorm_test_navigation_flow', () => {
       }
       if (!process.versions.electron) expect(threw).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -107,7 +107,7 @@ describe('MCP scorm_test_navigation_flow', () => {
       expect(closed.success).toBe(true);
 
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

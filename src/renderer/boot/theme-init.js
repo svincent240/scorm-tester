@@ -6,7 +6,7 @@
     if (typeof window !== 'undefined' && window.location && window.location.protocol !== 'scorm-app:' && typeof localStorage !== 'undefined') {
       try {
         savedTheme = localStorage.getItem('scorm-tester-theme');
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
 
     const systemTheme = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -18,6 +18,6 @@
       document.documentElement.setAttribute('data-theme', theme);
       document.documentElement.classList.add(`theme-${theme}`);
     }
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
 })();
 

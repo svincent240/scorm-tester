@@ -112,7 +112,7 @@ class WindowManager extends BaseService {
       this.setupMainWindowEvents(mainWindow);
       this.setupConsoleLogging(mainWindow);
       // Apply security policies and navigation restrictions
-      try { this.applySecurityHandlers(mainWindow); } catch (_) {}
+      try { this.applySecurityHandlers(mainWindow); } catch (_) { /* intentionally empty */ }
 
 
 
@@ -431,9 +431,9 @@ class WindowManager extends BaseService {
           if (!urlStr || !urlStr.startsWith('scorm-app://')) {
             event.preventDefault();
             this.logger?.warn('Navigation blocked by policy', { url: urlStr });
-            try { if (urlStr) shell?.openExternal?.(urlStr); } catch (_) {}
+            try { if (urlStr) shell?.openExternal?.(urlStr); } catch (_) { /* intentionally empty */ }
           }
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
       });
 
       const ses = wc.session;
@@ -449,14 +449,14 @@ class WindowManager extends BaseService {
           const allowed = allowedPermissions.includes(permission);
 
           if (allowed) {
-            try { this.logger?.debug(`Permission granted: ${permission}`); } catch (_) {}
+            try { this.logger?.debug(`Permission granted: ${permission}`); } catch (_) { /* intentionally empty */ }
           } else {
-            try { this.logger?.debug(`Permission denied by policy: ${permission}`); } catch (_) {}
+            try { this.logger?.debug(`Permission denied by policy: ${permission}`); } catch (_) { /* intentionally empty */ }
           }
 
           callback(allowed);
         });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Enforce a minimal CSP
       try {
@@ -473,7 +473,7 @@ class WindowManager extends BaseService {
               if (resolution && resolution.success && resolution.usedBase) {
                 usedBase = resolution.usedBase; // 'appRoot' | 'tempRoot'
               }
-            } catch (_) {}
+            } catch (_) { /* intentionally empty */ }
 
             // Strict CSP for UI (no inline scripts)
             const uiCsp = "default-src 'self' scorm-app:; img-src 'self' data: scorm-app:; style-src 'self' 'unsafe-inline' scorm-app:; script-src 'self' scorm-app:; connect-src 'self' scorm-app:";
@@ -490,8 +490,8 @@ class WindowManager extends BaseService {
             callback({ responseHeaders: details.responseHeaders });
           }
         });
-      } catch (_) {}
-    } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
+    } catch (_) { /* intentionally empty */ }
   }
 
   mapConsoleLevel(level) {

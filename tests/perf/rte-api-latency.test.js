@@ -151,18 +151,18 @@ function runRteSequenceOnce(options = {}) {
   for (let i = 0; i < burst; i++) {
     const k = keys[Math.floor(rng() * keys.length)];
     const v = pickValue(k, rng);
-    try { api.SetValue(k, v); } catch (_) {}
+    try { api.SetValue(k, v); } catch (_) { /* intentionally empty */ }
   }
 
   // A couple of reads
-  try { api.GetValue('cmi.location'); } catch (_) {}
-  try { api.GetValue('cmi.exit'); } catch (_) {}
+  try { api.GetValue('cmi.location'); } catch (_) { /* intentionally empty */ }
+  try { api.GetValue('cmi.exit'); } catch (_) { /* intentionally empty */ }
 
   // Commit
-  try { api.Commit(''); } catch (_) {}
+  try { api.Commit(''); } catch (_) { /* intentionally empty */ }
 
   // Terminate
-  try { api.Terminate(''); } catch (_) {}
+  try { api.Terminate(''); } catch (_) { /* intentionally empty */ }
 }
 
 function pickValue(key, rng) {
@@ -224,8 +224,8 @@ async function prunePerfArtifacts(outDir, prefix, keep) {
       const jsonFile = path.join(outDir, `${base}.json`);
       const txtFile = path.join(outDir, `${base}.txt`);
       // Best-effort deletions; ignore errors
-      try { await fs.unlink(jsonFile); } catch (_) {}
-      try { await fs.unlink(txtFile); } catch (_) {}
+      try { await fs.unlink(jsonFile); } catch (_) { /* intentionally empty */ }
+      try { await fs.unlink(txtFile); } catch (_) { /* intentionally empty */ }
     }
   } catch (_) {
     // Non-gating; ignore errors

@@ -48,7 +48,7 @@ class SNSnapshotService {
       }
       return null;
     } catch (e) {
-      try { this.logger?.warn && this.logger.warn('[SNSnapshotService] Poll failed', e?.message || e); } catch (_) {}
+      try { this.logger?.warn && this.logger.warn('[SNSnapshotService] Poll failed', e?.message || e); } catch (_) { /* intentionally empty */ }
       return null;
     }
   }
@@ -70,7 +70,7 @@ class SNSnapshotService {
         // schedule next poll
         this.timer = setTimeout(() => {
           this.timer = null;
-          this._pollLoop().catch(() => {});
+          this._pollLoop().catch(() => { /* intentionally empty */ }));
         }, this.pollIntervalMs);
       }
     }
@@ -80,7 +80,7 @@ class SNSnapshotService {
     if (this._isPolling) return;
     this._isPolling = true;
     // Kick off immediate poll
-    this._pollLoop().catch(() => {});
+    this._pollLoop().catch(() => { /* intentionally empty */ }));
     this.logger?.info && this.logger.info('[SNSnapshotService] Started polling SN status');
   }
 

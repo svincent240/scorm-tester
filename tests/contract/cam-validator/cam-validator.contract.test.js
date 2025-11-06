@@ -47,7 +47,7 @@ describe('Contract: CAM ↔ Validator', () => {
             };
           }
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   
     expect(typeof parseManifestFromString).toBe('function');
@@ -100,7 +100,7 @@ describe('Contract: CAM ↔ Validator', () => {
             };
           }
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
 
     expect(typeof parseManifestFromString).toBe('function');

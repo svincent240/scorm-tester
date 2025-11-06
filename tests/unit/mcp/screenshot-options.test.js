@@ -54,7 +54,7 @@ describe('MCP scorm_take_screenshot capture_options', () => {
       expect(captureMock).toHaveBeenCalledTimes(1);
       expect(typeof res.screenshot_data === 'string' || res.screenshot_data === null).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

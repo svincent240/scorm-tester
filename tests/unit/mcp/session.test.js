@@ -21,7 +21,7 @@ describe('MCP session tools', () => {
     try {
       // clean input folder
       fs.rmSync(tempCourseDir, { recursive: true, force: true });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   });
 
   test('open → status → events → close', async () => {

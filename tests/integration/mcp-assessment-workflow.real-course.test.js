@@ -108,8 +108,8 @@ describe('MCP assessment workflow on real course', () => {
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
     await Promise.race([
       new Promise(resolve => proc.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000))
@@ -162,8 +162,8 @@ describe('MCP assessment workflow on real course', () => {
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
     await Promise.race([
       new Promise(resolve => proc.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000))
@@ -221,8 +221,8 @@ describe('MCP assessment workflow on real course', () => {
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
     await Promise.race([
       new Promise(resolve => proc.once('exit', resolve)),
       new Promise(resolve => setTimeout(resolve, 3000))

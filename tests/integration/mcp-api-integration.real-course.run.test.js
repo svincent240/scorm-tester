@@ -75,8 +75,8 @@ describe('MCP scorm_test_api_integration on real course (smoke run)', () => {
     };
     console.log('MCP_API_RESULT_JSON=' + JSON.stringify(payload));
 
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
     // Wait for MCP process to exit to avoid open handle warnings
     await Promise.race([
       new Promise(resolve => proc.once('exit', resolve)),

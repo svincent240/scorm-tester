@@ -233,8 +233,8 @@ async function prunePerfArtifacts(outDir, prefix, keep) {
       const jsonFile = path.join(outDir, `${base}.json`);
       const txtFile = path.join(outDir, `${base}.txt`);
       // Best-effort deletions; ignore errors
-      try { await fs.unlink(jsonFile); } catch (_) {}
-      try { await fs.unlink(txtFile); } catch (_) {}
+      try { await fs.unlink(jsonFile); } catch (_) { /* intentionally empty */ }
+      try { await fs.unlink(txtFile); } catch (_) { /* intentionally empty */ }
     }
   } catch (_) {
     // Non-gating; ignore errors

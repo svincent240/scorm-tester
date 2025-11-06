@@ -51,9 +51,9 @@ describe('MCP stdout purity', () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Close stdin to allow graceful shutdown
-    try { proc.stdin.end(); } catch (_) {}
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
     // Kill process just in case
-    try { proc.kill(); } catch (_) {}
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
 
     // There should be at least two JSON-RPC lines on stdout
     expect(stdoutLines.length).toBeGreaterThanOrEqual(2);

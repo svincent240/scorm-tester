@@ -44,13 +44,13 @@ describe('Contract: RTE ↔ Data Model', () => {
       try {
         const eh = require('../../../src/shared/scorm/error-handler.js');
         resolvedGetErrorString = eh.getErrorString || (eh.default && eh.default.getErrorString);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
     if (typeof resolvedGetErrorString !== 'function') {
       try {
         const codes = require('../../../src/shared/constants/error-codes.js');
         resolvedGetErrorString = codes.getErrorString || (codes.default && codes.default.getErrorString);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
     expect(typeof resolvedGetErrorString).toBe('function');
     expect(resolvedGetErrorString('0')).toBeDefined();

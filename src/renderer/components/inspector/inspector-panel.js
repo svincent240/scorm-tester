@@ -165,7 +165,7 @@ class InspectorPanel extends BaseComponent {
     this.filters = this.filters || { method: 'all', errorsOnly: false, page: 1, pageSize: 100 };
 
     // Initial tab render
-    try { this.setActiveTab(this.activeTab || 'api'); } catch (_) {}
+    try { this.setActiveTab(this.activeTab || 'api'); } catch (_) { /* intentionally empty */ }
 
     // Initial tab render
 
@@ -188,7 +188,7 @@ class InspectorPanel extends BaseComponent {
           btn.classList.toggle('active', btn.getAttribute('data-tab') === next);
         });
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
     this.renderActiveTab();
   }
 
@@ -601,7 +601,7 @@ class InspectorPanel extends BaseComponent {
           if (btn && btn.dataset?.tab) this.setActiveTab(btn.dataset.tab);
         });
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // API tab controls (delegated)
     try {
@@ -654,7 +654,7 @@ class InspectorPanel extends BaseComponent {
           }
         });
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Subscribe to course-loaded event to clear and refresh inspector
     try {
@@ -671,7 +671,7 @@ class InspectorPanel extends BaseComponent {
         setTimeout(() => { void this.loadInitialData(); }, 500);
       });
       this._unsubs.push(offCourseLoaded);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Subscribe to main-pushed inspector updates
     try {
@@ -726,8 +726,8 @@ class InspectorPanel extends BaseComponent {
     const root = /** @type {HTMLElement | null} */ (this.element);
     if (root) root.classList.add('inspector-panel--visible');
     if (!this.loaded) this.loadInitialData();
-    try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) {}
-    try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) {}
+    try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) { /* intentionally empty */ }
+    try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) { /* intentionally empty */ }
     this.emit('visibilityChanged', { visible: true });
   }
 
@@ -741,8 +741,8 @@ class InspectorPanel extends BaseComponent {
       // Clear inline width style to allow CSS transition to collapse the panel
       root.style.width = '';
     }
-    try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) {}
-    try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) {}
+    try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) { /* intentionally empty */ }
+    try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) { /* intentionally empty */ }
     this.emit('visibilityChanged', { visible: false });
   }
 
@@ -789,12 +789,12 @@ class InspectorPanel extends BaseComponent {
       if (this._summary?.err) this._summary.err.textContent = String(this.state.errors.length || 0);
       if (this._summary?.obj) this._summary.obj.textContent = String(this.state.objectives.length || 0);
       if (this._summary?.nav) this._summary.nav.textContent = String(this.state.navigation.length || 0);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   destroy() {
-    try { this._unsubs?.forEach((off) => { try { off(); } catch (_) {} }); } catch (_) {}
-    try { this._resizeCleanup?.(); } catch (_) {}
+    try { this._unsubs?.forEach((off) => { try { off(); } catch (_) { /* intentionally empty */ } }); } catch (_) { /* intentionally empty */ }
+    try { this._resizeCleanup?.(); } catch (_) { /* intentionally empty */ }
     super.destroy();
   }
 

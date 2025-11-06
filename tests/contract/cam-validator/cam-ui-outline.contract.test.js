@@ -40,7 +40,7 @@ describe('CAM Contract: analysis.uiOutline via public entry', () => {
   });
 
   afterEach(() => {
-    try { rimraf(tmpDir); } catch (_) {}
+    try { rimraf(tmpDir); } catch (_) { /* intentionally empty */ }
     if (logger && typeof logger.clear === 'function') {
       logger.clear();
     }

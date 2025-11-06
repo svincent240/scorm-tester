@@ -40,8 +40,8 @@ describe('MCP error event emission', () => {
       }
       expect(threw).toBe(true);
     } finally {
-      try { await scorm_session_close({ session_id: opened && opened.session_id }); } catch (_) {}
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { await scorm_session_close({ session_id: opened && opened.session_id }); } catch (_) { /* intentionally empty */ }
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

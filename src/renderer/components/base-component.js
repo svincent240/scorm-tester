@@ -160,7 +160,7 @@ class BaseComponent {
       // Lazily resolve target element for test and jsdom environments
       try {
         this.element = this.findOrCreateElement();
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       if (!this.element) {
         throw new Error('Element not found for component');
       }
@@ -181,8 +181,8 @@ class BaseComponent {
 
     // Ensure event handlers and subscriptions are bound at least once
     if (!this._eventsBound) {
-      try { this.safeBindEvents(); } catch (_) {}
-      try { this.safeSetupEventSubscriptions(); } catch (_) {}
+      try { this.safeBindEvents(); } catch (_) { /* intentionally empty */ }
+      try { this.safeSetupEventSubscriptions(); } catch (_) { /* intentionally empty */ }
       this._eventsBound = true;
     }
 
@@ -504,7 +504,7 @@ class BaseComponent {
    * @private
    */
   findOrCreateElement() {
-    let selector = this.elementId;
+    const selector = this.elementId;
     let element = null;
 
     if (typeof selector === 'string') {

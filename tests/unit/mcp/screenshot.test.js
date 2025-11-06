@@ -28,7 +28,7 @@ describe('MCP scorm_take_screenshot (always real)', () => {
       }
       if (!process.versions.electron) expect(threw).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

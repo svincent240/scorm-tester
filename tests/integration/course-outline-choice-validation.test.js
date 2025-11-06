@@ -61,7 +61,7 @@ describe('CourseOutline choice validation', () => {
     // Instantiate component
     const outline = new CourseOutline('outline-root', { autoRender: false, snBridge: mockSnBridge });
     // Minimal setup: render base content and set a simple structure
-    await outline.initialize?.().catch(() => {}); // tolerate partial initialize in jsdom
+    await outline.initialize?.().catch(() => { /* intentionally empty */ })); // tolerate partial initialize in jsdom
     outline.renderContent();
     outline.setCourseStructure({ identifier: 'course', items: [{ identifier: 'sco-1', title: 'SCO 1', type: 'sco' }] });
     // Simulate authoritative state loaded for this validation-focused test

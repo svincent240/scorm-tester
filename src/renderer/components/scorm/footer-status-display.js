@@ -42,7 +42,7 @@ class FooterStatusDisplay extends BaseComponent {
     if (!this.element) {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterStatusDisplay: element not available for update');
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
       return;
     }
 
@@ -52,7 +52,7 @@ class FooterStatusDisplay extends BaseComponent {
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterStatusDisplay: #footer-status-text not found in DOM');
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
     }
 
     const footerScore = this.element.querySelector('#footer-score');
@@ -61,7 +61,7 @@ class FooterStatusDisplay extends BaseComponent {
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterStatusDisplay: #footer-score not found in DOM');
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
     }
 
     const footerTime = this.element.querySelector('#footer-time');
@@ -70,7 +70,7 @@ class FooterStatusDisplay extends BaseComponent {
     } else {
       import('../../utils/renderer-logger.js').then(({ rendererLogger }) => {
         rendererLogger.warn('FooterStatusDisplay: #footer-time not found in DOM');
-      }).catch(() => {});
+      }).catch(() => { /* intentionally empty */ }));
     }
   }
 

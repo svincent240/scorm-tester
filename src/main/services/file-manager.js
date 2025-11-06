@@ -10,7 +10,7 @@
  * @fileoverview File management service for SCORM Tester main process
  */
 
-const { dialog, shell, app } = require('electron');
+const { dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const StreamZip = require('node-stream-zip');
@@ -95,7 +95,7 @@ class FileManager extends BaseService {
     }
     
     // Cancel active operations
-    for (const [operationId, operation] of this.activeOperations) {
+    for (const [operationId] of this.activeOperations) {
       this.logger?.debug(`FileManager: Cancelling operation ${operationId}`);
       // Add operation cancellation logic if needed
     }
@@ -136,7 +136,7 @@ class FileManager extends BaseService {
           dialogOptions.defaultPath = options.defaultPath;
           this.logger?.info('FileManager: Using defaultPath for package dialog', options.defaultPath);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       const result = await dialog.showOpenDialog(dialogOptions);
 
@@ -200,7 +200,7 @@ class FileManager extends BaseService {
           dialogOptions.defaultPath = options.defaultPath;
           this.logger?.info('FileManager: Using defaultPath for folder dialog', options.defaultPath);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       const result = await dialog.showOpenDialog(dialogOptions);
 
@@ -577,7 +577,7 @@ class FileManager extends BaseService {
         const manifestCheckCopy = this.getManifestPath(destPath);
         if (!manifestCheckCopy.success) {
           // Clean up and fail
-          try { fs.rmSync(destPath, { recursive: true, force: true }); } catch(_) {}
+          try { fs.rmSync(destPath, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
           this.tempFiles.delete(destPath);
           return { success: false, error: 'Manifest not found in copied folder' };
         }
@@ -714,7 +714,7 @@ class FileManager extends BaseService {
       return { isValid: false, reason: `suspicious entry: ${entryName}` };
     }
     // Windows drive letter or colonized paths (e.g., C:\foo\bar.txt)
-    if (/^[A-Za-z]:[\\\/]/.test(originalName) || originalName.includes(':')) {
+    if (/^[A-Za-z]:[/\\]/.test(originalName) || originalName.includes(':')) {
       return { isValid: false, reason: `windows drive or colon path: ${entryName}` };
     }
 
@@ -770,6 +770,7 @@ class FileManager extends BaseService {
     }
     
     // Remove path separators and dangerous characters
+    // eslint-disable-next-line no-control-regex
     let sanitized = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '');
     
     // Remove leading/trailing dots and spaces

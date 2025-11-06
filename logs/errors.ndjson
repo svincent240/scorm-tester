@@ -1,1 +1,2 @@
-{"ts":1762433485105,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762438867636,"event":"ERROR_LOG_START","process":"node"}
+{"ts":1762438877785,"level":"error","msg":"MCP_TOOLS_ERROR","args":[{"id":3,"method":"scorm_runtime_open","error_code":"UNKNOWN_ERROR","message":"Electron child startup timeout"}],"context":{},"pid":32264,"process":"node"}

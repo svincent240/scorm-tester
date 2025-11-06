@@ -57,7 +57,7 @@ const safeInvoke = async (channel, ...args) => {
       } else {
         ipcRenderer.invoke('renderer-log-error', `[PRELOAD] IPC invoke failed for channel '${channel}': ${msg}`);
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
     return { success: false, error: error.message };
   }
 };
@@ -266,10 +266,10 @@ try {
       await fsp.writeFile(txtPath, lines.join('\n') + '\n', 'utf8');
 
       // Inform main logger
-      try { await ipcRenderer.invoke('renderer-log-info', '[Perf] artifacts written', { baseName, jsonPath, txtPath }); } catch (_) {}
+      try { await ipcRenderer.invoke('renderer-log-info', '[Perf] artifacts written', { baseName, jsonPath, txtPath }); } catch (_) { /* intentionally empty */ }
       return { success: true, jsonPath, txtPath };
     } catch (e) {
-      try { await ipcRenderer.invoke('renderer-log-error', '[Perf] artifact write failed', String(e?.message || e)); } catch (_) {}
+      try { await ipcRenderer.invoke('renderer-log-error', '[Perf] artifact write failed', String(e?.message || e)); } catch (_) { /* intentionally empty */ }
       return { success: false, error: String(e?.message || e) };
     }
   };
@@ -279,7 +279,7 @@ try {
 
 // Add a test method to verify the API is working
 electronAPI.testConnection = () => {
-  try { ipcRenderer.invoke('renderer-log-debug', 'electronAPI test connection called'); } catch (_) {}
+  try { ipcRenderer.invoke('renderer-log-debug', 'electronAPI test connection called'); } catch (_) { /* intentionally empty */ }
   return { success: true, message: 'electronAPI is working' };
 };
 
@@ -300,7 +300,7 @@ try {
 // The preload script should only expose the API and set the readiness flag
 
 // Log successful preload (via main logger IPC if available)
-try { ipcRenderer.invoke('renderer-log-info', 'Preload script loaded; electronAPI exposed', Object.keys(electronAPI)); } catch (_) {}
+try { ipcRenderer.invoke('renderer-log-info', 'Preload script loaded; electronAPI exposed', Object.keys(electronAPI)); } catch (_) { /* intentionally empty */ }
 
 // Note: DOM access is not available in preload scripts
 // DOM ready logging will be handled in the renderer process

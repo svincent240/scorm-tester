@@ -115,7 +115,7 @@ class RecentCoursesStore {
     }
 
      await this._save();
-     try { this._logger.info('RecentCoursesStore: addOrUpdate', { type, path }); } catch (_) {}
+     try { this._logger.info('RecentCoursesStore: addOrUpdate', { type, path }); } catch (_) { /* intentionally empty */ }
    }
 
   /**
@@ -132,7 +132,7 @@ class RecentCoursesStore {
     this._items.splice(idx, 1);
     this._items.unshift(existing);
     await this._save();
-    try { this._logger.debug('RecentCoursesStore: touch', { type, path }); } catch (_) {}
+    try { this._logger.debug('RecentCoursesStore: touch', { type, path }); } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -145,7 +145,7 @@ class RecentCoursesStore {
     if (idx === -1) return;
     const removed = this._items.splice(idx, 1);
     await this._save();
-    try { this._logger.info('RecentCoursesStore: remove', { type, path, removed: removed?.length || 0 }); } catch (_) {}
+    try { this._logger.info('RecentCoursesStore: remove', { type, path, removed: removed?.length || 0 }); } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -154,7 +154,7 @@ class RecentCoursesStore {
   async clear() {
     this._items = [];
     await this._save();
-    try { this._logger.warn('RecentCoursesStore: clear all'); } catch (_) {}
+    try { this._logger.warn('RecentCoursesStore: clear all'); } catch (_) { /* intentionally empty */ }
   }
 
   /**

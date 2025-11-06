@@ -18,7 +18,7 @@ describe('MCP scorm_lint_api_usage', () => {
       expect(Array.isArray(res.issues)).toBe(true);
       expect(res.issues.length).toBeGreaterThanOrEqual(1);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

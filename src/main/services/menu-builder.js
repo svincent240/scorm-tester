@@ -189,7 +189,7 @@ class MenuBuilder {
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       // New: also emit a unified 'menu-event' so renderer can handle via a single path
-      try { mainWindow.webContents.send('menu-event', { action, data }); } catch (_) {}
+      try { mainWindow.webContents.send('menu-event', { action, data }); } catch (_) { /* intentionally empty */ }
       // Keep original behavior for other menu items (even if they're not implemented)
       mainWindow.webContents.send(action, data);
     }

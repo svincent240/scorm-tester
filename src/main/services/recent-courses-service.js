@@ -236,12 +236,12 @@ class RecentCoursesService extends BaseService {
             // If fallback fails, try one more approach: direct write (non-atomic)
             try {
               await fs.writeFile(this.recentsFilePath, JSON.stringify(this._items, null, 2), 'utf8');
-              await fs.unlink(tempPath).catch(() => {}); // Best effort cleanup
+              await fs.unlink(tempPath).catch(() => { /* intentionally empty */ })); // Best effort cleanup
               this.logger?.warn('RecentCoursesService: fallback copy+unlink failed; used direct write.');
             } catch (directWriteErr) {
               // If all approaches fail, surface the original rename error for diagnostics
               this.logger?.warn('RecentCoursesService: All write strategies failed. Recent courses not persisted this time.');
-              await fs.unlink(tempPath).catch(() => {}); // Best effort cleanup
+              await fs.unlink(tempPath).catch(() => { /* intentionally empty */ })); // Best effort cleanup
               throw renameErr;
             }
           }

@@ -34,7 +34,7 @@ describe('MCP scorm_report', () => {
       const parsed = JSON.parse(res.report);
       expect(typeof parsed.score).toBe('number');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

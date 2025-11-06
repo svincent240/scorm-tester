@@ -37,7 +37,7 @@ function ensureIpcHandlers() {
       const method = String(payload?.method || "");
       const args = Array.isArray(payload?.args) ? payload.args : [];
       if (!handler || !method || typeof handler[method] !== "function") {
-        try { mcpLogger.error(`MCP API (sync): handler missing or method not found`, { id, method }); } catch (_) {}
+        try { mcpLogger.error(`MCP API (sync): handler missing or method not found`, { id, method }); } catch (_) { /* intentionally empty */ }
         event.returnValue = "false";
         return;
       }
@@ -45,7 +45,7 @@ function ensureIpcHandlers() {
       const res = handler[method].apply(handler, args);
       event.returnValue = typeof res === "string" ? res : String(res);
     } catch (e) {
-      try { mcpLogger.error(`MCP API (sync): error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) {}
+      try { mcpLogger.error(`MCP API (sync): error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
       event.returnValue = "false";
     }
   });
@@ -59,14 +59,14 @@ function ensureIpcHandlers() {
       const method = String(payload?.method || "");
       const args = Array.isArray(payload?.args) ? payload.args : [];
       if (!handler || !method || typeof handler[method] !== "function") {
-        try { mcpLogger.error(`MCP API: handler missing or method not found`, { id, method }); } catch (_) {}
+        try { mcpLogger.error(`MCP API: handler missing or method not found`, { id, method }); } catch (_) { /* intentionally empty */ }
         return "false";
       }
       // SCORM methods return strings per spec
       const res = await handler[method].apply(handler, args);
       return typeof res === "string" ? res : String(res);
     } catch (e) {
-      try { mcpLogger.error(`MCP API: error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) {}
+      try { mcpLogger.error(`MCP API: error invoking ${method}`, e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
       return "false";
     }
   });
@@ -158,14 +158,14 @@ function ensureIpcHandlers() {
 
       return { success: false, error: 'UNKNOWN_ACTION' };
     } catch (e) {
-      try { mcpLogger.error(`MCP SN: error handling action ${action}`, e && e.message ? e.message : String(e)); } catch (_) {}
+      try { mcpLogger.error(`MCP SN: error handling action ${action}`, e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
       return { success: false, error: e?.message || String(e) };
     }
   });
 
   // Renderer error channel for preload logging; fail-fast with clear surfacing
   ipcMain.handle("renderer-log-error", async (_event, ...args) => {
-    try { mcpLogger.error(...args); } catch (_) {}
+    try { mcpLogger.error(...args); } catch (_) { /* intentionally empty */ }
     return true;
   });
 
@@ -181,7 +181,7 @@ function installRealAdapterForWindow(win, options = {}) {
     // Minimal session manager for persistence and learner info
     const sessionManager = {
       registerSession: (id, handler) => { try { /* map kept externally */ return true; } catch (_) { return true; } },
-      unregisterSession: (_id) => { try { /* noop */ } catch (_) {} },
+      unregisterSession: (_id) => { try { /* noop */ } catch (_) { /* intentionally empty */ } },
       persistSessionData: (_id, _data) => { try { mcpLogger.info('MCP adapter: persistSessionData (noop)'); return true; } catch (_) { return true; } },
       getLearnerInfo: () => ({ id: 'mcp-learner', name: 'MCP Learner' })
     };
@@ -190,11 +190,11 @@ function installRealAdapterForWindow(win, options = {}) {
     handlerByWC.set(win.webContents.id, handler);
     // Cleanup on close
     win.on("closed", () => {
-      try { handlerByWC.delete(win.webContents.id); } catch (_) {}
+      try { handlerByWC.delete(win.webContents.id); } catch (_) { /* intentionally empty */ }
     });
     return true;
   } catch (e) {
-    try { mcpLogger.error('MCP adapter install failed', e && e.message ? e.message : String(e)); } catch (_) {}
+    try { mcpLogger.error('MCP adapter install failed', e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
     return false;
   }
 }

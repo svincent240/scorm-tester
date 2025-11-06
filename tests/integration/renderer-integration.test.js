@@ -144,7 +144,7 @@ describe('Renderer Integration Tests', () => {
     try {
       jest.runOnlyPendingTimers();
       jest.clearAllTimers();
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   
     // Clean up SCORM client if it exists
     try {
@@ -161,7 +161,7 @@ describe('Renderer Integration Tests', () => {
   
     // Force garbage collection if available
     if (global.gc) {
-      try { global.gc(); } catch (_) {}
+      try { global.gc(); } catch (_) { /* intentionally empty */ }
     }
   });
 

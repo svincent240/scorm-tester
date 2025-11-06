@@ -558,7 +558,7 @@ class UIStateManager {
           subscriber.callback(newState, previousState);
         }
       } catch (error) {
-        try { this.helpers.rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error); } catch (_) {}
+        try { this.helpers.rendererLogger.error('UIStateManager: Error in state subscriber', error?.message || error); } catch (_) { /* intentionally empty */ }
       }
     }
   }

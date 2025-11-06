@@ -501,7 +501,7 @@ async function scorm_report(params = {}) {
 
   if (format === 'html') {
     let obj = {};
-    try { obj = JSON.parse(compliance.validation_report || '{}'); } catch (_) {}
+    try { obj = JSON.parse(compliance.validation_report || '{}'); } catch (_) { /* intentionally empty */ }
     const html = [
       '<!doctype html>','<html>','<head>',
       '<meta charset="utf-8"/>',
@@ -532,7 +532,7 @@ async function scorm_report(params = {}) {
         fs.writeFileSync(outPath, html, 'utf8');
         sessions.addArtifact({ session_id, artifact: { type: 'report', path: outPath } });
         artifact_path = outPath;
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
 
     return { format: 'html', report: html, compliance_score: compliance.compliance_score, artifact_path };

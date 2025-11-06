@@ -18,6 +18,23 @@ const logger = getLogger();
 let _ipcMessageIdCounter = 0;
 
 async function resolveEntryPathFromManifest(workspace) {
+  function findFirstLaunchableItem(items, resById) {
+    if (!Array.isArray(items)) return null;
+    for (const it of items) {
+      if (!it) continue;
+      // visible, with identifierref pointing to a resource with href
+      if (it.identifierref && it.isvisible !== false) {
+        const res = resById.get(it.identifierref);
+        if (res && res.href) return { item: it, resource: res };
+      }
+      if (Array.isArray(it.children) && it.children.length) {
+        const found = findFirstLaunchableItem(it.children, resById);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
   const manifestPath = path.join(workspace, "imsmanifest.xml");
   if (!fs.existsSync(manifestPath)) return null;
   const parser = new ManifestParser({ setError: () => {} });
@@ -36,24 +53,7 @@ async function resolveEntryPathFromManifest(workspace) {
     const resById = new Map();
     for (const r of resources) if (r?.identifier) resById.set(r.identifier, r);
 
-    function findFirstLaunchableItem(items) {
-      if (!Array.isArray(items)) return null;
-      for (const it of items) {
-        if (!it) continue;
-        // visible, with identifierref pointing to a resource with href
-        if (it.identifierref && it.isvisible !== false) {
-          const res = resById.get(it.identifierref);
-          if (res && res.href) return { item: it, resource: res };
-        }
-        if (Array.isArray(it.children) && it.children.length) {
-          const found = findFirstLaunchableItem(it.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    }
-
-    const found = org ? findFirstLaunchableItem(org.items || []) : null;
+    const found = org ? findFirstLaunchableItem(org.items || [], resById) : null;
     const resource = found?.resource || null;
 
     // Strict CAM resolution only: require default org/item -> resource.href
@@ -63,7 +63,7 @@ async function resolveEntryPathFromManifest(workspace) {
       return resolved;
     }
     return null;
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   return null;
 }
 
@@ -95,6 +95,7 @@ function mapConsoleLevel(level) {
  * Also stores messages in browser context for scorm_get_console_errors
  * @param {BrowserWindow} win - The BrowserWindow to monitor
  */
+// eslint-disable-next-line no-unused-vars
 function setupConsoleLogging(win) {
   if (!win || !win.webContents) return;
 
@@ -274,38 +275,43 @@ class RuntimeManager {
   // Handle IPC messages from Node bridge (when in child mode)
   static async handleIPCMessage(message) {
     switch (message.type) {
-      case 'runtime_openPage':
+      case 'runtime_openPage': {
         // When called from IPC, we're in Electron child - create the window and return window ID
         const win = await this._openPageImpl(message.params);
         // Store window reference by ID for later operations
         const winId = win.webContents.id;
         return { windowId: winId, success: true };
+      }
 
-      case 'runtime_openPersistent':
+      case 'runtime_openPersistent': {
         await this._openPersistentImpl(message.params);
         return { success: true };
+      }
 
-      case 'runtime_capture':
+      case 'runtime_capture': {
         const session_id = message.params.session_id;
         const compress = message.params.compress !== false; // Default to compressed
         const persistentWin = this.getPersistent(session_id);
         if (!persistentWin) throw new Error('Runtime not open');
         const imageBuffer = await this.capture(persistentWin, compress);
         return { screenshot: imageBuffer.toString('base64'), success: true };
+      }
 
-      case 'runtime_callAPI':
+      case 'runtime_callAPI': {
         const apiWin = this.getPersistent(message.params.session_id);
         if (!apiWin) throw new Error('Runtime not open');
         const result = await this.callAPI(apiWin, message.params.method, message.params.args || []);
         return { result, success: true };
+      }
 
-      case 'runtime_getCapturedCalls':
+      case 'runtime_getCapturedCalls': {
         const callsWin = this.getPersistent(message.params.session_id);
         if (!callsWin) throw new Error('Runtime not open');
         const calls = await this.getCapturedCalls(callsWin);
         return { calls, success: true };
+      }
 
-      case 'runtime_executeJS':
+      case 'runtime_executeJS': {
         const jsWin = this.getPersistent(message.params.session_id);
         if (!jsWin) throw new Error('Runtime not open');
 
@@ -380,17 +386,20 @@ class RuntimeManager {
           };
           throw err;
         }
+      }
 
-      case 'runtime_getURL':
+      case 'runtime_getURL': {
         const urlWin = this.getPersistent(message.params.session_id);
         const url = urlWin ? this.getURL(urlWin) : null;
         return { url, success: true };
+      }
 
-      case 'runtime_closePersistent':
+      case 'runtime_closePersistent': {
         const closed = await this._closePersistentImpl(message.params.session_id);
         return { success: closed };
+      }
 
-      case 'runtime_getStatus':
+      case 'runtime_getStatus': {
         const statusWin = this.getPersistent(message.params.session_id);
         if (!statusWin) return { open: false };
         const statusUrl = this.getURL(statusWin);
@@ -404,20 +413,23 @@ class RuntimeManager {
           last_api_method: lastCall ? String(lastCall.method || '') : null,
           last_api_ts: lastCall ? Number(lastCall.ts || 0) : null
         };
+      }
 
-      case 'runtime_getInitializeState':
+      case 'runtime_getInitializeState': {
         const initWin = this.getPersistent(message.params.session_id);
         if (!initWin) throw new Error('Runtime not open');
         const state = await this.getInitializeState(initWin);
         return { state };
+      }
 
-      case 'runtime_snInvoke':
+      case 'runtime_snInvoke': {
         const snWin = this.getPersistent(message.params.session_id);
         if (!snWin) throw new Error('Runtime not open');
         const snResult = await this._snInvokeImplementation(snWin, message.params.method, message.params.payload);
         return { result: snResult, success: true };
+      }
 
-      case 'runtime_closeAll':
+      case 'runtime_closeAll': {
         // Close all persistent runtime windows (cleanup on MCP server exit)
         const sessionIds = Array.from(_persistentBySession.keys());
         for (const sid of sessionIds) {
@@ -428,6 +440,7 @@ class RuntimeManager {
           }
         }
         return { success: true, closed_count: sessionIds.length };
+      }
 
       default:
         throw new Error(`Unknown IPC message type: ${message.type}`);
@@ -451,16 +464,16 @@ class RuntimeManager {
   static async _openPageImpl({ entryPath, viewport = { width: 1024, height: 768 }, adapterOptions = {} }) {
     const { BrowserWindow } = electron;
     const wp = { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, disableDialogs: true };
-    try { wp.preload = getPreloadPath(); } catch (_) {}
+    try { wp.preload = getPreloadPath(); } catch (_) { /* intentionally empty */ }
     const win = new BrowserWindow({ show: false, webPreferences: wp });
     // Strictly disable popups, unload prompts, and permissions to keep MCP headless
-    try { win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); } catch (_) {}
-    try { win.webContents.on('will-prevent-unload', (e) => { try { e.preventDefault(); } catch (_) {} }); } catch (_) {}
-    try { win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => { try { callback(false); } catch (_) {} }); } catch (_) {}
+    try { win.webContents.setWindowOpenHandler(() => ({ action: 'deny' })); } catch (_) { /* intentionally empty */ }
+    try { win.webContents.on('will-prevent-unload', (e) => { try { e.preventDefault(); } catch (_) { /* intentionally empty */ } }); } catch (_) { /* intentionally empty */ }
+    try { win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => { try { callback(false); } catch (_) { /* intentionally empty */ } }); } catch (_) { /* intentionally empty */ }
     if (viewport?.width && viewport?.height) win.setSize(viewport.width, viewport.height);
     const url = 'file://' + entryPath;
     // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
-    try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) {}
+    try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) { /* intentionally empty */ }
     // Capture browser console messages to unified log (accessible via system_get_logs)
     this.setupConsoleLogging(win);
 
@@ -490,7 +503,7 @@ class RuntimeManager {
           try {
             const dir = path.dirname(entryPath);
             listing = fs.readdirSync(dir).sort();
-          } catch (_) {}
+          } catch (_) { /* intentionally empty */ }
           const err = new Error(`ERR_ABORTED while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
           err.code = 'ERR_ABORTED';
           throw err;
@@ -502,7 +515,7 @@ class RuntimeManager {
         try {
           const dir = path.dirname(entryPath);
           listing = fs.readdirSync(dir).sort();
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
         const err = new Error(`${msg} while loading ${entryPath}. Directory listing for ${path.dirname(entryPath)}: [${listing.join(', ')}]`);
         err.code = 'PAGE_LOAD_FAILED';
         throw err;
@@ -513,7 +526,7 @@ class RuntimeManager {
     try {
       const finalURL = win?.webContents?.getURL?.() || null;
       if (finalURL) { logger?.debug('Runtime final URL', { finalURL }); }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     return win;
   }
@@ -558,8 +571,8 @@ class RuntimeManager {
       try {
         _persistentBySession.delete(session_id);
         _networkRequestsBySession.delete(session_id);
-      } catch (_) {}
-    }); } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
+    }); } catch (_) { /* intentionally empty */ }
     return win;
   }
 
@@ -595,7 +608,7 @@ class RuntimeManager {
   static async _closePersistentImpl(session_id) {
     const win = _persistentBySession.get(session_id);
     if (win) {
-      try { win.destroy(); } catch (_) {}
+      try { win.destroy(); } catch (_) { /* intentionally empty */ }
       _persistentBySession.delete(session_id);
       return true;
     }
@@ -621,7 +634,7 @@ class RuntimeManager {
     try { return win?.webContents?.getURL() || null; } catch (_) { return null; }
   }
 
-  static async injectApiRecorder(win) {
+  static async injectApiRecorder(_win) {
     // Always real adapter via preload exposes API_1484_11 and __scorm_calls; nothing to inject here.
     return true;
   }
@@ -878,7 +891,7 @@ class RuntimeManager {
   }
 
   static async close(win) {
-    try { win?.destroy(); } catch (_) {}
+    try { win?.destroy(); } catch (_) { /* intentionally empty */ }
   }
 
   /**
@@ -956,7 +969,7 @@ class RuntimeManager {
     });
 
     // Capture page load errors
-    win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, _isMainFrame) => {
       logger?.error(`[Browser Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
     });
 

@@ -52,20 +52,20 @@ class CourseLoader {
         windowDefined,
         electronAPIType: windowDefined ? typeof window.electronAPI : 'undefined'
       });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     if (electronAPIAvailable) {
-      try { rendererLogger.info('CourseLoader: Using IpcClient for file selection and prep'); } catch (_) {}
+      try { rendererLogger.info('CourseLoader: Using IpcClient for file selection and prep'); } catch (_) { /* intentionally empty */ }
       // IPC surface verification removed in rewrite; fail-fast happens inside IpcClient
       const requiredMethods = [];
       const missingMethods = [];
       if (missingMethods.length > 0) {
-        try { rendererLogger.error('CourseLoader: Missing required Electron API methods:', missingMethods); } catch (_) {}
+        try { rendererLogger.error('CourseLoader: Missing required Electron API methods:', missingMethods); } catch (_) { /* intentionally empty */ }
       } else {
-        try { rendererLogger.info('CourseLoader: All required Electron API methods available'); } catch (_) {}
+        try { rendererLogger.info('CourseLoader: All required Electron API methods available'); } catch (_) { /* intentionally empty */ }
       }
     } else {
-      try { rendererLogger.error('CourseLoader: Electron API not available - this will prevent course loading'); } catch (_) {}
+      try { rendererLogger.error('CourseLoader: Electron API not available - this will prevent course loading'); } catch (_) { /* intentionally empty */ }
     }
   }
 /**
@@ -401,7 +401,7 @@ class CourseLoader {
           manifestIdentifier: manifest?.identifier || null
         };
         rendererLogger.info('CourseLoader: structure pre-normalize snapshot', diag);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Prefer CAM-provided uiOutline if available AND manifest has organizations
       try {
@@ -421,7 +421,7 @@ class CourseLoader {
         } else {
           rendererLogger.info('CourseLoader: CAM-provided uiOutline not present; falling back to renderer normalization');
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Step 4: Determine entry point from processed manifest (single-source from CAM)
       this.logger?.info && this.logger.info('CourseLoader: Step 4 - Determining entry point');
@@ -575,7 +575,7 @@ class CourseLoader {
           ? courseData.structure.items.slice(0, 24).map(n => n?.identifier || 'unknown')
           : [];
         rendererLogger.info('CourseLoader: uiStructure top-level IDs', { count: topIds.length, ids: topIds });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
 
       // Step 7: Update application state
       this.logger?.info && this.logger.info('CourseLoader: Step 7 - Updating application state');

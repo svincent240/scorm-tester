@@ -88,7 +88,7 @@ class ScormInspectorTelemetryStore {
       // Never throw from telemetry store; log and continue
       try { 
         this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] Failed to store API call', e?.message || e); 
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -115,7 +115,7 @@ class ScormInspectorTelemetryStore {
     } catch (e) {
       try { 
         this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] Failed to store SCORM error', e?.message || e); 
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -169,7 +169,7 @@ class ScormInspectorTelemetryStore {
     } catch (e) {
       try { 
         this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] getHistory failed', e?.message || e); 
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       return {
         success: false,
         history: [],
@@ -204,7 +204,7 @@ class ScormInspectorTelemetryStore {
     } catch (e) {
       try { 
         this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] getErrors failed', e?.message || e); 
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       return {
         success: false,
         errors: [],
@@ -284,7 +284,7 @@ class ScormInspectorTelemetryStore {
     } catch (e) {
       try { 
         this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] flushTo failed', e?.message || e); 
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 

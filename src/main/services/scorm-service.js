@@ -103,7 +103,7 @@ class ScormService extends BaseService {
     try {
       const ids = Array.from(this.sessions.keys());
       this.logger?.info(`ScormService: Active sessions at shutdown: [${ids.join(', ')}]`);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Terminate all active sessions (idempotent)
     for (const [sessionId] of this.sessions) {
@@ -191,11 +191,11 @@ class ScormService extends BaseService {
         const sessionManager = {
           registerSession: (id, handler) => {
             // store handler reference for debugging if needed
-            try { this.rteInstances.set(id, handler); } catch (_) {}
+            try { this.rteInstances.set(id, handler); } catch (_) { /* intentionally empty */ }
             return true;
           },
           unregisterSession: (id) => {
-            try { this.rteInstances.delete(id); } catch (_) {}
+            try { this.rteInstances.delete(id); } catch (_) { /* intentionally empty */ }
           },
           persistSessionData: (id, data) => {
             // Prefer telemetryStore for persistence/inspection
@@ -229,9 +229,9 @@ class ScormService extends BaseService {
 
         const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
         // Initialize RTE session and then bind its internal session id to our session id for mapping
-        try { rte.Initialize(''); } catch (_) {}
+        try { rte.Initialize(''); } catch (_) { /* intentionally empty */ }
         // Override generated sessionId with our provided sessionId for consistency
-        try { rte.sessionId = sessionId; } catch (_) {}
+        try { rte.sessionId = sessionId; } catch (_) { /* intentionally empty */ }
         this.rteInstances.set(sessionId, rte);
         // Subscribe to scorm-api-call-logged events from this RTE instance
         rte.eventEmitter.on('scorm-api-call-logged', (payload) => {
@@ -497,7 +497,7 @@ class ScormService extends BaseService {
         // Ensure map no longer holds terminated
         this.sessions.delete(sessionId);
         // Also cleanup associated RTE instance
-        try { this.rteInstances.delete(sessionId); } catch (_) {}
+        try { this.rteInstances.delete(sessionId); } catch (_) { /* intentionally empty */ }
         return { success: true, errorCode: '0', alreadyTerminated: true };
       }
       session.__terminating = true;
@@ -551,7 +551,7 @@ class ScormService extends BaseService {
         this.logger?.warn(`ScormService: Soft-ok terminate(${sessionId}) during shutdown/race: ${msg}`);
         // Ensure cleanup
         this.sessions.delete(sessionId);
-        try { this.rteInstances.delete(sessionId); } catch (_) {}
+        try { this.rteInstances.delete(sessionId); } catch (_) { /* intentionally empty */ }
         this.recordOperation('terminate', true);
         return { success: true, errorCode: '0', softOk: true };
       }
@@ -772,8 +772,8 @@ class ScormService extends BaseService {
        const ScormApiHandler = require('./scorm/rte/api-handler');
        const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
        const sessionManager = {
-         registerSession: (id, handler) => { try { this.rteInstances.set(id, handler); } catch (_) {} return true; },
-         unregisterSession: (id) => { try { this.rteInstances.delete(id); } catch (_) {} },
+         registerSession: (id, handler) => { try { this.rteInstances.set(id, handler); } catch (_) { /* intentionally empty */ } return true; },
+         unregisterSession: (id) => { try { this.rteInstances.delete(id); } catch (_) { /* intentionally empty */ } },
          persistSessionData: (id, data) => {
            try {
              const telemetry = this.getDependency && this.getDependency('telemetryStore');
@@ -880,7 +880,7 @@ class ScormService extends BaseService {
              : 'n/a',
            entryMode: rte.dataModel ? rte.dataModel.getValue('cmi.entry') : 'unknown'
          });
-       } catch (_) {}
+       } catch (_) { /* intentionally empty */ }
        if (initResult !== 'true') {
          this.sessions.delete(newSessionId);
          return {
@@ -944,7 +944,7 @@ class ScormService extends BaseService {
       try {
         this.rteInstances.delete(sessionId);
         this.logger?.debug(`ScormService: RTE instance deleted for session ${sessionId}`);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       this.logger?.info(`ScormService: Session ${sessionId} reset`);
       this.eventEmitter.emit('session:reset', { sessionId });
       return true;
@@ -1231,7 +1231,7 @@ class ScormService extends BaseService {
       const currentActivityId = this.snService.getSequencingState().currentActivity?.identifier;
 
       if (currentActivityId) {
-        let progressData = {};
+        const progressData = {};
         switch (element) {
           case 'cmi.completion_status':
             progressData.completed = (value === 'completed');
@@ -1297,7 +1297,7 @@ class ScormService extends BaseService {
           try {
             this.rteInstances.delete(sessionId);
             this.logger?.debug(`ScormService: RTE instance deleted for inactive session ${sessionId}`);
-          } catch (_) {}
+          } catch (_) { /* intentionally empty */ }
         }
       }
     }, 60000); // Check every minute

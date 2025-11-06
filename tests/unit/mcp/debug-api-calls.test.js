@@ -33,7 +33,7 @@ describe('MCP scorm_debug_api_calls (always real)', () => {
       }
       if (!process.versions.electron) expect(threw).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

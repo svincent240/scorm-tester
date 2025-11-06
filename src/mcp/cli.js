@@ -24,7 +24,7 @@ function runCli(opts = {}) {
   if (flags.allow_network) process.env.MCP_ALLOW_NETWORK = "1";
 
   // Log a simple banner to stderr (stdout is reserved for MCP JSON lines)
-  try { process.stderr.write(banner(flags) + "\n"); } catch (_) {}
+  try { process.stderr.write(banner(flags) + "\n"); } catch (_) { /* intentionally empty */ }
 
   if (opts.dryRun) {
     return { flags };

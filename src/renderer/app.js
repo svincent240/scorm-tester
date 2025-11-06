@@ -114,7 +114,7 @@ async function initializeApplication() {
     try {
       rendererLogger.error('Application initialization failed:', error?.message || error);
       rendererLogger.error('Error details stack:', error?.stack || 'no stack');
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     try {
       const resolvedUiState = await uiState;
@@ -137,11 +137,11 @@ async function initializeApplication() {
         type: 'error',
         duration: 0
       });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     try {
       eventBus.emit('app:error', { error });
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 }
  

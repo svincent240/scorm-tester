@@ -42,7 +42,7 @@ describe('MCP scorm_validate_compliance', () => {
       const parsed = JSON.parse(res.validation_report);
       expect(typeof parsed.score).toBe('number');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

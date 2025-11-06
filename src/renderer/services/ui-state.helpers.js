@@ -63,10 +63,10 @@ export function safePersistState(persistenceKey, uiSlice) {
       try {
         import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
-            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
+            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: localStorage unavailable', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch(() => { /* intentionally empty */ }));
+      } catch (_) { /* intentionally empty */ }
       return;
     }
 
@@ -75,10 +75,10 @@ export function safePersistState(persistenceKey, uiSlice) {
       try {
         import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
-            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
+            try { rendererLogger.info('[UIStateHelpers] safePersistState skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch(() => { /* intentionally empty */ }));
+      } catch (_) { /* intentionally empty */ }
       return;
     }
 
@@ -106,10 +106,10 @@ export function safeLoadPersistedUI(persistenceKey) {
       try {
         import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
-            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: localStorage unavailable', { persistenceKey }); } catch (_) {}
+            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: localStorage unavailable', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch(() => { /* intentionally empty */ }));
+      } catch (_) { /* intentionally empty */ }
       return null;
     }
 
@@ -117,10 +117,10 @@ export function safeLoadPersistedUI(persistenceKey) {
       try {
         import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
-            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) {}
+            try { rendererLogger.info('[UIStateHelpers] safeLoadPersistedUI skipped: scorm-app protocol (no localStorage)', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch(() => { /* intentionally empty */ }));
+      } catch (_) { /* intentionally empty */ }
       return null;
     }
 
@@ -144,11 +144,11 @@ export function safeLoadPersistedUI(persistenceKey) {
       if (typeof window !== 'undefined') {
         import('../utils/renderer-logger.js')
           .then(({ rendererLogger }) => {
-            try { rendererLogger.warn('[UIStateHelpers] safeLoadPersistedUI failed to parse persisted data', { persistenceKey }); } catch (_) {}
+            try { rendererLogger.warn('[UIStateHelpers] safeLoadPersistedUI failed to parse persisted data', { persistenceKey }); } catch (_) { /* intentionally empty */ }
           })
-          .catch(() => {});
+          .catch(() => { /* intentionally empty */ }));
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
     return null;
   }
 }

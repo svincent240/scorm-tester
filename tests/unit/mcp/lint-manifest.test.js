@@ -18,7 +18,7 @@ describe('MCP scorm_lint_manifest', () => {
   });
 
   afterAll(() => {
-    try { fs.rmSync(tempCourseDir, { recursive: true, force: true }); } catch (_) {}
+    try { fs.rmSync(tempCourseDir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
   });
 
   test('returns basic validation structure', async () => {
@@ -32,7 +32,7 @@ describe('MCP scorm_lint_manifest', () => {
   test('throws when manifest missing', async () => {
     const emptyDir = mktempDir();
     await expect(scorm_lint_manifest({ workspace_path: emptyDir })).resolves.toEqual(expect.objectContaining({ valid: false }));
-    try { fs.rmSync(emptyDir, { recursive: true, force: true }); } catch (_) {}
+    try { fs.rmSync(emptyDir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
   });
 });
 

@@ -48,7 +48,7 @@ describe('MCP scorm_debug_api_calls timing metrics', () => {
       expect(res.metrics.duration_ms).toBe(500);
       expect(res.metrics.methods.sort()).toEqual(['Commit','Initialize','SetValue','Terminate'].sort());
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

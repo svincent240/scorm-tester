@@ -19,7 +19,7 @@ function ensureSizeLimit(filePath, headerLine) {
     if (size > MAX_LOG_BYTES) {
       fs.writeFileSync(filePath, headerLine + '\n');
     }
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
 }
 
 class Logger {
@@ -49,10 +49,10 @@ class Logger {
             // Always clear files at startup for fresh debugging; retain only one file
             const startLine = `Log start ${new Date().toISOString()}`;
             fs.writeFileSync(this.logFile, `${startLine}\n`);
-            try { fs.writeFileSync(this.ndjsonFile, JSON.stringify({ ts: Date.now(), event: 'LOG_START', process: this.processType }) + '\n'); } catch (_) {}
-            try { fs.writeFileSync(this.errorsFile, JSON.stringify({ ts: Date.now(), event: 'ERROR_LOG_START', process: this.processType }) + '\n'); } catch (_) {}
+            try { fs.writeFileSync(this.ndjsonFile, JSON.stringify({ ts: Date.now(), event: 'LOG_START', process: this.processType }) + '\n'); } catch (_) { /* intentionally empty */ }
+            try { fs.writeFileSync(this.errorsFile, JSON.stringify({ ts: Date.now(), event: 'ERROR_LOG_START', process: this.processType }) + '\n'); } catch (_) { /* intentionally empty */ }
         } catch (error) {
-            try { console.error('Failed to initialize log files:', error); } catch (_) {}
+            try { console.error('Failed to initialize log files:', error); } catch (_) { /* intentionally empty */ }
         }
     }
 
@@ -130,7 +130,7 @@ class Logger {
         fs.fsyncSync(fd); // Force immediate flush to disk
         fs.closeSync(fd);
       } catch (error) {
-        try { console.error('Failed to write to log file:', error); } catch (_) {}
+        try { console.error('Failed to write to log file:', error); } catch (_) { /* intentionally empty */ }
       }
 
       // Structured NDJSON entry
@@ -148,14 +148,14 @@ class Logger {
         fs.writeSync(fd, JSON.stringify(entry) + '\n');
         fs.fsyncSync(fd); // Force immediate flush to disk
         fs.closeSync(fd);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
       if (level === 'error') {
         try {
           const fd = fs.openSync(this.errorsFile, 'a');
           fs.writeSync(fd, JSON.stringify(entry) + '\n');
           fs.fsyncSync(fd); // Force immediate flush to disk
           fs.closeSync(fd);
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
       }
 
       if (process.env.NODE_ENV === 'development') {

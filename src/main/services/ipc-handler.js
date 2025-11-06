@@ -103,9 +103,9 @@ class IpcHandler extends BaseService {
       if (telemetry) {
         this.telemetryStore = telemetry;
         // Ensure clean telemetry state on startup when telemetryStore is provided
-        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (_) {}
+        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (_) { /* intentionally empty */ }
       }
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
 
     // NOTE: SCORM API call broadcasting is handled by ScormInspectorTelemetryStore.storeApiCall()
@@ -148,7 +148,7 @@ class IpcHandler extends BaseService {
     try {
       const snSnapshot = this.getDependency('snSnapshotService');
       if (snSnapshot) this.snSnapshotService = snSnapshot;
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
 
     // Phase 1: Disable server-side IPC rate limiting (moved to client-side shaping)
     this.rateLimiter = null;
@@ -207,19 +207,19 @@ class IpcHandler extends BaseService {
     // Register logging handlers directly to bypass any potential issues
     try {
       ipcMain.handle('renderer-log-info', async (_event, ...args) => {
-        try { this.logger?.info(...args); } catch (e) {}
+        try { this.logger?.info(...args); } catch (_) { /* intentionally empty */ }
         return { success: true };
       });
       ipcMain.handle('renderer-log-warn', async (_event, ...args) => {
-        try { this.logger?.warn(...args); } catch (e) {}
+        try { this.logger?.warn(...args); } catch (_) { /* intentionally empty */ }
         return { success: true };
       });
       ipcMain.handle('renderer-log-error', async (_event, ...args) => {
-        try { this.logger?.error(...args); } catch (e) {}
+        try { this.logger?.error(...args); } catch (_) { /* intentionally empty */ }
         return { success: true };
       });
       ipcMain.handle('renderer-log-debug', async (_event, ...args) => {
-        try { this.logger?.debug(...args); } catch (e) {}
+        try { this.logger?.debug(...args); } catch (_) { /* intentionally empty */ }
         return { success: true };
       });
 
@@ -231,7 +231,7 @@ class IpcHandler extends BaseService {
             win.webContents.openDevTools({ mode: 'detach' });
           }
         } catch (e) {
-          try { this.logger?.warn('Failed to open dev tools', e?.message || String(e)); } catch (_) {}
+          try { this.logger?.warn('Failed to open dev tools', e?.message || String(e)); } catch (_) { /* intentionally empty */ }
         }
       });
 
@@ -246,7 +246,7 @@ class IpcHandler extends BaseService {
             }
           }
         } catch (e) {
-          try { this.logger?.warn('Failed to reload window', e?.message || String(e)); } catch (_) {}
+          try { this.logger?.warn('Failed to reload window', e?.message || String(e)); } catch (_) { /* intentionally empty */ }
         }
       });
 
@@ -1255,7 +1255,7 @@ class IpcHandler extends BaseService {
         const TERMINATE_TIMEOUT_MS = 1500;
         const p = Promise.resolve().then(() => scormService.terminateAllSessions({ silent: true }));
         await Promise.race([
-          p.catch(() => {}), // swallow individual errors
+          p.catch(() => { /* intentionally empty */ })), // swallow individual errors
           new Promise(res => setTimeout(res, TERMINATE_TIMEOUT_MS))
         ]);
         return;

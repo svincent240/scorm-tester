@@ -25,7 +25,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0]).toHaveProperty('code_snippet');
       expect(res.violations[0].file).toBe('sco.js');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -39,7 +39,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       
       expect(res.violations.length).toBe(0);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -58,7 +58,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       );
       expect(hasRelevantViolation).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -76,7 +76,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       
       expect(res.violations.length).toBeGreaterThan(2);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -95,7 +95,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations.length).toBeGreaterThan(0);
       expect(res.violations[0].file).toBe('sco.html');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -114,7 +114,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
 
       expect(res.violations.length).toBe(0);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -135,7 +135,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0].severity).toBe('warning');
       expect(res.violations[0].issue).toContain('position:fixed');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -156,7 +156,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0].issue).toContain('100vh');
       expect(res.violations[0].fix_suggestion).toContain('percentage-based heights');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -176,7 +176,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0].severity).toBe('warning');
       expect(res.violations[0].issue).toContain('100vw');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -199,7 +199,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0].severity).toBe('warning');
       expect(res.violations[0].issue).toContain('position:fixed');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -220,7 +220,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       expect(res.violations[0].file).toBe('styles.css');
       expect(res.violations[0].issue).toContain('position:sticky');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -251,7 +251,7 @@ describe('MCP scorm_lint_parent_dom_access', () => {
       // Should still contain the violation pattern
       expect(snippet).toContain('parent.document');
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

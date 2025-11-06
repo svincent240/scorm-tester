@@ -114,7 +114,7 @@ async function scorm_test_api_integration(params = {}) {
       scenario_ack: !!test_scenario
     };
   } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
+    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
   }
 }
 
@@ -160,13 +160,13 @@ async function scorm_take_screenshot(params = {}) {
             try {
               const el = document.querySelector(sel);
               if (el) return resolve(true);
-            } catch (e) {}
+            } catch (_) { /* intentionally empty */ }
             if (Date.now() - start > ${waitTimeoutMs}) return resolve(false);
             setTimeout(tick, 100);
           };
           tick();
         })`;
-        try { await win.webContents.executeJavaScript(pollScript, true); } catch (_) {}
+        try { await win.webContents.executeJavaScript(pollScript, true); } catch (_) { /* intentionally empty */ }
       }
 
       if (delayMs > 0) {
@@ -194,11 +194,11 @@ async function scorm_take_screenshot(params = {}) {
     const e = new Error(error?.message || String(error));
     e.code = 'CAPTURE_FAILED';
     if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_take_screenshot', error_code: e.code, message: e.message } }); } catch (_) {}
+      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_take_screenshot', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
     }
     throw e;
   } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
+    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
   }
 }
 
@@ -258,11 +258,11 @@ async function scorm_test_navigation_flow(params = {}) {
     const e = new Error(error?.message || String(error));
     e.code = 'NAV_FLOW_ERROR';
     if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_test_navigation_flow', error_code: e.code, message: e.message } }); } catch (_) {}
+      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_test_navigation_flow', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
     }
     throw e;
   } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
+    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
   }
 }
 
@@ -341,11 +341,11 @@ async function scorm_debug_api_calls(params = {}) {
     const e = new Error(error?.message || String(error));
     e.code = 'DEBUG_API_ERROR';
     if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_debug_api_calls', error_code: e.code, message: e.message } }); } catch (_) {}
+      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_debug_api_calls', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
     }
     throw e;
   } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
+    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
   }
 }
 
@@ -492,7 +492,7 @@ async function scorm_trace_sequencing(params = {}) {
       if (details && typeof details === 'object') rec.details = details;
       trace.push(rec);
       if (sessions.emit && session_id) {
-        try { sessions.emit({ session_id, type: 'trace:sequencing_step', payload: { step: rec.step, level: rec.level, index: trace.length } }); } catch (_) {}
+        try { sessions.emit({ session_id, type: 'trace:sequencing_step', payload: { step: rec.step, level: rec.level, index: trace.length } }); } catch (_) { /* intentionally empty */ }
       }
     }
   };
@@ -584,11 +584,11 @@ async function scorm_trace_sequencing(params = {}) {
     const e = new Error(error?.message || String(error));
     e.code = 'TRACE_SEQUENCING_ERROR';
     if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_trace_sequencing', error_code: e.code, message: e.message } }); } catch (_) {}
+      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_trace_sequencing', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
     }
     throw e;
   } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) {} }
+    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
   }
 }
 

@@ -375,13 +375,13 @@ class ScormClient {
         try {
           const { rendererLogger } = await import('../utils/renderer-logger.js');
           rendererLogger.warn('SCORM initialization failed', result.errorCode);
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
       }
     } catch (error) {
       try {
         const { rendererLogger } = await import('../utils/renderer-logger.js');
         rendererLogger.error('Error initializing SCORM session', error?.message || error);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -403,7 +403,7 @@ class ScormClient {
         try {
           const { rendererLogger } = await import('../utils/renderer-logger.js');
           rendererLogger.debug(`ScormClient: asyncTerminate - exitValue from cache: "${exitValue}"`);
-        } catch (_) {}
+        } catch (_) { /* intentionally empty */ }
         await ipcClient.scormTerminate(this.sessionId, exitValue);
       }
     } catch (error) {
@@ -435,7 +435,7 @@ class ScormClient {
       try {
         const { rendererLogger } = await import('../utils/renderer-logger.js');
         rendererLogger.error(`Error getting SCORM value for ${element}`, error?.message || error);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -683,10 +683,10 @@ class ScormClient {
     };
 
     // Keep lightweight per-window UI state (existing code path)
-    try { this.uiState.addApiCall(apiCall); } catch (_) {}
+    try { this.uiState.addApiCall(apiCall); } catch (_) { /* intentionally empty */ }
 
     // Emit a UI-scoped API call event (allowed). The SCORM Inspector receives data via IPC from main process.
-    try { eventBus.emit('ui:api:call', { data: apiCall }); } catch (_) {}
+    try { eventBus.emit('ui:api:call', { data: apiCall }); } catch (_) { /* intentionally empty */ }
 
   }
 

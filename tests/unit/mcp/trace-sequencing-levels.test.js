@@ -60,7 +60,7 @@ describe('MCP scorm_trace_sequencing trace levels', () => {
       expect(verboseSteps).toEqual(expect.arrayContaining(['context_info']));
       expect(resVerbose.trace.length).toBeGreaterThanOrEqual(resDetailed.trace.length);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

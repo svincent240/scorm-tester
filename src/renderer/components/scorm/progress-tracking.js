@@ -35,7 +35,7 @@ class ProgressTracking extends BaseComponent {
     try {
       const pd = this.uiState && this.uiState.getState ? (this.uiState.getState('progressData') || {}) : {};
       this.applyProgressSnapshot(pd);
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 
   renderContent() {
@@ -111,7 +111,7 @@ class ProgressTracking extends BaseComponent {
           this.state.timeSpent = t;
           this.updateProgress(this.state);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
   }
 
@@ -137,7 +137,7 @@ class ProgressTracking extends BaseComponent {
           const logger = mod && mod.rendererLogger ? mod.rendererLogger : null;
           if (logger && logger.warn) logger.warn('ProgressTracking.applyProgressSnapshot failed', (e && (e.message || e)));
         });
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     }
   }
 
@@ -202,7 +202,7 @@ class ProgressTracking extends BaseComponent {
       const pd = (this.uiState && typeof this.uiState.getState === 'function') ? (this.uiState.getState('progressData') || {}) : {};
       this.state.scoreRaw = (pd.scoreRaw != null && pd.scoreRaw !== '') ? Number(pd.scoreRaw) : this.state.scoreRaw;
       this.state.scoreScaled = (pd.scoreScaled != null && pd.scoreScaled !== '') ? Number(pd.scoreScaled) : this.state.scoreScaled;
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
 }
 

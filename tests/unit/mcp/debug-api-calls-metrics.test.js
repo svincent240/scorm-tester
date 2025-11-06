@@ -50,7 +50,7 @@ describe('MCP scorm_debug_api_calls metrics', () => {
       expect(res.metrics.total_calls).toBe(5);
       expect(res.metrics.by_method).toEqual({ Initialize: 1, SetValue: 2, Commit: 1, Terminate: 1 });
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 
@@ -96,7 +96,7 @@ describe('MCP scorm_debug_api_calls metrics', () => {
       expect(res.metrics.total_calls).toBe(2);
       expect(res.metrics.by_method).toEqual({ Initialize: 1, Commit: 1 });
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

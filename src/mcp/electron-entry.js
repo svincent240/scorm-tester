@@ -9,7 +9,7 @@ const { app } = require("electron");
 async function childMode() {
   // Child mode: Electron provides runtime services via IPC, no stdio MCP server
   app.on("window-all-closed", (e) => {
-    try { e.preventDefault(); } catch (_) {}
+    try { e.preventDefault(); } catch (_) { /* intentionally empty */ }
   });
 
   await app.whenReady();

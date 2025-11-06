@@ -33,7 +33,7 @@ describe('MCP scorm_lint_sequencing', () => {
       expect(hasLeafIssue).toBe(true);
       expect(res.stats.itemsScanned).toBeGreaterThan(0);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });

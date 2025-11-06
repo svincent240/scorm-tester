@@ -10,15 +10,15 @@ import { rendererLogger } from '../utils/renderer-logger.js';
 export async function initialize() {
   try {
     ipcClient.onActivityProgressUpdated((data) => {
-      try { eventBus.emit('activity:progress:updated', data); } catch (_) {}
+      try { eventBus.emit('activity:progress:updated', data); } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onObjectivesUpdated((data) => {
-      try { eventBus.emit('objectives:updated', data); } catch (_) {}
+      try { eventBus.emit('objectives:updated', data); } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onNavigationCompleted((data) => {
-      try { eventBus.emit('navigation:completed', data); } catch (_) {}
+      try { eventBus.emit('navigation:completed', data); } catch (_) { /* intentionally empty */ }
     });
 
     // NOTE: Do NOT forward course-loaded IPC event to course:loaded EventBus event
@@ -26,11 +26,11 @@ export async function initialize() {
     // Forwarding this would cause duplicate course:loaded events and duplicate success notifications
     ipcClient.onCourseLoaded((data) => {
       // IPC event received but not forwarded to EventBus to prevent duplicates
-      try { rendererLogger.debug('ipc-events-forwarder: course-loaded IPC event received (not forwarded to EventBus)'); } catch (_) {}
+      try { rendererLogger.debug('ipc-events-forwarder: course-loaded IPC event received (not forwarded to EventBus)'); } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onCourseExited((data) => {
-      try { eventBus.emit('course:exited', data); } catch (_) {}
+      try { eventBus.emit('course:exited', data); } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onScormApiCallLogged((data) => {
@@ -38,7 +38,7 @@ export async function initialize() {
         if (data && data.event === 'sn:initialized') {
           eventBus.emit('sn:initialized', data);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onScormInspectorDataUpdated((data) => {
@@ -46,14 +46,14 @@ export async function initialize() {
         if (data && data.type === 'course-outline:refresh-required') {
           eventBus.emit('course-outline:refresh-required', data);
         }
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     // Forward console errors from main process to EventBus for UI display
     ipcClient.onRendererConsoleError((data) => {
       try {
         eventBus.emit('renderer:console-error', data);
-      } catch (_) {}
+      } catch (_) { /* intentionally empty */ }
     });
 
     rendererLogger.info('ipc-events-forwarder: initialized');

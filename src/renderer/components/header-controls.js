@@ -55,15 +55,15 @@ class HeaderControls extends BaseComponent {
 
       switch (target.id) {
         case 'hc-open-zip':
-          try { rendererLogger.info('HeaderControls: emit course:open-zip:request'); } catch (_) {}
+          try { rendererLogger.info('HeaderControls: emit course:open-zip:request'); } catch (_) { /* intentionally empty */ }
           this.eventBus.emit('course:open-zip:request');
           break;
         case 'hc-open-folder':
-          try { rendererLogger.info('HeaderControls: emit course:open-folder:request'); } catch (_) {}
+          try { rendererLogger.info('HeaderControls: emit course:open-folder:request'); } catch (_) { /* intentionally empty */ }
           this.eventBus.emit('course:open-folder:request');
           break;
         case 'course-reload-btn':
-          try { rendererLogger.info('HeaderControls: emit course:reload:request'); } catch (_) {}
+          try { rendererLogger.info('HeaderControls: emit course:reload:request'); } catch (_) { /* intentionally empty */ }
           this.eventBus.emit('course:reload:request');
           break;
         case 'hc-inspector':

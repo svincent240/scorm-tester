@@ -21,7 +21,7 @@ describe('MCP scorm_validate_workspace', () => {
       expect(typeof res.compliance_score).toBe('number');
       expect(Array.isArray(res.actionable_fixes)).toBe(true);
     } finally {
-      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* intentionally empty */ }
     }
   });
 });
