@@ -62,6 +62,9 @@ class ScormDataModel {
     // Main data storage
     this.data = new Map();
 
+    // Track which elements have been explicitly set (vs. just initialized with defaults)
+    this.explicitlySet = new Set();
+
     // Collection storage
     this.interactions = [];
     this.objectives = [];
@@ -294,13 +297,19 @@ class ScormDataModel {
         return this.setCollectionValue(element, value);
       }
 
-      const previousValue = this.data.get(element);
+      // Track whether this element was explicitly set before
+      const wasExplicitlySet = this.explicitlySet.has(element);
+      // For change event, use undefined if never explicitly set, otherwise use actual value
+      const previousValueForChange = wasExplicitlySet ? this.data.get(element) : undefined;
+
+      // Mark as explicitly set
+      this.explicitlySet.add(element);
 
       // Set the value
       this.data.set(element, value);
 
-      // Emit change event only when value actually differs
-      this._emitChange(element, previousValue, value);
+      // Emit change event
+      this._emitChange(element, previousValueForChange, value);
 
       // Log browse mode operation if in browse mode
       if (this.isBrowseMode()) {
@@ -345,11 +354,16 @@ class ScormDataModel {
         return this.setCollectionValue(element, value);
       }
 
-      const previousValue = this.data.get(element);
+      // Track whether this element was explicitly set before
+      const wasExplicitlySet = this.explicitlySet.has(element);
+      const previousValueForChange = wasExplicitlySet ? this.data.get(element) : undefined;
+
+      // Mark as explicitly set
+      this.explicitlySet.add(element);
 
       // Directly set the value, bypassing read-only check
       this.data.set(element, value);
-      this._emitChange(element, previousValue, value, { source: 'internal' });
+      this._emitChange(element, previousValueForChange, value, { source: 'internal' });
       this.errorHandler.clearError(); // Clear any previous error from this operation
       return true;
     } catch (error) {
@@ -1004,6 +1018,7 @@ class ScormDataModel {
    */
   reset() {
     this.data.clear();
+    this.explicitlySet.clear();
     this.interactions = [];
     this.objectives = [];
     this.commentsFromLearner = [];

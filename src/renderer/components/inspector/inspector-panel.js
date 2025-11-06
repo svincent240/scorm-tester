@@ -261,7 +261,7 @@ class InspectorPanel extends BaseComponent {
     // Toggle tab containers
     Object.entries(this.tabEls || {}).forEach(([key, el]) => {
       if (!el) return;
-      el.style.display = key === next ? '' : 'none';
+      el.style.display = key === next ? 'flex' : 'none';
     });
     // Toggle active state on tab buttons for styling
     try {
@@ -602,6 +602,10 @@ class InspectorPanel extends BaseComponent {
       else if (method.includes('Commit')) methodClass = 'method-commit';
       else if (method.includes('GetLastError')) methodClass = 'method-error';
 
+      // Format JSON - escape for attribute but NOT for content inside <pre>
+      const paramsJson = params != null ? JSON.stringify(params, null, 2) : null;
+      const resultJson = result != null ? JSON.stringify(result, null, 2) : null;
+
       return `<li class="api-call${entry.hasError ? ' api-call-error' : ''}" data-record='${this._esc(recordData)}'>
         <div class="api-call__header">
           <code class="api-call__method ${methodClass}">${method}</code>
@@ -610,32 +614,107 @@ class InspectorPanel extends BaseComponent {
           <button class="api-call__copy js-copy-record" title="Copy record">📋</button>
         </div>
         <div class="api-call__details">
-          ${params != null ? `<div><strong>Params:</strong> <code>${this._esc(JSON.stringify(params))}</code></div>` : ''}
-          ${result != null ? `<div><strong>Result:</strong> <code>${this._esc(JSON.stringify(result))}</code></div>` : ''}
+          ${paramsJson ? `<div class="api-call__field"><strong>Params:</strong><pre class="api-call__json">${this._esc(paramsJson)}</pre></div>` : ''}
+          ${resultJson ? `<div class="api-call__field"><strong>Result:</strong><pre class="api-call__json">${this._esc(resultJson)}</pre></div>` : ''}
           ${entry.hasError ? `<div class="api-call__error"><strong>Error ${this._esc(String(errorCode))}:</strong> ${this._esc(errorMessage || 'Unknown error')}</div>` : ''}
-          ${sessionId ? `<div><strong>Session:</strong> ${this._esc(sessionId)}</div>` : ''}
+          ${sessionId ? `<div class="api-call__session"><strong>Session:</strong> ${this._esc(sessionId)}</div>` : ''}
         </div>
       </li>`;
     }
 
     const change = entry.data || {};
     const timestamp = entry.timestampIso ? new Date(entry.timestampIso).toLocaleTimeString() : '';
-    const previousValue = change.previousValue === undefined ? '<em>unset</em>' : this._esc(JSON.stringify(change.previousValue));
-    const newValue = change.newValue === undefined ? '<em>unset</em>' : this._esc(JSON.stringify(change.newValue));
-    const element = change.element ? this._esc(String(change.element)) : '<em>unknown</em>';
+    const element = change.element ? String(change.element) : 'unknown';
+    const elementEsc = this._esc(element);
     const source = change.source ? this._esc(String(change.source)) : 'unspecified';
     const payload = JSON.stringify(change, null, 2);
 
+    // Determine color class based on element type
+    let elementClass = 'element-default';
+    if (element.includes('cmi.score')) elementClass = 'element-score';
+    else if (element.includes('cmi.completion_status') || element.includes('cmi.success_status')) elementClass = 'element-status';
+    else if (element.includes('cmi.location') || element.includes('cmi.suspend_data')) elementClass = 'element-data';
+    else if (element.includes('cmi.interactions')) elementClass = 'element-interaction';
+    else if (element.includes('cmi.objectives')) elementClass = 'element-objective';
+    else if (element.includes('cmi.session_time') || element.includes('cmi.total_time')) elementClass = 'element-time';
+
+    // Format values - show actual value with proper formatting
+    const formatValue = (val) => {
+      if (val === undefined) return '<em class="value-unset">unset</em>';
+      if (val === null) return '<em class="value-null">null</em>';
+      if (val === '') return '<em class="value-empty">""</em>';
+      if (typeof val === 'string') {
+        // Check if string contains JSON - try to parse and format it
+        const trimmed = val.trim();
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+          try {
+            const parsed = JSON.parse(val);
+            // Successfully parsed - show as formatted JSON
+            return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(parsed, null, 2))}</pre>`;
+          } catch (e) {
+            // Not valid JSON, treat as regular string
+          }
+        }
+        // For strings, escape and wrap in quotes if it's not too long
+        const escaped = this._esc(val);
+        if (val.length > 100) {
+          // Long strings - show in pre block
+          return `<pre class="data-model-change__string-value">${escaped}</pre>`;
+        }
+        return `<span class="data-model-change__string-value">"${escaped}"</span>`;
+      }
+      if (typeof val === 'number' || typeof val === 'boolean') {
+        return `<span class="data-model-change__primitive-value">${this._esc(String(val))}</span>`;
+      }
+      // Complex object/array - show as formatted JSON in pre tag
+      return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(val, null, 2))}</pre>`;
+    };
+
+    const previousValueDisplay = formatValue(change.previousValue);
+    const newValueDisplay = formatValue(change.newValue);
+
+    // Build full data model snapshots if available
+    const hasSnapshots = change.dataModelBefore || change.dataModelAfter;
+    const snapshotsHtml = hasSnapshots ? `
+      <details class="data-model-change__snapshots">
+        <summary>📊 Show full data model snapshots</summary>
+        <div class="data-model-change__snapshot-container">
+          ${change.dataModelBefore ? `
+            <div class="data-model-change__snapshot">
+              <strong>Before:</strong>
+              <pre class="data-model-change__json-snapshot">${this._esc(JSON.stringify(change.dataModelBefore, null, 2))}</pre>
+            </div>
+          ` : ''}
+          ${change.dataModelAfter ? `
+            <div class="data-model-change__snapshot">
+              <strong>After:</strong>
+              <pre class="data-model-change__json-snapshot">${this._esc(JSON.stringify(change.dataModelAfter, null, 2))}</pre>
+            </div>
+          ` : ''}
+        </div>
+      </details>
+    ` : '';
+
     return `<li class="data-model-change" data-record='${this._esc(payload)}'>
       <div class="data-model-change__header">
-        <code class="data-model-change__element">${element}</code>
+        <code class="data-model-change__element ${elementClass}">${elementEsc}</code>
         ${timestamp ? `<span class="data-model-change__timestamp">${this._esc(timestamp)}</span>` : ''}
-        <span class="data-model-change__source">${this._esc(source)}</span>
+        <span class="data-model-change__source">${source}</span>
         <button class="data-model-change__copy js-copy-record" title="Copy record">📋</button>
       </div>
       <div class="data-model-change__details">
-        <div><strong>Previous:</strong> <code>${previousValue}</code></div>
-        <div><strong>New:</strong> <code>${newValue}</code></div>
+        <div class="data-model-change__value-comparison">
+          <div class="data-model-change__value-row">
+            <span class="data-model-change__label data-model-change__label--prev">Previous:</span>
+            <div class="data-model-change__value-content">${previousValueDisplay}</div>
+          </div>
+          <div class="data-model-change__value-row">
+            <span class="data-model-change__label data-model-change__label--new">New:</span>
+            <div class="data-model-change__value-content data-model-change__value-content--new">${newValueDisplay}</div>
+          </div>
+        </div>
+        ${snapshotsHtml}
       </div>
     </li>`;
   }
@@ -648,22 +727,82 @@ class InspectorPanel extends BaseComponent {
     const filtered = this._applyTimelineFilters(timeline);
     const { slice, page, pages, total } = this._paginate(filtered);
 
-    const methodOptions = ['<option value="all">All methods</option>'];
-    this._getMethods().forEach((method) => {
-      methodOptions.push(`<option value="${this._esc(method)}" ${this._timelineFilters.method === method ? 'selected' : ''}>${this._esc(method)}</option>`);
+    // Get unique API methods
+    const methods = this._getMethods();
+    const methodCheckboxes = methods.map((method) => {
+      const checked = this._timelineFilters.method === 'all' || this._timelineFilters.method === method ? 'checked' : '';
+      return `<label class="filter-checkbox"><input type="checkbox" class="js-method-filter" value="${this._esc(method)}" ${checked}/> ${this._esc(method)}</label>`;
+    }).join('');
+
+    // Get unique data model element types from current timeline
+    const dmElements = new Set();
+    this.state.dataModelChanges.forEach(change => {
+      if (change.element) {
+        // Extract base element type (e.g., "cmi.score.scaled" -> "cmi.score")
+        const parts = change.element.split('.');
+        if (parts.length >= 2) {
+          const baseType = `${parts[0]}.${parts[1]}`;
+          dmElements.add(baseType);
+        }
+      }
     });
+    
+    const elementCheckboxes = Array.from(dmElements).sort().map((element) => {
+      const label = element.replace('cmi.', '');
+      return `<label class="filter-checkbox"><input type="checkbox" class="js-element-filter" value="${this._esc(element)}" checked/> ${this._esc(label)}</label>`;
+    }).join('');
 
     const controls = `
       <div class="api-controls">
-        <label>Method <select class="js-api-filter">${methodOptions.join('')}</select></label>
-        <label><input type="checkbox" class="js-api-errors" ${this._timelineFilters.errorsOnly ? 'checked' : ''}/> Errors only</label>
-        <label><input type="checkbox" class="js-timeline-api" ${this._timelineFilters.showApi ? 'checked' : ''}/> API</label>
-        <label><input type="checkbox" class="js-timeline-dm" ${this._timelineFilters.showDataModel ? 'checked' : ''}/> Data model</label>
-        <button class="js-clear-timeline" title="Clear timeline">Clear</button>
-        <span class="api-paging">Page ${page}/${pages} • ${total} items</span>
-        <div class="api-paging__buttons">
-          <button class="js-page-prev" ${page <= 1 ? 'disabled' : ''}>Prev</button>
-          <button class="js-page-next" ${page >= pages ? 'disabled' : ''}>Next</button>
+        <div class="filter-group">
+          <span class="filter-group__label">Show:</span>
+          <label class="filter-checkbox filter-checkbox--primary">
+            <input type="checkbox" class="js-timeline-api" ${this._timelineFilters.showApi ? 'checked' : ''}/> 
+            <span>API Calls</span>
+          </label>
+          <label class="filter-checkbox filter-checkbox--primary">
+            <input type="checkbox" class="js-timeline-dm" ${this._timelineFilters.showDataModel ? 'checked' : ''}/> 
+            <span>Data Model Changes</span>
+          </label>
+        </div>
+        
+        ${methods.length > 0 ? `
+          <details class="filter-dropdown">
+            <summary class="filter-dropdown__summary">API Methods (${methods.length})</summary>
+            <div class="filter-dropdown__content">
+              <div class="filter-dropdown__actions">
+                <button class="filter-dropdown__action js-select-all-methods">Select All</button>
+                <button class="filter-dropdown__action js-unselect-all-methods">Unselect All</button>
+              </div>
+              ${methodCheckboxes}
+            </div>
+          </details>
+        ` : ''}
+        
+        ${dmElements.size > 0 ? `
+          <details class="filter-dropdown">
+            <summary class="filter-dropdown__summary">Data Model Elements (${dmElements.size})</summary>
+            <div class="filter-dropdown__content">
+              <div class="filter-dropdown__actions">
+                <button class="filter-dropdown__action js-select-all-elements">Select All</button>
+                <button class="filter-dropdown__action js-unselect-all-elements">Unselect All</button>
+              </div>
+              ${elementCheckboxes}
+            </div>
+          </details>
+        ` : ''}
+
+        <div class="filter-actions">
+          <button class="btn-clear js-clear-timeline" title="Clear timeline">Clear Timeline</button>
+        </div>
+      </div>`;
+
+    const pagination = `
+      <div class="timeline-pagination">
+        <span class="timeline-pagination__info">Page ${page} of ${pages} • Showing ${slice.length} of ${total} items</span>
+        <div class="timeline-pagination__buttons">
+          <button class="btn-page js-page-prev" ${page <= 1 ? 'disabled' : ''}>‹ Prev</button>
+          <button class="btn-page js-page-next" ${page >= pages ? 'disabled' : ''}>Next ›</button>
         </div>
       </div>`;
 
@@ -683,6 +822,9 @@ class InspectorPanel extends BaseComponent {
         </div>
         <div class="tab-section__content">
           <ul class="api-log api-log--enhanced">${list}</ul>
+        </div>
+        <div class="tab-section__footer">
+          ${pagination}
         </div>
       </div>
       ${errorsBlock}`;

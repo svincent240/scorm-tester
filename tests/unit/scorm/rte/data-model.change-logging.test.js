@@ -79,9 +79,9 @@ describe('ScormDataModel - Change Logging', () => {
       // Changes during constructor initialization should be suppressed
       // capturedChanges should only contain changes after init
       const initialLength = capturedChanges.length;
-      
-      // Any setValue after init should emit
-      dataModel.setValue('cmi.learner_name', 'John Doe');
+
+      // Any setValue after init should emit (use a writable element)
+      dataModel.setValue('cmi.location', 'page-1');
       expect(capturedChanges.length).toBeGreaterThan(initialLength);
     });
   });
@@ -90,16 +90,18 @@ describe('ScormDataModel - Change Logging', () => {
     test('should include all required fields in change payload', () => {
       dataModel.setValue('cmi.score.raw', '85');
 
-      expect(capturedChanges[0]).toMatchObject({
+      const change = capturedChanges[0];
+      expect(change).toMatchObject({
         entryType: 'data-model-change',
         changeType: 'data-model',
         element: 'cmi.score.raw',
-        previousValue: expect.anything(),
         newValue: '85',
         sessionId: 'test-session-123',
         timestamp: expect.any(Number),
         source: expect.any(String)
       });
+      // previousValue should exist (even if undefined for first-time sets)
+      expect(change).toHaveProperty('previousValue');
     });
 
     test('should include truncation metadata for large values', () => {

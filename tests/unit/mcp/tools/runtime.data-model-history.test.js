@@ -5,7 +5,7 @@
  */
 
 const { scorm_get_data_model_history } = require('../../../../src/mcp/tools/runtime');
-const RuntimeManager = require('../../../../src/mcp/runtime-manager');
+const { RuntimeManager } = require('../../../../src/mcp/runtime-manager');
 
 // Mock RuntimeManager
 jest.mock('../../../../src/mcp/runtime-manager');
@@ -191,10 +191,20 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       });
 
       expect(result).toEqual({
+        success: true,
         session_id: 'session-1',
-        changes: mockChanges,
-        total: 2,
-        has_more: false
+        data: {
+          changes: mockChanges,
+          total: 2,
+          has_more: false
+        },
+        filters_applied: {
+          since_ts: null,
+          element_prefix: null,
+          change_session_id: null,
+          limit: null,
+          offset: 0
+        }
       });
     });
 
@@ -211,10 +221,20 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       });
 
       expect(result).toEqual({
+        success: true,
         session_id: 'session-1',
-        changes: [],
-        total: 0,
-        has_more: false
+        data: {
+          changes: [],
+          total: 0,
+          has_more: false
+        },
+        filters_applied: {
+          since_ts: null,
+          element_prefix: null,
+          change_session_id: null,
+          limit: null,
+          offset: 0
+        }
       });
     });
 
@@ -231,9 +251,9 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
         limit: 50
       });
 
-      expect(result.total).toBe(500);
-      expect(result.has_more).toBe(true);
-      expect(result.changes.length).toBe(50);
+      expect(result.data.total).toBe(500);
+      expect(result.data.has_more).toBe(true);
+      expect(result.data.changes.length).toBe(50);
     });
   });
 
@@ -320,7 +340,7 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       });
 
       // Should handle undefined and return safe defaults
-      expect(result.changes).toBeDefined();
+      expect(result.data.changes).toBeDefined();
     });
   });
 });
