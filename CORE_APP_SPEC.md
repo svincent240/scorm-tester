@@ -54,6 +54,29 @@ Main Process
 *   **`RTE (Run-Time Environment)`**: Implements the SCORM API (via `ApiHandler`) and manages the data model for a SCO. It is the source of truth for `cmi.*` data.
 *   **`SN (Sequencing & Navigation)`**: Implements the SCORM sequencing and navigation logic. It is the source of truth for the activity tree, sequencing rules, and navigation state.
 
+### 3.3. SCORM Inspector Telemetry
+
+The **`ScormInspectorTelemetryStore`** captures diagnostic data for SCORM package analysis and debugging. This includes:
+
+*   **API Call History**: All SCORM API calls (`Initialize`, `SetValue`, `GetValue`, `Commit`, `Terminate`) with parameters, results, timing, and errors.
+*   **Data Model Change Log**: A sequential history of all mutations to the SCORM data model (`cmi.*` elements and collections). Each change entry includes:
+    *   `element`: The exact data model path (e.g., `cmi.location`, `cmi.interactions.0.id`)
+    *   `previousValue`: The value before the change (undefined if not previously set)
+    *   `newValue`: The value after the change
+    *   `source`: Origin of the change (`api:SetValue`, `api:Commit`, `internal`, etc.)
+    *   `timestamp`: Precise millisecond timestamp
+    *   `sessionId`: SCORM session identifier
+    *   `collectionIndex` and `collectionProperty`: For collection elements (interactions, objectives, comments)
+    *   Truncation metadata: For large values (e.g., `suspend_data`), the store records original length/bytes and includes a `truncated` flag
+
+The data model change log is maintained in a **ring buffer** (default 5000 entries, configurable via `SERVICE_DEFAULTS.TELEMETRY.MAX_DATA_MODEL_HISTORY`) and is separate from the API call history to ensure both streams can be independently queried and managed.
+
+**Change Capture**: The `ScormDataModel` emits change events via a callback listener. The `ScormApiHandler` subscribes to these events and forwards them to the telemetry store, ensuring every mutation—whether from API calls or internal LMS operations—is logged.
+
+**Broadcasting**: Changes are immediately broadcast to all renderer windows via IPC (`scorm-data-model-change` channel) for real-time inspector UI updates.
+
+**No Fallbacks**: The change log is the sole mechanism for tracking data model history. There are no legacy snapshot-only modes or alternate pathways.
+
 ## 4. Interfacing (IPC)
 
 The main process expects a well-behaved client (the renderer). Responsibility for managing API chattiness (e.g., from frequent SCORM `SetValue` calls) lies with the client, not the core application.
