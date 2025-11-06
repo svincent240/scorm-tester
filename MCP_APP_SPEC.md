@@ -391,6 +391,60 @@ Real-time sequencing rule debugging and visualization.
 - `visual_tree_url` (string): URL for activity tree visualization if enabled
 - `trace_log_url` (string): Real-time trace log interface URL
 
+#### `scorm_get_data_model_history`
+Retrieve the sequential history of all SCORM data model changes for an open runtime session.
+
+**Parameters:**
+- `session_id` (string, required): Active runtime session ID
+- `since_ts` (number, optional): Return only changes after this timestamp (milliseconds)
+- `element_prefix` (string|array, optional): Filter by element path prefix (e.g., `'cmi.interactions'` or `['cmi.score', 'cmi.objectives']`)
+- `change_session_id` (string, optional): Filter by specific session ID (useful when multiple sessions share telemetry)
+- `limit` (number, optional): Maximum number of changes to return (default: 1000)
+- `offset` (number, optional): Skip this many changes for pagination (default: 0)
+
+**Response:**
+- `session_id` (string): Runtime session ID
+- `changes` (array): Array of change entries, each containing:
+  - `element` (string): Data model path (e.g., `cmi.location`, `cmi.interactions.0.id`)
+  - `previousValue` (any): Value before change (undefined if not previously set)
+  - `newValue` (any): Value after change
+  - `source` (string): Origin of change (`api:SetValue`, `api:Commit`, `internal`, etc.)
+  - `timestamp` (number): Millisecond timestamp
+  - `timestampIso` (string): ISO 8601 timestamp
+  - `sessionId` (string): Session identifier
+  - `collectionIndex` (number, optional): For collection elements (interactions, objectives)
+  - `collectionProperty` (string, optional): Property name within collection
+  - `previousValueTruncated` (boolean): Whether previous value was truncated
+  - `newValueTruncated` (boolean): Whether new value was truncated
+  - `newValueOriginalLength` (number): Original length if truncated
+- `total` (number): Total number of changes in history
+- `has_more` (boolean): Whether more changes are available (for pagination)
+
+**Use Cases:**
+- Analyze how learner data evolves during a session
+- Debug unexpected data model state
+- Verify that API calls are correctly updating the data model
+- Track suspend_data changes across commits
+- Audit interaction and objective data flow
+- Compare before/after values to understand state transitions
+
+**Example:**
+```javascript
+// Get all score-related changes
+const scoreHistory = await scorm_get_data_model_history({
+  session_id: 'session-abc',
+  element_prefix: 'cmi.score'
+});
+
+// Get recent interaction changes
+const recentInteractions = await scorm_get_data_model_history({
+  session_id: 'session-abc',
+  element_prefix: 'cmi.interactions',
+  since_ts: Date.now() - 60000, // Last minute
+  limit: 50
+});
+```
+
 
 #### `scorm_interactive_develop`
 Launch interactive development session with advanced SCORM Inspector.
