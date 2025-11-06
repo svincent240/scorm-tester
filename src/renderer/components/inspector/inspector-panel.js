@@ -96,41 +96,54 @@ class InspectorPanel extends BaseComponent {
     const refreshBtn = this.element.querySelector('.js-refresh-tab');
     if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshActiveTab());
 
-    // Setup resize handle
-    const resizeHandle = this.element.querySelector('.inspector-panel__resize-handle');
-    if (resizeHandle) {
-      let isResizing = false;
-      let startY = 0;
-      let startHeight = 0;
+    // Setup resize handle with improved UX
+    this._setupResizeHandle();
+  }
 
-      resizeHandle.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        startY = e.clientX;  // Changed to clientX for horizontal resizing
-        if (this.element) {
-          startHeight = this.element.offsetWidth;  // Changed to offsetWidth
-        }
-        document.body.style.cursor = 'ew-resize';  // Changed to ew-resize
-        document.body.style.userSelect = 'none';
-        e.preventDefault();
-      });
+  _setupResizeHandle() {
+    const resizeHandle = this.element?.querySelector('.inspector-panel__resize-handle');
+    if (!resizeHandle) return;
 
-      document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
-        if (!this.element) return;
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
 
-        const deltaX = startY - e.clientX;  // Changed to clientX, inverted because panel grows leftward
-        const newWidth = Math.max(300, Math.min(window.innerWidth * 0.5, startHeight + deltaX));
-        this.element.style.width = `${newWidth}px`;
-      });
+    const handleMouseDown = (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = this.element?.offsetWidth || 0;
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    };
 
-      document.addEventListener('mouseup', () => {
-        if (isResizing) {
-          isResizing = false;
-          document.body.style.cursor = '';
-          document.body.style.userSelect = '';
-        }
-      });
-    }
+    const handleMouseMove = (e) => {
+      if (!isResizing || !this.element) return;
+
+      // Calculate delta: positive = drag right = shrink panel
+      const deltaX = e.clientX - startX;
+      const newWidth = Math.max(300, Math.min(window.innerWidth * 0.5, startWidth - deltaX));
+      this.element.style.width = `${newWidth}px`;
+    };
+
+    const handleMouseUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    resizeHandle.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Store cleanup function
+    this._resizeCleanup = () => {
+      resizeHandle.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
 
     this._summary = {
       api: this.element.querySelector('.js-api-count'),
@@ -644,6 +657,7 @@ class InspectorPanel extends BaseComponent {
 
   destroy() {
     try { this._unsubs?.forEach((off) => { try { off(); } catch (_) {} }); } catch (_) {}
+    try { this._resizeCleanup?.(); } catch (_) {}
     super.destroy();
   }
 
