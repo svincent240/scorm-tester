@@ -29,8 +29,8 @@ class SNBridge {
     try {
       import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
         if (rendererLogger) this.logger = rendererLogger;
-      }).catch(() => {});
-    } catch (_) {}
+      }).catch(() => { /* noop */ });
+    } catch (_) { /* noop */ }
   }
 
   /**
@@ -41,12 +41,12 @@ class SNBridge {
       const status = await ipcClient.invoke('sn:getStatus');
       if (status && status.success) {
         this.isConnected = true;
-        try { this.logger.debug('SNBridge: Connected to main process SN service'); } catch (_) {}
+  try { this.logger.debug('SNBridge: Connected to main process SN service'); } catch (_) { /* noop */ }
         return { success: true };
       }
       throw new Error('Failed to connect to SN service');
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to initialize', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to initialize', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -59,11 +59,11 @@ class SNBridge {
       const result = await this.invokeMain('sn:initialize', { manifest, packageInfo });
       if (result.success) {
         this.sessionId = result.sessionId;
-        try { this.logger.debug('SNBridge: Course initialized with SN service'); } catch (_) {}
+  try { this.logger.debug('SNBridge: Course initialized with SN service'); } catch (_) { /* noop */ }
       }
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to initialize course', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to initialize course', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -82,10 +82,10 @@ class SNBridge {
         targetActivityId
       });
 
-      try { this.logger.debug('SNBridge: Navigation processed', result); } catch (_) {}
+  try { this.logger.debug('SNBridge: Navigation processed', result); } catch (_) { /* noop */ }
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Navigation processing failed', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Navigation processing failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -106,7 +106,7 @@ class SNBridge {
 
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to update activity progress', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to update activity progress', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -123,7 +123,7 @@ class SNBridge {
       const result = await this.invokeMain('sn:getSequencingState');
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to get sequencing state', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to get sequencing state', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -140,7 +140,7 @@ class SNBridge {
       const result = await this.invokeMain('sn:refreshNavigation');
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to refresh navigation availability', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to refresh navigation availability', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -158,7 +158,7 @@ class SNBridge {
       this.sessionId = null;
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to reset SN service', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to reset SN service', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -171,7 +171,7 @@ class SNBridge {
       const result = await this.invokeMain('sn:getStatus');
       return result;
     } catch (error) {
-      try { this.logger.error('SNBridge: Failed to get status', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: Failed to get status', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
     }
   }
@@ -184,7 +184,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke(channel, data);
     } catch (error) {
-      try { this.logger.error(`SNBridge: IPC call failed for ${channel}`, error?.message || error); } catch (_) {}
+  try { this.logger.error(`SNBridge: IPC call failed for ${channel}`, error?.message || error); } catch (_) { /* noop */ }
       throw error;
     }
   }
@@ -209,7 +209,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('course-outline-get-activity-tree');
     } catch (error) {
-      try { this.logger.error('SNBridge: getCourseOutlineActivityTree failed', error?.message || error); } catch (_) {}
+  try { this.logger.error('SNBridge: getCourseOutlineActivityTree failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -221,7 +221,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('course-outline-get-available-navigation');
     } catch (error) {
-      try { this.logger.error('SNBridge: getCourseOutlineAvailableNavigation failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getCourseOutlineAvailableNavigation failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -233,7 +233,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('course-outline-validate-choice', { targetActivityId: activityId });
     } catch (error) {
-      try { this.logger.error('SNBridge: validateCourseOutlineChoice failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: validateCourseOutlineChoice failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, allowed: false, reason: error?.message || String(error) };
     }
   }
@@ -243,7 +243,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-history');
     } catch (error) {
-      try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getScormInspectorHistory failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -252,7 +252,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-data-model');
     } catch (error) {
-      try { this.logger.error('SNBridge: getScormDataModel failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getScormDataModel failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -261,7 +261,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-sn-state');
     } catch (error) {
-      try { this.logger.error('SNBridge: getSnState failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getSnState failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -270,7 +270,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-activity-tree');
     } catch (error) {
-      try { this.logger.error('SNBridge: getActivityTree failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getActivityTree failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -279,7 +279,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-navigation-requests');
     } catch (error) {
-      try { this.logger.error('SNBridge: getNavigationRequests failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getNavigationRequests failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -288,7 +288,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-global-objectives');
     } catch (error) {
-      try { this.logger.error('SNBridge: getGlobalObjectives failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getGlobalObjectives failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -297,7 +297,7 @@ class SNBridge {
     try {
       return await ipcClient.invoke('scorm-inspector-get-ssp-buckets');
     } catch (error) {
-      try { this.logger.error('SNBridge: getSSPBuckets failed', error?.message || error); } catch (_) {}
+      try { this.logger.error('SNBridge: getSSPBuckets failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -308,7 +308,17 @@ class SNBridge {
       if (typeof handler === 'function') {
         return ipcClient.onScormInspectorDataUpdated(handler);
       }
-    } catch (_) {}
+  } catch (_) { /* noop */ }
+    return () => {};
+  }
+
+  /** Subscribe to SCORM inspector error updates */
+  onScormInspectorErrorUpdated(handler) {
+    try {
+      if (typeof handler === 'function') {
+        return ipcClient.onScormInspectorErrorUpdated(handler);
+      }
+  } catch (_) { /* noop */ }
     return () => {};
   }
 
@@ -318,7 +328,7 @@ class SNBridge {
       if (typeof handler === 'function') {
         return ipcClient.onScormDataModelUpdated(handler);
       }
-    } catch (_) {}
+  } catch (_) { /* noop */ }
     return () => {};
   }
 
@@ -338,7 +348,7 @@ class SNBridge {
       if (typeof handler === 'function') {
         return ipcClient.onCourseLoaded(handler);
       }
-    } catch (_) {}
+  } catch (_) { /* noop */ }
     return () => {};
   }
 

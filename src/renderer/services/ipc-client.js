@@ -14,7 +14,7 @@ class IpcClient {
   _ensureAPI() {
     if (typeof window === 'undefined' || !window.electronAPI) {
       const err = new Error('Electron API not available in renderer');
-      try { rendererLogger.error('IpcClient: missing electronAPI'); } catch (_) {}
+      try { rendererLogger.error('IpcClient: missing electronAPI'); } catch (_) { /* noop */ }
       throw err;
     }
     return window.electronAPI;
@@ -162,6 +162,14 @@ class IpcClient {
       throw new Error('electronAPI.onScormInspectorDataUpdated not available');
     }
     return api.onScormInspectorDataUpdated(handler);
+  }
+
+  onScormInspectorErrorUpdated(handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormInspectorErrorUpdated !== 'function') {
+      throw new Error('electronAPI.onScormInspectorErrorUpdated not available');
+    }
+    return api.onScormInspectorErrorUpdated(handler);
   }
 
   onScormDataModelUpdated(handler) {

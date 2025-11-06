@@ -8,6 +8,7 @@
 import { BaseComponent } from '../base-component.js';
 import { snBridge } from '../../services/sn-bridge.js';
 import { createJsonViewer } from '../../utils/json-viewer.js';
+import { rendererLogger } from '../../utils/renderer-logger.js';
 
 class InspectorPanel extends BaseComponent {
   constructor(elementId, options = {}) {
@@ -18,6 +19,8 @@ class InspectorPanel extends BaseComponent {
     this.visible = false;
     this.loaded = false;
     this.activeTab = 'api';
+    /** @type {{ history: Array<Record<string, any>>; errors: Array<Record<string, any>>; dataModel: Record<string, any>; activityTree: Record<string, any>; navigation: Array<Record<string, any>>; objectives: Array<Record<string, any>>; ssp: Array<Record<string, any>>; }} */
+    /** @type {{ history: Array<Record<string, any>>; errors: Array<Record<string, any>>; dataModel: Record<string, any>; activityTree: Record<string, any>; navigation: Array<Record<string, any>>; objectives: Array<Record<string, any>>; ssp: Array<Record<string, any>>; sn?: Record<string, any>; }} */
     this.state = {
       history: [],
       errors: [],
@@ -25,9 +28,15 @@ class InspectorPanel extends BaseComponent {
       activityTree: {},
       navigation: [],
       objectives: [],
-      ssp: []
+      ssp: [],
+      sn: {}
     };
+    /** @type {Array<() => void>} */
     this._unsubs = [];
+    /** @type {number} */
+    this._maxHistory = 2000;
+    /** @type {number} */
+    this._maxErrors = 200;
   }
 
   getDefaultOptions() {
@@ -189,8 +198,8 @@ class InspectorPanel extends BaseComponent {
         case 'api': {
           const hist = await snBridge.getScormInspectorHistory();
           if (hist?.success && hist.data) {
-            this.state.history = hist.data.history || [];
-            this.state.errors = hist.data.errors || [];
+            this._replaceHistory(hist.data.history);
+            this._replaceErrors(hist.data.errors);
             this.state.dataModel = hist.data.dataModel || {};
           }
           break;
@@ -274,6 +283,116 @@ class InspectorPanel extends BaseComponent {
     return { slice: items.slice(start, end), page: clampedPage, pages, total, pageSize };
   }
 
+  /**
+   * Replace the inspector history with a bounded copy.
+   * @param {Array<Record<string, any>> | null | undefined} list
+   */
+  _replaceHistory(list) {
+    if (Array.isArray(list)) {
+      const trimmed = list.length > this._maxHistory
+        ? list.slice(list.length - this._maxHistory)
+        : list.slice();
+      this.state.history = trimmed;
+    } else {
+      this.state.history = [];
+    }
+  }
+
+  /**
+   * Replace the inspector errors with a bounded copy.
+   * @param {Array<Record<string, any>> | null | undefined} list
+   */
+  _replaceErrors(list) {
+    if (Array.isArray(list)) {
+      const trimmed = list.slice(0, this._maxErrors);
+      this.state.errors = trimmed;
+    } else {
+      this.state.errors = [];
+    }
+  }
+
+  /**
+   * Append a single history entry ensuring bounded length and no duplicates.
+   * @param {Record<string, any>} entry
+   * @returns {boolean}
+   */
+  _appendHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const list = Array.isArray(this.state.history) ? this.state.history.slice() : [];
+    const key = this._getEntryKey(entry);
+    if (key && list.some(item => this._getEntryKey(item) === key)) {
+      return false;
+    }
+    list.push(entry);
+    if (list.length > this._maxHistory) {
+      list.splice(0, list.length - this._maxHistory);
+    }
+    this.state.history = list;
+    return true;
+  }
+
+  /**
+   * Append a single error entry ensuring bounded length and no duplicates.
+   * @param {Record<string, any>} entry
+   * @returns {boolean}
+   */
+  _appendErrorEntry(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const list = Array.isArray(this.state.errors) ? this.state.errors.slice() : [];
+    const key = this._getEntryKey(entry);
+    if (key && list.some(item => this._getEntryKey(item) === key)) {
+      return false;
+    }
+    list.unshift(entry);
+    if (list.length > this._maxErrors) {
+      list.length = this._maxErrors;
+    }
+    this.state.errors = list;
+    return true;
+  }
+
+  /**
+   * Normalise inspector data payload into local state caches.
+   * @param {any} payload
+   * @returns {boolean}
+   */
+  _handleInspectorPayload(payload) {
+    let changed = false;
+    if (!payload) return changed;
+
+    if (Array.isArray(payload.history)) {
+      this._replaceHistory(payload.history);
+      changed = true;
+    } else if (payload && typeof payload === 'object' && (payload.method || payload.name)) {
+      changed = this._appendHistoryEntry(payload) || changed;
+    }
+
+    if (Array.isArray(payload.errors)) {
+      this._replaceErrors(payload.errors);
+      changed = true;
+    }
+
+    if (payload && typeof payload.dataModel === 'object' && payload.dataModel) {
+      this.state.dataModel = payload.dataModel;
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  /**
+   * Generate a stable identifier for history/error entries.
+   * @param {Record<string, any>} entry
+   * @returns {string}
+   */
+  _getEntryKey(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    if (entry.id) return String(entry.id);
+    if (entry.timestamp && entry.method) return `${entry.timestamp}:${entry.method}`;
+    if (entry.timestamp && entry.name) return `${entry.timestamp}:${entry.name}`;
+    return JSON.stringify(entry).slice(0, 120);
+  }
+
   // Simple, defensive renderers
   renderApiLog() {
     const el = this.tabEls?.api; if (!el) return;
@@ -282,7 +401,7 @@ class InspectorPanel extends BaseComponent {
     // REVERSE ORDER: Show newest first
     const reversed = [...all].reverse();
     const filtered = this._applyApiFilters(reversed);
-    const { slice, page, pages, total, pageSize } = this._paginate(filtered);
+  const { slice, page, pages, total } = this._paginate(filtered);
 
     const methodOptions = ['<option value="all">All methods</option>', ...this._getMethods().map(m => `<option value="${this._esc(m)}" ${this.filters?.method===m?'selected':''}>${this._esc(m)}</option>`)].join('');
 
@@ -512,13 +631,13 @@ class InspectorPanel extends BaseComponent {
             try {
               const result = await snBridge.clearScormInspector();
               if (result?.success) {
-                this.state.history = [];
-                this.state.errors = [];
+                this._replaceHistory([]);
+                this._replaceErrors([]);
                 this.updateSummaryCounts();
                 this.renderApiLog();
               }
             } catch (err) {
-              console.error('Failed to clear API log:', err);
+              rendererLogger.error('InspectorPanel: clear API log failed', err);
             }
           } else if (t?.classList?.contains('js-copy-record')) {
             // Copy individual API record
@@ -529,7 +648,7 @@ class InspectorPanel extends BaseComponent {
                 t.textContent = '✓';
                 setTimeout(() => { t.textContent = '📋'; }, 1000);
               } catch (err) {
-                console.error('Failed to copy record:', err);
+                rendererLogger.error('InspectorPanel: copy API record failed', err);
               }
             }
           }
@@ -541,56 +660,71 @@ class InspectorPanel extends BaseComponent {
     try {
       const offCourseLoaded = snBridge.onCourseLoaded(async () => {
         try {
-          // Clear inspector data
           await snBridge.clearScormInspector();
-          this.state.history = [];
-          this.state.errors = [];
-          this.state.dataModel = {};
-          this.updateSummaryCounts();
-          // Refresh after a short delay to allow course to initialize
-          setTimeout(() => {
-            this.loadInitialData();
-          }, 500);
         } catch (err) {
-          console.error('Failed to clear inspector on course load:', err);
+          rendererLogger.error('InspectorPanel: clearScormInspector failed on course load', err);
         }
+        this._replaceHistory([]);
+        this._replaceErrors([]);
+        this.state.dataModel = {};
+        this.updateSummaryCounts();
+        setTimeout(() => { void this.loadInitialData(); }, 500);
       });
       this._unsubs.push(offCourseLoaded);
     } catch (_) {}
 
     // Subscribe to main-pushed inspector updates
     try {
-      const off = snBridge.onScormInspectorDataUpdated((payload) => {
-          try {
-            if (payload?.history) this.state.history = payload.history;
-            if (payload?.errors) this.state.errors = payload.errors;
-            if (payload?.dataModel) this.state.dataModel = payload.dataModel;
-            this.updateSummaryCounts();
-            this.renderActiveTab();
-          } catch (_) {}
-        });
-        this._unsubs.push(off);
-    } catch (_) {}
+      const off = snBridge.onScormInspectorDataUpdated((/** @type {any} */ payload) => {
+        const changed = this._handleInspectorPayload(payload);
+        if (!changed) return;
+        this.updateSummaryCounts();
+        if (!this.visible) return;
+        if (this.activeTab === 'api') {
+          this.renderApiLog();
+        } else if (this.activeTab === 'model' && payload && typeof payload.dataModel === 'object') {
+          this.renderDataModel();
+        }
+      });
+      this._unsubs.push(off);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to inspector data updates', error);
+    }
+
+    // Subscribe to incremental inspector errors for quick feedback
+    try {
+      const offErrors = snBridge.onScormInspectorErrorUpdated((/** @type {any} */ entry) => {
+        if (!this._appendErrorEntry(entry)) return;
+        this.updateSummaryCounts();
+        if (this.visible && this.activeTab === 'api' && this.filters?.errorsOnly) {
+          this.renderApiLog();
+        }
+      });
+      this._unsubs.push(offErrors);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to inspector error updates', error);
+    }
 
     // Subscribe to data model updates
     try {
-      const offDataModel = snBridge.onScormDataModelUpdated((dataModel) => {
-          try {
-            this.state.dataModel = dataModel || {};
-            this.updateSummaryCounts();
-            if (this.activeTab === 'model') {
-              this.renderDataModel();
-            }
-          } catch (_) {}
-        });
-        this._unsubs.push(offDataModel);
-    } catch (_) {}
+      const offDataModel = snBridge.onScormDataModelUpdated((/** @type {Record<string, any> | undefined} */ dataModel) => {
+        this.state.dataModel = dataModel || {};
+        if (this.visible && this.activeTab === 'model') {
+          this.renderDataModel();
+        }
+      });
+      this._unsubs.push(offDataModel);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to data model updates', error);
+    }
   }
 
   show() {
     this.visible = true;
-    if (this.container) this.container.style.display = 'block';
-    if (this.element) this.element.classList.add('inspector-panel--visible');
+    const container = /** @type {HTMLElement | null} */ (this.container);
+    if (container) container.style.display = 'block';
+    const root = /** @type {HTMLElement | null} */ (this.element);
+    if (root) root.classList.add('inspector-panel--visible');
     if (!this.loaded) this.loadInitialData();
     try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) {}
     try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) {}
@@ -599,11 +733,13 @@ class InspectorPanel extends BaseComponent {
 
   hide() {
     this.visible = false;
-    if (this.container) this.container.style.display = 'none';
-    if (this.element) {
-      this.element.classList.remove('inspector-panel--visible');
+    const container = /** @type {HTMLElement | null} */ (this.container);
+    if (container) container.style.display = 'none';
+    const root = /** @type {HTMLElement | null} */ (this.element);
+    if (root) {
+      root.classList.remove('inspector-panel--visible');
       // Clear inline width style to allow CSS transition to collapse the panel
-      this.element.style.width = '';
+      root.style.width = '';
     }
     try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) {}
     try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) {}
@@ -627,8 +763,8 @@ class InspectorPanel extends BaseComponent {
       ]);
 
       if (hist?.success && hist.data) {
-        this.state.history = hist.data.history || [];
-        this.state.errors = hist.data.errors || [];
+        this._replaceHistory(hist.data.history);
+        this._replaceErrors(hist.data.errors);
         this.state.dataModel = hist.data.dataModel || {};
       }
       if (tree?.success) this.state.activityTree = tree.data || {};
@@ -641,8 +777,9 @@ class InspectorPanel extends BaseComponent {
       this.loaded = true;
       this.emit('dataLoaded', { ok: true });
     } catch (error) {
-      this.uiState?.showNotification({ type: 'error', message: 'Inspector load failed', details: error?.message || String(error) });
-      this.emit('dataLoaded', { ok: false, error });
+      const err = /** @type {any} */ (error);
+      this.uiState?.showNotification({ type: 'error', message: 'Inspector load failed', details: err?.message || String(err) });
+      this.emit('dataLoaded', { ok: false, error: err });
     }
   }
 
