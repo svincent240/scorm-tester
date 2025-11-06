@@ -91,8 +91,35 @@ The following components are responsible for presenting errors to users:
 *   **Interaction**: As a "Pure Consumer of State," this component **MUST** subscribe to `UIState` for all data it displays (e.g., `progressState`, `sessionTime`). It **MUST NOT** perform any calculations or maintain its own state.
 
 ### 4.3. `ScormInspectorPanel`
-*   **Responsibility**: Provides a detailed, real-time view of the SCORM session for debugging, including API calls, the full data model, and error logs.
-*   **Interaction**: The inspector is a "Pure Consumer" of diagnostic data. It **MUST** receive its data directly via dedicated IPC channels from the main process's `ScormInspectorTelemetryStore`. It **MUST NOT** use the renderer's `EventBus` for receiving core SCORM data to ensure a clean separation between application events and diagnostic telemetry. Internal controls like filters or export buttons should manage their own view state locally.
+
+- **Responsibility**: Provides a detailed, real-time view of the SCORM session for debugging, including:
+  - **Unified Timeline**: Merges API calls and data model changes into a single chronological view
+  - **API Call History**: All SCORM API interactions with parameters, results, errors, and timing
+  - **Data Model Change Log**: Sequential history of all mutations to `cmi.*` elements with before/after values, source, and metadata
+  - **Activity Tree**: Visual representation of the course structure and sequencing state
+  - **Error Analysis**: Classified SCORM errors with context and troubleshooting information
+
+- **Interaction**: The inspector is a "Pure Consumer" of diagnostic data. It **MUST** receive its data directly via dedicated IPC channels from the main process's `ScormInspectorTelemetryStore`:
+  - Subscribe to `scorm-data-model-change` events for real-time data model updates
+  - Call `getScormDataModelHistory()` to fetch initial change history on load
+  - Subscribe to `scorm-inspector-data-updated` for API call updates
+  - The inspector **MUST NOT** use the renderer's `EventBus` for receiving core SCORM data to ensure clean separation between application events and diagnostic telemetry
+
+- **Timeline Features**: The unified timeline provides:
+  - Independent toggles to show/hide API calls and data model changes
+  - Filtering by method, element prefix, error status, and session ID
+  - Pagination for large datasets
+  - Copy-to-clipboard for individual entries and bulk export
+  - Clear history functionality with confirmation
+
+- **Data Model Change Display**: Each change entry shows:
+  - Element path (e.g., `cmi.location`, `cmi.interactions.0.id`)
+  - Previous and new values (with truncation markers for large values)
+  - Source (API call, internal LMS operation, etc.)
+  - Timestamp and session identifier
+  - Collection metadata (index, property) for interaction/objective changes
+
+Internal controls like filters, pagination, or export buttons manage their own view state locally.
 
 ## 5. Key Component Contracts
 

@@ -58,16 +58,16 @@ Main Process
 
 The **`ScormInspectorTelemetryStore`** captures diagnostic data for SCORM package analysis and debugging. This includes:
 
-*   **API Call History**: All SCORM API calls (`Initialize`, `SetValue`, `GetValue`, `Commit`, `Terminate`) with parameters, results, timing, and errors.
-*   **Data Model Change Log**: A sequential history of all mutations to the SCORM data model (`cmi.*` elements and collections). Each change entry includes:
-    *   `element`: The exact data model path (e.g., `cmi.location`, `cmi.interactions.0.id`)
-    *   `previousValue`: The value before the change (undefined if not previously set)
-    *   `newValue`: The value after the change
-    *   `source`: Origin of the change (`api:SetValue`, `api:Commit`, `internal`, etc.)
-    *   `timestamp`: Precise millisecond timestamp
-    *   `sessionId`: SCORM session identifier
-    *   `collectionIndex` and `collectionProperty`: For collection elements (interactions, objectives, comments)
-    *   Truncation metadata: For large values (e.g., `suspend_data`), the store records original length/bytes and includes a `truncated` flag
+* **API Call History**: All SCORM API calls (`Initialize`, `SetValue`, `GetValue`, `Commit`, `Terminate`) with parameters, results, timing, and errors.
+* **Data Model Change Log**: A sequential history of all mutations to the SCORM data model (`cmi.*` elements and collections). Each change entry includes:
+  * `element`: The exact data model path (e.g., `cmi.location`, `cmi.interactions.0.id`)
+  * `previousValue`: The value before the change (undefined if not previously set)
+  * `newValue`: The value after the change
+  * `source`: Origin of the change (`api:SetValue`, `api:Commit`, `internal`, etc.)
+  * `timestamp`: Precise millisecond timestamp
+  * `sessionId`: SCORM session identifier
+  * `collectionIndex` and `collectionProperty`: For collection elements (interactions, objectives, comments)
+  * Truncation metadata: For large values (e.g., `suspend_data`), the store records original length/bytes and includes a `truncated` flag
 
 The data model change log is maintained in a **ring buffer** (default 5000 entries, configurable via `SERVICE_DEFAULTS.TELEMETRY.MAX_DATA_MODEL_HISTORY`) and is separate from the API call history to ensure both streams can be independently queried and managed.
 
