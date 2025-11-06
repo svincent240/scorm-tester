@@ -888,9 +888,19 @@ async function scorm_nav_next(params = {}) {
     };
   }
 
+  // Navigation not applicable when session not active (normal SCORM behavior)
+  // The SN service returns `reason` not `error` for expected states
+  if (!res.success && res.nav && res.nav.reason) {
+    return {
+      success: false,
+      applicable: false,
+      reason: res.nav.reason
+    };
+  }
+
   // Other navigation failures are real errors
   if (!res.success) {
-    const e = new Error(res.error || 'Navigation unsupported');
+    const e = new Error(res.error || 'Navigation error');
     e.code = 'NAV_UNSUPPORTED_ACTION';
     throw e;
   }
@@ -919,9 +929,19 @@ async function scorm_nav_previous(params = {}) {
     };
   }
 
+  // Navigation not applicable when session not active (normal SCORM behavior)
+  // The SN service returns `reason` not `error` for expected states
+  if (!res.success && res.nav && res.nav.reason) {
+    return {
+      success: false,
+      applicable: false,
+      reason: res.nav.reason
+    };
+  }
+
   // Other navigation failures are real errors
   if (!res.success) {
-    const e = new Error(res.error || 'Navigation unsupported');
+    const e = new Error(res.error || 'Navigation error');
     e.code = 'NAV_UNSUPPORTED_ACTION';
     throw e;
   }
@@ -952,9 +972,19 @@ async function scorm_nav_choice(params = {}) {
     };
   }
 
+  // Navigation not applicable when session not active (normal SCORM behavior)
+  // The SN service returns `reason` not `error` for expected states
+  if (!res.success && res.nav && res.nav.reason) {
+    return {
+      success: false,
+      applicable: false,
+      reason: res.nav.reason
+    };
+  }
+
   // Other navigation failures are real errors
   if (!res.success) {
-    const e = new Error(res.error || 'Navigation unsupported');
+    const e = new Error(res.error || 'Navigation error');
     e.code = 'NAV_UNSUPPORTED_ACTION';
     throw e;
   }
@@ -1047,21 +1077,22 @@ async function scorm_assessment_interaction_trace(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     logger?.error && logger.error('[scorm_assessment_interaction_trace] Runtime not open', { session_id });
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
   }
 
-  logger?.debug && logger.debug('[scorm_assessment_interaction_trace] Runtime window found, starting trace');
+  logger?.debug && logger.debug('[scorm_assessment_interaction_trace] Runtime open, starting trace');
 
   const steps = [];
   const issues_detected = [];
 
-  // Get initial API call count
-  const initialCalls = await RuntimeManager.getCapturedCalls(win);
+  // Get initial API call count via IPC
+  const initialCalls = await RuntimeManager.getCapturedCalls(null, session_id);
   const initialCallCount = initialCalls ? initialCalls.length : 0;
 
   for (let i = 0; i < actions.length; i++) {
@@ -1080,7 +1111,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
       // Capture DOM state before (if detailed mode and selector provided)
       if (capture_mode === 'detailed' && action.selector) {
         try {
-          const beforeState = await win.webContents.executeJavaScript(`
+          const beforeState = await RuntimeManager.executeJS(null, `
             (() => {
               const el = document.querySelector(${JSON.stringify(action.selector)});
               if (!el) return null;
@@ -1093,27 +1124,27 @@ async function scorm_assessment_interaction_trace(params = {}) {
                 classList: Array.from(el.classList)
               };
             })()
-          `);
+          `, session_id);
           step.dom_state_before = beforeState;
         } catch (_) {
           // Ignore DOM query errors
         }
       }
 
-      // Get API call count before action
-      const callsBefore = await RuntimeManager.getCapturedCalls(win);
+      // Get API call count before action via IPC
+      const callsBefore = await RuntimeManager.getCapturedCalls(null, session_id);
       const callCountBefore = callsBefore ? callsBefore.length : 0;
 
-      // Execute the action
+      // Execute the action via IPC
       if (action.type === 'click' && action.selector) {
-        await win.webContents.executeJavaScript(`
+        await RuntimeManager.executeJS(null, `
           (() => {
             const el = document.querySelector(${JSON.stringify(action.selector)});
             if (el) el.click();
           })()
-        `);
+        `, session_id);
       } else if (action.type === 'fill' && action.selector && action.value !== undefined) {
-        await win.webContents.executeJavaScript(`
+        await RuntimeManager.executeJS(null, `
           (() => {
             const el = document.querySelector(${JSON.stringify(action.selector)});
             if (el) {
@@ -1122,7 +1153,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
               el.dispatchEvent(new Event('change', { bubbles: true }));
             }
           })()
-        `);
+        `, session_id);
       } else if (action.type === 'wait' && action.ms) {
         await new Promise(resolve => setTimeout(resolve, action.ms));
       }
@@ -1133,7 +1164,7 @@ async function scorm_assessment_interaction_trace(params = {}) {
       // Capture DOM state after
       if (capture_mode === 'detailed' && action.selector) {
         try {
-          const afterState = await win.webContents.executeJavaScript(`
+          const afterState = await RuntimeManager.executeJS(null, `
             (() => {
               const el = document.querySelector(${JSON.stringify(action.selector)});
               if (!el) return null;
@@ -1146,15 +1177,15 @@ async function scorm_assessment_interaction_trace(params = {}) {
                 classList: Array.from(el.classList)
               };
             })()
-          `);
+          `, session_id);
           step.dom_state_after = afterState;
         } catch (_) {
           // Ignore DOM query errors
         }
       }
 
-      // Get API calls triggered by this action
-      const callsAfter = await RuntimeManager.getCapturedCalls(win);
+      // Get API calls triggered by this action via IPC
+      const callsAfter = await RuntimeManager.getCapturedCalls(null, session_id);
       const callCountAfter = callsAfter ? callsAfter.length : 0;
 
       if (callCountAfter > callCountBefore) {
@@ -1286,22 +1317,23 @@ async function scorm_validate_data_model_state(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     logger?.error && logger.error('[scorm_validate_data_model_state] Runtime not open', { session_id });
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
   }
 
-  logger?.debug && logger.debug('[scorm_validate_data_model_state] Runtime window found, validating elements');
+  logger?.debug && logger.debug('[scorm_validate_data_model_state] Runtime open, validating elements');
 
   const issues = [];
   const matches = [];
 
   for (const [element, expectedValue] of Object.entries(expected)) {
     try {
-      const actualValue = await RuntimeManager.callAPI(win, 'GetValue', [element]);
+      const actualValue = await RuntimeManager.callAPI(null, 'GetValue', [element], session_id);
 
       if (actualValue === expectedValue) {
         matches.push({ element, expected: expectedValue, actual: actualValue });
@@ -1341,7 +1373,7 @@ async function scorm_validate_data_model_state(params = {}) {
     total_elements: Object.keys(expected).length,
     matches: matches.length,
     issues: issues.length > 0 ? issues : undefined,
-    matched_elements: matches
+    matched_elements: matches.map(m => m.element)
   };
 
   logger?.debug && logger.debug('[scorm_validate_data_model_state] Returning result', {
@@ -1374,19 +1406,20 @@ async function scorm_get_console_errors(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     logger?.error && logger.error('[scorm_get_console_errors] Runtime not open', { session_id });
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
   }
 
-  logger?.debug && logger.debug('[scorm_get_console_errors] Runtime window found, fetching console messages');
+  logger?.debug && logger.debug('[scorm_get_console_errors] Runtime open, fetching console messages');
 
   try {
-    // Get console messages from the browser context
-    const consoleMessages = await win.webContents.executeJavaScript(`
+    // Get console messages from the browser context via IPC
+    const consoleMessages = await RuntimeManager.executeJS(null, `
       (() => {
         // Access stored console messages if available
         if (window.__scormConsoleMessages) {
@@ -1394,7 +1427,7 @@ async function scorm_get_console_errors(params = {}) {
         }
         return [];
       })()
-    `);
+    `, session_id);
 
     logger?.debug && logger.debug('[scorm_get_console_errors] Console messages fetched', {
       messageCount: consoleMessages ? consoleMessages.length : 0,
@@ -1546,8 +1579,9 @@ async function scorm_wait_for_api_call(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) {
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
     logger?.error && logger.error('[scorm_wait_for_api_call] Runtime not open', { session_id });
     const e = new Error('Runtime not open');
     e.code = 'RUNTIME_NOT_OPEN';
@@ -1555,7 +1589,7 @@ async function scorm_wait_for_api_call(params = {}) {
   }
 
   const startTime = Date.now();
-  const initialCalls = await RuntimeManager.getCapturedCalls(win);
+  const initialCalls = await RuntimeManager.getCapturedCalls(null, session_id);
   const initialCount = initialCalls ? initialCalls.length : 0;
 
   logger?.debug && logger.debug('[scorm_wait_for_api_call] Initial state', {
@@ -1568,7 +1602,7 @@ async function scorm_wait_for_api_call(params = {}) {
   // Poll for the API call
   while (Date.now() - startTime < timeout_ms) {
     pollCount++;
-    const currentCalls = await RuntimeManager.getCapturedCalls(win);
+    const currentCalls = await RuntimeManager.getCapturedCalls(null, session_id);
     const currentCount = currentCalls ? currentCalls.length : 0;
 
     if (pollCount % 10 === 0) {
@@ -1627,7 +1661,7 @@ async function scorm_wait_for_api_call(params = {}) {
     pollCount,
     elapsed: Date.now() - startTime,
     initialCount,
-    finalCount: (await RuntimeManager.getCapturedCalls(win))?.length || 0
+    finalCount: (await RuntimeManager.getCapturedCalls(null, session_id))?.length || 0
   });
   const e = new Error(`Timeout waiting for API call: ${method}`);
   e.code = 'WAIT_TIMEOUT';
@@ -1646,11 +1680,16 @@ async function scorm_get_current_page_context(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
 
   try {
-    const context = await win.webContents.executeJavaScript(`
+    const context = await RuntimeManager.executeJS(null, `
       (() => {
         const context = {
           page_type: 'unknown',
@@ -1671,7 +1710,7 @@ async function scorm_get_current_page_context(params = {}) {
         const slideIndicators = document.querySelectorAll('[class*="slide-number"], [id*="slide-number"], [class*="page-number"]');
         if (slideIndicators.length > 0) {
           const text = slideIndicators[0].textContent.trim();
-          const match = text.match(/(\d+)\s*\/\s*(\d+)/);
+          const match = text.match(/(\\d+)\\s*\\/\\s*(\\d+)/);
           if (match) {
             context.slide_number = parseInt(match[1]);
             context.total_slides = parseInt(match[2]);
@@ -1697,17 +1736,20 @@ async function scorm_get_current_page_context(params = {}) {
         }
 
         // Check navigation availability
-        const nextBtn = document.querySelector('[class*="next"], [id*="next"], button:has-text("Next")');
-        const prevBtn = document.querySelector('[class*="prev"], [class*="back"], [id*="prev"], button:has-text("Previous")');
-        const menuBtn = document.querySelector('[class*="menu"], [id*="menu"], button:has-text("Menu")');
+        const nextBtn = document.querySelector('[class*="next"], [id*="next"]') ||
+          Array.from(document.querySelectorAll('button')).find(btn => /next/i.test(btn.textContent));
+        const prevBtn = document.querySelector('[class*="prev"], [class*="back"], [id*="prev"]') ||
+          Array.from(document.querySelectorAll('button')).find(btn => /previous|prev|back/i.test(btn.textContent));
+        const menuBtn = document.querySelector('[class*="menu"], [id*="menu"]') ||
+          Array.from(document.querySelectorAll('button')).find(btn => /menu/i.test(btn.textContent));
 
-        context.navigation_available.next = nextBtn && !nextBtn.disabled;
-        context.navigation_available.previous = prevBtn && !prevBtn.disabled;
-        context.navigation_available.menu = menuBtn && !menuBtn.disabled;
+        context.navigation_available.next = !!(nextBtn && !nextBtn.disabled);
+        context.navigation_available.previous = !!(prevBtn && !prevBtn.disabled);
+        context.navigation_available.menu = !!(menuBtn && !menuBtn.disabled);
 
         return context;
       })()
-    `);
+    `, session_id);
 
     return context;
   } catch (error) {
@@ -1736,8 +1778,13 @@ async function scorm_replay_api_calls(params = {}) {
     throw e;
   }
 
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
 
   const results = [];
   let failed_at_index = null;
@@ -1746,7 +1793,7 @@ async function scorm_replay_api_calls(params = {}) {
   for (let i = 0; i < calls.length; i++) {
     const call = calls[i];
     try {
-      const result = await RuntimeManager.callAPI(win, call.method, call.args || []);
+      const result = await RuntimeManager.callAPI(null, call.method, call.args || [], session_id);
 
       results.push({
         index: i,
@@ -1836,9 +1883,13 @@ async function scorm_get_network_requests(params = {}) {
     throw e;
   }
 
-  // Check if runtime is open
-  const win = RuntimeManager.getPersistent(session_id);
-  if (!win) { const e = new Error('Runtime not open'); e.code = 'RUNTIME_NOT_OPEN'; throw e; }
+  // Check if runtime is open via IPC-aware method
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
 
   const requests = RuntimeManager.getNetworkRequests(session_id, filterOptions) || [];
 

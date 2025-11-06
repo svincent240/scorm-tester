@@ -88,11 +88,12 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     expect(Array.isArray(networkData.requests)).toBe(true);
 
     // Get current page context
-    const pageContext = await rpc('tools/call', { 
-      name: 'scorm_get_current_page_context', 
-      arguments: { session_id } 
+    const pageContext = await rpc('tools/call', {
+      name: 'scorm_get_current_page_context',
+      arguments: { session_id }
     }, id++);
     const contextData = parseMcpResponse(pageContext);
+    expect(contextData).toBeDefined();
     expect(contextData.page_type).toBeDefined();
     expect(contextData.url).toBeDefined();
     expect(contextData.navigation_available).toBeDefined();

@@ -304,8 +304,77 @@ class RuntimeManager {
       case 'runtime_executeJS':
         const jsWin = this.getPersistent(message.params.session_id);
         if (!jsWin) throw new Error('Runtime not open');
-        const jsResult = await jsWin.webContents.executeJavaScript(message.params.script, true);
-        return { result: jsResult, success: true };
+
+        // Wrap script in try-catch to capture actual JavaScript errors
+        // This provides detailed error information (name, message, stack, line/column numbers)
+        // instead of Electron's generic "Script failed to execute" message
+        // Use eval() to catch syntax errors that would otherwise fail during parsing
+        const wrappedScript = `
+          (() => {
+            try {
+              const __result = eval(\`${message.params.script.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
+              return { success: true, result: __result };
+            } catch (__error) {
+              return {
+                success: false,
+                error: {
+                  name: __error.name || 'Error',
+                  message: __error.message || String(__error),
+                  stack: __error.stack || null,
+                  lineNumber: __error.lineNumber || null,
+                  columnNumber: __error.columnNumber || null
+                }
+              };
+            }
+          })()
+        `;
+
+        try {
+          const jsResult = await jsWin.webContents.executeJavaScript(wrappedScript, true);
+
+          // If the script threw an error, convert it to a proper Error object
+          if (!jsResult.success) {
+            const err = new Error(`JavaScript execution failed: ${jsResult.error.name}: ${jsResult.error.message}`);
+            err.code = 'SCRIPT_EXECUTION_ERROR';
+            err.details = jsResult.error;
+            throw err;
+          }
+
+          return { result: jsResult.result, success: true };
+        } catch (electronError) {
+          // If executeJavaScript itself fails (e.g., syntax error during parsing),
+          // try to extract error details from the error message
+          const errorMessage = electronError.message || String(electronError);
+
+          // Try to parse error type from Electron's error message
+          // Example: "SyntaxError: Unexpected token ';'"
+          const errorMatch = errorMessage.match(/^(\w+Error):\s*(.+)$/);
+
+          if (errorMatch) {
+            const err = new Error(`JavaScript execution failed: ${errorMatch[1]}: ${errorMatch[2]}`);
+            err.code = 'SCRIPT_EXECUTION_ERROR';
+            err.details = {
+              name: errorMatch[1],
+              message: errorMatch[2],
+              stack: null,
+              lineNumber: null,
+              columnNumber: null
+            };
+            throw err;
+          }
+
+          // If we can't parse it, throw a generic error with what we have
+          const err = new Error(`JavaScript execution failed: ${errorMessage}`);
+          err.code = 'SCRIPT_EXECUTION_ERROR';
+          err.details = {
+            name: 'Error',
+            message: errorMessage,
+            stack: null,
+            lineNumber: null,
+            columnNumber: null
+          };
+          throw err;
+        }
 
       case 'runtime_getURL':
         const urlWin = this.getPersistent(message.params.session_id);
@@ -707,6 +776,7 @@ class RuntimeManager {
    * @param {string} script - JavaScript code to execute
    * @param {string|null} session_id - Session ID (used when called from Node.js parent via IPC)
    * @returns {Promise<any>} Result of the JavaScript execution
+   * @throws {Error} With code 'SCRIPT_EXECUTION_ERROR' and details property if script throws an error
    */
   static async executeJS(win, script, session_id = null) {
     if (session_id) {
@@ -716,6 +786,7 @@ class RuntimeManager {
           type: 'runtime_executeJS',
           params: { session_id, script }
         });
+        // IPC handler already throws if script failed, so result.result is the actual value
         return result.result;
       }
       throw new Error("Electron bridge not available");
@@ -725,7 +796,75 @@ class RuntimeManager {
     if (!win || !win.webContents) {
       throw new Error("Runtime not open");
     }
-    return await win.webContents.executeJavaScript(script, true);
+
+    // Wrap script in try-catch to capture actual JavaScript errors
+    // Use eval() to catch syntax errors that would otherwise fail during parsing
+    const wrappedScript = `
+      (() => {
+        try {
+          const __result = eval(\`${script.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`);
+          return { success: true, result: __result };
+        } catch (__error) {
+          return {
+            success: false,
+            error: {
+              name: __error.name || 'Error',
+              message: __error.message || String(__error),
+              stack: __error.stack || null,
+              lineNumber: __error.lineNumber || null,
+              columnNumber: __error.columnNumber || null
+            }
+          };
+        }
+      })()
+    `;
+
+    try {
+      const jsResult = await win.webContents.executeJavaScript(wrappedScript, true);
+
+      // If the script threw an error, convert it to a proper Error object
+      if (!jsResult.success) {
+        const err = new Error(`JavaScript execution failed: ${jsResult.error.name}: ${jsResult.error.message}`);
+        err.code = 'SCRIPT_EXECUTION_ERROR';
+        err.details = jsResult.error;
+        throw err;
+      }
+
+      return jsResult.result;
+    } catch (electronError) {
+      // If executeJavaScript itself fails (e.g., syntax error during parsing),
+      // try to extract error details from the error message
+      const errorMessage = electronError.message || String(electronError);
+
+      // Try to parse error type from Electron's error message
+      // Example: "SyntaxError: Unexpected token ';'"
+      const errorMatch = errorMessage.match(/^(\w+Error):\s*(.+)$/);
+
+      if (errorMatch) {
+        const err = new Error(`JavaScript execution failed: ${errorMatch[1]}: ${errorMatch[2]}`);
+        err.code = 'SCRIPT_EXECUTION_ERROR';
+        err.details = {
+          name: errorMatch[1],
+          message: errorMatch[2],
+          stack: null,
+          lineNumber: null,
+          columnNumber: null
+        };
+        throw err;
+      }
+
+      // If we can't parse it, throw a generic error with what we have
+      const err = new Error(`JavaScript execution failed: ${errorMessage}`);
+      err.code = 'SCRIPT_EXECUTION_ERROR';
+      err.details = {
+        name: 'Error',
+        message: errorMessage,
+        stack: null,
+        lineNumber: null,
+        columnNumber: null
+      };
+      throw err;
+    }
   }
 
   static async close(win) {

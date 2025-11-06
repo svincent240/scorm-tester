@@ -358,8 +358,37 @@ async function scorm_dom_evaluate(params = {}) {
     sessions.emit && sessions.emit({ session_id, type: 'dom:evaluate_complete', payload: {} });
     return { result };
   } catch (err) {
-    const e = new Error(`DOM evaluate failed: ${err.message}`);
+    // Format error message with JavaScript error details if available
+    let errorMessage = `DOM evaluate failed: ${err.message}`;
+
+    // If we have detailed error information from the browser context, include it
+    if (err.code === 'SCRIPT_EXECUTION_ERROR' && err.details) {
+      const details = err.details;
+      errorMessage = `DOM evaluate failed: ${details.name}: ${details.message}`;
+
+      // Add location information if available
+      if (details.lineNumber !== null || details.columnNumber !== null) {
+        const line = details.lineNumber !== null ? `line ${details.lineNumber}` : '';
+        const col = details.columnNumber !== null ? `column ${details.columnNumber}` : '';
+        const location = [line, col].filter(Boolean).join(', ');
+        if (location) {
+          errorMessage += ` (at ${location})`;
+        }
+      }
+
+      // Add first few lines of stack trace for debugging
+      if (details.stack) {
+        const stackLines = details.stack.split('\n').slice(0, 3);
+        errorMessage += `\n  Stack trace:\n  ${stackLines.join('\n  ')}`;
+      }
+    }
+
+    const e = new Error(errorMessage);
     e.code = 'DOM_EVALUATE_FAILED';
+    // Preserve original error details for programmatic access
+    if (err.details) {
+      e.details = err.details;
+    }
     throw e;
   }
 }

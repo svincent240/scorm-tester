@@ -3,7 +3,9 @@ const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, sc
 // Mock RuntimeManager
 jest.mock('../../../src/mcp/runtime-manager', () => ({
   RuntimeManager: {
-    getPersistent: jest.fn()
+    getPersistent: jest.fn(),
+    getRuntimeStatus: jest.fn(),
+    executeJS: jest.fn()
   }
 }));
 
@@ -20,19 +22,28 @@ describe('DOM Interaction Tools', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Create mock webContents with executeJavaScript
     mockWebContents = {
       executeJavaScript: jest.fn()
     };
-    
+
     // Create mock window
     mockWin = {
       webContents: mockWebContents
     };
-    
+
     // Default: return the mock window
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
+
+    // Default: runtime is open
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
+
+    // Default: executeJS returns success
+    RuntimeManager.executeJS.mockImplementation((win, script, session_id) => {
+      // Simulate the wrapped script execution
+      return mockWebContents.executeJavaScript(script, true);
+    });
   });
 
   describe('scorm_dom_click', () => {
@@ -47,7 +58,7 @@ describe('DOM Interaction Tools', () => {
     });
 
     test('throws error if runtime not open', async () => {
-      RuntimeManager.getPersistent.mockReturnValue(null);
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: false });
       await expect(scorm_dom_click({ session_id: 'test-session', selector: '.button' }))
         .rejects.toThrow('Runtime not open');
       await expect(scorm_dom_click({ session_id: 'test-session', selector: '.button' }))
@@ -219,26 +230,95 @@ describe('DOM Interaction Tools', () => {
         .rejects.toThrow('expression is required');
     });
 
-    test('executes JavaScript and returns result', async () => {
-      mockWebContents.executeJavaScript.mockResolvedValue({ count: 5 });
+    test('throws RUNTIME_NOT_OPEN if runtime is not open', async () => {
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: false });
 
-      const result = await scorm_dom_evaluate({ 
-        session_id: 'test-session', 
+      await expect(scorm_dom_evaluate({ session_id: 'test-session', expression: '2 + 2' }))
+        .rejects.toThrow('Runtime not open');
+      await expect(scorm_dom_evaluate({ session_id: 'test-session', expression: '2 + 2' }))
+        .rejects.toMatchObject({ code: 'RUNTIME_NOT_OPEN' });
+    });
+
+    test('executes JavaScript and returns result', async () => {
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
+      RuntimeManager.executeJS.mockResolvedValue({ count: 5 });
+
+      const result = await scorm_dom_evaluate({
+        session_id: 'test-session',
         expression: 'document.querySelectorAll(".item").length'
       });
 
       expect(result).toEqual({ result: { count: 5 } });
-      expect(mockWebContents.executeJavaScript).toHaveBeenCalledWith(
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
         'document.querySelectorAll(".item").length',
-        true
+        'test-session'
       );
     });
 
-    test('throws DOM_EVALUATE_FAILED on execution error', async () => {
-      mockWebContents.executeJavaScript.mockRejectedValue(new Error('Syntax error'));
+    test('throws DOM_EVALUATE_FAILED on generic execution error', async () => {
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
+      RuntimeManager.executeJS.mockRejectedValue(new Error('Generic error'));
 
       await expect(scorm_dom_evaluate({ session_id: 'test-session', expression: 'invalid js' }))
         .rejects.toMatchObject({ code: 'DOM_EVALUATE_FAILED' });
+    });
+
+    test('formats error message with JavaScript error details', async () => {
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
+
+      const scriptError = new Error('JavaScript execution failed: SyntaxError: Unexpected token');
+      scriptError.code = 'SCRIPT_EXECUTION_ERROR';
+      scriptError.details = {
+        name: 'SyntaxError',
+        message: 'Unexpected token',
+        stack: 'SyntaxError: Unexpected token\n    at <anonymous>:1:10\n    at executeJS',
+        lineNumber: 1,
+        columnNumber: 10
+      };
+
+      RuntimeManager.executeJS.mockRejectedValue(scriptError);
+
+      try {
+        await scorm_dom_evaluate({ session_id: 'test-session', expression: 'const x = ;' });
+        fail('Should have thrown error');
+      } catch (err) {
+        expect(err.code).toBe('DOM_EVALUATE_FAILED');
+        expect(err.message).toContain('SyntaxError');
+        expect(err.message).toContain('Unexpected token');
+        expect(err.message).toContain('line 1');
+        expect(err.message).toContain('column 10');
+        expect(err.message).toContain('Stack trace');
+        expect(err.details).toEqual(scriptError.details);
+      }
+    });
+
+    test('formats error message with partial error details', async () => {
+      RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
+
+      const scriptError = new Error('JavaScript execution failed: ReferenceError: x is not defined');
+      scriptError.code = 'SCRIPT_EXECUTION_ERROR';
+      scriptError.details = {
+        name: 'ReferenceError',
+        message: 'x is not defined',
+        stack: null,
+        lineNumber: null,
+        columnNumber: null
+      };
+
+      RuntimeManager.executeJS.mockRejectedValue(scriptError);
+
+      try {
+        await scorm_dom_evaluate({ session_id: 'test-session', expression: 'x.method()' });
+        fail('Should have thrown error');
+      } catch (err) {
+        expect(err.code).toBe('DOM_EVALUATE_FAILED');
+        expect(err.message).toContain('ReferenceError');
+        expect(err.message).toContain('x is not defined');
+        expect(err.message).not.toContain('line');
+        expect(err.message).not.toContain('Stack trace');
+        expect(err.details).toEqual(scriptError.details);
+      }
     });
   });
 

@@ -143,7 +143,14 @@ function ensureIpcHandlers() {
           } else {
             return { success: false, error: 'NAV_UNSUPPORTED_ACTION' };
           }
-          return { success: !!(navRes && navRes.success), nav: navRes };
+          mcpLogger?.debug && mcpLogger.debug('[MCP SN] nav result', {
+            action: a,
+            navRes,
+            navResKeys: navRes ? Object.keys(navRes) : null,
+            navSuccess: navRes?.success,
+            hasError: !!(navRes && navRes.error)
+          });
+          return { success: !!(navRes && navRes.success), error: navRes?.error, nav: navRes };
         } catch (e) {
           return { success: false, error: e?.message || String(e) };
         }
