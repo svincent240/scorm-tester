@@ -15,10 +15,16 @@
 
 class ScormInspectorTelemetryStore {
   constructor(options = {}) {
-    const { maxHistorySize = 2000, logger = null, enableBroadcast = true } = options;
+    const {
+      maxHistorySize = 2000,
+      dataModelHistorySize = 5000,
+      logger = null,
+      enableBroadcast = true
+    } = options;
     
     this.config = {
       maxHistorySize: Number(maxHistorySize) || 2000,
+      dataModelHistorySize: Number(dataModelHistorySize) || Number(maxHistorySize) || 2000,
       enableBroadcast: Boolean(enableBroadcast),
       retentionTimeMs: 3600000, // 1 hour
       ...options
@@ -29,6 +35,7 @@ class ScormInspectorTelemetryStore {
     // Ring buffer for SCORM API call history
     this.scormApiHistory = [];
     this.scormErrors = [];
+    this.dataModelHistory = [];
     
     // Window manager reference for broadcasting
     this.windowManager = null;
@@ -38,6 +45,7 @@ class ScormInspectorTelemetryStore {
       totalStoreTime: 0,
       totalBroadcastTime: 0,
       storeCallCount: 0,
+      dataModelStoreCallCount: 0,
       broadcastCount: 0,
       memoryUsage: 0
     };
@@ -56,18 +64,28 @@ class ScormInspectorTelemetryStore {
       const entry = {
         id: this.generateId(),
         timestamp: Date.now(),
+        entryType: 'api-call',
         ...data
       };
-      
-      // Ensure timestamp is set
-      if (!entry.timestamp) entry.timestamp = Date.now();
+
+      const numericTimestamp = typeof entry.timestamp === 'number'
+        ? entry.timestamp
+        : Date.parse(entry.timestamp) || Date.now();
+
+      entry.timestampMs = numericTimestamp;
+
+      const isoTimestamp = new Date(numericTimestamp).toISOString();
+      entry.timestampIso = isoTimestamp;
+      entry.timestamp = isoTimestamp;
+
+      if (!entry.entryType) entry.entryType = 'api-call';
       
       // Add to ring buffer
       this.scormApiHistory.push(entry);
       this.trimHistory();
       
       // Classify and store errors separately
-      if (data.errorCode && data.errorCode !== '0') {
+      if (entry.errorCode && entry.errorCode !== '0') {
         this.storeScormError(entry);
       }
       
@@ -120,6 +138,59 @@ class ScormInspectorTelemetryStore {
   }
 
   /**
+   * Store data model change events for inspection timeline
+   * @param {Object} data - Data model change payload
+   */
+  storeDataModelChange(data) {
+    const startTime = performance.now();
+
+    try {
+      if (!data || typeof data !== 'object') return;
+
+      const entry = {
+        id: data.id || this.generateId(),
+        timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now(),
+        entryType: 'data-model-change',
+        ...data
+      };
+
+      const numericTimestamp = typeof entry.timestamp === 'number'
+        ? entry.timestamp
+        : Date.parse(entry.timestamp) || Date.now();
+
+  entry.timestampMs = numericTimestamp;
+
+  const isoTimestamp = new Date(numericTimestamp).toISOString();
+  entry.timestampIso = isoTimestamp;
+  entry.timestamp = isoTimestamp;
+      if (!entry.entryType) entry.entryType = 'data-model-change';
+
+      if (entry.sessionId != null) {
+        entry.sessionId = String(entry.sessionId);
+      }
+
+      this.dataModelHistory.push(entry);
+      this.trimDataModelHistory();
+
+      if (this.config.enableBroadcast) {
+        this.broadcastToAllWindows('scorm-data-model-change', entry);
+      }
+
+      const endTime = performance.now();
+      this.performanceStats.totalStoreTime += (endTime - startTime);
+      this.performanceStats.dataModelStoreCallCount++;
+
+      if (this.performanceStats.dataModelStoreCallCount % 100 === 0) {
+        this.checkMemoryUsage();
+      }
+    } catch (e) {
+      try {
+        this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] Failed to store data model change', e?.message || e);
+      } catch (_) { /* intentionally empty */ }
+    }
+  }
+
+  /**
    * Get historical SCORM API calls for inspector window initialization
    * @param {Object} options - Query options
    * @returns {Object} Response with history data
@@ -135,7 +206,7 @@ class ScormInspectorTelemetryStore {
       // Apply filters
       if (sinceTs != null) {
         const since = Number(sinceTs) || 0;
-        filteredHistory = filteredHistory.filter(entry => (entry.timestamp || 0) >= since);
+        filteredHistory = filteredHistory.filter(entry => (entry.timestampMs || entry.timestamp || 0) >= since);
         this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] getHistory after sinceTs filter: ${filteredHistory.length} entries`);
       }
       
@@ -146,7 +217,7 @@ class ScormInspectorTelemetryStore {
       }
       
       // Sort newest first, then apply pagination
-      filteredHistory.sort((a, b) => b.timestamp - a.timestamp);
+      filteredHistory.sort((a, b) => (b.timestampMs || b.timestamp || 0) - (a.timestampMs || a.timestamp || 0));
       
       // Apply offset + limit
       const off = Math.max(0, Number(offset) || 0);
@@ -156,12 +227,17 @@ class ScormInspectorTelemetryStore {
       } else {
         filteredHistory = filteredHistory.slice(off);
       }
+
+  const dataModelResponse = this.getDataModelHistory({ sinceTs, limit, offset });
       
       this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] getHistory returning ${filteredHistory.length} entries`);
       
       return {
         success: true,
         history: filteredHistory,
+        dataModelChanges: dataModelResponse.success ? dataModelResponse.changes : [],
+        dataModelTotal: dataModelResponse.total,
+        dataModelHasMore: dataModelResponse.hasMore,
         total: this.scormApiHistory.length,
         hasMore: this.scormApiHistory.length > (off + filteredHistory.length)
       };
@@ -173,6 +249,9 @@ class ScormInspectorTelemetryStore {
       return {
         success: false,
         history: [],
+  dataModelChanges: [],
+        dataModelTotal: 0,
+        dataModelHasMore: false,
         total: 0,
         hasMore: false,
         error: e?.message || 'Unknown error'
@@ -215,6 +294,67 @@ class ScormInspectorTelemetryStore {
   }
 
   /**
+   * Retrieve data model change history
+   * @param {Object} options - Query options
+   * @returns {Object} Response with change data
+   */
+  getDataModelHistory(options = {}) {
+    try {
+      const {
+        sinceTs = null,
+        elementPrefix = null,
+        sessionId = null,
+        limit = 1000,
+        offset = 0
+      } = options || {};
+
+      let history = [...this.dataModelHistory];
+
+      if (sinceTs != null) {
+        const since = Number(sinceTs) || 0;
+        history = history.filter(entry => (entry.timestampMs || entry.timestamp || 0) >= since);
+      }
+
+      if (elementPrefix) {
+        const prefixes = Array.isArray(elementPrefix) ? elementPrefix : [elementPrefix];
+        history = history.filter(entry => {
+          if (!entry?.element) return false;
+          return prefixes.some(prefix => String(entry.element).startsWith(String(prefix)));
+        });
+      }
+
+      if (sessionId) {
+        const sid = String(sessionId);
+        history = history.filter(entry => String(entry.sessionId || '') === sid);
+      }
+
+  history.sort((a, b) => (b.timestampMs || b.timestamp || 0) - (a.timestampMs || a.timestamp || 0));
+
+      const off = Math.max(0, Number(offset) || 0);
+      const lim = limit == null ? null : Math.max(0, Number(limit) || 0);
+      const paged = lim != null ? history.slice(off, off + lim) : history.slice(off);
+
+      return {
+        success: true,
+        changes: paged,
+        total: this.dataModelHistory.length,
+        hasMore: this.dataModelHistory.length > (off + paged.length)
+      };
+    } catch (e) {
+      try {
+        this.logger?.warn && this.logger.warn('[ScormInspectorTelemetryStore] getDataModelHistory failed', e?.message || e);
+      } catch (_) { /* intentionally empty */ }
+      return {
+        success: false,
+        changes: [],
+        total: 0,
+        hasMore: false,
+        error: e?.message || 'Unknown error'
+      };
+    }
+  }
+
+  /**
    * Broadcast SCORM inspection data to all windows
    * @param {string} channel - IPC channel name
    * @param {Object} data - Data to broadcast
@@ -228,13 +368,11 @@ class ScormInspectorTelemetryStore {
     
     try {
       const windows = this.windowManager.getAllWindows();
-      let broadcastCount = 0;
       
       windows.forEach(window => {
         if (window && !window.isDestroyed()) {
           try {
             window.webContents.send(channel, data);
-            broadcastCount++;
           } catch (e) {
             this.logger?.warn && this.logger.warn(`[ScormInspectorTelemetryStore] Failed to send to window`, e?.message || e);
           }
@@ -296,6 +434,15 @@ class ScormInspectorTelemetryStore {
       const removeCount = this.scormApiHistory.length - this.config.maxHistorySize;
       this.scormApiHistory.splice(0, removeCount);
       this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Trimmed ${removeCount} old entries`);
+    }
+  }
+
+  trimDataModelHistory() {
+    const limit = this.config.dataModelHistorySize || this.config.maxHistorySize;
+    if (this.dataModelHistory.length > limit) {
+      const removeCount = this.dataModelHistory.length - limit;
+      this.dataModelHistory.splice(0, removeCount);
+      this.logger?.debug && this.logger.debug(`[ScormInspectorTelemetryStore] Trimmed ${removeCount} data model entries`);
     }
   }
 
@@ -390,8 +537,9 @@ class ScormInspectorTelemetryStore {
     const clearedApiCalls = this.scormApiHistory.length;
     const clearedErrors = this.scormErrors.length;
     
-    this.scormApiHistory = [];
-    this.scormErrors = [];
+  this.scormApiHistory = [];
+  this.scormErrors = [];
+  this.clearDataModelHistory();
     
     // Reset performance stats
     this.performanceStats = {
@@ -403,6 +551,18 @@ class ScormInspectorTelemetryStore {
     };
     
     this.logger?.info && this.logger.info(`[ScormInspectorTelemetryStore] Cleared ${clearedApiCalls} API calls and ${clearedErrors} errors`);
+  }
+
+  clearDataModelHistory({ suppressBroadcast = false } = {}) {
+    const clearedCount = this.dataModelHistory.length;
+    this.dataModelHistory = [];
+    if (!suppressBroadcast && this.config.enableBroadcast) {
+      this.broadcastToAllWindows('scorm-data-model-history-cleared', {
+        timestamp: Date.now(),
+        clearedCount
+      });
+    }
+    this.logger?.info && this.logger.info(`[ScormInspectorTelemetryStore] Cleared ${clearedCount} data model changes`);
   }
 
   /**

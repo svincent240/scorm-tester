@@ -7,8 +7,6 @@ const sessions = require("../session");
 const { RuntimeManager, resolveEntryPathFromManifest } = require("../runtime-manager");
 const getLogger = require('../../shared/utils/logger.js');
 const { scorm_dom_find_interactive_elements } = require('./dom');
-let electron = null;
-try { electron = require("electron"); } catch (_) { electron = null; }
 
 // Initialize logger
 const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
@@ -353,7 +351,7 @@ async function scorm_debug_api_calls(params = {}) {
  * Detect common API usage anomalies
  * @private
  */
-function detectApiAnomalies(calls, win) {
+function detectApiAnomalies(calls, _win) {
   const anomalies = [];
 
   if (!calls || calls.length === 0) {
@@ -1021,7 +1019,6 @@ async function scorm_sn_reset(params = {}) {
 
 async function scorm_capture_screenshot(params = {}) {
   const session_id = params.session_id;
-  const capture_options = params.capture_options || {};
   const return_base64 = params.return_base64 === true; // Explicit opt-in for base64 data
 
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
@@ -1104,8 +1101,6 @@ async function scorm_assessment_interaction_trace(params = {}) {
   const issues_detected = [];
 
   // Get initial API call count via IPC
-  const initialCalls = await RuntimeManager.getCapturedCalls(null, session_id);
-  const initialCallCount = initialCalls ? initialCalls.length : 0;
 
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
@@ -2160,6 +2155,7 @@ module.exports = {
   scorm_test_navigation_flow,
   scorm_debug_api_calls,
   scorm_trace_sequencing,
+  scorm_get_data_model_history,
   scorm_get_network_requests,
   scorm_assessment_interaction_trace,
   scorm_validate_data_model_state,
@@ -2207,4 +2203,80 @@ async function scorm_get_network_requests(params = {}) {
     request_count: requests.length,
     requests
   };
+}
+
+async function scorm_get_data_model_history(params = {}) {
+  const session_id = params.session_id;
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const filters = {};
+  if (params.since_ts != null) {
+    const since = Number(params.since_ts);
+    if (Number.isFinite(since)) filters.sinceTs = since;
+  }
+
+  if (params.element_prefix != null) {
+    if (Array.isArray(params.element_prefix)) filters.elementPrefix = params.element_prefix.map((p) => String(p));
+    else filters.elementPrefix = String(params.element_prefix);
+  }
+
+  if (params.change_session_id != null) {
+    filters.sessionId = String(params.change_session_id);
+  }
+
+  if (params.limit != null) {
+    const limit = Number(params.limit);
+    if (Number.isFinite(limit) && limit >= 0) filters.limit = limit;
+  }
+
+  if (params.offset != null) {
+    const offset = Number(params.offset);
+    if (Number.isFinite(offset) && offset >= 0) filters.offset = offset;
+  }
+
+  let result;
+  try {
+    result = await RuntimeManager.getDataModelHistory(session_id, filters);
+  } catch (error) {
+    if (!error.code) {
+      const msg = error?.message || '';
+      if (/runtime not open/i.test(msg)) error.code = 'RUNTIME_NOT_OPEN';
+      else if (/session_id is required/i.test(msg)) error.code = 'MCP_INVALID_PARAMS';
+    }
+    throw error;
+  }
+
+  const success = result?.success !== false;
+  const changes = Array.isArray(result?.changes) ? result.changes : [];
+  const total = Number(result?.total) || 0;
+  const hasMore = Boolean(result?.hasMore);
+
+  const filtersApplied = {
+    since_ts: filters.sinceTs ?? null,
+    element_prefix: Array.isArray(filters.elementPrefix) ? filters.elementPrefix : (filters.elementPrefix ?? null),
+    change_session_id: filters.sessionId ?? null,
+    limit: filters.limit ?? null,
+    offset: filters.offset ?? 0
+  };
+
+  const payload = {
+    success,
+    session_id,
+    data: {
+      changes,
+      total,
+      has_more: hasMore
+    },
+    filters_applied: filtersApplied
+  };
+
+  if (!success) {
+    payload.error = result?.error || 'Telemetry store reported failure';
+  }
+
+  return payload;
 }

@@ -416,6 +416,22 @@ module.exports = [
     }
   },
   {
+    channel: 'scorm-inspector-get-data-model-history',
+    handlerName: 'handleScormInspectorGetDataModelHistory',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
+    channel: 'scorm-inspector-clear-data-model-history',
+    handlerName: 'handleScormInspectorClearDataModelHistory',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
+  },
+  {
     channel: 'scorm-inspector-get-sn-state',
     handlerName: 'handleSNGetSequencingState',
     options: {

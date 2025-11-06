@@ -21,6 +21,8 @@ function getPreloadPath() {
 const handlerByWC = new Map();
 // Map of webContents.id -> SN service instance
 const snByWC = new Map();
+// Track telemetry stores so the runtime manager can expose history to MCP tools
+const telemetryStoreByWC = new Map();
 let ipcRegistered = false;
 
 function ensureIpcHandlers() {
@@ -30,11 +32,12 @@ function ensureIpcHandlers() {
   // Synchronous IPC handler for SCORM API compliance
   // Real SCORM content expects synchronous API methods that return strings immediately
   ipcMain.on("scorm-mcp:api-sync", (event, payload = {}) => {
+    let method = '';
     try {
       const wc = event?.sender;
       const id = wc?.id;
       const handler = id != null ? handlerByWC.get(id) : null;
-      const method = String(payload?.method || "");
+      method = String(payload?.method || "");
       const args = Array.isArray(payload?.args) ? payload.args : [];
       if (!handler || !method || typeof handler[method] !== "function") {
         try { mcpLogger.error(`MCP API (sync): handler missing or method not found`, { id, method }); } catch (_) { /* intentionally empty */ }
@@ -52,11 +55,12 @@ function ensureIpcHandlers() {
 
   // Async IPC handler for MCP tools that can handle promises
   ipcMain.handle("scorm-mcp:api", async (event, payload = {}) => {
+    let method = '';
     try {
       const wc = event?.sender;
       const id = wc?.id;
       const handler = id != null ? handlerByWC.get(id) : null;
-      const method = String(payload?.method || "");
+      method = String(payload?.method || "");
       const args = Array.isArray(payload?.args) ? payload.args : [];
       if (!handler || !method || typeof handler[method] !== "function") {
         try { mcpLogger.error(`MCP API: handler missing or method not found`, { id, method }); } catch (_) { /* intentionally empty */ }
@@ -180,24 +184,32 @@ function installRealAdapterForWindow(win, options = {}) {
     const telemetryStore = new ScormInspectorTelemetryStore({ enableBroadcast: false, logger: mcpLogger });
     // Minimal session manager for persistence and learner info
     const sessionManager = {
-      registerSession: (id, handler) => { try { /* map kept externally */ return true; } catch (_) { return true; } },
-      unregisterSession: (_id) => { try { /* noop */ } catch (_) { /* intentionally empty */ } },
-      persistSessionData: (_id, _data) => { try { mcpLogger.info('MCP adapter: persistSessionData (noop)'); return true; } catch (_) { return true; } },
+      registerSession: () => true,
+      unregisterSession: () => { /* no-op in MCP runtime */ },
+      persistSessionData: () => true,
       getLearnerInfo: () => ({ id: 'mcp-learner', name: 'MCP Learner' })
     };
     // Create a SCORM API handler instance for this window
     const handler = new ScormApiHandler(sessionManager, /* logger */ mcpLogger, options, telemetryStore, /* scormService */ null);
     handlerByWC.set(win.webContents.id, handler);
+    telemetryStoreByWC.set(win.webContents.id, telemetryStore);
     // Cleanup on close
     win.on("closed", () => {
       try { handlerByWC.delete(win.webContents.id); } catch (_) { /* intentionally empty */ }
+      try { telemetryStoreByWC.delete(win.webContents.id); } catch (_) { /* intentionally empty */ }
     });
-    return true;
+    try { win.__scormTelemetryStore = telemetryStore; } catch (_) { /* intentionally empty */ }
+    return telemetryStore;
   } catch (e) {
     try { mcpLogger.error('MCP adapter install failed', e && e.message ? e.message : String(e)); } catch (_) { /* intentionally empty */ }
-    return false;
+    return null;
   }
 }
 
-module.exports = { getPreloadPath, installRealAdapterForWindow };
+function getTelemetryStoreForWindowId(id) {
+  if (id == null) return null;
+  return telemetryStoreByWC.get(id) || null;
+}
+
+module.exports = { getPreloadPath, installRealAdapterForWindow, getTelemetryStoreForWindowId };
 

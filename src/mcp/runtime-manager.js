@@ -8,7 +8,7 @@ try { electron = require("electron"); } catch (_) { electron = null; }
 
 
 const PathUtils = require("../shared/utils/path-utils");
-const { getPreloadPath, installRealAdapterForWindow } = require("./runtime-adapter");
+const { getPreloadPath, installRealAdapterForWindow, getTelemetryStoreForWindowId } = require("./runtime-adapter");
 const getLogger = require("../shared/utils/logger");
 
 // Get logger instance for browser console capture
@@ -69,6 +69,7 @@ async function resolveEntryPathFromManifest(workspace) {
 
 // Persistent runtime registry keyed by session_id
 const _persistentBySession = new Map();
+const _telemetryStoreBySession = new Map();
 
 // Per-session network request buffers
 const _networkRequestsBySession = new Map();
@@ -288,6 +289,24 @@ class RuntimeManager {
         return { success: true };
       }
 
+      case 'telemetry_getDataModelHistory': {
+        const sessionId = String(message.params?.session_id || '');
+        if (!sessionId) {
+          const err = new Error('session_id required');
+          err.code = 'MCP_INVALID_PARAMS';
+          throw err;
+        }
+        const store = _telemetryStoreBySession.get(sessionId);
+        if (!store) {
+          const err = new Error('Runtime not open');
+          err.code = 'RUNTIME_NOT_OPEN';
+          throw err;
+        }
+        const raw = message.params?.options;
+        const options = raw && typeof raw === 'object' ? { ...raw } : {};
+        return store.getDataModelHistory(options) || { success: false, changes: [], total: 0, hasMore: false };
+      }
+
       case 'runtime_capture': {
         const session_id = message.params.session_id;
         const compress = message.params.compress !== false; // Default to compressed
@@ -473,7 +492,11 @@ class RuntimeManager {
     if (viewport?.width && viewport?.height) win.setSize(viewport.width, viewport.height);
     const url = 'file://' + entryPath;
     // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
-    try { installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) { /* intentionally empty */ }
+    let telemetryStore = null;
+    try { telemetryStore = installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) { /* intentionally empty */ }
+    if (telemetryStore) {
+      try { win.__scormTelemetryStore = telemetryStore; } catch (_) { /* intentionally empty */ }
+    }
     // Capture browser console messages to unified log (accessible via system_get_logs)
     this.setupConsoleLogging(win);
 
@@ -561,8 +584,16 @@ class RuntimeManager {
     if (!session_id) throw new Error("session_id required");
     // Close any existing window first
     await this._closePersistentImpl(session_id);
-    const win = await this._openPageImpl({ entryPath, viewport, adapterOptions });
+    const adapterWithSession = { ...(adapterOptions || {}), sessionId: session_id };
+    const win = await this._openPageImpl({ entryPath, viewport, adapterOptions: adapterWithSession });
     _persistentBySession.set(session_id, win);
+
+    const telemetryStore = (win && win.__scormTelemetryStore) || getTelemetryStoreForWindowId(win?.webContents?.id);
+    if (telemetryStore) {
+      _telemetryStoreBySession.set(session_id, telemetryStore);
+    } else {
+      logger?.warn && logger.warn('Persistent runtime opened without telemetry store', { session_id });
+    }
 
     // Set up per-session network monitoring
     setupNetworkMonitoring(win, session_id);
@@ -571,6 +602,7 @@ class RuntimeManager {
       try {
         _persistentBySession.delete(session_id);
         _networkRequestsBySession.delete(session_id);
+        _telemetryStoreBySession.delete(session_id);
       } catch (_) { /* intentionally empty */ }
     }); } catch (_) { /* intentionally empty */ }
     return win;
@@ -610,6 +642,7 @@ class RuntimeManager {
     if (win) {
       try { win.destroy(); } catch (_) { /* intentionally empty */ }
       _persistentBySession.delete(session_id);
+      _telemetryStoreBySession.delete(session_id);
       return true;
     }
     return false;
@@ -723,6 +756,41 @@ class RuntimeManager {
       } catch (_) { return []; }
     })()`;
     try { return await win.webContents.executeJavaScript(script, true); } catch (_) { return []; }
+  }
+
+  static async getDataModelHistory(session_id, options = {}) {
+    if (!session_id || typeof session_id !== 'string') {
+      const err = new Error('session_id is required');
+      err.code = 'MCP_INVALID_PARAMS';
+      throw err;
+    }
+
+    const safeOptions = options && typeof options === 'object' ? { ...options } : {};
+
+    if (global.__electronBridge && global.__electronBridge.sendMessage) {
+      try {
+        return await global.__electronBridge.sendMessage({
+          id: ++_ipcMessageIdCounter,
+          type: 'telemetry_getDataModelHistory',
+          params: { session_id, options: safeOptions }
+        });
+      } catch (error) {
+        if (!error.code) {
+          const msg = error?.message || '';
+          if (/runtime not open/i.test(msg)) error.code = 'RUNTIME_NOT_OPEN';
+          else if (/session_id required/i.test(msg)) error.code = 'MCP_INVALID_PARAMS';
+        }
+        throw error;
+      }
+    }
+
+    const store = _telemetryStoreBySession.get(session_id);
+    if (!store) {
+      const err = new Error('Runtime not open');
+      err.code = 'RUNTIME_NOT_OPEN';
+      throw err;
+    }
+    return store.getDataModelHistory(safeOptions) || { success: false, changes: [], total: 0, hasMore: false };
   }
 
   static async getInitializeState(win, session_id = null) {

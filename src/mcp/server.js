@@ -5,13 +5,12 @@
  * Transport: JSON-RPC 2.0 over stdio (one message per line on stdout).
  */
 
-const { successEnvelope, errorEnvelope } = require("./envelope");
 const { mapError } = require("./errors");
 const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
 const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
-const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
+const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
 const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
 
 const getLogger = require('../shared/utils/logger.js');
@@ -98,6 +97,7 @@ const TOOL_META = new Map([
   ["scorm_dom_click_by_text", { description: "Click element by visible text with fuzzy matching - handles whitespace normalization automatically", inputSchema: { type: "object", properties: { session_id: { type: "string" }, text: { type: "string" }, options: { type: "object", properties: { exact_match: { type: "boolean" }, element_types: { type: "array", items: { type: "string" } } } } }, required: ["session_id", "text"] } }],
 
   // Network & Debugging
+  ["scorm_get_data_model_history", { description: "Retrieve recorded SCORM data model change history for an open runtime session", inputSchema: { type: "object", properties: { session_id: { type: "string" }, since_ts: { type: "number" }, element_prefix: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] }, change_session_id: { type: "string" }, limit: { type: "number", minimum: 0 }, offset: { type: "number", minimum: 0 } }, required: ["session_id"] } }],
   ["scorm_get_network_requests", { description: "Get network requests made by SCORM content with optional filtering by resource type and timestamp", inputSchema: { type: "object", properties: { session_id: { type: "string" }, options: { type: "object", properties: { resource_types: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, max_count: { type: "number" } } } }, required: ["session_id"] } }],
   ["scorm_validate_data_model_state", { description: "Validate current data model state against expected values - returns detailed diff with helpful hints for mismatches", inputSchema: { type: "object", properties: { session_id: { type: "string" }, expected: { type: "object" } }, required: ["session_id", "expected"] } }],
   ["scorm_get_console_errors", { description: "Get browser console errors/warnings from SCORM content - categorized by type (scorm_api, syntax, runtime, network)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, since_ts: { type: "number" }, severity: { type: "array", items: { type: "string", enum: ["error", "warning", "info"] } } }, required: ["session_id"] } }],
@@ -145,6 +145,7 @@ router.register("scorm_sn_reset", scorm_sn_reset);
 router.register("scorm_test_navigation_flow", scorm_test_navigation_flow);
 router.register("scorm_debug_api_calls", scorm_debug_api_calls);
 router.register("scorm_trace_sequencing", scorm_trace_sequencing);
+router.register("scorm_get_data_model_history", scorm_get_data_model_history);
 router.register("scorm_get_network_requests", scorm_get_network_requests);
 router.register("scorm_validate_data_model_state", scorm_validate_data_model_state);
 router.register("scorm_get_console_errors", scorm_get_console_errors);
@@ -253,15 +254,6 @@ router.register("scorm_dom_evaluate", scorm_dom_evaluate);
 router.register("scorm_dom_wait_for", scorm_dom_wait_for);
 router.register("scorm_keyboard_type", scorm_keyboard_type);
 
-function writeMessage(msg) {
-  try {
-    const line = JSON.stringify(msg);
-    process.stdout.write(line + "\n");
-  } catch (_) {
-    // Best-effort only
-  }
-}
-
   // JSON-RPC helpers (for MCP-compatible clients like Kilo Code)
   function writeJSONRPCResult(id, result) {
     try { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); } catch (_) { /* intentionally empty */ }
@@ -274,7 +266,6 @@ function writeMessage(msg) {
 
 
 async function handleRequest(req) {
-  const startedAt = Date.now();
 
   // Detect JSON-RPC 2.0 shape
   const isJSONRPC = req && req.jsonrpc === "2.0";

@@ -353,8 +353,10 @@ class IpcHandler extends BaseService {
 
       // Additional Inspector endpoints
       this.registerHandler('scorm-inspector-get-data-model', this.handleScormInspectorGetDataModel?.bind(this) || this.handleScormInspectorGetDataModel);
+  this.registerHandler('scorm-inspector-get-data-model-history', this.handleScormInspectorGetDataModelHistory.bind(this));
       this.registerHandler('scorm-inspector-get-sn-state', this.handleSNGetSequencingState.bind(this));
       this.registerHandler('scorm-inspector-clear', this.handleScormInspectorClear.bind(this));
+  this.registerHandler('scorm-inspector-clear-data-model-history', this.handleScormInspectorClearDataModelHistory.bind(this));
 
 
       // Course Outline Navigation handlers
@@ -1233,11 +1235,20 @@ class IpcHandler extends BaseService {
 
         const responseData = {
           history: historyResponse.history || [],
+          dataModelChanges: historyResponse.dataModelChanges || [],
           errors: errorsResponse.errors || [],
-          dataModel: dataModel
+          dataModel,
+          totals: {
+            api: Number(historyResponse.total) || 0,
+            dataModel: Number(historyResponse.dataModelTotal) || 0
+          },
+          hasMore: {
+            api: Boolean(historyResponse.hasMore),
+            dataModel: Boolean(historyResponse.dataModelHasMore)
+          }
         };
 
-        return { success: true, data: responseData };
+        return { success: historyResponse.success !== false, data: responseData };
       } catch (error) {
         this.logger?.error(`IpcHandler: handleScormInspectorGetHistory failed: ${error.message}`);
         return { success: false, error: error.message, data: { history: [], errors: [], dataModel: {} } };
@@ -1245,7 +1256,7 @@ class IpcHandler extends BaseService {
     }
 
     // Fallback when telemetry store not available
-    return { success: true, data: { history: [], errors: [], dataModel: {} } };
+    return { success: true, data: { history: [], dataModelChanges: [], errors: [], dataModel: {}, totals: { api: 0, dataModel: 0 }, hasMore: { api: false, dataModel: false } } };
   }
 
   /**
@@ -1730,6 +1741,71 @@ class IpcHandler extends BaseService {
     }
   }
 
+  _normalizeDataModelHistoryOptions(rawOptions = {}) {
+    const options = typeof rawOptions === 'object' && rawOptions !== null ? { ...rawOptions } : {};
+    const out = {};
+
+    if (options.sinceTs != null) {
+      const since = Number(options.sinceTs);
+      if (Number.isFinite(since) && since >= 0) {
+        out.sinceTs = since;
+      }
+    }
+
+    if (options.limit != null) {
+      const limit = Number(options.limit);
+      if (Number.isFinite(limit) && limit > 0) {
+        out.limit = Math.min(limit, 5000);
+      }
+    }
+
+    if (options.offset != null) {
+      const offset = Number(options.offset);
+      if (Number.isFinite(offset) && offset >= 0) {
+        out.offset = offset;
+      }
+    }
+
+    if (options.elementPrefix) {
+      const prefixes = Array.isArray(options.elementPrefix) ? options.elementPrefix : [options.elementPrefix];
+      out.elementPrefix = prefixes
+        .filter((p) => typeof p === 'string' && p.trim().length > 0)
+        .map((p) => p.trim());
+      if (out.elementPrefix.length === 0) {
+        delete out.elementPrefix;
+      }
+    }
+
+    if (options.sessionId != null) {
+      out.sessionId = String(options.sessionId);
+    }
+
+    return out;
+  }
+
+  async handleScormInspectorGetDataModelHistory(_event, rawOptions = {}) {
+    if (!this.telemetryStore || typeof this.telemetryStore.getDataModelHistory !== 'function') {
+      return { success: false, error: 'Telemetry store not available', data: { changes: [], total: 0, hasMore: false } };
+    }
+
+    try {
+      const options = this._normalizeDataModelHistoryOptions(rawOptions);
+      const result = this.telemetryStore.getDataModelHistory(options) || {};
+
+      return {
+        success: result.success !== false,
+        data: {
+          changes: Array.isArray(result.changes) ? result.changes : [],
+          total: Number(result.total) || 0,
+          hasMore: Boolean(result.hasMore)
+        }
+      };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorGetDataModelHistory failed: ${error.message}`);
+      return { success: false, error: error.message, data: { changes: [], total: 0, hasMore: false } };
+    }
+  }
+
   /**
    * Clear SCORM Inspector telemetry data
    */
@@ -1743,6 +1819,20 @@ class IpcHandler extends BaseService {
       return { success: false, error: 'Telemetry store not available' };
     } catch (error) {
       this.logger?.error(`IpcHandler: handleScormInspectorClear failed: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleScormInspectorClearDataModelHistory(_event) {
+    try {
+      if (!this.telemetryStore || typeof this.telemetryStore.clearDataModelHistory !== 'function') {
+        return { success: false, error: 'Telemetry store not available' };
+      }
+      this.telemetryStore.clearDataModelHistory();
+      this.logger?.info('IpcHandler: Data model change history cleared');
+      return { success: true };
+    } catch (error) {
+      this.logger?.error(`IpcHandler: handleScormInspectorClearDataModelHistory failed: ${error.message}`);
       return { success: false, error: error.message };
     }
   }

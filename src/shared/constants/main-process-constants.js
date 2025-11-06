@@ -123,6 +123,13 @@ const SERVICE_DEFAULTS = {
     enableGlobalObjectives: true,
     enableRollupProcessing: true,
     maxSequencingDepth: 10
+  },
+
+  TELEMETRY: {
+    MAX_API_HISTORY: 5000,
+    MAX_DATA_MODEL_HISTORY: 5000,
+    MAX_ERROR_HISTORY: 1000,
+    MAX_CHANGE_VALUE_LENGTH: 4096
   }
 };
 
@@ -250,6 +257,8 @@ const SECURITY_CONFIG = {
       'scorm-inspector-get-navigation-requests',
       'scorm-inspector-get-global-objectives',
       'scorm-inspector-get-ssp-buckets',
+  'scorm-inspector-get-data-model-history',
+  'scorm-inspector-clear-data-model-history',
       // Course Outline channels
       'course-outline-validate-choice',
       'course-outline-get-activity-tree',

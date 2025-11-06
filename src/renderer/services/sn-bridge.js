@@ -250,9 +250,18 @@ class SNBridge {
 
   async getScormDataModel() {
     try {
-      return await ipcClient.invoke('scorm-inspector-get-data-model');
+      return await ipcClient.getScormDataModel();
     } catch (error) {
       try { this.logger.error('SNBridge: getScormDataModel failed', error?.message || error); } catch (_) { /* noop */ }
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async getScormDataModelHistory(options = {}) {
+    try {
+      return await ipcClient.getScormDataModelHistory(options);
+    } catch (error) {
+      try { this.logger.error('SNBridge: getScormDataModelHistory failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error?.message || String(error) };
     }
   }
@@ -332,13 +341,43 @@ class SNBridge {
     return () => {};
   }
 
+  /** Subscribe to granular data model change events */
+  onScormDataModelChange(handler) {
+    try {
+      if (typeof handler === 'function') {
+        return ipcClient.onScormDataModelChange(handler);
+      }
+  } catch (_) { /* noop */ }
+    return () => {};
+  }
+
+  /** Subscribe to data model history cleared events */
+  onScormDataModelHistoryCleared(handler) {
+    try {
+      if (typeof handler === 'function') {
+        return ipcClient.onScormDataModelHistoryCleared(handler);
+      }
+  } catch (_) { /* noop */ }
+    return () => {};
+  }
+
   /** Clear SCORM Inspector data */
   async clearScormInspector() {
     try {
       return await ipcClient.clearScormInspector();
     } catch (error) {
-      console.error('[SNBridge] clearScormInspector failed:', error);
+      try { this.logger.error('SNBridge: clearScormInspector failed', error?.message || error); } catch (_) { /* noop */ }
       return { success: false, error: error.message };
+    }
+  }
+
+  /** Clear SCORM data model history */
+  async clearScormDataModelHistory() {
+    try {
+      return await ipcClient.clearScormDataModelHistory();
+    } catch (error) {
+      try { this.logger.error('SNBridge: clearScormDataModelHistory failed', error?.message || error); } catch (_) { /* noop */ }
+      return { success: false, error: error?.message || String(error) };
     }
   }
 

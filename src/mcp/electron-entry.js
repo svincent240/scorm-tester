@@ -36,7 +36,10 @@ async function childMode() {
       }
     } catch (error) {
       if (process.send) {
-        process.send({ id: message.id, error: error.message || String(error) });
+        const payload = { message: error?.message || String(error) };
+        if (error && error.code) payload.code = error.code;
+        if (error && error.data !== undefined) payload.data = error.data;
+        process.send({ id: message.id, error: payload });
       }
     }
   });

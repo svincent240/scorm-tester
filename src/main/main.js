@@ -22,7 +22,7 @@ const AppStateService = require('./services/app-state');
 // Shared utilities
 const ScormErrorHandler = require('./services/scorm/rte/error-handler');
 const getLogger = require('../shared/utils/logger');
-const { SERVICE_EVENTS } = require('../shared/constants/main-process-constants');
+const { SERVICE_EVENTS, SERVICE_DEFAULTS } = require('../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../shared/constants/error-codes');
 
 /**
@@ -131,7 +131,8 @@ class MainProcess {
     // Pass the main logger into shared services so logs are consistent
     // Create SCORM Inspector store with enhanced capabilities for package analysis
     const telemetryStore = new ScormInspectorTelemetryStore({
-      maxHistorySize: 2000,
+      maxHistorySize: SERVICE_DEFAULTS.TELEMETRY?.MAX_API_HISTORY || 5000,
+      dataModelHistorySize: SERVICE_DEFAULTS.TELEMETRY?.MAX_DATA_MODEL_HISTORY || 5000,
       enableBroadcast: true,
       logger: this.logger
     });

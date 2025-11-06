@@ -1,7 +1,6 @@
 /*
- * Integrated Inspector Panel Component (Phase 2 skeleton)
- * Renders inside the main window and replaces the legacy separate Inspector window.
- * Listens to UI intent events and exposes simple show/hide/toggle methods.
+ * Integrated Inspector Panel Component
+ * Hosts the in-app inspector timeline and supporting SCORM views.
  */
 
 // @ts-check
@@ -10,19 +9,59 @@ import { snBridge } from '../../services/sn-bridge.js';
 import { createJsonViewer } from '../../utils/json-viewer.js';
 import { rendererLogger } from '../../utils/renderer-logger.js';
 
+/**
+ * @typedef {import('../../services/sn-bridge.js').SNBridge} SNBridgeType
+ * @typedef {'api-call'|'data-model-change'} TimelineKind
+ * @typedef {{
+ *   kind: TimelineKind;
+ *   timestampMs: number;
+ *   timestampIso: string;
+ *   data: Record<string, any>;
+ *   method?: string;
+ *   hasError?: boolean;
+ *   element?: string;
+ *   source?: string;
+ *   sessionId?: string;
+ * }} TimelineEntry
+ * @typedef {Record<string, any>} HistoryEntry
+ * @typedef {Record<string, any>} DataModelChangeEntry
+ * @typedef {object} InspectorPanelState
+ * @property {HistoryEntry[]} history
+ * @property {DataModelChangeEntry[]} dataModelChanges
+ * @property {Record<string, any>[]} errors
+ * @property {Record<string, any>} dataModel
+ * @property {Record<string, any>} activityTree
+ * @property {Record<string, any>[]} navigation
+ * @property {Record<string, any>[]} objectives
+ * @property {Record<string, any>[]} ssp
+ * @property {Record<string, any>} sn
+ * @typedef {{ total: number; hasMore: boolean }} HistoryMetaSummary
+ * @typedef {{ history: HistoryMetaSummary; dataModelChanges: HistoryMetaSummary }} InspectorStateMeta
+ * @typedef {{ method: string; errorsOnly: boolean; showApi: boolean; showDataModel: boolean }} InspectorTimelineFilters
+ * @typedef {{ page: number; pageSize: number }} InspectorTimelinePager
+ * @typedef {{ api: HTMLElement | null; tree: HTMLElement | null; objectives: HTMLElement | null; ssp: HTMLElement | null; model: HTMLElement | null; sn: HTMLElement | null }} InspectorTabMap
+ * @typedef {{ api: HTMLElement | null; dm: HTMLElement | null; err: HTMLElement | null; obj: HTMLElement | null; nav: HTMLElement | null }} InspectorSummaryRefs
+ * @typedef {{ changes: DataModelChangeEntry[]; total: number; hasMore: boolean; success?: boolean; error?: string }} DataModelHistoryResult
+ * @typedef {{ slice: TimelineEntry[]; page: number; pages: number; total: number; pageSize: number }} TimelinePagination
+ */
+
 class InspectorPanel extends BaseComponent {
+  /**
+   * @param {string} elementId
+   * @param {Record<string, any>} [options]
+   */
   constructor(elementId, options = {}) {
-    super(elementId, {
-      className: 'inspector-panel',
-      ...options,
-    });
+    super(elementId, { className: 'inspector-panel', ...options });
+    /** @type {boolean} */
     this.visible = false;
+    /** @type {boolean} */
     this.loaded = false;
+    /** @type {'api'|'tree'|'objectives'|'ssp'|'model'|'sn'} */
     this.activeTab = 'api';
-    /** @type {{ history: Array<Record<string, any>>; errors: Array<Record<string, any>>; dataModel: Record<string, any>; activityTree: Record<string, any>; navigation: Array<Record<string, any>>; objectives: Array<Record<string, any>>; ssp: Array<Record<string, any>>; }} */
-    /** @type {{ history: Array<Record<string, any>>; errors: Array<Record<string, any>>; dataModel: Record<string, any>; activityTree: Record<string, any>; navigation: Array<Record<string, any>>; objectives: Array<Record<string, any>>; ssp: Array<Record<string, any>>; sn?: Record<string, any>; }} */
+    /** @type {InspectorPanelState} */
     this.state = {
       history: [],
+      dataModelChanges: [],
       errors: [],
       dataModel: {},
       activityTree: {},
@@ -31,12 +70,52 @@ class InspectorPanel extends BaseComponent {
       ssp: [],
       sn: {}
     };
-    /** @type {Array<() => void>} */
-    this._unsubs = [];
+    /** @type {InspectorStateMeta} */
+    this.stateMeta = {
+      history: { total: 0, hasMore: false },
+      dataModelChanges: { total: 0, hasMore: false }
+    };
+    /** @type {InspectorTimelineFilters} */
+    this._timelineFilters = {
+      method: 'all',
+      errorsOnly: false,
+      showApi: true,
+      showDataModel: true
+    };
+    /** @type {InspectorTimelinePager} */
+    this._timelinePager = { page: 1, pageSize: 100 };
     /** @type {number} */
     this._maxHistory = 2000;
     /** @type {number} */
+    this._maxDataModelHistory = 5000;
+    /** @type {number} */
     this._maxErrors = 200;
+    /** @type {InspectorSummaryRefs} */
+    this._summary = { api: null, dm: null, err: null, obj: null, nav: null };
+    /** @type {Array<() => void>} */
+    this._unsubs = [];
+    /** @type {(() => void) | null} */
+    this._resizeCleanup = null;
+    /** @type {HTMLElement | null} */
+    this.container = null;
+    /** @type {HTMLElement | null} */
+    this.tabsEl = null;
+    /** @type {HTMLElement | null} */
+    this.bodyEl = null;
+    /** @type {InspectorTabMap} */
+    this.tabEls = { api: null, tree: null, objectives: null, ssp: null, model: null, sn: null };
+    /** @type {boolean} */
+    this._subscriptionsBound = false;
+    /** @type {boolean} */
+    this._runtimeSubscriptionsBound = false;
+    /** @type {boolean} */
+    this._domEventsBound = false;
+    /** @type {((event: Event) => void) | null} */
+    this._tabsClickHandler = null;
+    /** @type {((event: Event) => void) | null} */
+    this._apiChangeHandler = null;
+    /** @type {((event: Event) => void) | null} */
+    this._apiClickHandler = null;
   }
 
   getDefaultOptions() {
@@ -46,27 +125,37 @@ class InspectorPanel extends BaseComponent {
     };
   }
 
-  setupEventSubscriptions() {
-    // Listen for inspector toggle requests from header controls
-    this.subscribe('ui:inspector:toggle-request', () => this.toggleVisibility());
-    this.subscribe('ui:inspector:show-request', () => this.show());
-    this.subscribe('ui:inspector:hide-request', () => this.hide());
+  async setup() {
+    if (!this._subscriptionsBound) {
+      try {
+        // Removed ui:inspector:toggle-request - AppManager handles this and calls toggleVisibility() directly
+        // Keeping show/hide requests for potential future use
+        this.subscribe('ui:inspector:show-request', () => this.show());
+        this.subscribe('ui:inspector:hide-request', () => this.hide());
+      } catch (error) {
+        rendererLogger.error('InspectorPanel: event bus subscription failed', error);
+      }
+      this._subscriptionsBound = true;
+    }
+
+    this._registerRuntimeSubscriptions();
   }
 
   renderContent() {
-    // Shell with tabs, controls, summary, and per-tab containers
+    this._unbindDomEvents();
+
     this.element.innerHTML = `
       <div class="inspector-panel__resize-handle" title="Drag to resize"></div>
       <div class="inspector-panel__container" style="display:none">
         <div class="inspector-panel__header">
-          <strong>SCORM Inspector (Integrated)</strong>
+          <strong>SCORM Inspector</strong>
           <div class="inspector-panel__header-actions">
             <button class="js-refresh-tab" title="Refresh current tab">⟳ Refresh</button>
             <button class="inspector-panel__close" title="Close">✕</button>
           </div>
         </div>
         <div class="inspector-panel__tabs">
-          <button data-tab="api">API Log</button>
+          <button data-tab="api">Timeline</button>
           <button data-tab="tree">Activity Tree</button>
           <button data-tab="objectives">Objectives</button>
           <button data-tab="ssp">SSP Buckets</button>
@@ -75,7 +164,8 @@ class InspectorPanel extends BaseComponent {
         </div>
         <div class="inspector-panel__body">
           <div class="inspector-panel__summary">
-            <span class="summary__item">API calls: <b class="js-api-count">0</b></span>
+            <span class="summary__item">Timeline: <b class="js-api-count">0</b></span>
+            <span class="summary__item">Data changes: <b class="js-dm-count">0</b></span>
             <span class="summary__item">Errors: <b class="js-error-count">0</b></span>
             <span class="summary__item">Objectives: <b class="js-objective-count">0</b></span>
             <span class="summary__item">Nav records: <b class="js-nav-count">0</b></span>
@@ -106,7 +196,18 @@ class InspectorPanel extends BaseComponent {
     if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshActiveTab());
 
     // Setup resize handle with improved UX
+    this._summary = {
+      api: this.element.querySelector('.js-api-count'),
+      dm: this.element.querySelector('.js-dm-count'),
+      err: this.element.querySelector('.js-error-count'),
+      obj: this.element.querySelector('.js-objective-count'),
+      nav: this.element.querySelector('.js-nav-count')
+    };
+
     this._setupResizeHandle();
+    this.setActiveTab(this.activeTab);
+    this._domEventsBound = false;
+    this._bindDomEvents();
   }
 
   _setupResizeHandle() {
@@ -117,20 +218,19 @@ class InspectorPanel extends BaseComponent {
     let startX = 0;
     let startWidth = 0;
 
-    const handleMouseDown = (e) => {
+    const handleMouseDown = (event) => {
       isResizing = true;
-      startX = e.clientX;
+      startX = event.clientX;
       startWidth = this.element?.offsetWidth || 0;
       document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
-      e.preventDefault();
+      event.preventDefault();
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (event) => {
       if (!isResizing || !this.element) return;
 
-      // Calculate delta: positive = drag right = shrink panel
-      const deltaX = e.clientX - startX;
+      const deltaX = event.clientX - startX;
       const newWidth = Math.max(300, Math.min(window.innerWidth * 0.5, startWidth - deltaX));
       this.element.style.width = `${newWidth}px`;
     };
@@ -147,29 +247,12 @@ class InspectorPanel extends BaseComponent {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
-    // Store cleanup function
     this._resizeCleanup = () => {
       resizeHandle.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-
-    this._summary = {
-      api: this.element.querySelector('.js-api-count'),
-      err: this.element.querySelector('.js-error-count'),
-      obj: this.element.querySelector('.js-objective-count'),
-      nav: this.element.querySelector('.js-nav-count')
-    };
-
-    // Filters/paging state for API tab
-    this.filters = this.filters || { method: 'all', errorsOnly: false, page: 1, pageSize: 100 };
-
-    // Initial tab render
-    try { this.setActiveTab(this.activeTab || 'api'); } catch (_) { /* intentionally empty */ }
-
-    // Initial tab render
-
-    }
+  }
 
   setActiveTab(tab) {
     const allowed = ['api','tree','objectives','ssp','model','sn'];
@@ -196,12 +279,7 @@ class InspectorPanel extends BaseComponent {
     try {
       switch (this.activeTab) {
         case 'api': {
-          const hist = await snBridge.getScormInspectorHistory();
-          if (hist?.success && hist.data) {
-            this._replaceHistory(hist.data.history);
-            this._replaceErrors(hist.data.errors);
-            this.state.dataModel = hist.data.dataModel || {};
-          }
+          await this._refreshTimelineData();
           break;
         }
         case 'tree': {
@@ -232,14 +310,19 @@ class InspectorPanel extends BaseComponent {
       }
       this.updateSummaryCounts();
       this.renderActiveTab();
-    } catch (e) {
-      this.uiState?.showNotification({ type: 'error', message: 'Refresh failed', details: e?.message || String(e) });
+    } catch (error) {
+      this.uiState?.showNotification({
+        type: 'error',
+        message: 'Refresh failed',
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
   renderActiveTab() {
     switch (this.activeTab) {
-      case 'api': return this.renderApiLog();
+      case 'api':
+        return this.renderApiLog();
       case 'tree': return this.renderActivityTree();
       case 'objectives': return this.renderObjectives();
       case 'ssp': return this.renderSSP();
@@ -249,122 +332,133 @@ class InspectorPanel extends BaseComponent {
     }
   }
 
-  // Helpers for API tab
   _getMethods() {
     const hist = Array.isArray(this.state.history) ? this.state.history : [];
     const methods = new Set();
-    hist.forEach(it => {
-      const m = it?.method || it?.name;
-      if (m) methods.add(String(m));
+    hist.forEach((entry) => {
+      const method = entry?.method || entry?.name;
+      if (method) methods.add(String(method));
     });
     return Array.from(methods).sort();
   }
 
-  _applyApiFilters(items) {
-    let out = items;
-    const { method, errorsOnly } = this.filters || {};
-    if (method && method !== 'all') {
-      out = out.filter(it => (it?.method || it?.name) === method);
-    }
-    if (errorsOnly) {
-      out = out.filter(it => it?.error || it?.level === 'error');
-    }
-    return out;
+  _applyTimelineFilters(items) {
+    const filters = this._timelineFilters;
+    return items.filter((entry) => {
+      if (filters.errorsOnly && entry.kind === 'api-call' && !entry.hasError) {
+        return false;
+      }
+      if (!filters.showApi && entry.kind === 'api-call') return false;
+      if (!filters.showDataModel && entry.kind === 'data-model-change') return false;
+      if (filters.method !== 'all' && entry.kind === 'api-call') {
+        return entry.method === filters.method;
+      }
+      return true;
+    });
   }
 
   _paginate(items) {
-    const pageSize = Math.max(10, Math.min(500, this.filters?.pageSize || 100));
-    const page = Math.max(1, this.filters?.page || 1);
+    const size = Math.max(10, Math.min(500, Number(this._timelinePager.pageSize) || 100));
+    const requestedPage = Math.max(1, Number(this._timelinePager.page) || 1);
     const total = items.length;
-    const pages = Math.max(1, Math.ceil(total / pageSize));
-    const clampedPage = Math.min(page, pages);
-    const start = (clampedPage - 1) * pageSize;
-    const end = start + pageSize;
-    return { slice: items.slice(start, end), page: clampedPage, pages, total, pageSize };
+    const pages = Math.max(1, Math.ceil(total / size));
+    const page = Math.min(requestedPage, pages);
+    const start = (page - 1) * size;
+    const end = start + size;
+    return { slice: items.slice(start, end), page, pages, total, pageSize: size };
   }
 
-  /**
-   * Replace the inspector history with a bounded copy.
-   * @param {Array<Record<string, any>> | null | undefined} list
-   */
-  _replaceHistory(list) {
+  _replaceHistory(list, meta = {}) {
     if (Array.isArray(list)) {
-      const trimmed = list.length > this._maxHistory
-        ? list.slice(list.length - this._maxHistory)
-        : list.slice();
+      const trimmed = list.length > this._maxHistory ? list.slice(-this._maxHistory) : list.slice();
       this.state.history = trimmed;
+      this.stateMeta.history = {
+        total: typeof meta.total === 'number' ? meta.total : trimmed.length,
+        hasMore: Boolean(meta.hasMore)
+      };
     } else {
       this.state.history = [];
+      this.stateMeta.history = { total: 0, hasMore: false };
     }
   }
 
-  /**
-   * Replace the inspector errors with a bounded copy.
-   * @param {Array<Record<string, any>> | null | undefined} list
-   */
+  _replaceDataModelHistory(list, meta = {}) {
+    if (Array.isArray(list)) {
+      const trimmed = list.length > this._maxDataModelHistory ? list.slice(-this._maxDataModelHistory) : list.slice();
+      this.state.dataModelChanges = trimmed;
+      this.stateMeta.dataModelChanges = {
+        total: typeof meta.total === 'number' ? meta.total : trimmed.length,
+        hasMore: Boolean(meta.hasMore)
+      };
+    } else {
+      this.state.dataModelChanges = [];
+      this.stateMeta.dataModelChanges = { total: 0, hasMore: false };
+    }
+  }
+
   _replaceErrors(list) {
     if (Array.isArray(list)) {
-      const trimmed = list.slice(0, this._maxErrors);
-      this.state.errors = trimmed;
+      this.state.errors = list.slice(0, this._maxErrors);
     } else {
       this.state.errors = [];
     }
   }
 
-  /**
-   * Append a single history entry ensuring bounded length and no duplicates.
-   * @param {Record<string, any>} entry
-   * @returns {boolean}
-   */
   _appendHistoryEntry(entry) {
     if (!entry || typeof entry !== 'object') return false;
     const list = Array.isArray(this.state.history) ? this.state.history.slice() : [];
-    const key = this._getEntryKey(entry);
-    if (key && list.some(item => this._getEntryKey(item) === key)) {
-      return false;
-    }
+    const key = this._getHistoryKey(entry);
+    if (key && list.some((item) => this._getHistoryKey(item) === key)) return false;
     list.push(entry);
-    if (list.length > this._maxHistory) {
-      list.splice(0, list.length - this._maxHistory);
-    }
+    if (list.length > this._maxHistory) list.splice(0, list.length - this._maxHistory);
     this.state.history = list;
+    this.stateMeta.history.total = Math.max(list.length, this.stateMeta.history.total || 0);
     return true;
   }
 
-  /**
-   * Append a single error entry ensuring bounded length and no duplicates.
-   * @param {Record<string, any>} entry
-   * @returns {boolean}
-   */
   _appendErrorEntry(entry) {
     if (!entry || typeof entry !== 'object') return false;
     const list = Array.isArray(this.state.errors) ? this.state.errors.slice() : [];
-    const key = this._getEntryKey(entry);
-    if (key && list.some(item => this._getEntryKey(item) === key)) {
-      return false;
-    }
+    const key = this._getHistoryKey(entry);
+    if (key && list.some((item) => this._getHistoryKey(item) === key)) return false;
     list.unshift(entry);
-    if (list.length > this._maxErrors) {
-      list.length = this._maxErrors;
-    }
+    if (list.length > this._maxErrors) list.length = this._maxErrors;
     this.state.errors = list;
     return true;
   }
 
-  /**
-   * Normalise inspector data payload into local state caches.
-   * @param {any} payload
-   * @returns {boolean}
-   */
+  _appendDataModelChange(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const list = Array.isArray(this.state.dataModelChanges) ? this.state.dataModelChanges.slice() : [];
+    const key = this._getDataModelChangeKey(entry);
+    if (key && list.some((item) => this._getDataModelChangeKey(item) === key)) return false;
+    list.push(entry);
+    if (list.length > this._maxDataModelHistory) list.splice(0, list.length - this._maxDataModelHistory);
+    this.state.dataModelChanges = list;
+    this.stateMeta.dataModelChanges.total = Math.max(list.length, this.stateMeta.dataModelChanges.total || 0);
+    return true;
+  }
+
   _handleInspectorPayload(payload) {
     let changed = false;
     if (!payload) return changed;
 
     if (Array.isArray(payload.history)) {
-      this._replaceHistory(payload.history);
+      this._replaceHistory(payload.history, {
+        total: payload.historyTotal,
+        hasMore: payload.historyHasMore
+      });
       changed = true;
     } else if (payload && typeof payload === 'object' && (payload.method || payload.name)) {
       changed = this._appendHistoryEntry(payload) || changed;
+    }
+
+    if (Array.isArray(payload.dataModelChanges)) {
+      this._replaceDataModelHistory(payload.dataModelChanges, {
+        total: payload.dataModelTotal,
+        hasMore: payload.dataModelHasMore
+      });
+      changed = true;
     }
 
     if (Array.isArray(payload.errors)) {
@@ -377,101 +471,218 @@ class InspectorPanel extends BaseComponent {
       changed = true;
     }
 
+    if (Array.isArray(payload.navigation)) {
+      this.state.navigation = payload.navigation;
+      changed = true;
+    }
+
     return changed;
   }
 
-  /**
-   * Generate a stable identifier for history/error entries.
-   * @param {Record<string, any>} entry
-   * @returns {string}
-   */
-  _getEntryKey(entry) {
+  _getHistoryKey(entry) {
     if (!entry || typeof entry !== 'object') return '';
     if (entry.id) return String(entry.id);
     if (entry.timestamp && entry.method) return `${entry.timestamp}:${entry.method}`;
     if (entry.timestamp && entry.name) return `${entry.timestamp}:${entry.name}`;
+    if (entry.timestamp && entry.element) return `${entry.timestamp}:${entry.element}`;
     return JSON.stringify(entry).slice(0, 120);
   }
 
-  // Simple, defensive renderers
+  _getDataModelChangeKey(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    if (entry.id) return String(entry.id);
+    const ts = entry.timestampMs || entry.timestamp || 0;
+    const element = entry.element || entry.path || 'unknown';
+    return `${ts}:${element}`;
+  }
+
+  _normalizeTimestamp(entry) {
+    let raw = entry?.timestampMs;
+    if (raw == null) {
+      const ts = entry?.timestamp;
+      if (typeof ts === 'number') raw = ts;
+      else if (typeof ts === 'string') raw = Date.parse(ts);
+    }
+    const ms = Number.isFinite(raw) ? Number(raw) : Date.now();
+    return { ms, iso: new Date(ms).toISOString() };
+  }
+
+  _decorateTimelineEntry(entry, kind) {
+    const { ms, iso } = this._normalizeTimestamp(entry);
+    if (kind === 'api-call') {
+      return {
+        kind,
+        timestampMs: ms,
+        timestampIso: iso,
+        data: entry,
+        method: entry?.method ? String(entry.method) : (entry?.name ? String(entry.name) : undefined),
+        hasError: Boolean(entry?.errorCode && entry.errorCode !== '0'),
+        sessionId: entry?.sessionId ? String(entry.sessionId) : undefined
+      };
+    }
+    return {
+      kind,
+      timestampMs: ms,
+      timestampIso: iso,
+      data: entry,
+      element: entry?.element ? String(entry.element) : undefined,
+      source: entry?.source ? String(entry.source) : undefined,
+      sessionId: entry?.sessionId ? String(entry.sessionId) : undefined
+    };
+  }
+
+  _buildTimeline() {
+    const timeline = [];
+    if (Array.isArray(this.state.history)) {
+      this.state.history.forEach((entry) => {
+        timeline.push(this._decorateTimelineEntry(entry, 'api-call'));
+      });
+    }
+    if (Array.isArray(this.state.dataModelChanges)) {
+      this.state.dataModelChanges.forEach((entry) => {
+        timeline.push(this._decorateTimelineEntry(entry, 'data-model-change'));
+      });
+    }
+    timeline.sort((a, b) => b.timestampMs - a.timestampMs);
+    return timeline;
+  }
+
+  async _refreshTimelineData() {
+    const historyPromise = snBridge.getScormInspectorHistory();
+    const dataModelHistoryPromise = snBridge.getScormDataModelHistory({ limit: this._maxDataModelHistory });
+
+    const [historyResult, dataModelHistoryResult] = await Promise.all([historyPromise, dataModelHistoryPromise]);
+
+    if (historyResult?.success && historyResult.data) {
+      this._replaceHistory(historyResult.data.history, {
+        total: historyResult.data?.totals?.history,
+        hasMore: historyResult.data?.hasMore?.history
+      });
+      this._replaceErrors(historyResult.data.errors);
+      if (historyResult.data.dataModel) {
+        this.state.dataModel = historyResult.data.dataModel;
+      }
+      if (Array.isArray(historyResult.data.dataModelChanges)) {
+        this._replaceDataModelHistory(historyResult.data.dataModelChanges, {
+          total: historyResult.data?.totals?.dataModel,
+          hasMore: historyResult.data?.hasMore?.dataModel
+        });
+      }
+      if (Array.isArray(historyResult.data.navigation)) {
+        this.state.navigation = historyResult.data.navigation;
+      }
+    }
+
+    if (dataModelHistoryResult?.success && Array.isArray(dataModelHistoryResult.data)) {
+      this._replaceDataModelHistory(dataModelHistoryResult.data, {
+        total: typeof dataModelHistoryResult.total === 'number' ? dataModelHistoryResult.total : undefined,
+        hasMore: dataModelHistoryResult.hasMore
+      });
+    }
+  }
+
+  _renderTimelineEntry(entry) {
+    if (entry.kind === 'api-call') {
+      const call = entry.data || {};
+      const method = this._esc(entry.method || 'unknown');
+      const timestamp = entry.timestampIso ? new Date(entry.timestampIso).toLocaleTimeString() : '';
+      const params = call.parameters ?? call.args;
+      const result = call.result;
+      const errorCode = call.errorCode;
+      const errorMessage = call.errorMessage;
+      const duration = call.durationMs != null ? `${call.durationMs}ms` : '';
+      const sessionId = call.sessionId != null ? String(call.sessionId) : '';
+      const recordData = JSON.stringify(call, null, 2);
+
+      let methodClass = 'method-default';
+      if (method.includes('Initialize')) methodClass = 'method-init';
+      else if (method.includes('Terminate')) methodClass = 'method-terminate';
+      else if (method.includes('GetValue')) methodClass = 'method-get';
+      else if (method.includes('SetValue')) methodClass = 'method-set';
+      else if (method.includes('Commit')) methodClass = 'method-commit';
+      else if (method.includes('GetLastError')) methodClass = 'method-error';
+
+      return `<li class="api-call${entry.hasError ? ' api-call-error' : ''}" data-record='${this._esc(recordData)}'>
+        <div class="api-call__header">
+          <code class="api-call__method ${methodClass}">${method}</code>
+          ${timestamp ? `<span class="api-call__timestamp">${this._esc(timestamp)}</span>` : ''}
+          ${duration ? `<span class="api-call__duration">${this._esc(duration)}</span>` : ''}
+          <button class="api-call__copy js-copy-record" title="Copy record">📋</button>
+        </div>
+        <div class="api-call__details">
+          ${params != null ? `<div><strong>Params:</strong> <code>${this._esc(JSON.stringify(params))}</code></div>` : ''}
+          ${result != null ? `<div><strong>Result:</strong> <code>${this._esc(JSON.stringify(result))}</code></div>` : ''}
+          ${entry.hasError ? `<div class="api-call__error"><strong>Error ${this._esc(String(errorCode))}:</strong> ${this._esc(errorMessage || 'Unknown error')}</div>` : ''}
+          ${sessionId ? `<div><strong>Session:</strong> ${this._esc(sessionId)}</div>` : ''}
+        </div>
+      </li>`;
+    }
+
+    const change = entry.data || {};
+    const timestamp = entry.timestampIso ? new Date(entry.timestampIso).toLocaleTimeString() : '';
+    const previousValue = change.previousValue === undefined ? '<em>unset</em>' : this._esc(JSON.stringify(change.previousValue));
+    const newValue = change.newValue === undefined ? '<em>unset</em>' : this._esc(JSON.stringify(change.newValue));
+    const element = change.element ? this._esc(String(change.element)) : '<em>unknown</em>';
+    const source = change.source ? this._esc(String(change.source)) : 'unspecified';
+    const payload = JSON.stringify(change, null, 2);
+
+    return `<li class="data-model-change" data-record='${this._esc(payload)}'>
+      <div class="data-model-change__header">
+        <code class="data-model-change__element">${element}</code>
+        ${timestamp ? `<span class="data-model-change__timestamp">${this._esc(timestamp)}</span>` : ''}
+        <span class="data-model-change__source">${this._esc(source)}</span>
+        <button class="data-model-change__copy js-copy-record" title="Copy record">📋</button>
+      </div>
+      <div class="data-model-change__details">
+        <div><strong>Previous:</strong> <code>${previousValue}</code></div>
+        <div><strong>New:</strong> <code>${newValue}</code></div>
+      </div>
+    </li>`;
+  }
+
   renderApiLog() {
-    const el = this.tabEls?.api; if (!el) return;
-    const all = Array.isArray(this.state.history) ? this.state.history : [];
+    const el = this.tabEls?.api;
+    if (!el) return;
 
-    // REVERSE ORDER: Show newest first
-    const reversed = [...all].reverse();
-    const filtered = this._applyApiFilters(reversed);
-  const { slice, page, pages, total } = this._paginate(filtered);
+    const timeline = this._buildTimeline();
+    const filtered = this._applyTimelineFilters(timeline);
+    const { slice, page, pages, total } = this._paginate(filtered);
 
-    const methodOptions = ['<option value="all">All methods</option>', ...this._getMethods().map(m => `<option value="${this._esc(m)}" ${this.filters?.method===m?'selected':''}>${this._esc(m)}</option>`)].join('');
+    const methodOptions = ['<option value="all">All methods</option>'];
+    this._getMethods().forEach((method) => {
+      methodOptions.push(`<option value="${this._esc(method)}" ${this._timelineFilters.method === method ? 'selected' : ''}>${this._esc(method)}</option>`);
+    });
 
     const controls = `
       <div class="api-controls">
-        <label>Method <select class="js-api-filter">${methodOptions}</select></label>
-        <label><input type="checkbox" class="js-api-errors" ${this.filters?.errorsOnly?'checked':''}/> Errors only</label>
-        <button class="js-clear-api-log" title="Clear API log">Clear Log</button>
-        <span class="api-paging">Page ${page}/${pages} • ${total} items (newest first)</span>
+        <label>Method <select class="js-api-filter">${methodOptions.join('')}</select></label>
+        <label><input type="checkbox" class="js-api-errors" ${this._timelineFilters.errorsOnly ? 'checked' : ''}/> Errors only</label>
+        <label><input type="checkbox" class="js-timeline-api" ${this._timelineFilters.showApi ? 'checked' : ''}/> API</label>
+        <label><input type="checkbox" class="js-timeline-dm" ${this._timelineFilters.showDataModel ? 'checked' : ''}/> Data model</label>
+        <button class="js-clear-timeline" title="Clear timeline">Clear</button>
+        <span class="api-paging">Page ${page}/${pages} • ${total} items</span>
         <div class="api-paging__buttons">
-          <button class="js-page-prev" ${page<=1?'disabled':''}>Prev</button>
-          <button class="js-page-next" ${page>=pages?'disabled':''}>Next</button>
+          <button class="js-page-prev" ${page <= 1 ? 'disabled' : ''}>Prev</button>
+          <button class="js-page-next" ${page >= pages ? 'disabled' : ''}>Next</button>
         </div>
       </div>`;
 
-    // Enhanced API log with all captured data
-    const list = ['<ul class="api-log api-log--enhanced">',
-      ...slice.map((it) => {
-        const hasError = it?.errorCode && it.errorCode !== '0';
-        const method = this._esc(it?.method || it?.name || 'unknown');
-        const timestamp = it?.timestamp ? new Date(it.timestamp).toLocaleTimeString() : '';
-        const params = it?.parameters || it?.args;
-        const result = it?.result;
-        const errorCode = it?.errorCode;
-        const errorMessage = it?.errorMessage;
-        const durationMs = it?.durationMs;
-        const sessionId = it?.sessionId;
+    const list = slice.length
+      ? slice.map((entry) => this._renderTimelineEntry(entry)).join('')
+      : '<li class="api-call api-call--empty"><em>No timeline entries yet.</em></li>';
 
-        // Color-code by method type
-        let methodClass = 'method-default';
-        if (method.includes('Initialize')) methodClass = 'method-init';
-        else if (method.includes('Terminate')) methodClass = 'method-terminate';
-        else if (method.includes('GetValue')) methodClass = 'method-get';
-        else if (method.includes('SetValue')) methodClass = 'method-set';
-        else if (method.includes('Commit')) methodClass = 'method-commit';
-        else if (method.includes('GetLastError')) methodClass = 'method-error';
-
-        const errorClass = hasError ? 'api-call-error' : '';
-
-        const recordData = JSON.stringify(it, null, 2);
-
-        return `<li class="api-call ${errorClass}" data-record='${this._esc(recordData)}'>
-          <div class="api-call__header">
-            <code class="api-call__method ${methodClass}">${method}</code>
-            ${timestamp ? `<span class="api-call__timestamp">${this._esc(timestamp)}</span>` : ''}
-            ${durationMs != null ? `<span class="api-call__duration">${this._esc(String(durationMs))}ms</span>` : ''}
-            <button class="api-call__copy js-copy-record" title="Copy record to clipboard">📋</button>
-          </div>
-          <div class="api-call__details">
-            ${params != null ? `<div class="api-call__params"><strong>Params:</strong> <code>${this._esc(JSON.stringify(params))}</code></div>` : ''}
-            ${result != null ? `<div class="api-call__result"><strong>Result:</strong> <code>${this._esc(JSON.stringify(result))}</code></div>` : ''}
-            ${hasError ? `<div class="api-call__error"><strong>Error ${this._esc(errorCode)}:</strong> ${this._esc(errorMessage || 'Unknown error')}</div>` : ''}
-            ${sessionId ? `<div class="api-call__session"><strong>Session:</strong> ${this._esc(sessionId)}</div>` : ''}
-          </div>
-        </li>`;
-      }),
-      '</ul>'].join('');
-
-    const errorsBlock = this.state.errors?.length && this.filters?.errorsOnly
-      ? `<div class="tab-section"><h4>Errors (${this.state.errors.length})</h4><ul class="api-errors">${this.state.errors.slice(0,100).map(e=>`<li>${this._esc(e?.message||String(e))}</li>`).join('')}</ul></div>`
+    const errorsBlock = this.state.errors?.length && this._timelineFilters.errorsOnly
+      ? `<div class="tab-section"><h4>Errors (${this.state.errors.length})</h4><ul class="api-errors">${this.state.errors.slice(0, 100).map((err) => `<li>${this._esc(err?.message || String(err))}</li>`).join('')}</ul></div>`
       : '';
 
     el.innerHTML = `
       <div class="tab-section">
         <div class="tab-section__header">
-          <h4>API Calls</h4>
+          <h4>API &amp; Data Model Timeline</h4>
           ${controls}
         </div>
         <div class="tab-section__content">
-          ${list}
+          <ul class="api-log api-log--enhanced">${list}</ul>
         </div>
       </div>
       ${errorsBlock}`;
@@ -589,146 +800,37 @@ class InspectorPanel extends BaseComponent {
       <tbody>${rows.slice(0,200).map(renderRow).join('') || '<tr><td colspan="3"><em>No SSP data</em></td></tr>'}</tbody></table></div>`;
   }
 
-  _esc(v) { try { return String(v).replace(/[&<>"]+/g, (m)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])); } catch (e) { return ''; } }
-
-  bindEvents() {
-    super.bindEvents();
-    // Tabs click handler
+  _esc(value) {
     try {
-      if (this.tabsEl) {
-        this.tabsEl.addEventListener('click', (e) => {
-          const btn = e.target?.closest?.('button[data-tab]');
-          if (btn && btn.dataset?.tab) this.setActiveTab(btn.dataset.tab);
-        });
-      }
-    } catch (_) { /* intentionally empty */ }
-
-    // API tab controls (delegated)
-    try {
-      const apiTab = this.tabEls?.api;
-      if (apiTab) {
-        apiTab.addEventListener('change', (e) => {
-          if (e.target?.classList?.contains('js-api-filter')) {
-            this.filters.method = e.target.value || 'all';
-            this.filters.page = 1;
-            this.renderApiLog();
-          } else if (e.target?.classList?.contains('js-api-errors')) {
-            this.filters.errorsOnly = !!e.target.checked;
-            this.filters.page = 1;
-            this.renderApiLog();
-          }
-        });
-        apiTab.addEventListener('click', async (e) => {
-          const t = e.target;
-          if (t?.classList?.contains('js-page-prev')) {
-            this.filters.page = Math.max(1, (this.filters.page||1)-1);
-            this.renderApiLog();
-          } else if (t?.classList?.contains('js-page-next')) {
-            this.filters.page = (this.filters.page||1)+1;
-            this.renderApiLog();
-          } else if (t?.classList?.contains('js-clear-api-log')) {
-            // Clear API log
-            try {
-              const result = await snBridge.clearScormInspector();
-              if (result?.success) {
-                this._replaceHistory([]);
-                this._replaceErrors([]);
-                this.updateSummaryCounts();
-                this.renderApiLog();
-              }
-            } catch (err) {
-              rendererLogger.error('InspectorPanel: clear API log failed', err);
-            }
-          } else if (t?.classList?.contains('js-copy-record')) {
-            // Copy individual API record
-            const record = t.closest('.api-call')?.dataset?.record;
-            if (record) {
-              try {
-                await navigator.clipboard.writeText(record);
-                t.textContent = '✓';
-                setTimeout(() => { t.textContent = '📋'; }, 1000);
-              } catch (err) {
-                rendererLogger.error('InspectorPanel: copy API record failed', err);
-              }
-            }
-          }
-        });
-      }
-    } catch (_) { /* intentionally empty */ }
-
-    // Subscribe to course-loaded event to clear and refresh inspector
-    try {
-      const offCourseLoaded = snBridge.onCourseLoaded(async () => {
-        try {
-          await snBridge.clearScormInspector();
-        } catch (err) {
-          rendererLogger.error('InspectorPanel: clearScormInspector failed on course load', err);
-        }
-        this._replaceHistory([]);
-        this._replaceErrors([]);
-        this.state.dataModel = {};
-        this.updateSummaryCounts();
-        setTimeout(() => { void this.loadInitialData(); }, 500);
-      });
-      this._unsubs.push(offCourseLoaded);
-    } catch (_) { /* intentionally empty */ }
-
-    // Subscribe to main-pushed inspector updates
-    try {
-      const off = snBridge.onScormInspectorDataUpdated((/** @type {any} */ payload) => {
-        const changed = this._handleInspectorPayload(payload);
-        if (!changed) return;
-        this.updateSummaryCounts();
-        if (!this.visible) return;
-        if (this.activeTab === 'api') {
-          this.renderApiLog();
-        } else if (this.activeTab === 'model' && payload && typeof payload.dataModel === 'object') {
-          this.renderDataModel();
-        }
-      });
-      this._unsubs.push(off);
+      return String(value).replace(/[&<>"']+/g, (match) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[match] || match));
     } catch (error) {
-      rendererLogger.error('InspectorPanel: failed to subscribe to inspector data updates', error);
-    }
-
-    // Subscribe to incremental inspector errors for quick feedback
-    try {
-      const offErrors = snBridge.onScormInspectorErrorUpdated((/** @type {any} */ entry) => {
-        if (!this._appendErrorEntry(entry)) return;
-        this.updateSummaryCounts();
-        if (this.visible && this.activeTab === 'api' && this.filters?.errorsOnly) {
-          this.renderApiLog();
-        }
-      });
-      this._unsubs.push(offErrors);
-    } catch (error) {
-      rendererLogger.error('InspectorPanel: failed to subscribe to inspector error updates', error);
-    }
-
-    // Subscribe to data model updates
-    try {
-      const offDataModel = snBridge.onScormDataModelUpdated((/** @type {Record<string, any> | undefined} */ dataModel) => {
-        this.state.dataModel = dataModel || {};
-        if (this.visible && this.activeTab === 'model') {
-          this.renderDataModel();
-        }
-      });
-      this._unsubs.push(offDataModel);
-    } catch (error) {
-      rendererLogger.error('InspectorPanel: failed to subscribe to data model updates', error);
+      try { rendererLogger.warn('InspectorPanel: failed to escape value', error); } catch (_) { /* noop */ }
+      return '';
     }
   }
 
   show() {
     this.visible = true;
     const container = /** @type {HTMLElement | null} */ (this.container);
-    if (container) container.style.display = 'block';
+    if (container) {
+      container.style.display = 'block';
+      try { rendererLogger.debug('InspectorPanel: Container display set to block'); } catch (_) { /* noop */ }
+    } else {
+      try { rendererLogger.warn('InspectorPanel: Container element not found in show()'); } catch (_) { /* noop */ }
+    }
     const root = /** @type {HTMLElement | null} */ (this.element);
     if (root) root.classList.add('inspector-panel--visible');
-    if (!this.loaded) this.loadInitialData();
+  if (!this.loaded) this.loadInitialData();
     try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) { /* intentionally empty */ }
-    try { this.eventBus?.emit('inspector:state:updated', { visible: true }); } catch (_) { /* intentionally empty */ }
+    // Removed inspector:state:updated to prevent event cycle with inspectorpanel:visibilityChanged
     this.emit('visibilityChanged', { visible: true });
+    try { rendererLogger.info('InspectorPanel: Shown'); } catch (_) { /* noop */ }
   }
 
   hide() {
@@ -742,36 +844,50 @@ class InspectorPanel extends BaseComponent {
       root.style.width = '';
     }
     try { this.uiState?.setState('ui.inspectorVisible', false, true); } catch (_) { /* intentionally empty */ }
-    try { this.eventBus?.emit('inspector:state:updated', { visible: false }); } catch (_) { /* intentionally empty */ }
+    // Removed inspector:state:updated to prevent event cycle with inspectorpanel:visibilityChanged
     this.emit('visibilityChanged', { visible: false });
   }
 
   toggleVisibility() {
-    if (this.visible) this.hide(); else this.show();
+    try { rendererLogger.info('InspectorPanel: toggleVisibility called', { currentlyVisible: this.visible }); } catch (_) { /* noop */ }
+    if (this.visible) this.hide();
+    else this.show();
   }
-
 
   async loadInitialData() {
     try {
-      const [hist, tree, nav, obj, ssp, sn] = await Promise.all([
+      const [hist, tree, nav, obj, ssp, sn, dmHistory] = await Promise.all([
         snBridge.getScormInspectorHistory(),
         snBridge.getActivityTree(),
         snBridge.getNavigationRequests(),
         snBridge.getGlobalObjectives(),
         snBridge.getSSPBuckets(),
-        snBridge.getSnState()
+        snBridge.getSnState(),
+        snBridge.getScormDataModelHistory({ limit: this._maxDataModelHistory })
       ]);
 
       if (hist?.success && hist.data) {
         this._replaceHistory(hist.data.history);
         this._replaceErrors(hist.data.errors);
         this.state.dataModel = hist.data.dataModel || {};
+        if (Array.isArray(hist.data.dataModelChanges)) {
+          this._replaceDataModelHistory(hist.data.dataModelChanges, {
+            total: hist.data?.totals?.dataModel,
+            hasMore: hist.data?.hasMore?.dataModel
+          });
+        }
       }
       if (tree?.success) this.state.activityTree = tree.data || {};
       if (nav?.success) this.state.navigation = nav.data || [];
       if (obj?.success) this.state.objectives = obj.data || [];
       if (ssp?.success) this.state.ssp = ssp.data || [];
       if (sn?.success) this.state.sn = sn;
+      if (dmHistory?.success && Array.isArray(dmHistory.data)) {
+        this._replaceDataModelHistory(dmHistory.data, {
+          total: typeof dmHistory.total === 'number' ? dmHistory.total : undefined,
+          hasMore: dmHistory.hasMore
+        });
+      }
 
       this.updateSummaryCounts();
       this.loaded = true;
@@ -786,25 +902,249 @@ class InspectorPanel extends BaseComponent {
   updateSummaryCounts() {
     try {
       if (this._summary?.api) this._summary.api.textContent = String(this.state.history.length || 0);
+      if (this._summary?.dm) this._summary.dm.textContent = String(this.state.dataModelChanges.length || 0);
       if (this._summary?.err) this._summary.err.textContent = String(this.state.errors.length || 0);
       if (this._summary?.obj) this._summary.obj.textContent = String(this.state.objectives.length || 0);
       if (this._summary?.nav) this._summary.nav.textContent = String(this.state.navigation.length || 0);
     } catch (_) { /* intentionally empty */ }
   }
 
+  _registerRuntimeSubscriptions() {
+    if (this._runtimeSubscriptionsBound) return;
+
+    try {
+      const offCourseLoaded = snBridge.onCourseLoaded(async () => {
+        try {
+          await snBridge.clearScormInspector();
+        } catch (err) {
+          rendererLogger.error('InspectorPanel: clearScormInspector failed on course load', err);
+        }
+        this._replaceHistory([]);
+        this._replaceDataModelHistory([]);
+        this._replaceErrors([]);
+        this.state.dataModel = {};
+        this.updateSummaryCounts();
+        setTimeout(() => { void this.loadInitialData(); }, 500);
+      });
+      this._unsubs.push(offCourseLoaded);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to course loaded', error);
+    }
+
+    try {
+      const offInspectorData = snBridge.onScormInspectorDataUpdated((payload) => {
+        const changed = this._handleInspectorPayload(payload);
+        if (!changed) return;
+        this.updateSummaryCounts();
+        if (!this.visible) return;
+        if (this.activeTab === 'api') {
+          this.renderApiLog();
+        } else if (this.activeTab === 'model' && payload && typeof payload.dataModel === 'object') {
+          this.renderDataModel();
+        }
+      });
+      this._unsubs.push(offInspectorData);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to inspector data updates', error);
+    }
+
+    try {
+      const offErrors = snBridge.onScormInspectorErrorUpdated((entry) => {
+        if (!this._appendErrorEntry(entry)) return;
+        this.updateSummaryCounts();
+        if (this.visible && this.activeTab === 'api' && this._timelineFilters.errorsOnly) {
+          this.renderApiLog();
+        }
+      });
+      this._unsubs.push(offErrors);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to inspector error updates', error);
+    }
+
+    try {
+      const offDataModel = snBridge.onScormDataModelUpdated((dataModel) => {
+        this.state.dataModel = dataModel || {};
+        if (this.visible && this.activeTab === 'model') this.renderDataModel();
+        if (this.visible && this.activeTab === 'api') this.renderApiLog();
+      });
+      this._unsubs.push(offDataModel);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to data model updates', error);
+    }
+
+    try {
+      const offDataModelChange = snBridge.onScormDataModelChange((entry) => {
+        if (!this._appendDataModelChange(entry)) return;
+        this.updateSummaryCounts();
+        if (this.visible && this.activeTab === 'api') this.renderApiLog();
+      });
+      this._unsubs.push(offDataModelChange);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to data model change updates', error);
+    }
+
+    try {
+      const offCleared = snBridge.onScormDataModelHistoryCleared(() => {
+        this._replaceDataModelHistory([]);
+        this.updateSummaryCounts();
+        if (this.visible && this.activeTab === 'api') this.renderApiLog();
+      });
+      this._unsubs.push(offCleared);
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to subscribe to data model history cleared updates', error);
+    }
+
+    this._runtimeSubscriptionsBound = true;
+  }
+
+  _bindDomEvents() {
+    if (this._domEventsBound) return;
+
+    if (this.tabsEl) {
+      this._tabsClickHandler = (event) => {
+        const target = event.target;
+        const btn = typeof target?.closest === 'function' ? target.closest('button[data-tab]') : null;
+        if (btn && btn.dataset?.tab) this.setActiveTab(btn.dataset.tab);
+      };
+      this.tabsEl.addEventListener('click', this._tabsClickHandler);
+    }
+
+    const apiTab = this.tabEls?.api;
+    if (apiTab) {
+      this._apiChangeHandler = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+        if (target.classList.contains('js-api-filter')) {
+          this._timelineFilters.method = target.value || 'all';
+          this._timelinePager.page = 1;
+          this.renderApiLog();
+        } else if (target.classList.contains('js-api-errors')) {
+          this._timelineFilters.errorsOnly = Boolean(target.checked);
+          this._timelinePager.page = 1;
+          this.renderApiLog();
+        } else if (target.classList.contains('js-timeline-api')) {
+          this._timelineFilters.showApi = Boolean(target.checked);
+          this._timelinePager.page = 1;
+          this.renderApiLog();
+        } else if (target.classList.contains('js-timeline-dm')) {
+          this._timelineFilters.showDataModel = Boolean(target.checked);
+          this._timelinePager.page = 1;
+          this.renderApiLog();
+        }
+      };
+      apiTab.addEventListener('change', this._apiChangeHandler);
+
+      this._apiClickHandler = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+
+        if (target.classList.contains('js-page-prev')) {
+          this._timelinePager.page = Math.max(1, (this._timelinePager.page || 1) - 1);
+          this.renderApiLog();
+        } else if (target.classList.contains('js-page-next')) {
+          this._timelinePager.page = (this._timelinePager.page || 1) + 1;
+          this.renderApiLog();
+        } else if (target.classList.contains('js-clear-timeline')) {
+          void this._clearTimeline();
+        } else if (target.classList.contains('js-copy-record')) {
+          const record = target.closest('li')?.getAttribute('data-record');
+          if (record) this._copyRecord(target, record);
+        }
+      };
+      apiTab.addEventListener('click', this._apiClickHandler);
+    }
+
+    this._domEventsBound = true;
+  }
+
+  _unbindDomEvents() {
+    if (!this._domEventsBound) {
+      this._tabsClickHandler = null;
+      this._apiChangeHandler = null;
+      this._apiClickHandler = null;
+      return;
+    }
+
+    if (this.tabsEl && this._tabsClickHandler) {
+      this.tabsEl.removeEventListener('click', this._tabsClickHandler);
+    }
+
+    const apiTab = this.tabEls?.api;
+    if (apiTab) {
+      if (this._apiChangeHandler) {
+        apiTab.removeEventListener('change', this._apiChangeHandler);
+      }
+      if (this._apiClickHandler) {
+        apiTab.removeEventListener('click', this._apiClickHandler);
+      }
+    }
+
+    this._tabsClickHandler = null;
+    this._apiChangeHandler = null;
+    this._apiClickHandler = null;
+    this._domEventsBound = false;
+  }
+
   destroy() {
+    this._unbindDomEvents();
     try { this._unsubs?.forEach((off) => { try { off(); } catch (_) { /* intentionally empty */ } }); } catch (_) { /* intentionally empty */ }
+    this._unsubs = [];
+    this._runtimeSubscriptionsBound = false;
+    this._subscriptionsBound = false;
     try { this._resizeCleanup?.(); } catch (_) { /* intentionally empty */ }
     super.destroy();
   }
 
+  async _clearTimeline() {
+    try {
+      const [apiResult, dmResult] = await Promise.all([
+        snBridge.clearScormInspector(),
+        snBridge.clearScormDataModelHistory()
+      ]);
+      if (apiResult?.success) {
+        this._replaceHistory([]);
+        this._replaceErrors([]);
+      }
+      if (dmResult?.success) {
+        this._replaceDataModelHistory([]);
+      }
+      this.updateSummaryCounts();
+      this.renderApiLog();
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: failed to clear timeline', error);
+      this.uiState?.showNotification({
+        type: 'error',
+        message: 'Failed to clear inspector timeline',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  _copyRecord(button, payload) {
+    try {
+      navigator.clipboard.writeText(payload).then(() => {
+        button.textContent = '✓';
+        setTimeout(() => { button.textContent = '📋'; }, 1000);
+      }).catch((error) => {
+        rendererLogger.error('InspectorPanel: copy failed', error);
+      });
+    } catch (error) {
+      rendererLogger.error('InspectorPanel: copy failed', error);
+    }
+  }
+
   getStatus() {
-    return { visible: this.visible, loaded: this.loaded, counts: {
-      api: this.state.history.length,
-      errors: this.state.errors.length,
-      objectives: this.state.objectives.length,
-      navigation: this.state.navigation.length
-    }};
+    return {
+      visible: this.visible,
+      loaded: this.loaded,
+      counts: {
+        api: this.state.history.length,
+        dataModelChanges: this.state.dataModelChanges.length,
+        errors: this.state.errors.length,
+        objectives: this.state.objectives.length,
+        navigation: this.state.navigation.length
+      }
+    };
   }
 }
 

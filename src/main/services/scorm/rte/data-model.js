@@ -17,6 +17,7 @@
 const { DATA_MODEL_SCHEMA, ACCESS_TYPES, DATA_TYPES } = require('../../../../shared/constants/data-model-schema');
 const SCORM_CONSTANTS = require('../../../../shared/constants/scorm-constants');
 const { COMMON_ERRORS } = require('../../../../shared/constants/error-codes');
+const { Buffer } = require('buffer');
 
 /**
  * SCORM Data Model Handler Class
@@ -42,6 +43,22 @@ class ScormDataModel {
     this.memoryOnlyStorage = options.memoryOnlyStorage || false;
     this.browseSession = null;
 
+    // Data model change logging configuration
+    const {
+      changeListener = null,
+      changeContextProvider = null,
+      maxChangeValueLength = 2048
+    } = options || {};
+
+    this.changeListener = typeof changeListener === 'function' ? changeListener : null;
+    this.changeContextProvider = typeof changeContextProvider === 'function' ? changeContextProvider : null;
+    this.changeContextStack = [];
+    this.currentChangeContext = null;
+    this.changeConfig = {
+      maxValueLength: Number(maxChangeValueLength) > 0 ? Number(maxChangeValueLength) : 2048
+    };
+    this.suppressChangeEvents = false;
+
     // Main data storage
     this.data = new Map();
 
@@ -51,13 +68,140 @@ class ScormDataModel {
     this.commentsFromLearner = [];
     this.commentsFromLms = [];
 
-    // Initialize with default values
-    this.initializeDefaults();
+    // Initialize with default values (suppress change logging during bootstrap)
+    this.suppressChangeEvents = true;
+    try {
+      this.initializeDefaults();
+    } finally {
+      this.suppressChangeEvents = false;
+    }
 
     this.logger?.debug('ScormDataModel initialized', {
       launchMode: this.launchMode,
       memoryOnlyStorage: this.memoryOnlyStorage
     });
+  }
+
+  pushChangeContext(context = {}) {
+    this.changeContextStack.push(this.currentChangeContext);
+    if (context && typeof context === 'object' && Object.keys(context).length > 0) {
+      this.currentChangeContext = { ...context };
+    } else {
+      this.currentChangeContext = null;
+    }
+  }
+
+  popChangeContext() {
+    if (this.changeContextStack.length > 0) {
+      this.currentChangeContext = this.changeContextStack.pop() || null;
+    } else {
+      this.currentChangeContext = null;
+    }
+  }
+
+  withChangeContext(context = {}, fn) {
+    this.pushChangeContext(context);
+    try {
+      return fn();
+    } finally {
+      this.popChangeContext();
+    }
+  }
+
+  _normalizeForComparison(value) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'string') return value;
+    try {
+      return String(value);
+    } catch (_) {
+      return Object.prototype.toString.call(value);
+    }
+  }
+
+  _sanitizeValue(value) {
+    if (value === undefined) {
+      return { value: undefined, truncated: false, originalLength: 0, originalBytes: 0 };
+    }
+    if (value === null) {
+      return { value: null, truncated: false, originalLength: 0, originalBytes: 0 };
+    }
+
+    const str = typeof value === 'string' ? value : String(value);
+    const originalBytes = Buffer.byteLength(str, 'utf8');
+    const max = this.changeConfig.maxValueLength;
+
+    if (max > 0 && str.length > max) {
+      return {
+        value: str.slice(0, max),
+        truncated: true,
+        originalLength: str.length,
+        originalBytes
+      };
+    }
+
+    return {
+      value: str,
+      truncated: false,
+      originalLength: str.length,
+      originalBytes
+    };
+  }
+
+  _emitChange(element, previousRaw, newRaw, meta = {}) {
+    if (this.suppressChangeEvents || typeof this.changeListener !== 'function') {
+      return;
+    }
+
+    const previousComparable = this._normalizeForComparison(previousRaw);
+    const newComparable = this._normalizeForComparison(newRaw);
+
+    if (previousComparable === newComparable) {
+      return;
+    }
+
+    const sanitizedPrevious = this._sanitizeValue(previousComparable);
+    const sanitizedNew = this._sanitizeValue(newComparable);
+
+    const providerContext = typeof this.changeContextProvider === 'function'
+      ? (this.changeContextProvider() || {})
+      : {};
+
+    const combinedContext = {
+      ...providerContext,
+      ...(this.currentChangeContext || {}),
+      ...meta
+    };
+
+    const timestamp = typeof combinedContext.timestamp === 'number'
+      ? combinedContext.timestamp
+      : Date.now();
+
+    const payload = {
+      entryType: 'data-model-change',
+      changeType: 'data-model',
+      element,
+      previousValue: sanitizedPrevious.value,
+      previousValueTruncated: sanitizedPrevious.truncated,
+      previousValueOriginalLength: sanitizedPrevious.originalLength,
+      previousValueOriginalBytes: sanitizedPrevious.originalBytes,
+      newValue: sanitizedNew.value,
+      newValueTruncated: sanitizedNew.truncated,
+      newValueOriginalLength: sanitizedNew.originalLength,
+      newValueOriginalBytes: sanitizedNew.originalBytes,
+      timestamp,
+      ...combinedContext
+    };
+
+    if (!payload.source) {
+      payload.source = 'internal';
+    }
+
+    if (!payload.sessionId && providerContext.sessionId) {
+      payload.sessionId = providerContext.sessionId;
+    }
+
+    this.changeListener(payload);
   }
 
   /**
@@ -150,8 +294,13 @@ class ScormDataModel {
         return this.setCollectionValue(element, value);
       }
 
+      const previousValue = this.data.get(element);
+
       // Set the value
       this.data.set(element, value);
+
+      // Emit change event only when value actually differs
+      this._emitChange(element, previousValue, value);
 
       // Log browse mode operation if in browse mode
       if (this.isBrowseMode()) {
@@ -196,8 +345,11 @@ class ScormDataModel {
         return this.setCollectionValue(element, value);
       }
 
+      const previousValue = this.data.get(element);
+
       // Directly set the value, bypassing read-only check
       this.data.set(element, value);
+      this._emitChange(element, previousValue, value, { source: 'internal' });
       this.errorHandler.clearError(); // Clear any previous error from this operation
       return true;
     } catch (error) {
@@ -514,14 +666,27 @@ class ScormDataModel {
       if (interactionMatch) {
         const index = parseInt(interactionMatch[1], 10);
         const property = element.substring(element.lastIndexOf('.') + 1);
+        const previousCount = this.data.get('cmi.interactions._count');
 
         // Ensure interaction exists
         while (this.interactions.length <= index) {
           this.interactions.push({});
         }
 
-        this.interactions[index][property] = value;
-        this.data.set('cmi.interactions._count', String(this.interactions.length));
+        const interaction = this.interactions[index];
+        const previousValue = interaction[property];
+        interaction[property] = value;
+        this._emitChange(element, previousValue, value, {
+          collection: 'interactions',
+          collectionIndex: index,
+          collectionProperty: property
+        });
+
+        const newCount = String(this.interactions.length);
+        this.data.set('cmi.interactions._count', newCount);
+        this._emitChange('cmi.interactions._count', previousCount, newCount, {
+          collection: 'interactions'
+        });
         return true;
       }
 
@@ -544,14 +709,27 @@ class ScormDataModel {
       if (objectiveMatch) {
         const index = parseInt(objectiveMatch[1], 10);
         const property = element.substring(element.lastIndexOf('.') + 1);
+        const previousCount = this.data.get('cmi.objectives._count');
 
         // Ensure objective exists
         while (this.objectives.length <= index) {
           this.objectives.push({});
         }
 
-        this.objectives[index][property] = value;
-        this.data.set('cmi.objectives._count', String(this.objectives.length));
+        const objective = this.objectives[index];
+        const previousValue = objective[property];
+        objective[property] = value;
+        this._emitChange(element, previousValue, value, {
+          collection: 'objectives',
+          collectionIndex: index,
+          collectionProperty: property
+        });
+
+        const newCount = String(this.objectives.length);
+        this.data.set('cmi.objectives._count', newCount);
+        this._emitChange('cmi.objectives._count', previousCount, newCount, {
+          collection: 'objectives'
+        });
         return true;
       }
 
@@ -574,14 +752,27 @@ class ScormDataModel {
       if (match) {
         const index = parseInt(match[1], 10);
         const property = match[2];
+        const previousCount = this.data.get('cmi.comments_from_learner._count');
 
         // Ensure comment exists
         while (this.commentsFromLearner.length <= index) {
           this.commentsFromLearner.push({});
         }
 
-        this.commentsFromLearner[index][property] = value;
-        this.data.set('cmi.comments_from_learner._count', String(this.commentsFromLearner.length));
+        const comment = this.commentsFromLearner[index];
+        const previousValue = comment[property];
+        comment[property] = value;
+        this._emitChange(element, previousValue, value, {
+          collection: 'comments_from_learner',
+          collectionIndex: index,
+          collectionProperty: property
+        });
+
+        const newCount = String(this.commentsFromLearner.length);
+        this.data.set('cmi.comments_from_learner._count', newCount);
+        this._emitChange('cmi.comments_from_learner._count', previousCount, newCount, {
+          collection: 'comments_from_learner'
+        });
         return true;
       }
 
@@ -604,14 +795,27 @@ class ScormDataModel {
       if (match) {
         const index = parseInt(match[1], 10);
         const property = match[2];
+        const previousCount = this.data.get('cmi.comments_from_lms._count');
 
         // Ensure comment exists
         while (this.commentsFromLms.length <= index) {
           this.commentsFromLms.push({});
         }
 
-        this.commentsFromLms[index][property] = value;
-        this.data.set('cmi.comments_from_lms._count', String(this.commentsFromLms.length));
+        const comment = this.commentsFromLms[index];
+        const previousValue = comment[property];
+        comment[property] = value;
+        this._emitChange(element, previousValue, value, {
+          collection: 'comments_from_lms',
+          collectionIndex: index,
+          collectionProperty: property
+        });
+
+        const newCount = String(this.commentsFromLms.length);
+        this.data.set('cmi.comments_from_lms._count', newCount);
+        this._emitChange('cmi.comments_from_lms._count', previousCount, newCount, {
+          collection: 'comments_from_lms'
+        });
         return true;
       }
 
@@ -804,8 +1008,14 @@ class ScormDataModel {
     this.objectives = [];
     this.commentsFromLearner = [];
     this.commentsFromLms = [];
-    
-    this.initializeDefaults();
+
+    const previousSuppress = this.suppressChangeEvents;
+    this.suppressChangeEvents = true;
+    try {
+      this.initializeDefaults();
+    } finally {
+      this.suppressChangeEvents = previousSuppress;
+    }
     this.logger?.debug('ScormDataModel reset to initial state');
   }
 

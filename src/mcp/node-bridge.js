@@ -16,7 +16,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { startServer } = require('./server');
 
 // Global reference to Electron child process
@@ -62,16 +61,16 @@ async function ensureElectronChild() {
 
   // Suppress Electron output to avoid polluting MCP protocol
   // Only log if there's an actual error
-  electronChild.stdout.on('data', (data) => {
+  electronChild.stdout.on('data', (_data) => {
     // Silently consume stdout
   });
 
-  electronChild.stderr.on('data', (data) => {
+  electronChild.stderr.on('data', (_data) => {
     // Silently consume stderr to avoid polluting MCP protocol channel
     // All diagnostic info is logged to files via system_get_logs tool
   });
 
-  electronChild.on('exit', (code) => {
+  electronChild.on('exit', (_code) => {
     // Silently handle exit - diagnostic info available via system_get_logs
     electronChild = null;
   });
@@ -102,7 +101,18 @@ global.__electronBridge = {
           clearTimeout(timeout);
           child.removeListener('message', handler);
           if (response.error) {
-            reject(new Error(response.error));
+            const details = response.error;
+            let message = 'Unknown error';
+            let code;
+            if (typeof details === 'string') {
+              message = details;
+            } else if (details && typeof details === 'object') {
+              if (details.message) message = details.message;
+              if (details.code) code = details.code;
+            }
+            const err = new Error(message);
+            if (code) err.code = code;
+            reject(err);
           } else {
             resolve(response.result);
           }

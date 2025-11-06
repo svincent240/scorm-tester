@@ -189,6 +189,7 @@ const electronAPI = {
   // SCORM Inspector
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
   getScormDataModel: () => safeInvoke('scorm-inspector-get-data-model'),
+  getScormDataModelHistory: (options) => safeInvoke('scorm-inspector-get-data-model-history', options),
   getSnState: () => safeInvoke('scorm-inspector-get-sn-state'),
 
 
@@ -205,6 +206,8 @@ const electronAPI = {
 
   // SCORM Inspector Event Listeners
   onScormDataModelUpdated: (callback) => safeOn('scorm-data-model-updated', callback),
+  onScormDataModelChange: (callback) => safeOn('scorm-data-model-change', callback),
+  onScormDataModelHistoryCleared: (callback) => safeOn('scorm-data-model-history-cleared', callback),
   onNavigationAvailabilityUpdated: (callback) => safeOn('navigation:availability:updated', callback),
 
   // Course Outline SCORM Event Listeners
@@ -225,7 +228,6 @@ const electronAPI = {
 
 // Performance artifacts writer (JSON + TXT) - optional bridge used by diagnostics benchmarks
 try {
-  const fs = require('fs');
   const fsp = require('fs').promises;
   const path = require('path');
 

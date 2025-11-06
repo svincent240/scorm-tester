@@ -164,7 +164,7 @@ class IpcClient {
     return api.onScormInspectorDataUpdated(handler);
   }
 
-  onScormInspectorErrorUpdated(handler) {
+  onScormInspectorErrorUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onScormInspectorErrorUpdated !== 'function') {
       throw new Error('electronAPI.onScormInspectorErrorUpdated not available');
@@ -172,7 +172,7 @@ class IpcClient {
     return api.onScormInspectorErrorUpdated(handler);
   }
 
-  onScormDataModelUpdated(handler) {
+  onScormDataModelUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onScormDataModelUpdated !== 'function') {
       throw new Error('electronAPI.onScormDataModelUpdated not available');
@@ -188,7 +188,7 @@ class IpcClient {
     return api.invoke('scorm-inspector-clear');
   }
 
-  onNavigationAvailabilityUpdated(handler) {
+  onNavigationAvailabilityUpdated(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onNavigationAvailabilityUpdated !== 'function') {
       throw new Error('electronAPI.onNavigationAvailabilityUpdated not available');
@@ -196,7 +196,7 @@ class IpcClient {
     return api.onNavigationAvailabilityUpdated(handler);
   }
 
-  onRendererConsoleError(handler) {
+  onRendererConsoleError(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onRendererConsoleError !== 'function') {
       throw new Error('electronAPI.onRendererConsoleError not available');
@@ -204,7 +204,7 @@ class IpcClient {
     return api.onRendererConsoleError(handler);
   }
 
-  onCourseLoaded(handler) {
+  onCourseLoaded(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onCourseLoaded !== 'function') {
       throw new Error('electronAPI.onCourseLoaded not available');
@@ -212,7 +212,7 @@ class IpcClient {
     return api.onCourseLoaded(handler);
   }
 
-  onCourseClosed(handler) {
+  onCourseClosed(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onCourseClosed !== 'function') {
       throw new Error('electronAPI.onCourseClosed not available');
@@ -220,7 +220,7 @@ class IpcClient {
     return api.onCourseClosed(handler);
   }
 
-  onCourseExited(handler) {
+  onCourseExited(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onCourseExited !== 'function') {
       throw new Error('electronAPI.onCourseExited not available');
@@ -229,7 +229,7 @@ class IpcClient {
   }
 
   // SCORM typed helpers (preserve positional arg shapes exposed by preload)
-  async scormInitialize(sessionId, options = {}) {
+  async scormInitialize(/** @type {string} */ sessionId, /** @type {any} */ options = {}) {
     const api = this._ensureAPI();
     if (typeof api.scormInitialize !== 'function') {
       throw new Error('electronAPI.scormInitialize not available');
@@ -237,7 +237,7 @@ class IpcClient {
     return api.scormInitialize(sessionId, options);
   }
 
-  async scormGetProgressSnapshot(sessionId) {
+  async scormGetProgressSnapshot(/** @type {string} */ sessionId) {
     const api = this._ensureAPI();
     if (typeof api.scormGetProgressSnapshot !== 'function') {
       throw new Error('electronAPI.scormGetProgressSnapshot not available');
@@ -245,7 +245,7 @@ class IpcClient {
     return api.scormGetProgressSnapshot(sessionId);
   }
 
-  async scormTerminate(sessionId, exitValue = '') {
+  async scormTerminate(/** @type {string} */ sessionId, /** @type {string} */ exitValue = '') {
     const api = this._ensureAPI();
     if (typeof api.scormTerminate !== 'function') {
       throw new Error('electronAPI.scormTerminate not available');
@@ -253,7 +253,7 @@ class IpcClient {
     return api.scormTerminate(sessionId, exitValue);
   }
 
-  async scormGetValue(sessionId, element) {
+  async scormGetValue(/** @type {string} */ sessionId, /** @type {string} */ element) {
     const api = this._ensureAPI();
     if (typeof api.scormGetValue !== 'function') {
       throw new Error('electronAPI.scormGetValue not available');
@@ -261,7 +261,7 @@ class IpcClient {
     return api.scormGetValue(sessionId, element);
   }
 
-  async scormSetValue(sessionId, element, value) {
+  async scormSetValue(/** @type {string} */ sessionId, /** @type {string} */ element, /** @type {string} */ value) {
     const api = this._ensureAPI();
     if (typeof api.scormSetValue !== 'function') {
       throw new Error('electronAPI.scormSetValue not available');
@@ -269,7 +269,7 @@ class IpcClient {
     return api.scormSetValue(sessionId, element, value);
   }
 
-  async scormSetValuesBatch(sessionId, batch) {
+  async scormSetValuesBatch(/** @type {string} */ sessionId, /** @type {Array<[string, string]>} */ batch) {
     const api = this._ensureAPI();
     if (typeof api.scormSetValuesBatch !== 'function') {
       throw new Error('electronAPI.scormSetValuesBatch not available');
@@ -277,12 +277,44 @@ class IpcClient {
     return api.scormSetValuesBatch(sessionId, batch);
   }
 
-  async scormCommit(sessionId) {
+  async scormCommit(/** @type {string} */ sessionId) {
     const api = this._ensureAPI();
     if (typeof api.scormCommit !== 'function') {
       throw new Error('electronAPI.scormCommit not available');
     }
     return api.scormCommit(sessionId);
+  }
+
+  async getScormDataModelHistory(/** @type {any} */ options = {}) {
+    const api = this._ensureAPI();
+    if (typeof api.getScormDataModelHistory !== 'function') {
+      throw new Error('electronAPI.getScormDataModelHistory not available');
+    }
+    return api.getScormDataModelHistory(options);
+  }
+
+  onScormDataModelChange(/** @type {any} */ handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormDataModelChange !== 'function') {
+      throw new Error('electronAPI.onScormDataModelChange not available');
+    }
+    return api.onScormDataModelChange(handler);
+  }
+
+  onScormDataModelHistoryCleared(/** @type {any} */ handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormDataModelHistoryCleared !== 'function') {
+      throw new Error('electronAPI.onScormDataModelHistoryCleared not available');
+    }
+    return api.onScormDataModelHistoryCleared(handler);
+  }
+
+  clearScormDataModelHistory() {
+    const api = this._ensureAPI();
+    if (typeof api.invoke !== 'function') {
+      throw new Error('electronAPI.invoke not available');
+    }
+    return api.invoke('scorm-inspector-clear-data-model-history');
   }
 
 

@@ -59,7 +59,10 @@ class ScormApiHandler {
     // Initialize data model with browse mode support
     const dataModelOptions = {
       launchMode: this.options.launchMode,
-      memoryOnlyStorage: this.options.memoryOnlyStorage
+      memoryOnlyStorage: this.options.memoryOnlyStorage,
+      changeListener: this._handleDataModelChange.bind(this),
+      changeContextProvider: () => ({ sessionId: this.sessionId }),
+      maxChangeValueLength: this.options.maxChangeValueLength || 4096
     };
     this.dataModel = new ScormDataModel(this.errorHandler, logger, dataModelOptions);
     this.eventEmitter = new EventEmitter();
@@ -78,6 +81,55 @@ class ScormApiHandler {
       launchMode: this.options.launchMode,
       memoryOnlyStorage: this.options.memoryOnlyStorage
     });
+  }
+
+  _withDataModelContext(context, action) {
+    if (this.dataModel && typeof this.dataModel.withChangeContext === 'function') {
+      return this.dataModel.withChangeContext(context, action);
+    }
+    return action();
+  }
+
+  _setInternalDataModelValue(element, value, meta = {}) {
+    if (!this.dataModel || typeof this.dataModel._setInternalValue !== 'function') {
+      return false;
+    }
+
+    const context = {
+      sessionId: this.sessionId,
+      source: meta.source || 'internal',
+      element,
+      ...meta
+    };
+
+    return this._withDataModelContext(context, () => this.dataModel._setInternalValue(element, value));
+  }
+
+  _handleDataModelChange(change) {
+    if (!change || !this.telemetryStore) {
+      return;
+    }
+
+    const payload = {
+      sessionId: this.sessionId,
+      ...change
+    };
+
+    if (!payload.sessionId) {
+      payload.sessionId = this.sessionId;
+    }
+
+    if (typeof payload.timestamp !== 'number') {
+      payload.timestamp = Date.now();
+    }
+
+    try {
+      if (typeof this.telemetryStore.storeDataModelChange === 'function') {
+        this.telemetryStore.storeDataModelChange(payload);
+      }
+    } catch (error) {
+      this.logger?.warn('ScormApiHandler: Failed to store data model change', error?.message || error);
+    }
   }
 
   /**
@@ -125,7 +177,10 @@ class ScormApiHandler {
         const lastLocation = this.options.browseModeService.getLastLocation();
         if (lastLocation && lastLocation.activityId) {
           // Update entry mode to resume since we have a saved location
-          this.dataModel._setInternalValue('cmi.entry', 'resume');
+          this._setInternalDataModelValue('cmi.entry', 'resume', {
+            source: 'internal:browse-resume',
+            reason: 'browse-mode-resume'
+          });
           this.logger?.info('Browse mode: Entry mode set to resume due to saved location', {
             sessionId: this.sessionId,
             lastLocation: lastLocation.activityId
@@ -357,8 +412,14 @@ class ScormApiHandler {
         return result;
       }
 
+      const context = {
+        sessionId: this.sessionId,
+        source: 'api:SetValue',
+        element
+      };
+
       // Set value in data model
-      const success = this.dataModel.setValue(element, value);
+      const success = this._withDataModelContext(context, () => this.dataModel.setValue(element, value));
 
       if (success) {
         result = "true";
@@ -553,13 +614,13 @@ class ScormApiHandler {
   initializeSessionData() {
     // Set entry mode based on previous session state
     const entryMode = this.determineEntryMode();
-    this.dataModel._setInternalValue('cmi.entry', entryMode);
+    this._setInternalDataModelValue('cmi.entry', entryMode, { source: 'internal:session-init' });
 
     // Set credit mode (could come from launch parameters)
-    this.dataModel._setInternalValue('cmi.credit', 'credit');
+    this._setInternalDataModelValue('cmi.credit', 'credit', { source: 'internal:session-init' });
 
     // Set lesson mode using dynamic launch mode (SCORM-compliant)
-    this.dataModel._setInternalValue('cmi.mode', this.options.launchMode);
+    this._setInternalDataModelValue('cmi.mode', this.options.launchMode, { source: 'internal:session-init' });
 
     // Create browse session if in browse mode
     if (this.options.launchMode === 'browse') {
@@ -570,7 +631,7 @@ class ScormApiHandler {
     if (this.sessionManager) {
       const learnerInfo = this.sessionManager.getLearnerInfo();
       if (learnerInfo) {
-        this.dataModel.setLearnerInfo(learnerInfo);
+  this.dataModel.setLearnerInfo(learnerInfo);
       }
     }
 
@@ -618,7 +679,7 @@ class ScormApiHandler {
       const seconds = Math.floor((sessionDuration % (1000 * 60)) / 1000);
       
       const sessionTime = `PT${hours}H${minutes}M${seconds}S`;
-      this.dataModel._setInternalValue('cmi.session_time', sessionTime);
+  this._setInternalDataModelValue('cmi.session_time', sessionTime, { source: 'internal:commit' });
       
       this.logger?.debug('Session time calculated:', sessionTime);
     }
