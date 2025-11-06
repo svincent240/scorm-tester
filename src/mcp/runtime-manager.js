@@ -284,10 +284,11 @@ class RuntimeManager {
 
       case 'runtime_capture':
         const session_id = message.params.session_id;
+        const compress = message.params.compress !== false; // Default to compressed
         const persistentWin = this.getPersistent(session_id);
         if (!persistentWin) throw new Error('Runtime not open');
-        const png = await this.capture(persistentWin);
-        return { screenshot: png.toString('base64'), success: true };
+        const imageBuffer = await this.capture(persistentWin, compress);
+        return { screenshot: imageBuffer.toString('base64'), success: true };
 
       case 'runtime_callAPI':
         const apiWin = this.getPersistent(message.params.session_id);
@@ -743,8 +744,12 @@ class RuntimeManager {
     return { open: false };
   }
 
-  static async capture(win) {
+  static async capture(win, compress = true) {
     const image = await win.webContents.capturePage();
+    if (compress) {
+      // Use JPEG with 70% quality for ~10x compression vs PNG
+      return image.toJPEG(70);
+    }
     return image.toPNG();
   }
 

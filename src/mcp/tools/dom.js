@@ -383,11 +383,33 @@ async function scorm_dom_evaluate(params = {}) {
       }
     }
 
+    // Try to fetch recent console errors to provide additional context
+    let consoleErrors = null;
+    try {
+      const { scorm_get_console_errors } = require('./runtime');
+      const recentErrors = await scorm_get_console_errors({
+        session_id,
+        severity: ['error'],
+        since_ts: Date.now() - 5000 // Last 5 seconds
+      });
+      if (recentErrors.errors && recentErrors.errors.length > 0) {
+        consoleErrors = recentErrors.errors.slice(0, 3); // Include last 3 errors
+      }
+    } catch (_) {
+      // Ignore errors fetching console errors
+    }
+
+    errorMessage += `\n\nHint: Use scorm_get_console_errors to see all browser console output, or system_get_logs for complete application logs.`;
+
     const e = new Error(errorMessage);
     e.code = 'DOM_EVALUATE_FAILED';
     // Preserve original error details for programmatic access
     if (err.details) {
       e.details = err.details;
+    }
+    // Include recent console errors if available
+    if (consoleErrors) {
+      e.console_errors = consoleErrors;
     }
     throw e;
   }
@@ -874,6 +896,87 @@ async function scorm_dom_fill_form_batch(params = {}) {
   };
 }
 
+/**
+ * Click element by visible text (fuzzy matching)
+ * Handles whitespace normalization and searches common clickable elements
+ */
+async function scorm_dom_click_by_text(params = {}) {
+  const session_id = params.session_id;
+  const text = params.text;
+  const options = params.options || {};
+  const exact_match = options.exact_match !== false; // Default true
+  const element_types = options.element_types || ['button', 'a', 'input[type="button"]', 'input[type="submit"]', '[role="button"]'];
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (!text || typeof text !== 'string') {
+    const e = new Error('text is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Check if runtime is open via IPC
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  const script = `
+    (() => {
+      const searchText = ${JSON.stringify(text)};
+      const exactMatch = ${exact_match};
+      const elementTypes = ${JSON.stringify(element_types)};
+
+      // Build selector for all clickable element types
+      const selector = elementTypes.join(', ');
+      const elements = Array.from(document.querySelectorAll(selector));
+
+      // Find element with matching text (normalize whitespace)
+      const normalize = (str) => str.replace(/\\s+/g, ' ').trim().toLowerCase();
+      const searchNormalized = normalize(searchText);
+
+      const match = elements.find(el => {
+        const text = (el.textContent || el.value || el.getAttribute('aria-label') || '');
+        const normalized = normalize(text);
+        return exactMatch ? normalized === searchNormalized : normalized.includes(searchNormalized);
+      });
+
+      if (!match) {
+        throw new Error('No element found with text: ' + searchText);
+      }
+
+      match.click();
+
+      return {
+        clicked: true,
+        element: {
+          tagName: match.tagName,
+          id: match.id,
+          className: match.className,
+          textContent: match.textContent?.substring(0, 100)
+        }
+      };
+    })()
+  `;
+
+  try {
+    sessions.emit && sessions.emit({ session_id, type: 'dom:click_by_text_start', payload: { text } });
+    const result = await RuntimeManager.executeJS(null, script, session_id);
+    sessions.emit && sessions.emit({ session_id, type: 'dom:click_by_text_complete', payload: { text } });
+    return result;
+  } catch (err) {
+    const e = new Error(`DOM click by text failed: ${err.message}`);
+    e.code = 'DOM_CLICK_BY_TEXT_FAILED';
+    throw e;
+  }
+}
+
 module.exports = {
   scorm_dom_click,
   scorm_dom_fill,
@@ -882,6 +985,7 @@ module.exports = {
   scorm_dom_wait_for,
   scorm_keyboard_type,
   scorm_dom_find_interactive_elements,
-  scorm_dom_fill_form_batch
+  scorm_dom_fill_form_batch,
+  scorm_dom_click_by_text
 };
 

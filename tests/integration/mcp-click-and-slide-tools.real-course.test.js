@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { parseMcpResponse } = require('../helpers/mcp-response-parser');
 
-describe('MCP scorm_dom_evaluate error handling on real course', () => {
+describe('MCP click by text and slide navigation tools', () => {
   jest.setTimeout(90000);
 
   function rpcClient() {
@@ -47,60 +47,52 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     return { proc, rpc };
   }
 
-  test('successful JavaScript execution returns result', async () => {
+  test('scorm_dom_click_by_text finds and clicks button by text', async () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
 
-    console.log('[TEST] Initializing MCP for successful execution test...');
     const initRes = await rpc('initialize', {}, id++);
     expect(initRes && !initRes.error).toBe(true);
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
 
-    console.log('[TEST] Opening session...');
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
     const openData = parseMcpResponse(openSession);
     const session_id = openData.session_id;
 
-    console.log('[TEST] Opening runtime...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
-    // Test successful execution - simple expression
-    console.log('[TEST] Testing successful simple expression...');
-    const simpleExpr = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: '2 + 2'
-      }
+    // First, find interactive elements to see what buttons exist
+    const elements = await rpc('tools/call', {
+      name: 'scorm_dom_find_interactive_elements',
+      arguments: { session_id }
     }, id++);
-    const simpleData = parseMcpResponse(simpleExpr);
-    expect(simpleData.result).toBe(4);
-
-    // Test successful execution - DOM query
-    console.log('[TEST] Testing successful DOM query...');
-    const domQuery = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: 'document.querySelectorAll("*").length'
+    const elementsData = parseMcpResponse(elements);
+    
+    // Should have some buttons
+    expect(Array.isArray(elementsData.buttons)).toBe(true);
+    
+    if (elementsData.buttons.length > 0) {
+      const firstButton = elementsData.buttons[0];
+      const buttonText = firstButton.label || firstButton.text;
+      
+      if (buttonText) {
+        // Try to click by text (fuzzy match)
+        const clickResult = await rpc('tools/call', {
+          name: 'scorm_dom_click_by_text',
+          arguments: { 
+            session_id,
+            text: buttonText.substring(0, 5), // Use partial text for fuzzy match
+            options: { exact_match: false }
+          }
+        }, id++);
+        const clickData = parseMcpResponse(clickResult);
+        
+        expect(clickData.clicked).toBe(true);
+        expect(clickData.element).toBeDefined();
+        expect(clickData.element.tagName).toBeDefined();
       }
-    }, id++);
-    const domData = parseMcpResponse(domQuery);
-    expect(typeof domData.result).toBe('number');
-    expect(domData.result).toBeGreaterThan(0);
-
-    // Test successful execution - object return
-    console.log('[TEST] Testing object return...');
-    const objExpr = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: '({ foo: "bar", count: 42 })'
-      }
-    }, id++);
-    const objData = parseMcpResponse(objExpr);
-    expect(objData.result).toEqual({ foo: 'bar', count: 42 });
+    }
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
@@ -113,186 +105,51 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     ]);
   });
 
-  test('syntax error provides detailed error message', async () => {
+  test('scorm_dom_click_by_text handles whitespace normalization', async () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
 
-    console.log('[TEST] Initializing MCP for syntax error test...');
     const initRes = await rpc('initialize', {}, id++);
     expect(initRes && !initRes.error).toBe(true);
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
 
-    console.log('[TEST] Opening session...');
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
     const openData = parseMcpResponse(openSession);
     const session_id = openData.session_id;
 
-    console.log('[TEST] Opening runtime...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
-    // Test syntax error - missing value after assignment
-    console.log('[TEST] Testing syntax error...');
-    const syntaxError = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: 'const x = ;'
-      }
-    }, id++);
-
-    console.log('[TEST] Syntax error response:', JSON.stringify(syntaxError, null, 2));
-    expect(syntaxError.result).toBeDefined();
-    expect(syntaxError.result.isError).toBe(true);
-    expect(syntaxError.result.content).toBeDefined();
-    expect(syntaxError.result.content[0].text).toContain('SyntaxError');
-    expect(syntaxError.result.content[0].text).toContain('DOM evaluate failed');
-
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
-
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
-    await Promise.race([
-      new Promise(resolve => proc.once('exit', resolve)),
-      new Promise(resolve => setTimeout(resolve, 3000))
-    ]);
-  });
-
-  test('reference error provides detailed error message', async () => {
-    const { proc, rpc } = rpcClient();
-    let id = 1;
-
-    console.log('[TEST] Initializing MCP for reference error test...');
-    const initRes = await rpc('initialize', {}, id++);
-    expect(initRes && !initRes.error).toBe(true);
-
-    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
-
-    console.log('[TEST] Opening session...');
-    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
-    const openData = parseMcpResponse(openSession);
-    const session_id = openData.session_id;
-
-    console.log('[TEST] Opening runtime...');
-    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-
-    // Test reference error - accessing undefined variable
-    console.log('[TEST] Testing reference error...');
-    const refError = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: 'nonExistentVariable.someMethod()'
-      }
-    }, id++);
-
-    console.log('[TEST] Reference error response:', JSON.stringify(refError, null, 2));
-    expect(refError.result).toBeDefined();
-    expect(refError.result.isError).toBe(true);
-    expect(refError.result.content).toBeDefined();
-    expect(refError.result.content[0].text).toContain('ReferenceError');
-    expect(refError.result.content[0].text).toContain('DOM evaluate failed');
-    expect(refError.result.content[0].text).toContain('nonExistentVariable');
-
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
-
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
-    await Promise.race([
-      new Promise(resolve => proc.once('exit', resolve)),
-      new Promise(resolve => setTimeout(resolve, 3000))
-    ]);
-  });
-
-  test('type error provides detailed error message', async () => {
-    const { proc, rpc } = rpcClient();
-    let id = 1;
-
-    console.log('[TEST] Initializing MCP for type error test...');
-    const initRes = await rpc('initialize', {}, id++);
-    expect(initRes && !initRes.error).toBe(true);
-
-    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
-
-    console.log('[TEST] Opening session...');
-    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
-    const openData = parseMcpResponse(openSession);
-    const session_id = openData.session_id;
-
-    console.log('[TEST] Opening runtime...');
-    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-
-    // Test type error - calling method on null
-    console.log('[TEST] Testing type error...');
-    const typeError = await rpc('tools/call', {
-      name: 'scorm_dom_evaluate',
-      arguments: {
-        session_id,
-        expression: 'null.someMethod()'
-      }
-    }, id++);
-
-    console.log('[TEST] Type error response:', JSON.stringify(typeError, null, 2));
-    expect(typeError.result).toBeDefined();
-    expect(typeError.result.isError).toBe(true);
-    expect(typeError.result.content).toBeDefined();
-    expect(typeError.result.content[0].text).toContain('TypeError');
-    expect(typeError.result.content[0].text).toContain('DOM evaluate failed');
-
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
-
-    try { proc.stdin.end(); } catch (_) {}
-    try { proc.kill(); } catch (_) {}
-    await Promise.race([
-      new Promise(resolve => proc.once('exit', resolve)),
-      new Promise(resolve => setTimeout(resolve, 3000))
-    ]);
-  });
-
-  test('complex expression with button click works correctly', async () => {
-    const { proc, rpc } = rpcClient();
-    let id = 1;
-
-    console.log('[TEST] Initializing MCP for complex expression test...');
-    const initRes = await rpc('initialize', {}, id++);
-    expect(initRes && !initRes.error).toBe(true);
-
-    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
-
-    console.log('[TEST] Opening session...');
-    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
-    const openData = parseMcpResponse(openSession);
-    const session_id = openData.session_id;
-
-    console.log('[TEST] Opening runtime...');
-    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-
-    // Test complex expression - find and click button (should work or return meaningful result)
-    console.log('[TEST] Testing complex button search expression...');
-    const complexExpr = await rpc('tools/call', {
+    // Create a test button with extra whitespace
+    await rpc('tools/call', {
       name: 'scorm_dom_evaluate',
       arguments: {
         session_id,
         expression: `
           (() => {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            return {
-              totalButtons: buttons.length,
-              buttonTexts: buttons.slice(0, 5).map(b => b.textContent.trim())
-            };
+            const btn = document.createElement('button');
+            btn.id = 'test-whitespace-btn';
+            btn.textContent = '  Click   Me  ';
+            document.body.appendChild(btn);
+            return true;
           })()
         `
       }
     }, id++);
 
-    const complexData = parseMcpResponse(complexExpr);
-    console.log('[TEST] Complex expression result:', JSON.stringify(complexData, null, 2));
-    expect(complexData.result).toBeDefined();
-    expect(typeof complexData.result.totalButtons).toBe('number');
-    expect(Array.isArray(complexData.result.buttonTexts)).toBe(true);
+    // Click with normalized text (no extra spaces)
+    const clickResult = await rpc('tools/call', {
+      name: 'scorm_dom_click_by_text',
+      arguments: { 
+        session_id,
+        text: 'click me',
+        options: { exact_match: true }
+      }
+    }, id++);
+    const clickData = parseMcpResponse(clickResult);
+    
+    expect(clickData.clicked).toBe(true);
+    expect(clickData.element.id).toBe('test-whitespace-btn');
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
@@ -305,38 +162,208 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     ]);
   });
 
-  test('error includes hint to use scorm_get_console_errors', async () => {
+  test('scorm_dom_click_by_text fails gracefully when text not found', async () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
 
-    console.log('[TEST] Initializing MCP for error hint test...');
     const initRes = await rpc('initialize', {}, id++);
     expect(initRes && !initRes.error).toBe(true);
 
     const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
 
-    console.log('[TEST] Opening session...');
     const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
     const openData = parseMcpResponse(openSession);
     const session_id = openData.session_id;
 
-    console.log('[TEST] Opening runtime...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
-    // Test that error includes helpful hint
-    console.log('[TEST] Testing error hint...');
-    const errorResult = await rpc('tools/call', {
+    // Try to click non-existent button
+    const clickResult = await rpc('tools/call', {
+      name: 'scorm_dom_click_by_text',
+      arguments: { 
+        session_id,
+        text: 'ThisButtonDoesNotExist12345'
+      }
+    }, id++);
+    
+    // Should return error
+    expect(clickResult.result).toBeDefined();
+    expect(clickResult.result.isError).toBe(true);
+    expect(clickResult.result.content[0].text).toContain('No element found with text');
+
+    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
+    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
+
+    try { proc.stdin.end(); } catch (_) {}
+    try { proc.kill(); } catch (_) {}
+    await Promise.race([
+      new Promise(resolve => proc.once('exit', resolve)),
+      new Promise(resolve => setTimeout(resolve, 3000))
+    ]);
+  });
+
+  test('scorm_get_slide_map discovers slides in course', async () => {
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    const initRes = await rpc('initialize', {}, id++);
+    expect(initRes && !initRes.error).toBe(true);
+
+    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
+
+    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
+    const openData = parseMcpResponse(openSession);
+    const session_id = openData.session_id;
+
+    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+
+    // Get slide map
+    const slideMap = await rpc('tools/call', {
+      name: 'scorm_get_slide_map',
+      arguments: { session_id }
+    }, id++);
+    const mapData = parseMcpResponse(slideMap);
+
+    // Verify structure
+    expect(mapData.total_slides).toBeDefined();
+    expect(typeof mapData.total_slides).toBe('number');
+    expect(mapData.current_slide_index).toBeDefined();
+    expect(Array.isArray(mapData.slides)).toBe(true);
+
+    // If slides found, verify slide structure
+    if (mapData.total_slides > 0) {
+      const firstSlide = mapData.slides[0];
+      expect(firstSlide.index).toBeDefined();
+      expect(typeof firstSlide.index).toBe('number');
+      expect(firstSlide.visible).toBeDefined();
+      expect(typeof firstSlide.visible).toBe('boolean');
+    }
+
+    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
+    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
+
+    try { proc.stdin.end(); } catch (_) {}
+    try { proc.kill(); } catch (_) {}
+    await Promise.race([
+      new Promise(resolve => proc.once('exit', resolve)),
+      new Promise(resolve => setTimeout(resolve, 3000))
+    ]);
+  });
+
+  test('scorm_navigate_to_slide navigates by index', async () => {
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    const initRes = await rpc('initialize', {}, id++);
+    expect(initRes && !initRes.error).toBe(true);
+
+    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
+
+    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
+    const openData = parseMcpResponse(openSession);
+    const session_id = openData.session_id;
+
+    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+
+    // Create test slides
+    await rpc('tools/call', {
       name: 'scorm_dom_evaluate',
       arguments: {
         session_id,
-        expression: 'throw new Error("Test error")'
+        expression: `
+          (() => {
+            // Create 3 test slides
+            for (let i = 0; i < 3; i++) {
+              const slide = document.createElement('section');
+              slide.id = 'slide-' + i;
+              slide.setAttribute('data-slide-id', 'slide-' + i);
+              slide.style.display = i === 0 ? 'block' : 'none';
+              const title = document.createElement('h2');
+              title.textContent = 'Slide ' + (i + 1);
+              slide.appendChild(title);
+              document.body.appendChild(slide);
+            }
+            return true;
+          })()
+        `
       }
     }, id++);
 
-    console.log('[TEST] Error response:', JSON.stringify(errorResult, null, 2));
-    expect(errorResult.result).toBeDefined();
-    expect(errorResult.result.isError).toBe(true);
-    expect(errorResult.result.content[0].text).toContain('Hint: Use scorm_get_console_errors');
+    // Navigate to slide 1 (second slide)
+    const navResult = await rpc('tools/call', {
+      name: 'scorm_navigate_to_slide',
+      arguments: { 
+        session_id,
+        slide_identifier: 1
+      }
+    }, id++);
+    const navData = parseMcpResponse(navResult);
+
+    expect(navData.success).toBe(true);
+    expect(navData.slide_index).toBe(1);
+
+    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
+    await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
+
+    try { proc.stdin.end(); } catch (_) {}
+    try { proc.kill(); } catch (_) {}
+    await Promise.race([
+      new Promise(resolve => proc.once('exit', resolve)),
+      new Promise(resolve => setTimeout(resolve, 3000))
+    ]);
+  });
+
+  test('scorm_navigate_to_slide navigates by title substring', async () => {
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    const initRes = await rpc('initialize', {}, id++);
+    expect(initRes && !initRes.error).toBe(true);
+
+    const ws = path.resolve('references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition');
+
+    const openSession = await rpc('tools/call', { name: 'scorm_session_open', arguments: { package_path: ws } }, id++);
+    const openData = parseMcpResponse(openSession);
+    const session_id = openData.session_id;
+
+    await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+
+    // Create test slides with titles
+    await rpc('tools/call', {
+      name: 'scorm_dom_evaluate',
+      arguments: {
+        session_id,
+        expression: `
+          (() => {
+            const titles = ['Introduction', 'Assessment', 'Summary'];
+            for (let i = 0; i < titles.length; i++) {
+              const slide = document.createElement('section');
+              slide.id = 'slide-' + i;
+              slide.setAttribute('data-slide-id', 'slide-' + i);
+              slide.style.display = i === 0 ? 'block' : 'none';
+              const title = document.createElement('h2');
+              title.textContent = titles[i];
+              slide.appendChild(title);
+              document.body.appendChild(slide);
+            }
+            return true;
+          })()
+        `
+      }
+    }, id++);
+
+    // Navigate to "Assessment" slide by title substring
+    const navResult = await rpc('tools/call', {
+      name: 'scorm_navigate_to_slide',
+      arguments: { 
+        session_id,
+        slide_identifier: 'assess'
+      }
+    }, id++);
+    const navData = parseMcpResponse(navResult);
+
+    expect(navData.success).toBe(true);
+    expect(navData.slide_index).toBe(1); // Assessment is second slide
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);

@@ -1016,6 +1016,8 @@ async function scorm_sn_reset(params = {}) {
 async function scorm_capture_screenshot(params = {}) {
   const session_id = params.session_id;
   const capture_options = params.capture_options || {};
+  const return_base64 = params.return_base64 === true; // Explicit opt-in for base64 data
+
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
 
   // Bridge mode: delegate to Electron child
@@ -1028,21 +1030,25 @@ async function scorm_capture_screenshot(params = {}) {
   const result = await global.__electronBridge.sendMessage({
     id: Date.now(),
     type: 'runtime_capture',
-    params: { session_id }
+    params: { session_id, compress: true } // Request compressed screenshot
   });
 
   const base64 = result.screenshot;
   let artifactPath = null;
   const s = sessions.sessions.get(session_id);
   if (s && base64) {
-    const rel = `screenshot_${Date.now()}.png`;
+    const rel = `screenshot_${Date.now()}.jpg`; // Use JPEG for compression
     artifactPath = path.join(s.workspace, rel);
-    const pngBuffer = Buffer.from(base64, 'base64');
-    fs.writeFileSync(artifactPath, pngBuffer);
+    const imageBuffer = Buffer.from(base64, 'base64');
+    fs.writeFileSync(artifactPath, imageBuffer);
     sessions.addArtifact({ session_id, artifact: { type: 'screenshot', path: artifactPath } });
   }
 
-  return { artifact_path: artifactPath, screenshot_data: base64 };
+  // Only return base64 if explicitly requested (to avoid token bloat)
+  return {
+    artifact_path: artifactPath,
+    ...(return_base64 ? { screenshot_data: base64 } : {})
+  };
 }
 
 /**
@@ -1834,6 +1840,266 @@ async function scorm_replay_api_calls(params = {}) {
   };
 }
 
+/**
+ * Get comprehensive page state in a single call
+ * Reduces multiple round-trips by fetching all common state at once
+ */
+async function scorm_get_page_state(params = {}) {
+  const session_id = params.session_id;
+  const include_options = params.include || {
+    page_context: true,
+    interactive_elements: true,
+    data_model: true,
+    console_errors: true,
+    network_requests: false
+  };
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Check if runtime is open
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  // Parallel execution of all requested state queries
+  // Build array of promises, filtering out null values
+  const promises = [];
+  const promiseIndices = {};
+
+  if (include_options.page_context) {
+    promiseIndices.page_context = promises.length;
+    promises.push(scorm_get_current_page_context({ session_id }));
+  }
+
+  if (include_options.interactive_elements) {
+    promiseIndices.interactive_elements = promises.length;
+    const { scorm_dom_find_interactive_elements } = require('./dom');
+    promises.push(scorm_dom_find_interactive_elements({ session_id }));
+  }
+
+  if (include_options.data_model) {
+    promiseIndices.data_model = promises.length;
+    promises.push(scorm_data_model_get({ session_id, patterns: ['cmi.*'] }));
+  }
+
+  if (include_options.console_errors) {
+    promiseIndices.console_errors = promises.length;
+    promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warning'] }));
+  }
+
+  if (include_options.network_requests) {
+    promiseIndices.network_requests = promises.length;
+    promises.push(scorm_get_network_requests({ session_id }));
+  }
+
+  const results = await Promise.allSettled(promises);
+
+  // Map results back to named fields
+  const response = {
+    page_context: null,
+    interactive_elements: null,
+    data_model: null,
+    console_errors: null,
+    network_requests: null,
+    timestamp: Date.now(),
+    errors: []
+  };
+
+  // Populate results based on what was requested
+  for (const [key, index] of Object.entries(promiseIndices)) {
+    if (results[index].status === 'fulfilled') {
+      response[key] = results[index].value;
+    } else {
+      response.errors.push({
+        field: key,
+        error: results[index].reason?.message || 'Unknown error'
+      });
+    }
+  }
+
+  return response;
+}
+
+/**
+ * Get slide map for single-SCO courses
+ * Discovers all slides with titles and IDs for easy navigation
+ */
+async function scorm_get_slide_map(params = {}) {
+  const session_id = params.session_id;
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Check if runtime is open
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  try {
+    const slideMap = await RuntimeManager.executeJS(null, `
+      (() => {
+        const slides = [];
+
+        // Strategy 1: Look for slide containers with data attributes
+        document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]').forEach((slide, idx) => {
+          const slideData = {
+            index: idx,
+            id: slide.id || slide.getAttribute('data-slide-id') || null,
+            title: null,
+            selector: slide.id ? '#' + slide.id : null,
+            visible: slide.offsetParent !== null
+          };
+
+          // Try to extract title
+          const titleEl = slide.querySelector('h1, h2, h3, [class*="title"]');
+          if (titleEl) {
+            slideData.title = titleEl.textContent.trim();
+          }
+
+          slides.push(slideData);
+        });
+
+        // Strategy 2: If no slides found, look for sections
+        if (slides.length === 0) {
+          document.querySelectorAll('section, [role="region"]').forEach((section, idx) => {
+            slides.push({
+              index: idx,
+              id: section.id || null,
+              title: section.querySelector('h1, h2, h3')?.textContent.trim() || null,
+              selector: section.id ? '#' + section.id : 'section:nth-of-type(' + (idx + 1) + ')',
+              visible: section.offsetParent !== null
+            });
+          });
+        }
+
+        return {
+          total_slides: slides.length,
+          current_slide_index: slides.findIndex(s => s.visible),
+          slides: slides
+        };
+      })()
+    `, session_id);
+
+    return slideMap;
+  } catch (error) {
+    const e = new Error(error?.message || String(error));
+    e.code = 'SLIDE_MAP_ERROR';
+    throw e;
+  }
+}
+
+/**
+ * Navigate to a specific slide by index, ID, or title
+ * Works with single-SCO courses that use slide-based navigation
+ */
+async function scorm_navigate_to_slide(params = {}) {
+  const session_id = params.session_id;
+  const slide_identifier = params.slide_identifier; // Can be index, id, or title substring
+
+  if (!session_id || typeof session_id !== 'string') {
+    const e = new Error('session_id is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  if (slide_identifier === undefined || slide_identifier === null) {
+    const e = new Error('slide_identifier is required');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Check if runtime is open
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  if (!status || !status.open) {
+    const e = new Error('Runtime not open');
+    e.code = 'RUNTIME_NOT_OPEN';
+    throw e;
+  }
+
+  try {
+    const script = `
+      (() => {
+        const identifier = ${JSON.stringify(slide_identifier)};
+
+        // Get all slides
+        let slides = Array.from(document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]'));
+        if (slides.length === 0) {
+          slides = Array.from(document.querySelectorAll('section, [role="region"]'));
+        }
+
+        let targetSlide = null;
+
+        // Try to match by index
+        if (typeof identifier === 'number') {
+          targetSlide = slides[identifier];
+        }
+        // Try to match by ID
+        else if (typeof identifier === 'string') {
+          targetSlide = slides.find(s => s.id === identifier);
+
+          // Try to match by title substring
+          if (!targetSlide) {
+            const searchText = identifier.toLowerCase();
+            targetSlide = slides.find(s => {
+              const title = s.querySelector('h1, h2, h3')?.textContent.toLowerCase() || '';
+              return title.includes(searchText);
+            });
+          }
+        }
+
+        if (!targetSlide) {
+          throw new Error('Slide not found: ' + identifier);
+        }
+
+        // Navigate to slide (implementation depends on course structure)
+        // Strategy 1: Trigger click on navigation button
+        const navButtons = document.querySelectorAll('[data-slide-nav], [class*="slide-nav"]');
+        const targetButton = Array.from(navButtons).find(btn =>
+          btn.getAttribute('data-slide') === targetSlide.id ||
+          btn.getAttribute('data-slide-index') === String(slides.indexOf(targetSlide))
+        );
+
+        if (targetButton) {
+          targetButton.click();
+          return { success: true, method: 'button_click', slide_id: targetSlide.id };
+        }
+
+        // Strategy 2: Show/hide slides directly
+        slides.forEach(s => s.style.display = 'none');
+        targetSlide.style.display = '';
+        targetSlide.scrollIntoView({ behavior: 'smooth' });
+
+        return {
+          success: true,
+          method: 'direct_show',
+          slide_id: targetSlide.id,
+          slide_index: slides.indexOf(targetSlide)
+        };
+      })()
+    `;
+
+    const result = await RuntimeManager.executeJS(null, script, session_id);
+    return result;
+  } catch (error) {
+    const e = new Error(error?.message || String(error));
+    e.code = 'SLIDE_NAVIGATION_ERROR';
+    throw e;
+  }
+}
+
 module.exports = {
   scorm_runtime_open,
   scorm_runtime_status,
@@ -1861,7 +2127,10 @@ module.exports = {
   scorm_compare_data_model_snapshots,
   scorm_wait_for_api_call,
   scorm_get_current_page_context,
-  scorm_replay_api_calls
+  scorm_replay_api_calls,
+  scorm_get_page_state,
+  scorm_get_slide_map,
+  scorm_navigate_to_slide
 };
 
 /**

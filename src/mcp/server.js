@@ -11,8 +11,8 @@ const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
 const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
-const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls } = require("./tools/runtime");
-const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch } = require("./tools/dom");
+const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
+const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
 
 const getLogger = require('../shared/utils/logger.js');
 const fs = require('fs');
@@ -95,6 +95,7 @@ const TOOL_META = new Map([
   ["scorm_keyboard_type", { description: "Simulate keyboard typing in focused element with optional delay between keystrokes", inputSchema: { type: "object", properties: { session_id: { type: "string" }, text: { type: "string" }, options: { type: "object", properties: { selector: { type: "string" }, delay_ms: { type: "number" } } } }, required: ["session_id", "text"] } }],
   ["scorm_dom_find_interactive_elements", { description: "Discover all interactive elements on the current page - returns structured data about forms, buttons, inputs, and assessments with selectors and labels", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_dom_fill_form_batch", { description: "Fill multiple form fields in a single batch operation - reduces multiple scorm_dom_fill calls to one", inputSchema: { type: "object", properties: { session_id: { type: "string" }, fields: { type: "array", items: { type: "object", properties: { selector: { type: "string" }, value: { type: ["string", "boolean", "number"] }, options: { type: "object" } }, required: ["selector", "value"] } } }, required: ["session_id", "fields"] } }],
+  ["scorm_dom_click_by_text", { description: "Click element by visible text with fuzzy matching - handles whitespace normalization automatically", inputSchema: { type: "object", properties: { session_id: { type: "string" }, text: { type: "string" }, options: { type: "object", properties: { exact_match: { type: "boolean" }, element_types: { type: "array", items: { type: "string" } } } } }, required: ["session_id", "text"] } }],
 
   // Network & Debugging
   ["scorm_get_network_requests", { description: "Get network requests made by SCORM content with optional filtering by resource type and timestamp", inputSchema: { type: "object", properties: { session_id: { type: "string" }, options: { type: "object", properties: { resource_types: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, max_count: { type: "number" } } } }, required: ["session_id"] } }],
@@ -104,6 +105,9 @@ const TOOL_META = new Map([
   ["scorm_wait_for_api_call", { description: "Wait for a specific SCORM API call to occur - eliminates polling and arbitrary delays", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, timeout_ms: { type: "number" } }, required: ["session_id", "method"] } }],
   ["scorm_get_current_page_context", { description: "Get semantic information about current page - slide number, section title, page type, navigation availability", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_replay_api_calls", { description: "Replay a sequence of API calls to reproduce behavior - useful for debugging and testing", inputSchema: { type: "object", properties: { session_id: { type: "string" }, calls: { type: "array", items: { type: "object", properties: { method: { type: "string" }, args: { type: "array" } }, required: ["method"] } } }, required: ["session_id", "calls"] } }],
+  ["scorm_get_page_state", { description: "Get comprehensive page state in a single call - includes page context, interactive elements, data model, console errors, and network requests", inputSchema: { type: "object", properties: { session_id: { type: "string" }, include: { type: "object", properties: { page_context: { type: "boolean" }, interactive_elements: { type: "boolean" }, data_model: { type: "boolean" }, console_errors: { type: "boolean" }, network_requests: { type: "boolean" } } } }, required: ["session_id"] } }],
+  ["scorm_get_slide_map", { description: "Get slide map for single-SCO courses - discovers all slides with titles and IDs for easy navigation", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_navigate_to_slide", { description: "Navigate to a specific slide by index, ID, or title substring - works with single-SCO courses", inputSchema: { type: "object", properties: { session_id: { type: "string" }, slide_identifier: { type: ["string", "number"] } }, required: ["session_id", "slide_identifier"] } }],
 
   // System Logging & Diagnostics
   ["system_get_logs", { description: "Get recent log entries in NDJSON format - includes browser console errors/warnings and all application logs with filtering by level/timestamp/component", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
@@ -156,6 +160,10 @@ router.register("scorm_dom_wait_for", scorm_dom_wait_for);
 router.register("scorm_keyboard_type", scorm_keyboard_type);
 router.register("scorm_dom_find_interactive_elements", scorm_dom_find_interactive_elements);
 router.register("scorm_dom_fill_form_batch", scorm_dom_fill_form_batch);
+router.register("scorm_dom_click_by_text", scorm_dom_click_by_text);
+router.register("scorm_get_page_state", scorm_get_page_state);
+router.register("scorm_get_slide_map", scorm_get_slide_map);
+router.register("scorm_navigate_to_slide", scorm_navigate_to_slide);
 router.register("scorm_report", scorm_report);
 // System tools for logs and log level control
 async function system_get_logs(params = {}) {
