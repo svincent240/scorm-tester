@@ -190,15 +190,12 @@ async function scorm_runtime_open(params = {}) {
   const win = await RuntimeManager.openPersistent({ session_id, entryPath, viewport });
   const finalURL = RuntimeManager.getURL(win);
   sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_opened', payload: { url: finalURL || null } });
-  
-  // Since content auto-initializes, we can determine the result.
-  // Let's call Initialize again. If the error is 103 (Already Initialized), it means the first one was successful.
-  const initCheck = await RuntimeManager.callAPI(null, 'Initialize', [''], session_id);
-  const lastError = await RuntimeManager.callAPI(null, 'GetLastError', [], session_id);
 
-  // If the error is 103, the auto-initialization was successful.
-  // If initCheck was 'true', it means we just initialized it, also successful.
-  const initialization_result = (lastError === '103' || initCheck === 'true') ? 'true' : 'false';
+  // Get the runtime status to determine the result of the auto-initialization.
+  const status = await RuntimeManager.getRuntimeStatus(session_id);
+  
+  // The `initialize_state` will be 'initialized' if the auto-init was successful.
+  const initialization_result = (status && status.initialize_state === 'initialized') ? 'true' : 'false';
 
   return { runtime_id: session_id, entry_found: true, viewport, initialization_result };
 }
