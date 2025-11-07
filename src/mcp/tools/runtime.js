@@ -2119,8 +2119,74 @@ async function scorm_navigate_to_slide(params = {}) {
     const script = `
       (() => {
         const identifier = ${JSON.stringify(slide_identifier)};
+        let targetIndex = null;
+        let targetId = null;
+        let navigationMethod = null;
 
-        // Get all slides
+        // Strategy 1: JavaScript framework navigation (window.Course)
+        if (window.Course && typeof window.Course.countSlides === 'function') {
+          const count = window.Course.countSlides();
+
+          // Match by numeric index
+          if (typeof identifier === 'number') {
+            if (identifier >= 0 && identifier < count) {
+              targetIndex = identifier;
+            }
+          }
+          // Match by ID or title substring
+          else if (typeof identifier === 'string') {
+            const searchText = identifier.toLowerCase();
+            for (let i = 0; i < count; i++) {
+              const slideObj = window.CourseConfig?.slides?.[i];
+              const title = typeof window.Course.getSlideName === 'function'
+                ? window.Course.getSlideName(i)
+                : null;
+
+              // Match by ID
+              if (slideObj?.id === identifier) {
+                targetIndex = i;
+                targetId = slideObj.id;
+                break;
+              }
+
+              // Match by title substring
+              const titleText = (title || slideObj?.title || '').toLowerCase();
+              if (titleText.includes(searchText)) {
+                targetIndex = i;
+                targetId = slideObj?.id;
+                break;
+              }
+            }
+          }
+
+          if (targetIndex !== null) {
+            // Use the framework's navigation method
+            if (window.courseRuntime && typeof window.courseRuntime.goToSlide === 'function') {
+              window.courseRuntime.goToSlide(targetIndex);
+              navigationMethod = 'framework_courseRuntime';
+            } else if (window.courseState && typeof window.courseState.setState === 'function') {
+              window.courseState.setState({ currentSlide: targetIndex });
+              if (window.Course.renderSlide && typeof window.Course.renderSlide === 'function') {
+                const contentEl = document.getElementById('content') || document.querySelector('main');
+                if (contentEl) {
+                  window.Course.renderSlide(contentEl, targetIndex);
+                }
+              }
+              navigationMethod = 'framework_manual';
+            }
+
+            if (navigationMethod) {
+              return {
+                success: true,
+                method: navigationMethod,
+                slide_index: targetIndex,
+                slide_id: targetId
+              };
+            }
+          }
+        }
+
+        // Strategy 2: DOM-based navigation (fallback)
         let slides = Array.from(document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]'));
         if (slides.length === 0) {
           slides = Array.from(document.querySelectorAll('section, [role="region"]'));
@@ -2132,11 +2198,10 @@ async function scorm_navigate_to_slide(params = {}) {
         if (typeof identifier === 'number') {
           targetSlide = slides[identifier];
         }
-        // Try to match by ID
+        // Try to match by ID or title
         else if (typeof identifier === 'string') {
           targetSlide = slides.find(s => s.id === identifier);
 
-          // Try to match by title substring
           if (!targetSlide) {
             const searchText = identifier.toLowerCase();
             targetSlide = slides.find(s => {
@@ -2150,8 +2215,8 @@ async function scorm_navigate_to_slide(params = {}) {
           throw new Error('Slide not found: ' + identifier);
         }
 
-        // Navigate to slide (implementation depends on course structure)
-        // Strategy 1: Trigger click on navigation button
+        // DOM-based navigation methods
+        // Try navigation buttons first
         const navButtons = document.querySelectorAll('[data-slide-nav], [class*="slide-nav"]');
         const targetButton = Array.from(navButtons).find(btn =>
           btn.getAttribute('data-slide') === targetSlide.id ||
@@ -2160,17 +2225,17 @@ async function scorm_navigate_to_slide(params = {}) {
 
         if (targetButton) {
           targetButton.click();
-          return { success: true, method: 'button_click', slide_id: targetSlide.id };
+          return { success: true, method: 'dom_button_click', slide_id: targetSlide.id };
         }
 
-        // Strategy 2: Show/hide slides directly
+        // Direct show/hide
         slides.forEach(s => s.style.display = 'none');
         targetSlide.style.display = '';
         targetSlide.scrollIntoView({ behavior: 'smooth' });
 
         return {
           success: true,
-          method: 'direct_show',
+          method: 'dom_direct_show',
           slide_id: targetSlide.id,
           slide_index: slides.indexOf(targetSlide)
         };
