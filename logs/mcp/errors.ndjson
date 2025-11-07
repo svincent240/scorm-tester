@@ -1,2 +1,1 @@
-{"ts":1762482445040,"event":"ERROR_LOG_START","process":"browser"}
-{"ts":1762482542283,"level":"error","msg":"SCORM Error [general]: 103 - Already Initialized","args":[{"code":"103","diagnostic":"Initialize called when session already initialized","context":"validateSessionState","sessionState":"running"}],"context":{},"pid":23007,"process":"browser"}
+{"ts":1762485010650,"event":"ERROR_LOG_START","process":"browser"}

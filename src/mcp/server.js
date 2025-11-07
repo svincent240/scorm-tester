@@ -228,8 +228,6 @@ router.register('system_set_log_level', system_set_log_level);
 
 router.register("scorm_sn_init", scorm_sn_init);
 router.register("scorm_sn_reset", scorm_sn_reset);
-router.register("scorm_test_navigation_flow", scorm_test_navigation_flow);
-router.register("scorm_debug_api_calls", scorm_debug_api_calls);
 router.register("scorm_trace_sequencing", scorm_trace_sequencing);
 router.register("scorm_report", scorm_report);
 router.register("scorm_get_network_requests", scorm_get_network_requests);

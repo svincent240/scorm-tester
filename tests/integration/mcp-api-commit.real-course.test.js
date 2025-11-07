@@ -61,6 +61,7 @@ describe('MCP API flow (Initialize → Commit → Terminate) on persistent runti
     const runtimeData = parseMcpResponse(runtimeOpen);
     expect(runtimeData && runtimeData.runtime_id === session_id).toBe(true);
 
+    const apiInit = await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
     const apiInitData = parseMcpResponse(apiInit);
     expect(apiInitData && apiInitData.result === 'true').toBe(true);
 

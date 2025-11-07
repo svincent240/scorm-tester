@@ -73,13 +73,15 @@ async function scorm_dom_click(params = {}) {
         el.click();
       }
 
+      // Ensure all returned values are JSON-serializable primitives
+      // to avoid CDP structured clone errors
       return {
         success: true,
         element: {
-          tagName: el.tagName,
-          id: el.id || null,
-          className: el.className || null,
-          textContent: el.textContent?.substring(0, 100) || null
+          tagName: String(el.tagName || ''),
+          id: el.id ? String(el.id) : null,
+          className: el.className ? String(el.className) : null,
+          textContent: el.textContent ? String(el.textContent).substring(0, 100) : null
         }
       };
     })()
@@ -193,15 +195,16 @@ async function scorm_dom_fill(params = {}) {
         throw new Error('Unsupported element type: ' + tagName + (inputType ? ' (' + inputType + ')' : ''));
       }
 
+      // Ensure all returned values are JSON-serializable primitives
       return {
         success: true,
         element: {
-          tagName: el.tagName,
-          type: el.type || null,
-          id: el.id || null,
-          className: el.className || null,
-          value: el.value || null,
-          checked: el.checked || null
+          tagName: String(el.tagName || ''),
+          type: el.type ? String(el.type) : null,
+          id: el.id ? String(el.id) : null,
+          className: el.className ? String(el.className) : null,
+          value: el.value !== undefined ? String(el.value) : null,
+          checked: el.checked !== undefined ? Boolean(el.checked) : null
         }
       };
     })()
@@ -592,13 +595,14 @@ async function scorm_keyboard_type(params = {}) {
       // Trigger change event after typing
       targetEl.dispatchEvent(new Event('change', { bubbles: true }));
 
+      // Ensure all returned values are JSON-serializable primitives
       return {
         success: true,
         characters_typed: text.length,
         element: {
-          tagName: targetEl.tagName,
-          id: targetEl.id || null,
-          value: targetEl.value || null
+          tagName: String(targetEl.tagName || ''),
+          id: targetEl.id ? String(targetEl.id) : null,
+          value: targetEl.value !== undefined ? String(targetEl.value) : null
         }
       };
     })()
@@ -890,7 +894,7 @@ async function scorm_dom_click_by_text(params = {}) {
   const session_id = params.session_id;
   const text = params.text;
   const options = params.options || {};
-  const exact_match = options.exact_match !== false; // Default true
+  const exact_match = options.exact_match === true; // Default false (fuzzy matching)
   const element_types = options.element_types || ['button', 'a', 'input[type="button"]', 'input[type="submit"]', '[role="button"]'];
 
   if (!session_id || typeof session_id !== 'string') {
@@ -939,13 +943,14 @@ async function scorm_dom_click_by_text(params = {}) {
 
       match.click();
 
+      // Ensure all returned values are JSON-serializable primitives
       return {
         clicked: true,
         element: {
-          tagName: match.tagName,
-          id: match.id,
-          className: match.className,
-          textContent: match.textContent?.substring(0, 100)
+          tagName: String(match.tagName || ''),
+          id: match.id ? String(match.id) : null,
+          className: match.className ? String(match.className) : null,
+          textContent: match.textContent ? String(match.textContent).substring(0, 100) : null
         }
       };
     })()
