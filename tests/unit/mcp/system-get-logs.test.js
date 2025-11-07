@@ -22,7 +22,11 @@ describe('MCP system_get_logs', () => {
       jest.doMock('../../../src/shared/utils/logger.js', () => {
         return jest.fn(() => ({
           ndjsonFile: mockLogFile,
-          logFile: mockLogFile
+          logFile: mockLogFile,
+          info: jest.fn(),
+          warn: jest.fn(),
+          error: jest.fn(),
+          debug: jest.fn()
         }));
       });
       

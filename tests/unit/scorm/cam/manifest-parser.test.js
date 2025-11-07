@@ -51,7 +51,7 @@ describe('ManifestParser', () => {
   describe('parseManifestXML', () => {
     test('should parse valid SCORM manifest', () => {
       const validManifest = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="TEST-MANIFEST" version="1.0">
           <metadata>
             <schema>ADL SCORM</schema>
@@ -60,6 +60,9 @@ describe('ManifestParser', () => {
           <organizations default="ORG-1">
             <organization identifier="ORG-1">
               <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
             </organization>
           </organizations>
           <resources>
@@ -81,14 +84,21 @@ describe('ManifestParser', () => {
 
     test('should handle manifest without version', () => {
       const manifestWithoutVersion = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="TEST-MANIFEST">
           <organizations default="ORG-1">
             <organization identifier="ORG-1">
               <title>Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
             </organization>
           </organizations>
-          <resources/>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
         </manifest>`;
 
       const result = manifestParser.parseManifestXML(manifestWithoutVersion);
@@ -127,14 +137,21 @@ describe('ManifestParser', () => {
     beforeEach(async () => {
       // Create test manifest file
       const testManifest = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="FILE-TEST" version="1.0">
           <organizations default="ORG-1">
             <organization identifier="ORG-1">
               <title>File Test Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
             </organization>
           </organizations>
-          <resources/>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
         </manifest>`;
       
       await fs.mkdir(path.dirname(testManifestPath), { recursive: true });
@@ -217,17 +234,30 @@ describe('ManifestParser', () => {
   describe('parseOrganizations', () => {
     test('should parse organizations section', () => {
       const manifestWithOrgs = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="ORG-TEST">
           <organizations default="ORG-1">
             <organization identifier="ORG-1">
               <title>Primary Organization</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
             </organization>
             <organization identifier="ORG-2">
               <title>Secondary Organization</title>
+              <item identifier="ITEM-2" identifierref="RES-2">
+                <title>Test Item 2</title>
+              </item>
             </organization>
           </organizations>
-          <resources/>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+            <resource identifier="RES-2" type="webcontent" href="page2.html">
+              <file href="page2.html"/>
+            </resource>
+          </resources>
         </manifest>`;
 
       const result = manifestParser.parseManifestXML(manifestWithOrgs);
@@ -462,14 +492,21 @@ describe('ManifestParser', () => {
 
     test('should handle special characters in text content', () => {
       const manifestWithSpecialChars = `<?xml version="1.0" encoding="UTF-8"?>
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" 
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
                   identifier="SPECIAL-CHARS">
           <organizations default="ORG-1">
             <organization identifier="ORG-1">
               <title>Test &amp; Special "Chars" &lt;Title&gt;</title>
+              <item identifier="ITEM-1" identifierref="RES-1">
+                <title>Test Item</title>
+              </item>
             </organization>
           </organizations>
-          <resources/>
+          <resources>
+            <resource identifier="RES-1" type="webcontent" href="index.html">
+              <file href="index.html"/>
+            </resource>
+          </resources>
         </manifest>`;
 
       const result = manifestParser.parseManifestXML(manifestWithSpecialChars);

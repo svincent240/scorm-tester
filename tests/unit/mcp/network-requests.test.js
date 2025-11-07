@@ -4,7 +4,8 @@ const path = require('path');
 jest.mock('../../../src/mcp/runtime-manager', () => ({
   RuntimeManager: {
     getPersistent: jest.fn(),
-    getNetworkRequests: jest.fn()
+    getNetworkRequests: jest.fn(),
+    getRuntimeStatus: jest.fn()
   }
 }));
 
@@ -22,8 +23,8 @@ describe('scorm_get_network_requests', () => {
   });
 
   test('throws error if runtime not open', async () => {
-    RuntimeManager.getPersistent.mockReturnValue(null);
-    
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: false });
+
     await expect(scorm_get_network_requests({ session_id: 'test-session' }))
       .rejects.toThrow('Runtime not open');
     await expect(scorm_get_network_requests({ session_id: 'test-session' }))
@@ -32,6 +33,7 @@ describe('scorm_get_network_requests', () => {
 
   test('returns network requests for session', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     
     const mockRequests = [
@@ -71,6 +73,7 @@ describe('scorm_get_network_requests', () => {
 
   test('supports filtering by resource types', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     RuntimeManager.getNetworkRequests.mockReturnValue([]);
 
@@ -90,6 +93,7 @@ describe('scorm_get_network_requests', () => {
 
   test('supports filtering by timestamp', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     RuntimeManager.getNetworkRequests.mockReturnValue([]);
 
@@ -110,6 +114,7 @@ describe('scorm_get_network_requests', () => {
 
   test('supports limiting request count', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     RuntimeManager.getNetworkRequests.mockReturnValue([]);
 
@@ -129,6 +134,7 @@ describe('scorm_get_network_requests', () => {
 
   test('returns empty array when no requests captured', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     RuntimeManager.getNetworkRequests.mockReturnValue([]);
 
@@ -143,6 +149,7 @@ describe('scorm_get_network_requests', () => {
 
   test('includes failed requests with error information', async () => {
     const mockWin = { webContents: {} };
+    RuntimeManager.getRuntimeStatus.mockResolvedValue({ open: true });
     RuntimeManager.getPersistent.mockReturnValue(mockWin);
     
     const mockRequests = [

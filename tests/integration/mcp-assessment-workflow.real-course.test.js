@@ -133,6 +133,7 @@ describe('MCP assessment workflow on real course', () => {
     const runtimeOpenData = parseMcpResponse(runtimeOpenRes);
     console.log('[TEST] Runtime open data:', JSON.stringify(runtimeOpenData, null, 2));
 
+    const attemptInitRes = await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
     console.log('[TEST] Initialize response:', JSON.stringify(attemptInitRes, null, 2));
 
     // Trace assessment interactions with simple actions
@@ -180,11 +181,12 @@ describe('MCP assessment workflow on real course', () => {
     const session_id = openData.session_id;
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
+    await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
 
     // Set some values
-    await rpc('tools/call', { 
-      name: 'scorm_api_call', 
-      arguments: { session_id, method: 'SetValue', args: ['cmi.location', 'test_location'] } 
+    await rpc('tools/call', {
+      name: 'scorm_api_call',
+      arguments: { session_id, method: 'SetValue', args: ['cmi.location', 'test_location'] }
     }, id++);
 
     // Validate data model state

@@ -123,12 +123,13 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
     // Start waiting for Initialize call (in background)
-    const waitPromise = rpc('tools/call', { 
-      name: 'scorm_wait_for_api_call', 
-      arguments: { session_id, method: 'Initialize', timeout_ms: 5000 } 
+    const waitPromise = rpc('tools/call', {
+      name: 'scorm_wait_for_api_call',
+      arguments: { session_id, method: 'Initialize', timeout_ms: 5000 }
     }, id++);
 
     // Trigger Initialize
+    await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
 
     // Wait should complete
     const waitResult = await waitPromise;

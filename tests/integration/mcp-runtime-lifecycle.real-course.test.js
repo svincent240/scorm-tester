@@ -89,6 +89,7 @@ describe('MCP runtime lifecycle on real course', () => {
 
     // Initialize SCORM attempt
     console.log('[TEST] Initializing SCORM attempt...');
+    const initAttempt = await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
     console.log('[TEST] Initialize attempt response:', JSON.stringify(initAttempt, null, 2));
     const initAttemptData = parseMcpResponse(initAttempt);
     console.log('[TEST] Parsed init attempt data:', JSON.stringify(initAttemptData, null, 2));
@@ -165,20 +166,8 @@ describe('MCP runtime lifecycle on real course', () => {
     expect(statusAfterTerminateData.initialize_state).toBe('terminated');
     expect(statusAfterTerminateData.last_api_method).toBe('Terminate');
 
-    // Close runtime
-    console.log('[TEST] Closing runtime...');
-    console.log('[TEST] Close runtime response:', JSON.stringify(closeRuntime, null, 2));
-    const closeRuntimeData = parseMcpResponse(closeRuntime);
-    console.log('[TEST] Parsed close runtime data:', JSON.stringify(closeRuntimeData, null, 2));
-    expect(closeRuntimeData.success).toBe(true);
-
-    // Check runtime status (should be closed)
-    console.log('[TEST] Checking runtime status after close...');
-    const statusAfterClose = await rpc('tools/call', { name: 'scorm_runtime_status', arguments: { session_id } }, id++);
-    console.log('[TEST] Status after close response:', JSON.stringify(statusAfterClose, null, 2));
-    const statusAfterCloseData = parseMcpResponse(statusAfterClose);
-    console.log('[TEST] Parsed status after close:', JSON.stringify(statusAfterCloseData, null, 2));
-    expect(statusAfterCloseData.open).toBe(false);
+    // Note: Runtime is automatically closed when the session closes
+    // There is no separate scorm_runtime_close tool
 
     // Close session
     console.log('[TEST] Closing session...');
@@ -212,6 +201,7 @@ describe('MCP runtime lifecycle on real course', () => {
     console.log('[TEST] Opening runtime for pattern test...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
     console.log('[TEST] Initializing attempt for pattern test...');
+    await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Initialize', args: [''] } }, id++);
 
     // Set some interaction data
     console.log('[TEST] Setting interaction data...');

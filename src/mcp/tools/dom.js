@@ -80,7 +80,7 @@ async function scorm_dom_click(params = {}) {
         element: {
           tagName: String(el.tagName || ''),
           id: el.id ? String(el.id) : null,
-          className: el.className ? String(el.className) : null,
+          className: el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null,
           textContent: el.textContent ? String(el.textContent).substring(0, 100) : null
         }
       };
@@ -202,7 +202,7 @@ async function scorm_dom_fill(params = {}) {
           tagName: String(el.tagName || ''),
           type: el.type ? String(el.type) : null,
           id: el.id ? String(el.id) : null,
-          className: el.className ? String(el.className) : null,
+          className: el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null,
           value: el.value !== undefined ? String(el.value) : null,
           checked: el.checked !== undefined ? Boolean(el.checked) : null
         }
@@ -277,7 +277,7 @@ async function scorm_dom_query(params = {}) {
           result.attributes[attr.name] = attr.value;
         }
         result.id = el.id || null;
-        result.className = el.className || null;
+        result.className = el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null;
       }
 
       // Get visibility state
@@ -394,10 +394,6 @@ async function scorm_dom_evaluate(params = {}) {
     // Preserve original error details for programmatic access
     if (err.details) {
       e.details = err.details;
-    }
-    // Include recent console errors if available
-    if (consoleErrors) {
-      e.console_errors = consoleErrors;
     }
     throw e;
   }
@@ -602,6 +598,7 @@ async function scorm_keyboard_type(params = {}) {
         element: {
           tagName: String(targetEl.tagName || ''),
           id: targetEl.id ? String(targetEl.id) : null,
+          className: targetEl.className ? (typeof targetEl.className === 'object' ? targetEl.className.baseVal : targetEl.className) : null,
           value: targetEl.value !== undefined ? String(targetEl.value) : null
         }
       };
@@ -719,7 +716,7 @@ async function scorm_dom_find_interactive_elements(params = {}) {
 
           // Infer purpose from text/class
           const lowerText = text.toLowerCase();
-          const className = btn.className || '';
+          const className = (btn.className && typeof btn.className === 'object' ? btn.className.baseVal : btn.className) || '';
           if (lowerText.includes('next') || className.includes('next')) {
             btnData.purpose = 'navigation_next';
           } else if (lowerText.includes('prev') || lowerText.includes('back') || className.includes('prev')) {
@@ -949,7 +946,7 @@ async function scorm_dom_click_by_text(params = {}) {
         element: {
           tagName: String(match.tagName || ''),
           id: match.id ? String(match.id) : null,
-          className: match.className ? String(match.className) : null,
+          className: match.className ? (typeof match.className === 'object' ? match.className.baseVal : match.className) : null,
           textContent: match.textContent ? String(match.textContent).substring(0, 100) : null
         }
       };
