@@ -10,7 +10,7 @@ const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
 const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
-const { scorm_runtime_open, scorm_runtime_status, scorm_runtime_close, scorm_attempt_initialize, scorm_attempt_terminate, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_test_api_integration, scorm_take_screenshot, scorm_test_navigation_flow, scorm_debug_api_calls, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
+const { scorm_runtime_open, scorm_runtime_status, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
 const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
 
 const getLogger = require('../shared/utils/logger.js');
@@ -58,12 +58,9 @@ const TOOL_META = new Map([
   // Runtime Execution & Testing (Electron required)
   ["scorm_runtime_open", { description: "Open persistent offscreen runtime for a session - loads SCORM content in background browser (Electron required)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, viewport: { type: "object" } }, required: ["session_id"] } }],
   ["scorm_runtime_status", { description: "Get persistent runtime status (open state, URL, Initialize state, last API call)", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
-  ["scorm_runtime_close", { description: "Close persistent runtime and cleanup resources", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
 
   // SCORM RTE API Methods (requires open runtime)
-  ["scorm_attempt_initialize", { description: "Call Initialize('') on SCORM API - starts a learning attempt", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
-  ["scorm_attempt_terminate", { description: "Call Terminate('') on SCORM API - ends the learning attempt", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
-  ["scorm_api_call", { description: "Call any SCORM RTE API method (GetValue, SetValue, Commit, etc.) on persistent runtime", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, args: { type: "array" } }, required: ["session_id", "method"] } }],
+  ["scorm_api_call", { description: "Call any SCORM RTE API method (GetValue, SetValue, Commit, Initialize, Terminate, etc.) on persistent runtime", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, args: { type: "array" } }, required: ["session_id", "method"] } }],
   ["scorm_data_model_get", { description: "Get multiple data model elements in one call - supports wildcards (e.g., 'cmi.interactions.*') for bulk reading", inputSchema: { type: "object", properties: { session_id: { type: "string" }, elements: { type: "array", items: { type: "string" } }, patterns: { type: "array", items: { type: "string" } }, include_metadata: { type: "boolean" } }, required: ["session_id"] } }],
 
   // Sequencing & Navigation (requires SN bridge initialization)
@@ -75,15 +72,11 @@ const TOOL_META = new Map([
   ["scorm_nav_choice", { description: "Execute sequencing choice navigation to target activity", inputSchema: { type: "object", properties: { session_id: { type: "string" }, targetId: { type: "string" } }, required: ["session_id", "targetId"] } }],
 
   // Integrated Testing Tools (Electron required)
-  ["scorm_test_api_integration", { description: "Execute SCORM content and capture API calls - returns data model state and call history (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, capture_api_calls: { type: "boolean" }, session_id: { type: "string" }, viewport: { type: "object" }, test_scenario: { type: "object" } }, required: ["workspace_path"] } }],
-  ["scorm_test_navigation_flow", { description: "Execute navigation sequence and optionally capture screenshots at each step (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, navigation_sequence: { type: "array", items: { type: "string" } }, capture_each_step: { type: "boolean" }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
-  ["scorm_debug_api_calls", { description: "Execute content and capture all SCORM API calls with optional method filtering, anomaly detection, and data model state tracking (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, filter_methods: { type: "array", items: { type: "string" } }, detect_anomalies: { type: "boolean" }, include_data_model_state: { type: "boolean" }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_trace_sequencing", { description: "Execute content and capture sequencing structure trace with configurable detail level (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, trace_level: { type: "string", enum: ["basic", "detailed", "verbose"] }, viewport: { type: "object" } }, required: ["workspace_path"] } }],
   ["scorm_assessment_interaction_trace", { description: "Trace assessment interactions with complete before/after correlation of DOM actions, API calls, and data model state - ideal for debugging assessment issues (requires open runtime)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, actions: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: ["click", "fill", "wait"] }, selector: { type: "string" }, value: { type: ["string", "number", "boolean"] }, ms: { type: "number" } } } }, capture_mode: { type: "string", enum: ["standard", "detailed"] } }, required: ["session_id", "actions"] } }],
 
   // Screenshot & Visual Validation (Electron required)
-  ["scorm_take_screenshot", { description: "Execute content and capture screenshot with viewport configuration (Electron required)", inputSchema: { type: "object", properties: { workspace_path: { type: "string" }, session_id: { type: "string" }, viewport: { type: "object" }, capture_options: { type: "object" } }, required: ["workspace_path"] } }],
-  ["scorm_capture_screenshot", { description: "Capture screenshot from persistent runtime session", inputSchema: { type: "object", properties: { session_id: { type: "string" }, capture_options: { type: "object" } }, required: ["session_id"] } }],
+  ["scorm_capture_screenshot", { description: "Capture screenshot from persistent runtime session with optional wait/delay", inputSchema: { type: "object", properties: { session_id: { type: "string" }, capture_options: { type: "object", properties: { wait_for_selector: { type: "string" }, wait_timeout_ms: { type: "number" }, delay_ms: { type: "number" } } } }, required: ["session_id"] } }],
 
   // DOM Interaction (requires open runtime)
   ["scorm_dom_click", { description: "Click DOM element by CSS selector in SCORM content", inputSchema: { type: "object", properties: { session_id: { type: "string" }, selector: { type: "string" }, options: { type: "object", properties: { click_type: { type: "string", enum: ["single", "double", "right"] }, wait_for_selector: { type: "boolean" }, wait_timeout_ms: { type: "number" } } } }, required: ["session_id", "selector"] } }],
@@ -127,14 +120,9 @@ router.register("scorm_lint_sequencing", scorm_lint_sequencing);
 router.register("scorm_validate_compliance", scorm_validate_compliance);
 router.register("scorm_runtime_open", scorm_runtime_open);
 router.register("scorm_runtime_status", scorm_runtime_status);
-router.register("scorm_runtime_close", scorm_runtime_close);
-router.register("scorm_attempt_initialize", scorm_attempt_initialize);
-router.register("scorm_attempt_terminate", scorm_attempt_terminate);
 router.register("scorm_api_call", scorm_api_call);
 router.register("scorm_data_model_get", scorm_data_model_get);
-router.register("scorm_test_api_integration", scorm_test_api_integration);
 router.register("scorm_assessment_interaction_trace", scorm_assessment_interaction_trace);
-router.register("scorm_take_screenshot", scorm_take_screenshot);
 router.register("scorm_capture_screenshot", scorm_capture_screenshot);
 router.register("scorm_nav_get_state", scorm_nav_get_state);
 router.register("scorm_nav_next", scorm_nav_next);
@@ -142,8 +130,6 @@ router.register("scorm_nav_previous", scorm_nav_previous);
 router.register("scorm_nav_choice", scorm_nav_choice);
 router.register("scorm_sn_init", scorm_sn_init);
 router.register("scorm_sn_reset", scorm_sn_reset);
-router.register("scorm_test_navigation_flow", scorm_test_navigation_flow);
-router.register("scorm_debug_api_calls", scorm_debug_api_calls);
 router.register("scorm_trace_sequencing", scorm_trace_sequencing);
 router.register("scorm_get_data_model_history", scorm_get_data_model_history);
 router.register("scorm_get_network_requests", scorm_get_network_requests);

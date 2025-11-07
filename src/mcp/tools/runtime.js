@@ -35,426 +35,13 @@ function resolveViewport(vp) {
   if (vp.device && presets[vp.device]) return presets[vp.device];
   return { width: vp.width || 1024, height: vp.height || 768, scale: vp.scale || 1 };
 }
+// scorm_test_api_integration removed - use session-based pattern instead:
+// 1. scorm_session_open + scorm_runtime_open
+// 2. scorm_get_data_model_history to get API calls
 
-async function scorm_test_api_integration(params = {}) {
-  const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
-  if (!workspace) {
-    const e = new Error("workspace_path is required");
-    e.code = "MCP_INVALID_PARAMS";
-    throw e;
-  }
-
-  const capture_api_calls = !!params.capture_api_calls;
-  const test_scenario = params.test_scenario || null;
-  const session_id = params.session_id || null;
-
-  let manifestOk = false; let schemaversion = null;
-  try {
-    const manifestPath = ensureManifestPath(workspace);
-    const parser = new ManifestParser({ setError: () => {} });
-    const parsed = await parser.parseManifestFile(manifestPath);
-    schemaversion = parsed?.schemaversion || null;
-    manifestOk = true;
-  } catch (err) {
-    logger?.error('Manifest parsing failed', { error: err.message, code: err.code });
-    manifestOk = false;
-  }
-
-  if (!RuntimeManager.isSupported) {
-    const e = new Error("Electron runtime is required for runtime tests");
-    e.code = "ELECTRON_REQUIRED";
-    throw e;
-  }
-
-  let win = null;
-  try {
-    const entryPath = await resolveEntryPathFromManifest(workspace);
-    if (!entryPath) {
-      return {
-        api_test_results: {
-          initialize_success: false,
-          data_model_state: {},
-          ...(capture_api_calls ? { api_calls_captured: [] } : {})
-        },
-        manifest_ok: manifestOk,
-        scorm_version: schemaversion,
-        scenario_ack: !!test_scenario
-      };
-    }
-
-    const viewport = resolveViewport(params.viewport);
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'runtime:open_start', payload: { entryPath, viewport } });
-    win = await RuntimeManager.openPage({ entryPath, viewport });
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'runtime:page_opened', payload: { entryPath } });
-    await RuntimeManager.injectApiRecorder(win);
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'runtime:api_recorder_injected', payload: {} });
-
-    if (test_scenario) {
-      const steps = Array.isArray(test_scenario.steps) ? test_scenario.steps.length : 0;
-      sessions.emit && session_id && sessions.emit({ session_id, type: 'runtime:scenario_start', payload: { steps } });
-      await RuntimeManager.runScenario(win, test_scenario);
-      sessions.emit && session_id && sessions.emit({ session_id, type: 'runtime:scenario_complete', payload: { steps } });
-    }
-
-    const calls = capture_api_calls ? await RuntimeManager.getCapturedCalls(win) : [];
-    if (capture_api_calls && session_id && sessions.emit) {
-      sessions.emit({ session_id, type: 'debug:api_calls_captured', payload: { count: calls.length } });
-    }
-    const initialize_success = !!(calls.find(c => c.method === 'Initialize'));
-    return {
-      api_test_results: {
-        initialize_success,
-        data_model_state: {},
-        ...(capture_api_calls ? { api_calls_captured: calls } : {})
-      },
-      manifest_ok: manifestOk,
-      scorm_version: schemaversion,
-      scenario_ack: !!test_scenario
-    };
-  } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
-  }
-}
-
-async function scorm_take_screenshot(params = {}) {
-  const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
-  const session_id = params.session_id || null;
-  const viewport = resolveViewport(params.viewport);
-  const capture_options = params.capture_options || {};
-
-  if (!workspace) {
-    const e = new Error("workspace_path is required");
-    e.code = "MCP_INVALID_PARAMS";
-    throw e;
-  }
-
-  if (!RuntimeManager.isSupported) {
-    const e = new Error("Electron runtime is required for screenshots");
-    e.code = "ELECTRON_REQUIRED";
-    throw e;
-  }
-
-  // Try to locate an entry HTML from manifest
-  const entryPath = await resolveEntryPathFromManifest(workspace);
-
-  if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
-
-  let win = null;
-  try {
-    if (entryPath) {
-      sessions.emit && session_id && sessions.emit({ session_id, type: 'screenshot:capture_start', payload: { entryPath, viewport } });
-      win = await RuntimeManager.openPage({ entryPath, viewport });
-
-      // Optional waits before capture
-      const delayMs = Number(capture_options.delay_ms || 0);
-      const waitForSelector = capture_options.wait_for_selector;
-      const waitTimeoutMs = Number(capture_options.wait_timeout_ms || 5000);
-
-      if (waitForSelector && win?.webContents?.executeJavaScript) {
-        const pollScript = `new Promise((resolve) => {
-          const sel = ${JSON.stringify(waitForSelector)};
-          const start = Date.now();
-          const tick = () => {
-            try {
-              const el = document.querySelector(sel);
-              if (el) return resolve(true);
-            } catch (_) { /* intentionally empty */ }
-            if (Date.now() - start > ${waitTimeoutMs}) return resolve(false);
-            setTimeout(tick, 100);
-          };
-          tick();
-        })`;
-        try { await win.webContents.executeJavaScript(pollScript, true); } catch (_) { /* intentionally empty */ }
-      }
-
-      if (delayMs > 0) {
-        await new Promise(r => setTimeout(r, delayMs));
-      }
-    }
-
-    const pngBuffer = win ? await RuntimeManager.capture(win) : Buffer.from([]);
-    const base64 = pngBuffer.length ? pngBuffer.toString('base64') : null;
-
-    let artifactPath = null;
-    if (session_id && pngBuffer.length) {
-      const id = Date.now();
-      const rel = `screenshot_${id}.png`;
-      const s = sessions.sessions.get(session_id);
-      if (s) {
-        artifactPath = path.join(s.workspace, rel);
-        fs.writeFileSync(artifactPath, pngBuffer);
-        sessions.addArtifact({ session_id, artifact: { type: 'screenshot', path: artifactPath } });
-      }
-    }
-
-    return { supported: !!win, screenshot_data: base64, entry_found: !!entryPath, artifact_path: artifactPath };
-  } catch (error) {
-    const e = new Error(error?.message || String(error));
-    e.code = 'CAPTURE_FAILED';
-    if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_take_screenshot', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
-    }
-    throw e;
-  } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
-  }
-}
-
-async function scorm_test_navigation_flow(params = {}) {
-  const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
-  const session_id = params.session_id || null;
-  const capture_each_step = !!params.capture_each_step;
-  const viewport = resolveViewport(params.viewport);
-  const navigation_sequence = Array.isArray(params.navigation_sequence) ? params.navigation_sequence : [];
-
-  if (!workspace) {
-    const e = new Error("workspace_path is required");
-    e.code = "MCP_INVALID_PARAMS";
-    throw e;
-  }
-
-  const entryPath = await resolveEntryPathFromManifest(workspace);
-  if (!RuntimeManager.isSupported) {
-    const e = new Error("Electron runtime is required for navigation flow testing");
-    e.code = "ELECTRON_REQUIRED";
-    throw e;
-  }
-
-  let win = null;
-  const artifacts = [];
-  try {
-    if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
-    win = await RuntimeManager.openPage({ entryPath, viewport });
-    await RuntimeManager.injectApiRecorder(win);
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'navigation:start', payload: { steps: navigation_sequence.length } });
-
-    let stepIndex = 0;
-    for (const rawStep of navigation_sequence) {
-      stepIndex++;
-      const step = String(rawStep || '').toLowerCase();
-      sessions.emit && session_id && sessions.emit({ session_id, type: 'trace:sequencing_step', payload: { step, index: stepIndex } });
-      // Placeholder: real sequencing integration TBD. For now, simulate minimal waits.
-      // Optionally capture after each step
-      if (capture_each_step) {
-        const png = await RuntimeManager.capture(win);
-        if (png && png.length && session_id) {
-          const s = sessions.sessions.get(session_id);
-          if (s) {
-            const rel = `nav_step_${Date.now()}_${stepIndex}.png`;
-            const outPath = path.join(s.workspace, rel);
-            fs.writeFileSync(outPath, png);
-            sessions.addArtifact({ session_id, artifact: { type: 'screenshot', path: outPath } });
-            artifacts.push(outPath);
-          }
-        }
-      }
-    }
-
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'navigation:completed', payload: { steps_executed: navigation_sequence.length } });
-    return { supported: true, entry_found: true, steps_executed: navigation_sequence.length, artifacts };
-  } catch (error) {
-    const e = new Error(error?.message || String(error));
-    e.code = 'NAV_FLOW_ERROR';
-    if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_test_navigation_flow', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
-    }
-    throw e;
-  } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
-  }
-}
-
-async function scorm_debug_api_calls(params = {}) {
-  const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
-  const session_id = params.session_id || null;
-  const detect_anomalies = !!params.detect_anomalies;
-  const include_data_model_state = !!params.include_data_model_state;
-
-  if (!workspace) {
-    const e = new Error("workspace_path is required");
-    e.code = "MCP_INVALID_PARAMS";
-    throw e;
-  }
-  const entryPath = await resolveEntryPathFromManifest(workspace);
-  if (!RuntimeManager.isSupported) {
-    const e = new Error("Electron runtime is required for API call debugging");
-    e.code = "ELECTRON_REQUIRED";
-    throw e;
-  }
-  let win = null;
-  try {
-    if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
-    const viewport = resolveViewport(params.viewport);
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'debug:api_session_start', payload: { entryPath } });
-    win = await RuntimeManager.openPage({ entryPath, viewport });
-    await RuntimeManager.injectApiRecorder(win);
-    let calls = await RuntimeManager.getCapturedCalls(win);
-    const filterMethods = Array.isArray(params.filter_methods) ? params.filter_methods.map(String) : null;
-    if (filterMethods && filterMethods.length) {
-      calls = calls.filter(c => filterMethods.includes(String(c?.method)));
-    }
-
-    // Enhance calls with data model state if requested
-    if (include_data_model_state && calls && calls.length > 0) {
-      for (const call of calls) {
-        if (call.method === 'SetValue' && call.args && call.args.length >= 2) {
-          const element = call.args[0];
-          try {
-            const currentValue = await RuntimeManager.callAPI(win, 'GetValue', [element]);
-            call.data_model_state = { [element]: currentValue };
-          } catch (_) {
-            // Ignore errors reading state
-          }
-        }
-      }
-    }
-
-    const metrics = { total_calls: Array.isArray(calls) ? calls.length : 0, by_method: {}, first_ts: null, last_ts: null, duration_ms: 0, methods: [] };
-    for (const c of (calls || [])) {
-      const m = String(c?.method || '');
-      if (m) metrics.by_method[m] = (metrics.by_method[m] || 0) + 1;
-      const t = Number(c && c.ts);
-      if (Number.isFinite(t)) {
-        metrics.first_ts = (metrics.first_ts == null) ? t : Math.min(metrics.first_ts, t);
-        metrics.last_ts = (metrics.last_ts == null) ? t : Math.max(metrics.last_ts, t);
-      }
-    }
-    if (metrics.first_ts != null && metrics.last_ts != null) metrics.duration_ms = Math.max(0, metrics.last_ts - metrics.first_ts);
-    metrics.methods = Object.keys(metrics.by_method);
-
-    // Detect anomalies if requested
-    let anomalies = undefined;
-    if (detect_anomalies) {
-      anomalies = detectApiAnomalies(calls, win);
-    }
-
-    sessions.emit && session_id && sessions.emit({ session_id, type: 'debug:api_session_end', payload: { count: metrics.total_calls } });
-
-    const result = { supported: true, entry_found: true, calls, metrics };
-    if (anomalies) {
-      result.anomalies = anomalies;
-    }
-    return result;
-  } catch (error) {
-    const e = new Error(error?.message || String(error));
-    e.code = 'DEBUG_API_ERROR';
-    if (session_id && sessions && sessions.emit) {
-      try { sessions.emit({ session_id, type: 'error', payload: { source: 'scorm_debug_api_calls', error_code: e.code, message: e.message } }); } catch (_) { /* intentionally empty */ }
-    }
-    throw e;
-  } finally {
-    if (win) { try { await RuntimeManager.close(win); } catch (_) { /* intentionally empty */ } }
-  }
-}
-
-/**
- * Detect common API usage anomalies
- * @private
- */
-function detectApiAnomalies(calls, _win) {
-  const anomalies = [];
-
-  if (!calls || calls.length === 0) {
-    return anomalies;
-  }
-
-  // Track SetValue calls without subsequent Commit
-  const setValueIndices = [];
-  const commitIndices = [];
-
-  calls.forEach((call, idx) => {
-    if (call.method === 'SetValue') {
-      setValueIndices.push(idx);
-    } else if (call.method === 'Commit') {
-      commitIndices.push(idx);
-    }
-  });
-
-  // Check for SetValue without Commit
-  if (setValueIndices.length > 0 && commitIndices.length === 0) {
-    anomalies.push({
-      type: 'missing_commit',
-      severity: 'warning',
-      description: `${setValueIndices.length} SetValue call(s) made but Commit never called`,
-      affected_calls: setValueIndices,
-      recommendation: 'Add Commit() after SetValue calls to persist data to the LMS'
-    });
-  } else if (setValueIndices.length > commitIndices.length * 5) {
-    // More than 5 SetValues per Commit might indicate inefficiency
-    anomalies.push({
-      type: 'infrequent_commit',
-      severity: 'info',
-      description: `${setValueIndices.length} SetValue calls but only ${commitIndices.length} Commit calls`,
-      recommendation: 'Consider batching SetValue calls followed by a single Commit for better performance'
-    });
-  }
-
-  // Check for Initialize/Terminate pairing
-  const initializeCalls = calls.filter(c => c.method === 'Initialize');
-  const terminateCalls = calls.filter(c => c.method === 'Terminate');
-
-  if (initializeCalls.length === 0) {
-    anomalies.push({
-      type: 'missing_initialize',
-      severity: 'error',
-      description: 'No Initialize() call detected',
-      recommendation: 'Call Initialize() before any other SCORM API methods'
-    });
-  }
-
-  if (initializeCalls.length > 1) {
-    anomalies.push({
-      type: 'multiple_initialize',
-      severity: 'warning',
-      description: `Initialize() called ${initializeCalls.length} times`,
-      recommendation: 'Initialize() should only be called once per session'
-    });
-  }
-
-  if (terminateCalls.length === 0 && initializeCalls.length > 0) {
-    anomalies.push({
-      type: 'missing_terminate',
-      severity: 'warning',
-      description: 'Initialize() called but Terminate() never called',
-      recommendation: 'Call Terminate() when the learner exits the content'
-    });
-  }
-
-  // Check for API calls before Initialize
-  const firstInitIdx = calls.findIndex(c => c.method === 'Initialize');
-  if (firstInitIdx > 0) {
-    const callsBeforeInit = calls.slice(0, firstInitIdx).filter(c =>
-      c.method !== 'GetLastError' && c.method !== 'GetErrorString' && c.method !== 'GetDiagnostic'
-    );
-    if (callsBeforeInit.length > 0) {
-      anomalies.push({
-        type: 'calls_before_initialize',
-        severity: 'error',
-        description: `${callsBeforeInit.length} API call(s) made before Initialize()`,
-        affected_calls: callsBeforeInit.map((_, idx) => idx),
-        recommendation: 'Call Initialize() before any GetValue or SetValue calls'
-      });
-    }
-  }
-
-  // Check for GetValue/SetValue after Terminate
-  const firstTerminateIdx = calls.findIndex(c => c.method === 'Terminate');
-  if (firstTerminateIdx >= 0 && firstTerminateIdx < calls.length - 1) {
-    const callsAfterTerminate = calls.slice(firstTerminateIdx + 1).filter(c =>
-      c.method === 'GetValue' || c.method === 'SetValue'
-    );
-    if (callsAfterTerminate.length > 0) {
-      anomalies.push({
-        type: 'calls_after_terminate',
-        severity: 'error',
-        description: `${callsAfterTerminate.length} GetValue/SetValue call(s) made after Terminate()`,
-        recommendation: 'Do not call GetValue or SetValue after Terminate()'
-      });
-    }
-  }
-
-  return anomalies;
-}
+// scorm_take_screenshot removed - use scorm_capture_screenshot with session instead
+// scorm_test_navigation_flow removed - use session + scorm_nav_next/previous/choice instead
+// scorm_debug_api_calls removed - use scorm_get_data_model_history instead
 
 async function scorm_trace_sequencing(params = {}) {
   const workspace = params.workspace_path ? path.resolve(params.workspace_path) : null;
@@ -613,27 +200,9 @@ async function scorm_runtime_status(params = {}) {
   return await RuntimeManager.getRuntimeStatus(session_id);
 }
 
-async function scorm_runtime_close(params = {}) {
-  const session_id = params.session_id;
-  if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const ok = await RuntimeManager.closePersistent(session_id);
-  sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_closed', payload: {} });
-  return { success: !!ok };
-}
-
-async function scorm_attempt_initialize(params = {}) {
-  const session_id = params.session_id;
-  if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const res = await RuntimeManager.callAPI(null, 'Initialize', [''], session_id);
-  return { result: String(res || '') };
-}
-
-async function scorm_attempt_terminate(params = {}) {
-  const session_id = params.session_id;
-  if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
-  const res = await RuntimeManager.callAPI(null, 'Terminate', [''], session_id);
-  return { result: String(res || '') };
-}
+// scorm_runtime_close removed - scorm_session_close handles runtime cleanup automatically
+// scorm_attempt_initialize removed - content auto-initializes when runtime_open loads it
+// scorm_attempt_terminate removed - use scorm_api_call('Terminate', ['']) instead
 
 async function scorm_api_call(params = {}) {
   const session_id = params.session_id;
@@ -1020,6 +589,7 @@ async function scorm_sn_reset(params = {}) {
 async function scorm_capture_screenshot(params = {}) {
   const session_id = params.session_id;
   const return_base64 = params.return_base64 === true; // Explicit opt-in for base64 data
+  const capture_options = params.capture_options || {};
 
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
 
@@ -1033,7 +603,14 @@ async function scorm_capture_screenshot(params = {}) {
   const result = await global.__electronBridge.sendMessage({
     id: ++_ipcMessageIdCounter,
     type: 'runtime_capture',
-    params: { session_id, compress: true } // Request compressed screenshot
+    params: {
+      session_id,
+      compress: true,
+      // Pass wait/delay options to Electron child
+      wait_for_selector: capture_options.wait_for_selector,
+      wait_timeout_ms: capture_options.wait_timeout_ms || 5000,
+      delay_ms: capture_options.delay_ms || 0
+    }
   });
 
   const base64 = result.screenshot;
@@ -2254,9 +1831,9 @@ async function scorm_navigate_to_slide(params = {}) {
 module.exports = {
   scorm_runtime_open,
   scorm_runtime_status,
-  scorm_runtime_close,
-  scorm_attempt_initialize,
-  scorm_attempt_terminate,
+  // scorm_runtime_close removed - use scorm_session_close
+  // scorm_attempt_initialize removed - auto-initializes on runtime_open
+  // scorm_attempt_terminate removed - use scorm_api_call
   scorm_api_call,
   scorm_data_model_get,
   scorm_nav_get_state,
@@ -2266,10 +1843,10 @@ module.exports = {
   scorm_sn_init,
   scorm_sn_reset,
   scorm_capture_screenshot,
-  scorm_test_api_integration,
-  scorm_take_screenshot,
-  scorm_test_navigation_flow,
-  scorm_debug_api_calls,
+  // scorm_test_api_integration removed - use session pattern
+  // scorm_take_screenshot removed - use scorm_capture_screenshot
+  // scorm_test_navigation_flow removed - use session nav tools
+  // scorm_debug_api_calls removed - use scorm_get_data_model_history
   scorm_trace_sequencing,
   scorm_get_data_model_history,
   scorm_get_network_requests,

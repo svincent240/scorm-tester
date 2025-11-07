@@ -61,7 +61,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     const session_id = openData.session_id;
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Get console errors
     const consoleErrors = await rpc('tools/call', { 
@@ -98,7 +97,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     expect(contextData.url).toBeDefined();
     expect(contextData.navigation_available).toBeDefined();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -131,7 +129,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     }, id++);
 
     // Trigger Initialize
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Wait should complete
     const waitResult = await waitPromise;
@@ -161,7 +158,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     expect(replayData.executed_calls).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(replayData.results)).toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -186,7 +182,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     const session_id = openData.session_id;
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Get initial snapshot
     const snapshot1 = await rpc('tools/call', { 
@@ -222,7 +217,6 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     expect(compareData.changed).toBeDefined();
     expect(Array.isArray(compareData.changed)).toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

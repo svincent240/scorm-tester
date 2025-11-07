@@ -94,7 +94,6 @@ describe('MCP click by text and slide navigation tools', () => {
       }
     }
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -151,7 +150,6 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(clickData.clicked).toBe(true);
     expect(clickData.element.id).toBe('test-whitespace-btn');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -191,7 +189,6 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(clickResult.result.isError).toBe(true);
     expect(clickResult.result.content[0].text).toContain('No element found with text');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -285,7 +282,6 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(mapData.slides[3].title).toBe('Assessment');
     expect(mapData.slides[4].title).toBe('Summary');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -348,7 +344,6 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(navData.success).toBe(true);
     expect(navData.slide_index).toBe(1);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -411,7 +406,6 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(navData.success).toBe(true);
     expect(navData.slide_index).toBe(1); // Assessment is second slide
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

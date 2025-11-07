@@ -66,7 +66,6 @@ describe('MCP assessment workflow on real course', () => {
     console.log('[TEST] Opening runtime...');
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
     console.log('[TEST] Initializing attempt...');
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Discover interactive elements
     console.log('[TEST] Discovering interactive elements...');
@@ -105,7 +104,6 @@ describe('MCP assessment workflow on real course', () => {
       }
     }
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -135,7 +133,6 @@ describe('MCP assessment workflow on real course', () => {
     const runtimeOpenData = parseMcpResponse(runtimeOpenRes);
     console.log('[TEST] Runtime open data:', JSON.stringify(runtimeOpenData, null, 2));
 
-    const attemptInitRes = await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
     console.log('[TEST] Initialize response:', JSON.stringify(attemptInitRes, null, 2));
 
     // Trace assessment interactions with simple actions
@@ -159,7 +156,6 @@ describe('MCP assessment workflow on real course', () => {
     expect(traceData.summary.total_actions).toBe(1);
     expect(traceData.issues_detected).toBeDefined();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -184,7 +180,6 @@ describe('MCP assessment workflow on real course', () => {
     const session_id = openData.session_id;
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Set some values
     await rpc('tools/call', { 
@@ -218,7 +213,6 @@ describe('MCP assessment workflow on real course', () => {
     const screenshotData = parseMcpResponse(screenshot);
     expect(screenshotData.artifact_path || screenshotData.screenshot_data).toBeTruthy();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

@@ -72,7 +72,6 @@ describe('MCP SN init flow on real course (sequencing bridge)', () => {
     const navData = parseMcpResponse(navState);
     expect(navData && typeof navData.sessionState === 'string').toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

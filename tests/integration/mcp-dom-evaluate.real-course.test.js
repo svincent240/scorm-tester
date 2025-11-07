@@ -102,7 +102,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     const objData = parseMcpResponse(objExpr);
     expect(objData.result).toEqual({ foo: 'bar', count: 42 });
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -148,7 +147,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     expect(syntaxError.result.content[0].text).toContain('SyntaxError');
     expect(syntaxError.result.content[0].text).toContain('DOM evaluate failed');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -195,7 +193,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     expect(refError.result.content[0].text).toContain('DOM evaluate failed');
     expect(refError.result.content[0].text).toContain('nonExistentVariable');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -241,7 +238,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     expect(typeError.result.content[0].text).toContain('TypeError');
     expect(typeError.result.content[0].text).toContain('DOM evaluate failed');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -294,7 +290,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     expect(typeof complexData.result.totalButtons).toBe('number');
     expect(Array.isArray(complexData.result.buttonTexts)).toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -338,7 +333,6 @@ describe('MCP scorm_dom_evaluate error handling on real course', () => {
     expect(errorResult.result.isError).toBe(true);
     expect(errorResult.result.content[0].text).toContain('Hint: Use scorm_get_console_errors');
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

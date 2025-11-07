@@ -84,7 +84,6 @@ describe('MCP SN navigation flow on real course', () => {
     const shotData = parseMcpResponse(shot);
     expect(shotData && (shotData.artifact_path || shotData.screenshot_data)).toBeTruthy();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

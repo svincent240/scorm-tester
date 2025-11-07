@@ -86,7 +86,6 @@ describe('MCP new tools (screenshot compression, bulk state, click by text, slid
     expect(stats.size).toBeGreaterThan(0);
     expect(stats.size).toBeLessThan(500000); // Should be < 500KB with compression
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -125,7 +124,6 @@ describe('MCP new tools (screenshot compression, bulk state, click by text, slid
     expect(typeof screenshotData.screenshot_data).toBe('string');
     expect(screenshotData.screenshot_data.length).toBeGreaterThan(0);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -150,7 +148,6 @@ describe('MCP new tools (screenshot compression, bulk state, click by text, slid
     const session_id = openData.session_id;
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
-    await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
 
     // Get comprehensive page state
     const pageState = await rpc('tools/call', {
@@ -200,7 +197,6 @@ describe('MCP new tools (screenshot compression, bulk state, click by text, slid
     expect(stateData.network_requests.session_id).toBe(session_id);
     expect(Array.isArray(stateData.network_requests.requests)).toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -251,7 +247,6 @@ describe('MCP new tools (screenshot compression, bulk state, click by text, slid
     expect(stateData.data_model).toBeNull();
     expect(stateData.network_requests).toBeNull();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

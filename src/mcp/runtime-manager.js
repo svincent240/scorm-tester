@@ -310,8 +310,36 @@ class RuntimeManager {
       case 'runtime_capture': {
         const session_id = message.params.session_id;
         const compress = message.params.compress !== false; // Default to compressed
+        const waitForSelector = message.params.wait_for_selector;
+        const waitTimeoutMs = Number(message.params.wait_timeout_ms || 5000);
+        const delayMs = Number(message.params.delay_ms || 0);
+
         const persistentWin = this.getPersistent(session_id);
         if (!persistentWin) throw new Error('Runtime not open');
+
+        // Wait for selector if specified
+        if (waitForSelector && persistentWin.webContents?.executeJavaScript) {
+          const pollScript = `new Promise((resolve) => {
+            const sel = ${JSON.stringify(waitForSelector)};
+            const start = Date.now();
+            const tick = () => {
+              try {
+                const el = document.querySelector(sel);
+                if (el) return resolve(true);
+              } catch (_) { /* intentionally empty */ }
+              if (Date.now() - start > ${waitTimeoutMs}) return resolve(false);
+              setTimeout(tick, 100);
+            };
+            tick();
+          })`;
+          try { await persistentWin.webContents.executeJavaScript(pollScript, true); } catch (_) { /* intentionally empty */ }
+        }
+
+        // Additional delay if specified
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
         const imageBuffer = await this.capture(persistentWin, compress);
         return { screenshot: imageBuffer.toString('base64'), success: true };
       }

@@ -115,7 +115,6 @@ describe('MCP complete navigation workflow on real course', () => {
       expect(typeof navChoiceData.applicable).toBe('boolean');
     }
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
@@ -173,7 +172,6 @@ describe('MCP complete navigation workflow on real course', () => {
     // After reset, should be back to initial state
     expect(stateAfterData.currentActivity).toBeDefined();
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }

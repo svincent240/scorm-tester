@@ -61,7 +61,6 @@ describe('MCP API flow (Initialize → Commit → Terminate) on persistent runti
     const runtimeData = parseMcpResponse(runtimeOpen);
     expect(runtimeData && runtimeData.runtime_id === session_id).toBe(true);
 
-    const apiInit = await rpc('tools/call', { name: 'scorm_attempt_initialize', arguments: { session_id } }, id++);
     const apiInitData = parseMcpResponse(apiInit);
     expect(apiInitData && apiInitData.result === 'true').toBe(true);
 
@@ -69,11 +68,10 @@ describe('MCP API flow (Initialize → Commit → Terminate) on persistent runti
     const apiCommitData = parseMcpResponse(apiCommit);
     expect(apiCommitData && apiCommitData.result === 'true').toBe(true);
 
-    const apiTerm = await rpc('tools/call', { name: 'scorm_attempt_terminate', arguments: { session_id } }, id++);
+    const apiTerm = await rpc('tools/call', { name: 'scorm_api_call', arguments: { session_id, method: 'Terminate', args: [''] } }, id++);
     const apiTermData = parseMcpResponse(apiTerm);
     expect(apiTermData && apiTermData.result === 'true').toBe(true);
 
-    await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);
 
     try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
