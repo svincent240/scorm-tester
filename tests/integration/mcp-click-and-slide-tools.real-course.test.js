@@ -202,7 +202,7 @@ describe('MCP click by text and slide navigation tools', () => {
     ]);
   });
 
-  test('scorm_get_slide_map discovers slides in course', async () => {
+  test('scorm_get_slide_map discovers all slides in course', async () => {
     const { proc, rpc } = rpcClient();
     let id = 1;
 
@@ -217,6 +217,30 @@ describe('MCP click by text and slide navigation tools', () => {
 
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
+    // Create multiple test slides to verify all are discovered
+    await rpc('tools/call', {
+      name: 'scorm_dom_evaluate',
+      arguments: {
+        session_id,
+        expression: `
+          (() => {
+            const titles = ['Introduction', 'Content Slide 1', 'Content Slide 2', 'Assessment', 'Summary'];
+            for (let i = 0; i < titles.length; i++) {
+              const slide = document.createElement('section');
+              slide.id = 'slide-' + i;
+              slide.setAttribute('data-slide-id', 'slide-' + i);
+              slide.style.display = i === 0 ? 'block' : 'none';
+              const title = document.createElement('h2');
+              title.textContent = titles[i];
+              slide.appendChild(title);
+              document.body.appendChild(slide);
+            }
+            return true;
+          })()
+        `
+      }
+    }, id++);
+
     // Get slide map
     const slideMap = await rpc('tools/call', {
       name: 'scorm_get_slide_map',
@@ -230,14 +254,36 @@ describe('MCP click by text and slide navigation tools', () => {
     expect(mapData.current_slide_index).toBeDefined();
     expect(Array.isArray(mapData.slides)).toBe(true);
 
-    // If slides found, verify slide structure
-    if (mapData.total_slides > 0) {
-      const firstSlide = mapData.slides[0];
-      expect(firstSlide.index).toBeDefined();
-      expect(typeof firstSlide.index).toBe('number');
-      expect(firstSlide.visible).toBeDefined();
-      expect(typeof firstSlide.visible).toBe('boolean');
+    // Verify that ALL slides are discovered (we created 5)
+    expect(mapData.total_slides).toBe(5);
+    expect(mapData.slides.length).toBe(5);
+
+    // Verify current slide is the first one (index 0)
+    expect(mapData.current_slide_index).toBe(0);
+
+    // Verify all slides have correct structure and sequential indexes
+    for (let i = 0; i < 5; i++) {
+      const slide = mapData.slides[i];
+      expect(slide.index).toBe(i);
+      expect(typeof slide.index).toBe('number');
+      expect(slide.id).toBe('slide-' + i);
+      expect(slide.title).toBeDefined();
+      expect(typeof slide.visible).toBe('boolean');
+
+      // Only first slide should be visible
+      if (i === 0) {
+        expect(slide.visible).toBe(true);
+      } else {
+        expect(slide.visible).toBe(false);
+      }
     }
+
+    // Verify slide titles match what we created
+    expect(mapData.slides[0].title).toBe('Introduction');
+    expect(mapData.slides[1].title).toBe('Content Slide 1');
+    expect(mapData.slides[2].title).toBe('Content Slide 2');
+    expect(mapData.slides[3].title).toBe('Assessment');
+    expect(mapData.slides[4].title).toBe('Summary');
 
     await rpc('tools/call', { name: 'scorm_runtime_close', arguments: { session_id } }, id++);
     await rpc('tools/call', { name: 'scorm_session_close', arguments: { session_id } }, id++);

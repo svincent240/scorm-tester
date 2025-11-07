@@ -1,10 +1,111 @@
-Log start 2025-11-06T12:48:58.848Z
-2025-11-06T12:48:58.893Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-06T12:48:58.901Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-06T12:48:58.909Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-06T12:48:58.915Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-06T12:48:58.921Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-06T12:48:58.968Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+Log start 2025-11-07T02:22:21.091Z
+2025-11-07T02:22:21.137Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-07T02:22:21.144Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-07T02:22:21.152Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-07T02:22:21.158Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-07T02:22:21.164Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-07T02:22:21.227Z [INFO] [Browser Console] [CourseInit] Starting initialization... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:206) 
+2025-11-07T02:22:21.234Z [INFO] [Browser Console] [CourseInit] Document ready state: loading (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:456) 
+2025-11-07T02:22:21.241Z [INFO] [Browser Console] [CourseInit] Waiting for DOMContentLoaded (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:458) 
+2025-11-07T02:22:21.247Z [INFO] [Browser Console] [Framework] Loading TRC SCORM Framework v2.0.0 (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:113) 
+2025-11-07T02:22:21.255Z [INFO] [Browser Console] [Framework] Framework base path: file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:114) 
+2025-11-07T02:22:21.261Z [INFO] [Browser Console] [Framework] Document location: file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:115) 
+2025-11-07T02:22:21.268Z [INFO] [Browser Console] [Framework] Loading 20 scripts... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:116) 
+2025-11-07T02:22:21.273Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.279Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.286Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.291Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.298Z [INFO] [Browser Console] [Framework] Loaded: js/core/scorm_api_wrapper.js (1/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.304Z [INFO] [Browser Console] [Framework] Loaded: js/core/utilities.js (2/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.312Z [INFO] [Browser Console] [Framework] Loaded: js/core/accessibility-enhancements.js (3/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.321Z [INFO] [Browser Console] [Framework] Loaded: js/managers/event-bus.js (4/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.329Z [INFO] [Browser Console] [Framework] Loaded: js/managers/state-manager.js (5/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.335Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.345Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.352Z [INFO] [Browser Console] [Framework] Loaded: js/core/runtime.js (6/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.361Z [INFO] [Browser Console] [Framework] Loaded: js/components/ui-components.js (7/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.369Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/interaction-utils.js (8/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.377Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/fill-in.js (9/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.384Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.392Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.401Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/drag-drop.js (10/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.411Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/hotspot.js (11/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.419Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/numeric.js (12/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.427Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/multiple-choice.js (13/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.434Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.442Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.451Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/true-false.js (14/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.460Z [INFO] [Browser Console] [Framework] Loaded: js/components/interactions/matching.js (15/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.468Z [INFO] [Browser Console] [Framework] Loaded: js/systems/interaction-persistence.js (16/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.477Z [INFO] [Browser Console] [Framework] Loaded: js/components/assessment-navigator.js (17/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.485Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.493Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.502Z [INFO] [Browser Console] [Framework] Loaded: js/components/feedback-system.js (18/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.511Z [INFO] [Browser Console] [Framework] Loaded: js/managers/accessibility-manager.js (19/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.520Z [INFO] [Browser Console] [Framework] Loaded: js/systems/course-runtime.js (20/20) (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:92) 
+2025-11-07T02:22:21.528Z [INFO] [Browser Console] [Framework] All scripts loaded successfully (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/loader.js:126) 
+2025-11-07T02:22:21.536Z [INFO] [Browser Console] [Course] Framework ready, version: 2.0.0 (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:147) 
+2025-11-07T02:22:21.544Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.553Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.562Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/intro.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.571Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/ui-demo.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.580Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/content.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.587Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.595Z [INFO] [Browser Console] [CourseInit] Course not ready, waiting... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:450) 
+2025-11-07T02:22:21.605Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/assessment.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.615Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/remedial.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.625Z [INFO] [Browser Console] [Course] Loaded: ../content/course/slides/summary.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.635Z [INFO] [Browser Console] [Course] Loaded: ../content/course/course-config.js (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:174) 
+2025-11-07T02:22:21.644Z [INFO] [Browser Console] [Course] All course scripts loaded (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:164) 
+2025-11-07T02:22:21.652Z [INFO] [Browser Console] [CourseInit] Checking for Course module... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:445) 
+2025-11-07T02:22:21.659Z [INFO] [Browser Console] [CourseInit] Course API ready, initializing... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:447) 
+2025-11-07T02:22:21.668Z [INFO] [Browser Console] [CourseInit] Initializing course modules... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:213) 
+2025-11-07T02:22:21.675Z [INFO] [Browser Console] [CourseInit] Initializing SCORM connection... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:234) 
+2025-11-07T02:22:21.684Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:38) 
+2025-11-07T02:22:21.694Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
+2025-11-07T02:22:21.702Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
+2025-11-07T02:22:21.710Z [INFO] SCORM session initialized: scorm_1762482141693_k54xx2xws 
+2025-11-07T02:22:21.719Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:45) 
+2025-11-07T02:22:21.728Z [INFO] [Browser Console] [SCORM Init] initialized flag: true (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:46) 
+2025-11-07T02:22:21.739Z [INFO] [Browser Console] [SCORM Init] Current completion status: unknown (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:50) 
+2025-11-07T02:22:21.748Z [WARN] Cannot update activity tree state: SN service access not available through telemetry store 
+2025-11-07T02:22:21.756Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.763Z [INFO] [Browser Console] [SCORM Init] Set completion status to incomplete (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:53) 
+2025-11-07T02:22:21.776Z [INFO] [Browser Console] [CourseInit] SCORM connection: SUCCESS (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:236) 
+2025-11-07T02:22:21.785Z [INFO] [Browser Console] [CourseInit] Restoring from SCORM suspend data: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:241) 
+2025-11-07T02:22:21.792Z [INFO] [Browser Console] [CourseInit] Restoring bookmark location: null (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:242) 
+2025-11-07T02:22:21.799Z [INFO] [Browser Console] [CourseInit] Final initial state: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:270) 
+2025-11-07T02:22:21.806Z [INFO] [Browser Console] [CourseInit] StateManager created (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:277) 
+2025-11-07T02:22:21.814Z [INFO] [Browser Console] [CourseInit] CourseRuntime created (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:281) 
+2025-11-07T02:22:21.821Z [INFO] [Browser Console] [CourseInit] AccessibilityManager created (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:285) 
+2025-11-07T02:22:21.828Z [INFO] [Browser Console] [CourseRuntime] Initializing... (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:52) 
+2025-11-07T02:22:21.838Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.846Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.853Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.860Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.868Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.875Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.882Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.891Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.901Z [INFO] [Browser Console] [CourseRuntime] Updating navigation buttons. Current state: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:612) 
+2025-11-07T02:22:21.909Z [INFO] [Browser Console] [CourseRuntime] Navigation availability: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:623) 
+2025-11-07T02:22:21.920Z [INFO] [Browser Console] [CourseRuntime] Initialization complete (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:77) 
+2025-11-07T02:22:21.930Z [INFO] [Browser Console] [AccessibilityManager] Initialized (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:69) 
+2025-11-07T02:22:21.938Z [INFO] [Browser Console] [CourseInit] Initialization complete (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:306) 
+2025-11-07T02:22:21.969Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:38) 
+2025-11-07T02:22:21.977Z [INFO] [Browser Console] [SCORM Init] Already connected (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:40) 
+2025-11-07T02:22:21.986Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:21.996Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.004Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.010Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.018Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.026Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.032Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.041Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-07T02:22:22.048Z [INFO] [Browser Console] [CourseRuntime] Updating navigation buttons. Current state: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:612) 
+2025-11-07T02:22:22.054Z [INFO] [Browser Console] [CourseRuntime] Navigation availability: [object Object] (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/systems/course-runtime.js:623) 
+2025-11-07T02:22:25.166Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
+2025-11-07T02:22:25.175Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
   Policy set or a policy with "unsafe-eval" enabled. This exposes users of
   this app to unnecessary security risks.
 
@@ -12,7 +113,11 @@ For more information and help, consult
 https://electronjs.org/docs/tutorial/security.
 This warning will not show up
 once the app is packaged. (node:electron/js2c/sandbox_bundle:2) 
-2025-11-06T12:48:58.984Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/SequencingSimpleRemediation_SCORM20043rdEdition/shared/launchpage.html?content=playing"}]
-2025-11-06T12:48:59.016Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-06T12:48:59.022Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-06T12:48:59.028Z [INFO] SCORM session initialized: scorm_1762433339016_nz2oaczpv 
+2025-11-07T02:22:29.919Z [INFO] [Browser Console] [SCORM Terminate] Attempting to terminate (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:76) 
+2025-11-07T02:22:29.927Z [INFO] [Browser Console] [SCORM Terminate] Connected: true Already terminated: undefined (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:77) 
+2025-11-07T02:22:29.936Z [INFO] [Browser Console] [SCORM Terminate] Setting session time: PT8.57S (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:86) 
+2025-11-07T02:22:29.944Z [INFO] [Browser Console] [SCORM Terminate] Calling doTerminate() (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:91) 
+2025-11-07T02:22:29.952Z [DEBUG] Terminate called with parameter: [""]
+2025-11-07T02:22:29.960Z [DEBUG] Session time calculated: ["PT0H0M8S"]
+2025-11-07T02:22:29.965Z [INFO] SCORM session terminated: scorm_1762482141693_k54xx2xws 
+2025-11-07T02:22:29.971Z [INFO] [Browser Console] [SCORM Terminate] Terminate result: true Terminated: true (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:94) 

@@ -1987,27 +1987,74 @@ async function scorm_get_slide_map(params = {}) {
     const slideMap = await RuntimeManager.executeJS(null, `
       (() => {
         const slides = [];
+        let discoveryMethod = null;
 
-        // Strategy 1: Look for slide containers with data attributes
-        document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]').forEach((slide, idx) => {
-          const slideData = {
-            index: idx,
-            id: slide.id || slide.getAttribute('data-slide-id') || null,
-            title: null,
-            selector: slide.id ? '#' + slide.id : null,
-            visible: slide.offsetParent !== null
-          };
-
-          // Try to extract title
-          const titleEl = slide.querySelector('h1, h2, h3, [class*="title"]');
-          if (titleEl) {
-            slideData.title = titleEl.textContent.trim();
+        // Strategy 1: Check for JavaScript course frameworks (window.Course, window.CourseConfig)
+        if (window.Course && typeof window.Course.countSlides === 'function') {
+          const count = window.Course.countSlides();
+          for (let i = 0; i < count; i++) {
+            const title = typeof window.Course.getSlideName === 'function'
+              ? window.Course.getSlideName(i)
+              : null;
+            const slideObj = window.CourseConfig?.slides?.[i];
+            slides.push({
+              index: i,
+              id: slideObj?.id || null,
+              title: title || slideObj?.title || null,
+              selector: null,
+              visible: i === (window.courseState?.getState?.()?.currentSlide || 0)
+            });
           }
+          discoveryMethod = 'javascript_framework';
+        }
 
-          slides.push(slideData);
-        });
+        // Strategy 2: Check for Storyline/Articulate frame.json data
+        if (slides.length === 0 && window.frameData?.nav_data?.outline?.links) {
+          const extractSlides = (links, parentIndex = 0) => {
+            links.forEach((link, idx) => {
+              if (link.type === 'slide' && link.slideid) {
+                slides.push({
+                  index: slides.length,
+                  id: link.slideid,
+                  title: link.slidetitle || link.displaytext || null,
+                  selector: null,
+                  visible: false
+                });
+              }
+              if (link.links && Array.isArray(link.links)) {
+                extractSlides(link.links, slides.length);
+              }
+            });
+          };
+          extractSlides(window.frameData.nav_data.outline.links);
+          discoveryMethod = 'storyline_framedata';
+        }
 
-        // Strategy 2: If no slides found, look for sections
+        // Strategy 3: Look for slide containers with data attributes (DOM-based)
+        if (slides.length === 0) {
+          document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]').forEach((slide, idx) => {
+            const slideData = {
+              index: idx,
+              id: slide.id || slide.getAttribute('data-slide-id') || null,
+              title: null,
+              selector: slide.id ? '#' + slide.id : null,
+              visible: slide.offsetParent !== null
+            };
+
+            // Try to extract title
+            const titleEl = slide.querySelector('h1, h2, h3, [class*="title"]');
+            if (titleEl) {
+              slideData.title = titleEl.textContent.trim();
+            }
+
+            slides.push(slideData);
+          });
+          if (slides.length > 0) {
+            discoveryMethod = 'dom_data_attributes';
+          }
+        }
+
+        // Strategy 4: If no slides found, look for sections
         if (slides.length === 0) {
           document.querySelectorAll('section, [role="region"]').forEach((section, idx) => {
             slides.push({
@@ -2018,12 +2065,16 @@ async function scorm_get_slide_map(params = {}) {
               visible: section.offsetParent !== null
             });
           });
+          if (slides.length > 0) {
+            discoveryMethod = 'dom_sections';
+          }
         }
 
         return {
           total_slides: slides.length,
           current_slide_index: slides.findIndex(s => s.visible),
-          slides: slides
+          slides: slides,
+          discovery_method: discoveryMethod
         };
       })()
     `, session_id);

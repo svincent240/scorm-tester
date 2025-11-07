@@ -110,8 +110,14 @@ class InspectorPanel extends BaseComponent {
     /** @type {boolean} */
     this._domEventsBound = false;
     this._filtersInitialized = false;
+    /** @type {Set<string>} */
+    this._knownMethods = new Set();
+    /** @type {Set<string>} */
+    this._knownDmElements = new Set();
     /** @type {((event: Event) => void) | null} */
     this._tabsClickHandler = null;
+    /** @type {((event: MouseEvent) => void) | null} */
+    this._outsideClickHandler = null;
     /** @type {((event: Event) => void) | null} */
     this._apiChangeHandler = null;
     /** @type {((event: Event) => void) | null} */
@@ -318,30 +324,8 @@ class InspectorPanel extends BaseComponent {
     }
   }
 
-  _getMethods() {
-    const hist = Array.isArray(this.state.history) ? this.state.history : [];
-    const methods = new Set();
-    hist.forEach((entry) => {
-      const method = entry?.method || entry?.name;
-      if (method) methods.add(String(method));
-    });
-    return Array.from(methods).sort();
-  }
-
   _applyTimelineFilters(items) {
     const filters = this._timelineFilters;
-    const knownMethods = this._getMethods();
-    const dmElements = new Set();
-    this.state.dataModelChanges.forEach(change => {
-      if (change.element) {
-        const parts = change.element.split('.');
-        if (parts.length >= 2) {
-          const baseType = `${parts[0]}.${parts[1]}`;
-          dmElements.add(baseType);
-        }
-      }
-    });
-    const sortedDmElements = Array.from(dmElements).sort();
 
     return items.filter((entry) => {
       if (filters.errorsOnly && entry.kind === 'api-call' && !entry.hasError) {
@@ -351,7 +335,7 @@ class InspectorPanel extends BaseComponent {
         if (filters.selectedMethods.has(entry.method)) {
           return true;
         }
-        if (filters.showOtherMethods && !knownMethods.includes(entry.method)) {
+        if (filters.showOtherMethods && !this._knownMethods.has(entry.method)) {
           return true;
         }
         return false;
@@ -363,7 +347,7 @@ class InspectorPanel extends BaseComponent {
           if (filters.selectedElements.has(baseType)) {
             return true;
           }
-          if (filters.showOtherElements && !sortedDmElements.includes(baseType)) {
+          if (filters.showOtherElements && !this._knownDmElements.has(baseType)) {
             return true;
           }
         } else if (filters.showOtherElements) {
@@ -741,27 +725,49 @@ class InspectorPanel extends BaseComponent {
     const el = this.tabEls?.api;
     if (!el) return;
 
+    const oldDropdown = el.querySelector('.filter-dropdown');
+    const wasOpen = oldDropdown instanceof HTMLDetailsElement ? oldDropdown.open : false;
+    const oldDropdownContent = oldDropdown ? oldDropdown.querySelector('.filter-dropdown__content') : null;
+    const scrollPos = oldDropdownContent ? oldDropdownContent.scrollTop : 0;
+
     const timeline = this._buildTimeline();
 
-    // Get unique API methods and data model elements
-    const methods = this._getMethods();
-    const dmElements = new Set();
+    // Update the session-wide known methods and elements, and select new ones by default
+    this.state.history.forEach(entry => {
+      const method = entry?.method || entry?.name;
+      if (method) {
+        const stringMethod = String(method);
+        if (!this._knownMethods.has(stringMethod)) {
+          this._knownMethods.add(stringMethod);
+          if (this._timelineFilters.showOtherMethods) {
+            this._timelineFilters.selectedMethods.add(stringMethod);
+          }
+        }
+      }
+    });
     this.state.dataModelChanges.forEach(change => {
       if (change.element) {
         const parts = change.element.split('.');
         if (parts.length >= 2) {
           const baseType = `${parts[0]}.${parts[1]}`;
-          dmElements.add(baseType);
+          if (!this._knownDmElements.has(baseType)) {
+            this._knownDmElements.add(baseType);
+            if (this._timelineFilters.showOtherElements) {
+              this._timelineFilters.selectedElements.add(baseType);
+            }
+          }
         }
       }
     });
-    const sortedDmElements = Array.from(dmElements).sort();
+
+    const sortedMethods = Array.from(this._knownMethods).sort();
+    const sortedDmElements = Array.from(this._knownDmElements).sort();
 
     // Initialize filters if they are not initialized yet
     if (!this._filtersInitialized) {
-      methods.forEach(m => this._timelineFilters.selectedMethods.add(m));
+      sortedMethods.forEach(m => this._timelineFilters.selectedMethods.add(m));
       sortedDmElements.forEach(e => this._timelineFilters.selectedElements.add(e));
-      if (methods.length > 0 || sortedDmElements.length > 0) {
+      if (sortedMethods.length > 0 || sortedDmElements.length > 0) {
         this._filtersInitialized = true;
       }
     }
@@ -769,7 +775,7 @@ class InspectorPanel extends BaseComponent {
     const filtered = this._applyTimelineFilters(timeline);
     const { slice, page, pages, total } = this._paginate(filtered);
 
-    const methodCheckboxes = methods.map((method) => {
+    const methodCheckboxes = sortedMethods.map((method) => {
       const checked = this._timelineFilters.selectedMethods.has(method) ? 'checked' : '';
       return `<label class="filter-checkbox"><input type="checkbox" class="js-method-filter" value="${this._esc(method)}" ${checked}/> ${this._esc(method)}</label>`;
     }).join('');
@@ -846,6 +852,17 @@ class InspectorPanel extends BaseComponent {
         </div>
       </div>
       ${errorsBlock}`;
+
+    if (wasOpen) {
+      const newDropdown = el.querySelector('.filter-dropdown');
+      if (newDropdown instanceof HTMLDetailsElement) {
+        newDropdown.open = true;
+        const newDropdownContent = newDropdown.querySelector('.filter-dropdown__content');
+        if (newDropdownContent) {
+          newDropdownContent.scrollTop = scrollPos;
+        }
+      }
+    }
   }
 
   renderActivityTree() {
@@ -986,7 +1003,13 @@ class InspectorPanel extends BaseComponent {
     }
     const root = /** @type {HTMLElement | null} */ (this.element);
     if (root) root.classList.add('inspector-panel--visible');
-  if (!this.loaded) this.loadInitialData();
+
+    if (!this.loaded) {
+      this.loadInitialData();
+    } else {
+      this.refreshActiveTab();
+    }
+
     try { this.uiState?.setState('ui.inspectorVisible', true, true); } catch (_) { /* intentionally empty */ }
     // Removed inspector:state:updated to prevent event cycle with inspectorpanel:visibilityChanged
     this.emit('visibilityChanged', { visible: true });
@@ -1160,6 +1183,19 @@ class InspectorPanel extends BaseComponent {
 
     const apiTab = this.tabEls?.api;
     if (apiTab) {
+      // This listener is attached once to the document and finds the dropdown dynamically.
+      if (!this._outsideClickHandler) {
+        this._outsideClickHandler = (event) => {
+          const filterDropdown = this.element.querySelector('.filter-dropdown');
+          if (filterDropdown instanceof HTMLDetailsElement && filterDropdown.open) {
+            if (!filterDropdown.contains(/** @type {Node} */ (event.target))) {
+              filterDropdown.open = false;
+            }
+          }
+        };
+        document.addEventListener('click', this._outsideClickHandler);
+      }
+
       this._apiChangeHandler = (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement)) return;
@@ -1198,6 +1234,14 @@ class InspectorPanel extends BaseComponent {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
 
+        // If a click happens inside the dropdown content, it will trigger a re-render.
+        // We stop the event from bubbling to the document's 'outside-click' handler,
+        // which would incorrectly close the dropdown because the re-render makes the event target stale.
+        const dropdownContent = target.closest('.filter-dropdown__content');
+        if (dropdownContent) {
+          event.stopPropagation();
+        }
+
         if (target.classList.contains('js-page-prev')) {
           this._timelinePager.page = Math.max(1, (this._timelinePager.page || 1) - 1);
           this.renderApiLog();
@@ -1210,26 +1254,20 @@ class InspectorPanel extends BaseComponent {
           const record = target.closest('li')?.getAttribute('data-record');
           if (record) this._copyRecord(target, record);
         } else if (target.classList.contains('js-select-all-methods')) {
-          this._getMethods().forEach(m => this._timelineFilters.selectedMethods.add(m));
+          this._knownMethods.forEach(m => this._timelineFilters.selectedMethods.add(m));
+          this._timelineFilters.showOtherMethods = true;
           this.renderApiLog();
         } else if (target.classList.contains('js-unselect-all-methods')) {
           this._timelineFilters.selectedMethods.clear();
+          this._timelineFilters.showOtherMethods = false;
           this.renderApiLog();
         } else if (target.classList.contains('js-select-all-elements')) {
-          const dmElements = new Set();
-          this.state.dataModelChanges.forEach(change => {
-            if (change.element) {
-              const parts = change.element.split('.');
-              if (parts.length >= 2) {
-                const baseType = `${parts[0]}.${parts[1]}`;
-                dmElements.add(baseType);
-              }
-            }
-          });
-          dmElements.forEach(e => this._timelineFilters.selectedElements.add(e));
+          this._knownDmElements.forEach(e => this._timelineFilters.selectedElements.add(e));
+          this._timelineFilters.showOtherElements = true;
           this.renderApiLog();
         } else if (target.classList.contains('js-unselect-all-elements')) {
           this._timelineFilters.selectedElements.clear();
+          this._timelineFilters.showOtherElements = false;
           this.renderApiLog();
         }
       };
@@ -1264,6 +1302,10 @@ class InspectorPanel extends BaseComponent {
     this._tabsClickHandler = null;
     this._apiChangeHandler = null;
     this._apiClickHandler = null;
+    if (this._outsideClickHandler) {
+      document.removeEventListener('click', this._outsideClickHandler);
+      this._outsideClickHandler = null;
+    }
     this._domEventsBound = false;
   }
 
