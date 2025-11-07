@@ -75,12 +75,13 @@ class InspectorPanel extends BaseComponent {
       history: { total: 0, hasMore: false },
       dataModelChanges: { total: 0, hasMore: false }
     };
-    /** @type {InspectorTimelineFilters} */
+    /** @type {{ errorsOnly: boolean; selectedMethods: Set<string>; selectedElements: Set<string>; showOtherMethods: boolean; showOtherElements: boolean }} */
     this._timelineFilters = {
-      method: 'all',
       errorsOnly: false,
-      showApi: true,
-      showDataModel: true
+      selectedMethods: new Set(),
+      selectedElements: new Set(),
+      showOtherMethods: true,
+      showOtherElements: true
     };
     /** @type {InspectorTimelinePager} */
     this._timelinePager = { page: 1, pageSize: 100 };
@@ -90,8 +91,6 @@ class InspectorPanel extends BaseComponent {
     this._maxDataModelHistory = 5000;
     /** @type {number} */
     this._maxErrors = 200;
-    /** @type {InspectorSummaryRefs} */
-    this._summary = { api: null, dm: null, err: null, obj: null, nav: null };
     /** @type {Array<() => void>} */
     this._unsubs = [];
     /** @type {(() => void) | null} */
@@ -110,6 +109,7 @@ class InspectorPanel extends BaseComponent {
     this._runtimeSubscriptionsBound = false;
     /** @type {boolean} */
     this._domEventsBound = false;
+    this._filtersInitialized = false;
     /** @type {((event: Event) => void) | null} */
     this._tabsClickHandler = null;
     /** @type {((event: Event) => void) | null} */
@@ -163,13 +163,7 @@ class InspectorPanel extends BaseComponent {
           <button data-tab="sn">Sequencing State</button>
         </div>
         <div class="inspector-panel__body">
-          <div class="inspector-panel__summary">
-            <span class="summary__item">Timeline: <b class="js-api-count">0</b></span>
-            <span class="summary__item">Data changes: <b class="js-dm-count">0</b></span>
-            <span class="summary__item">Errors: <b class="js-error-count">0</b></span>
-            <span class="summary__item">Objectives: <b class="js-objective-count">0</b></span>
-            <span class="summary__item">Nav records: <b class="js-nav-count">0</b></span>
-          </div>
+
           <div class="inspector-tab" id="inspector-tab-api"></div>
           <div class="inspector-tab" id="inspector-tab-tree" style="display:none"></div>
           <div class="inspector-tab" id="inspector-tab-objectives" style="display:none"></div>
@@ -195,14 +189,7 @@ class InspectorPanel extends BaseComponent {
     const refreshBtn = this.element.querySelector('.js-refresh-tab');
     if (refreshBtn) refreshBtn.addEventListener('click', () => this.refreshActiveTab());
 
-    // Setup resize handle with improved UX
-    this._summary = {
-      api: this.element.querySelector('.js-api-count'),
-      dm: this.element.querySelector('.js-dm-count'),
-      err: this.element.querySelector('.js-error-count'),
-      obj: this.element.querySelector('.js-objective-count'),
-      nav: this.element.querySelector('.js-nav-count')
-    };
+
 
     this._setupResizeHandle();
     this.setActiveTab(this.activeTab);
@@ -308,7 +295,6 @@ class InspectorPanel extends BaseComponent {
           break;
         }
       }
-      this.updateSummaryCounts();
       this.renderActiveTab();
     } catch (error) {
       this.uiState?.showNotification({
@@ -344,14 +330,46 @@ class InspectorPanel extends BaseComponent {
 
   _applyTimelineFilters(items) {
     const filters = this._timelineFilters;
+    const knownMethods = this._getMethods();
+    const dmElements = new Set();
+    this.state.dataModelChanges.forEach(change => {
+      if (change.element) {
+        const parts = change.element.split('.');
+        if (parts.length >= 2) {
+          const baseType = `${parts[0]}.${parts[1]}`;
+          dmElements.add(baseType);
+        }
+      }
+    });
+    const sortedDmElements = Array.from(dmElements).sort();
+
     return items.filter((entry) => {
       if (filters.errorsOnly && entry.kind === 'api-call' && !entry.hasError) {
         return false;
       }
-      if (!filters.showApi && entry.kind === 'api-call') return false;
-      if (!filters.showDataModel && entry.kind === 'data-model-change') return false;
-      if (filters.method !== 'all' && entry.kind === 'api-call') {
-        return entry.method === filters.method;
+      if (entry.kind === 'api-call') {
+        if (filters.selectedMethods.has(entry.method)) {
+          return true;
+        }
+        if (filters.showOtherMethods && !knownMethods.includes(entry.method)) {
+          return true;
+        }
+        return false;
+      }
+      if (entry.kind === 'data-model-change') {
+        const parts = (entry.element || '').split('.');
+        if (parts.length >= 2) {
+          const baseType = `${parts[0]}.${parts[1]}`;
+          if (filters.selectedElements.has(baseType)) {
+            return true;
+          }
+          if (filters.showOtherElements && !sortedDmElements.includes(baseType)) {
+            return true;
+          }
+        } else if (filters.showOtherElements) {
+          return true; // Show if it doesn't have a base type and "Other" is checked
+        }
+        return false;
       }
       return true;
     });
@@ -724,21 +742,12 @@ class InspectorPanel extends BaseComponent {
     if (!el) return;
 
     const timeline = this._buildTimeline();
-    const filtered = this._applyTimelineFilters(timeline);
-    const { slice, page, pages, total } = this._paginate(filtered);
 
-    // Get unique API methods
+    // Get unique API methods and data model elements
     const methods = this._getMethods();
-    const methodCheckboxes = methods.map((method) => {
-      const checked = this._timelineFilters.method === 'all' || this._timelineFilters.method === method ? 'checked' : '';
-      return `<label class="filter-checkbox"><input type="checkbox" class="js-method-filter" value="${this._esc(method)}" ${checked}/> ${this._esc(method)}</label>`;
-    }).join('');
-
-    // Get unique data model element types from current timeline
     const dmElements = new Set();
     this.state.dataModelChanges.forEach(change => {
       if (change.element) {
-        // Extract base element type (e.g., "cmi.score.scaled" -> "cmi.score")
         const parts = change.element.split('.');
         if (parts.length >= 2) {
           const baseType = `${parts[0]}.${parts[1]}`;
@@ -746,51 +755,60 @@ class InspectorPanel extends BaseComponent {
         }
       }
     });
-    
-    const elementCheckboxes = Array.from(dmElements).sort().map((element) => {
+    const sortedDmElements = Array.from(dmElements).sort();
+
+    // Initialize filters if they are not initialized yet
+    if (!this._filtersInitialized) {
+      methods.forEach(m => this._timelineFilters.selectedMethods.add(m));
+      sortedDmElements.forEach(e => this._timelineFilters.selectedElements.add(e));
+      if (methods.length > 0 || sortedDmElements.length > 0) {
+        this._filtersInitialized = true;
+      }
+    }
+
+    const filtered = this._applyTimelineFilters(timeline);
+    const { slice, page, pages, total } = this._paginate(filtered);
+
+    const methodCheckboxes = methods.map((method) => {
+      const checked = this._timelineFilters.selectedMethods.has(method) ? 'checked' : '';
+      return `<label class="filter-checkbox"><input type="checkbox" class="js-method-filter" value="${this._esc(method)}" ${checked}/> ${this._esc(method)}</label>`;
+    }).join('');
+
+    const elementCheckboxes = sortedDmElements.map((element) => {
       const label = element.replace('cmi.', '');
-      return `<label class="filter-checkbox"><input type="checkbox" class="js-element-filter" value="${this._esc(element)}" checked/> ${this._esc(label)}</label>`;
+      const checked = this._timelineFilters.selectedElements.has(element) ? 'checked' : '';
+      return `<label class="filter-checkbox"><input type="checkbox" class="js-element-filter" value="${this._esc(element)}" ${checked}/> ${this._esc(label)}</label>`;
     }).join('');
 
     const controls = `
       <div class="api-controls">
-        <div class="filter-group">
-          <span class="filter-group__label">Show:</span>
-          <label class="filter-checkbox filter-checkbox--primary">
-            <input type="checkbox" class="js-timeline-api" ${this._timelineFilters.showApi ? 'checked' : ''}/> 
-            <span>API Calls</span>
-          </label>
-          <label class="filter-checkbox filter-checkbox--primary">
-            <input type="checkbox" class="js-timeline-dm" ${this._timelineFilters.showDataModel ? 'checked' : ''}/> 
-            <span>Data Model Changes</span>
-          </label>
-        </div>
-        
-        ${methods.length > 0 ? `
-          <details class="filter-dropdown">
-            <summary class="filter-dropdown__summary">API Methods (${methods.length})</summary>
-            <div class="filter-dropdown__content">
-              <div class="filter-dropdown__actions">
-                <button class="filter-dropdown__action js-select-all-methods">Select All</button>
-                <button class="filter-dropdown__action js-unselect-all-methods">Unselect All</button>
+        <details class="filter-dropdown">
+          <summary class="filter-dropdown__summary">Filters</summary>
+          <div class="filter-dropdown__content">
+            <div class="filter-section">
+              <h5 class="filter-section__title">API Methods</h5>
+              <div class="filter-section__actions">
+                <button class="filter-dropdown__action js-select-all-methods">All</button>
+                <button class="filter-dropdown__action js-unselect-all-methods">None</button>
               </div>
-              ${methodCheckboxes}
-            </div>
-          </details>
-        ` : ''}
-        
-        ${dmElements.size > 0 ? `
-          <details class="filter-dropdown">
-            <summary class="filter-dropdown__summary">Data Model Elements (${dmElements.size})</summary>
-            <div class="filter-dropdown__content">
-              <div class="filter-dropdown__actions">
-                <button class="filter-dropdown__action js-select-all-elements">Select All</button>
-                <button class="filter-dropdown__action js-unselect-all-elements">Unselect All</button>
+              <div class="filter-section__checkboxes">
+                ${methodCheckboxes}
+                <label class="filter-checkbox"><input type="checkbox" class="js-method-filter-other" ${this._timelineFilters.showOtherMethods ? 'checked' : ''}/> Other</label>
               </div>
-              ${elementCheckboxes}
             </div>
-          </details>
-        ` : ''}
+            <div class="filter-section">
+              <h5 class="filter-section__title">Data Model Elements</h5>
+              <div class="filter-section__actions">
+                <button class="filter-dropdown__action js-select-all-elements">All</button>
+                <button class="filter-dropdown__action js-unselect-all-elements">None</button>
+              </div>
+              <div class="filter-section__checkboxes">
+                ${elementCheckboxes}
+                <label class="filter-checkbox"><input type="checkbox" class="js-element-filter-other" ${this._timelineFilters.showOtherElements ? 'checked' : ''}/> Other</label>
+              </div>
+            </div>
+          </div>
+        </details>
 
         <div class="filter-actions">
           <button class="btn-clear js-clear-timeline" title="Clear timeline">Clear Timeline</button>
@@ -961,8 +979,8 @@ class InspectorPanel extends BaseComponent {
     this.visible = true;
     const container = /** @type {HTMLElement | null} */ (this.container);
     if (container) {
-      container.style.display = 'block';
-      try { rendererLogger.debug('InspectorPanel: Container display set to block'); } catch (_) { /* noop */ }
+      container.style.display = 'flex';
+      try { rendererLogger.debug('InspectorPanel: Container display set to flex'); } catch (_) { /* noop */ }
     } else {
       try { rendererLogger.warn('InspectorPanel: Container element not found in show()'); } catch (_) { /* noop */ }
     }
@@ -1031,9 +1049,11 @@ class InspectorPanel extends BaseComponent {
         });
       }
 
-      this.updateSummaryCounts();
       this.loaded = true;
       this.emit('dataLoaded', { ok: true });
+      if (this.visible && this.activeTab === 'api') {
+        this.renderApiLog();
+      }
     } catch (error) {
       const err = /** @type {any} */ (error);
       this.uiState?.showNotification({ type: 'error', message: 'Inspector load failed', details: err?.message || String(err) });
@@ -1041,15 +1061,7 @@ class InspectorPanel extends BaseComponent {
     }
   }
 
-  updateSummaryCounts() {
-    try {
-      if (this._summary?.api) this._summary.api.textContent = String(this.state.history.length || 0);
-      if (this._summary?.dm) this._summary.dm.textContent = String(this.state.dataModelChanges.length || 0);
-      if (this._summary?.err) this._summary.err.textContent = String(this.state.errors.length || 0);
-      if (this._summary?.obj) this._summary.obj.textContent = String(this.state.objectives.length || 0);
-      if (this._summary?.nav) this._summary.nav.textContent = String(this.state.navigation.length || 0);
-    } catch (_) { /* intentionally empty */ }
-  }
+
 
   _registerRuntimeSubscriptions() {
     if (this._runtimeSubscriptionsBound) return;
@@ -1065,7 +1077,6 @@ class InspectorPanel extends BaseComponent {
         this._replaceDataModelHistory([]);
         this._replaceErrors([]);
         this.state.dataModel = {};
-        this.updateSummaryCounts();
         setTimeout(() => { void this.loadInitialData(); }, 500);
       });
       this._unsubs.push(offCourseLoaded);
@@ -1077,7 +1088,6 @@ class InspectorPanel extends BaseComponent {
       const offInspectorData = snBridge.onScormInspectorDataUpdated((payload) => {
         const changed = this._handleInspectorPayload(payload);
         if (!changed) return;
-        this.updateSummaryCounts();
         if (!this.visible) return;
         if (this.activeTab === 'api') {
           this.renderApiLog();
@@ -1093,7 +1103,6 @@ class InspectorPanel extends BaseComponent {
     try {
       const offErrors = snBridge.onScormInspectorErrorUpdated((entry) => {
         if (!this._appendErrorEntry(entry)) return;
-        this.updateSummaryCounts();
         if (this.visible && this.activeTab === 'api' && this._timelineFilters.errorsOnly) {
           this.renderApiLog();
         }
@@ -1117,7 +1126,6 @@ class InspectorPanel extends BaseComponent {
     try {
       const offDataModelChange = snBridge.onScormDataModelChange((entry) => {
         if (!this._appendDataModelChange(entry)) return;
-        this.updateSummaryCounts();
         if (this.visible && this.activeTab === 'api') this.renderApiLog();
       });
       this._unsubs.push(offDataModelChange);
@@ -1128,7 +1136,6 @@ class InspectorPanel extends BaseComponent {
     try {
       const offCleared = snBridge.onScormDataModelHistoryCleared(() => {
         this._replaceDataModelHistory([]);
-        this.updateSummaryCounts();
         if (this.visible && this.activeTab === 'api') this.renderApiLog();
       });
       this._unsubs.push(offCleared);
@@ -1155,21 +1162,32 @@ class InspectorPanel extends BaseComponent {
     if (apiTab) {
       this._apiChangeHandler = (event) => {
         const target = event.target;
-        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
-        if (target.classList.contains('js-api-filter')) {
-          this._timelineFilters.method = target.value || 'all';
+        if (!(target instanceof HTMLInputElement)) return;
+
+        if (target.classList.contains('js-method-filter')) {
+          const method = target.value;
+          if (target.checked) {
+            this._timelineFilters.selectedMethods.add(method);
+          } else {
+            this._timelineFilters.selectedMethods.delete(method);
+          }
           this._timelinePager.page = 1;
           this.renderApiLog();
-        } else if (target.classList.contains('js-api-errors')) {
-          this._timelineFilters.errorsOnly = Boolean(target.checked);
+        } else if (target.classList.contains('js-element-filter')) {
+          const element = target.value;
+          if (target.checked) {
+            this._timelineFilters.selectedElements.add(element);
+          } else {
+            this._timelineFilters.selectedElements.delete(element);
+          }
           this._timelinePager.page = 1;
           this.renderApiLog();
-        } else if (target.classList.contains('js-timeline-api')) {
-          this._timelineFilters.showApi = Boolean(target.checked);
+        } else if (target.classList.contains('js-method-filter-other')) {
+          this._timelineFilters.showOtherMethods = target.checked;
           this._timelinePager.page = 1;
           this.renderApiLog();
-        } else if (target.classList.contains('js-timeline-dm')) {
-          this._timelineFilters.showDataModel = Boolean(target.checked);
+        } else if (target.classList.contains('js-element-filter-other')) {
+          this._timelineFilters.showOtherElements = target.checked;
           this._timelinePager.page = 1;
           this.renderApiLog();
         }
@@ -1191,6 +1209,28 @@ class InspectorPanel extends BaseComponent {
         } else if (target.classList.contains('js-copy-record')) {
           const record = target.closest('li')?.getAttribute('data-record');
           if (record) this._copyRecord(target, record);
+        } else if (target.classList.contains('js-select-all-methods')) {
+          this._getMethods().forEach(m => this._timelineFilters.selectedMethods.add(m));
+          this.renderApiLog();
+        } else if (target.classList.contains('js-unselect-all-methods')) {
+          this._timelineFilters.selectedMethods.clear();
+          this.renderApiLog();
+        } else if (target.classList.contains('js-select-all-elements')) {
+          const dmElements = new Set();
+          this.state.dataModelChanges.forEach(change => {
+            if (change.element) {
+              const parts = change.element.split('.');
+              if (parts.length >= 2) {
+                const baseType = `${parts[0]}.${parts[1]}`;
+                dmElements.add(baseType);
+              }
+            }
+          });
+          dmElements.forEach(e => this._timelineFilters.selectedElements.add(e));
+          this.renderApiLog();
+        } else if (target.classList.contains('js-unselect-all-elements')) {
+          this._timelineFilters.selectedElements.clear();
+          this.renderApiLog();
         }
       };
       apiTab.addEventListener('click', this._apiClickHandler);
@@ -1247,11 +1287,8 @@ class InspectorPanel extends BaseComponent {
         this._replaceHistory([]);
         this._replaceErrors([]);
       }
-      if (dmResult?.success) {
         this._replaceDataModelHistory([]);
-      }
-      this.updateSummaryCounts();
-      this.renderApiLog();
+        this.renderApiLog();
     } catch (error) {
       rendererLogger.error('InspectorPanel: failed to clear timeline', error);
       this.uiState?.showNotification({

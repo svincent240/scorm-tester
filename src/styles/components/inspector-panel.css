@@ -25,9 +25,9 @@
 .inspector-panel__resize-handle {
   position: absolute;
   top: 0;
-  left: -10px;
+  left: 0;
   bottom: 0;
-  width: 20px;
+  width: 10px;
   background: transparent;
   cursor: ew-resize;
   z-index: 1000;
@@ -115,6 +115,24 @@
   gap: var(--spacing-xs);
   padding: var(--spacing-sm) 0;
   flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.inspector-panel__tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.inspector-panel__tabs::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.inspector-panel__tabs::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.inspector-panel__tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
 }
 
 .inspector-panel__tabs button[data-tab] {
@@ -931,3 +949,34 @@
 }
 
 
+.filter-section {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.filter-section:last-child {
+  border-bottom: none;
+}
+
+.filter-section__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin: 0 0 var(--spacing-xs) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.filter-section__actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.filter-section__checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 150px;
+  overflow-y: auto;
+}

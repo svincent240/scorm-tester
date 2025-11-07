@@ -240,6 +240,7 @@ class AppManager {
               <div id="recent-courses"></div>
               <div id="content-viewer"></div>
               <div id="inspector-panel"></div>
+              <div id="course-exit-summary"></div>
             </section>
           </main>
           <footer class="app-footer" id="app-footer">
@@ -250,7 +251,6 @@ class AppManager {
           <div id="notification-container"></div>
           <div id="error-dialog"></div>
           <div id="error-list-panel"></div>
-          <div id="course-exit-summary"></div>
         </div>
       `;
     } catch (_) {
