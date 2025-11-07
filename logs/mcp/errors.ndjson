@@ -1,1 +1,6 @@
-{"ts":1762486549226,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1762517692862,"event":"ERROR_LOG_START","process":"browser"}
+{"ts":1762517697204,"level":"error","msg":"SCORM Error [general]: 103 - Already Initialized","args":[{"code":"103","diagnostic":"Initialize called when session already initialized","context":"validateSessionState","sessionState":"running"}],"context":{},"pid":76315,"process":"browser"}
+{"ts":1762517712049,"level":"error","msg":"[Browser Console] Uncaught (in promise) Error: Element not found: button#next-btn (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:0)","args":[],"context":{},"pid":76315,"process":"browser"}
+{"ts":1762517716493,"level":"error","msg":"[Browser Console] Uncaught (in promise) Error: Wait condition timeout after 5000ms (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:0)","args":[],"context":{},"pid":76315,"process":"browser"}
+{"ts":1762518249506,"level":"error","msg":"SCORM Error [general]: 103 - Already Initialized","args":[{"code":"103","diagnostic":"Initialize called when session already initialized","context":"validateSessionState","sessionState":"running"}],"context":{},"pid":76315,"process":"browser"}
+{"ts":1762518262638,"level":"error","msg":"[Browser Console] Uncaught (in promise) Error: Element not found: #next-btn (file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html:0)","args":[],"context":{},"pid":76315,"process":"browser"}
