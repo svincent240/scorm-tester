@@ -45,33 +45,44 @@ function renderValue(value, depth, shouldExpand, maxDepth) {
   if (value === null) {
     return '<span class="json-null">null</span>';
   }
-  
+
   if (value === undefined) {
     return '<span class="json-undefined">undefined</span>';
   }
-  
+
   const type = typeof value;
-  
+
   if (type === 'boolean') {
     return `<span class="json-boolean">${value}</span>`;
   }
-  
+
   if (type === 'number') {
     return `<span class="json-number">${value}</span>`;
   }
-  
+
   if (type === 'string') {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        const parsed = JSON.parse(value);
+        // It's a JSON string, render it as an object or array
+        return renderValue(parsed, depth, shouldExpand, maxDepth);
+      } catch (e) {
+        // Not a valid JSON string, treat as a regular string
+      }
+    }
     return `<span class="json-string">"${escapeHtml(value)}"</span>`;
   }
-  
+
   if (Array.isArray(value)) {
     return renderArray(value, depth, shouldExpand, maxDepth);
   }
-  
+
   if (type === 'object') {
     return renderObject(value, depth, shouldExpand, maxDepth);
   }
-  
+
   // Fallback for functions, symbols, etc.
   return `<span class="json-other">${escapeHtml(String(value))}</span>`;
 }

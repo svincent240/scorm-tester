@@ -45,6 +45,33 @@ import { rendererLogger } from '../../utils/renderer-logger.js';
  * @typedef {{ slice: TimelineEntry[]; page: number; pages: number; total: number; pageSize: number }} TimelinePagination
  */
 
+
+/**
+ * Recursively parses JSON strings within an object or array.
+ * @param {*} data
+ * @returns {*}
+ */
+function recursiveJsonParse(data) {
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      return recursiveJsonParse(parsed);
+    } catch (e) {
+      return data;
+    }
+  }
+  if (Array.isArray(data)) {
+    return data.map(recursiveJsonParse);
+  }
+  if (typeof data === 'object' && data !== null) {
+    return Object.entries(data).reduce((acc, [key, value]) => {
+      acc[key] = recursiveJsonParse(value);
+      return acc;
+    }, {});
+  }
+  return data;
+}
+
 class InspectorPanel extends BaseComponent {
   /**
    * @param {string} elementId
@@ -648,12 +675,13 @@ class InspectorPanel extends BaseComponent {
       if (typeof val === 'string') {
         // Check if string contains JSON - try to parse and format it
         const trimmed = val.trim();
-        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
             (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
           try {
             const parsed = JSON.parse(val);
             // Successfully parsed - show as formatted JSON
-            return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(parsed, null, 2))}</pre>`;
+            const recursivelyParsed = recursiveJsonParse(parsed);
+            return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(recursivelyParsed, null, 2))}</pre>`;
           } catch (e) {
             // Not valid JSON, treat as regular string
           }
@@ -670,7 +698,8 @@ class InspectorPanel extends BaseComponent {
         return `<span class="data-model-change__primitive-value">${this._esc(String(val))}</span>`;
       }
       // Complex object/array - show as formatted JSON in pre tag
-      return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(val, null, 2))}</pre>`;
+      const recursivelyParsed = recursiveJsonParse(val);
+      return `<pre class="data-model-change__json-value">${this._esc(JSON.stringify(recursivelyParsed, null, 2))}</pre>`;
     };
 
     const previousValueDisplay = formatValue(change.previousValue);

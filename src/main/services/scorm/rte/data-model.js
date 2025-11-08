@@ -132,16 +132,6 @@ class ScormDataModel {
 
     const str = typeof value === 'string' ? value : String(value);
     const originalBytes = Buffer.byteLength(str, 'utf8');
-    const max = this.changeConfig.maxValueLength;
-
-    if (max > 0 && str.length > max) {
-      return {
-        value: str.slice(0, max),
-        truncated: true,
-        originalLength: str.length,
-        originalBytes
-      };
-    }
 
     return {
       value: str,
