@@ -10,6 +10,7 @@ try { electron = require("electron"); } catch (_) { electron = null; }
 const PathUtils = require("../shared/utils/path-utils");
 const { getPreloadPath, installRealAdapterForWindow, getTelemetryStoreForWindowId } = require("./runtime-adapter");
 const getLogger = require("../shared/utils/logger");
+const { setupConsoleCapture, getConsoleMessages, clearConsoleMessages, getConsoleStats } = require("../shared/utils/console-capture");
 
 // Get logger instance for browser console capture
 const logger = getLogger();
@@ -73,135 +74,6 @@ const _telemetryStoreBySession = new Map();
 
 // Per-session network request buffers
 const _networkRequestsBySession = new Map();
-
-/**
- * Map Chromium console level to logger level
- * @param {number} level - Chromium console level (0-3)
- * @returns {string} Logger level string
- */
-function mapConsoleLevel(level) {
-  switch (level) {
-    case 0: return 'debug';  // verbose
-    case 1: return 'info';   // info
-    case 2: return 'warn';   // warning
-    case 3: return 'error';  // error
-    default: return 'info';
-  }
-}
-
-/**
- * Set up console logging capture for a BrowserWindow
- * Captures all browser console messages and logs them to the unified logging system
- * Browser console logs are accessible via system_get_logs MCP tool
- * Also stores messages in browser context for scorm_get_console_errors
- * @param {BrowserWindow} win - The BrowserWindow to monitor
- */
-// eslint-disable-next-line no-unused-vars
-function setupConsoleLogging(win) {
-  if (!win || !win.webContents) return;
-
-  // Initialize console message storage in browser context
-  win.webContents.executeJavaScript(`
-    if (!window.__scormConsoleMessages) {
-      window.__scormConsoleMessages = [];
-
-      // Override console methods to capture messages
-      const originalConsole = {
-        log: console.log,
-        warn: console.warn,
-        error: console.error,
-        info: console.info
-      };
-
-      ['log', 'warn', 'error', 'info'].forEach(method => {
-        console[method] = function(...args) {
-          const message = args.map(arg => {
-            if (typeof arg === 'object') {
-              try { return JSON.stringify(arg); } catch { return String(arg); }
-            }
-            return String(arg);
-          }).join(' ');
-
-          window.__scormConsoleMessages.push({
-            level: method === 'log' ? 'info' : method,
-            message: message,
-            timestamp: Date.now(),
-            source: 'console.' + method
-          });
-
-          // Keep only last 500 messages to prevent memory issues
-          if (window.__scormConsoleMessages.length > 500) {
-            window.__scormConsoleMessages.shift();
-          }
-
-          // Call original console method
-          originalConsole[method].apply(console, args);
-        };
-      });
-
-      // Capture uncaught errors
-      window.addEventListener('error', (event) => {
-        window.__scormConsoleMessages.push({
-          level: 'error',
-          message: event.message || String(event.error),
-          timestamp: Date.now(),
-          source: event.filename ? event.filename + ':' + event.lineno : 'unknown',
-          stack_trace: event.error?.stack || null
-        });
-      });
-
-      // Capture unhandled promise rejections
-      window.addEventListener('unhandledrejection', (event) => {
-        window.__scormConsoleMessages.push({
-          level: 'error',
-          message: 'Unhandled Promise Rejection: ' + (event.reason?.message || String(event.reason)),
-          timestamp: Date.now(),
-          source: 'promise-rejection',
-          stack_trace: event.reason?.stack || null
-        });
-      });
-    }
-  `).catch(() => {
-    // Ignore errors during initialization
-  });
-
-  // Capture all console messages from renderer process
-  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    let logLevel = mapConsoleLevel(level);
-    const source = sourceId ? `${sourceId}:${line}` : 'scorm-content';
-
-    try {
-      const msgStr = String(message || '');
-
-      // Demote known benign CSP violations from embedded SCORM content to warnings
-      if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
-        logLevel = 'warn';
-      }
-
-      // Filter out benign Chromium warnings
-      const isBenignWarning = logLevel === 'warn' && (
-        // Iframe sandboxing warning - expected when loading SCORM content
-        msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
-        msgStr.includes("can remove its sandboxing")
-      );
-
-      // Log all non-benign messages to unified logging system (accessible via system_get_logs)
-      if (!isBenignWarning) {
-        logger?.[logLevel](`[Browser Console] ${message}`, { source, line });
-      }
-    } catch (_) { /* no-op */ }
-  });
-
-  // Capture page load errors
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    logger?.error(`[Browser Load Error] ${errorDescription} (${errorCode})`, { url: validatedURL, isMainFrame });
-  });
-
-  // Capture renderer crashes
-  win.webContents.on('crashed', (event, killed) => {
-    logger?.error(`[Browser Crash] Renderer process crashed`, { killed });
-  });
-}
 
 /**
  * Set up network request monitoring for a BrowserWindow
@@ -476,6 +348,13 @@ class RuntimeManager {
         return { result: snResult, success: true };
       }
 
+      case 'runtime_getConsoleMessages': {
+        // Get console messages from Electron child's buffer
+        const { session_id, filters } = message.params;
+        const messages = getConsoleMessages(session_id, filters);
+        return { messages };
+      }
+
       case 'runtime_closeAll': {
         // Close all persistent runtime windows (cleanup on MCP server exit)
         const sessionIds = Array.from(_persistentBySession.keys());
@@ -525,8 +404,10 @@ class RuntimeManager {
     if (telemetryStore) {
       try { win.__scormTelemetryStore = telemetryStore; } catch (_) { /* intentionally empty */ }
     }
-    // Capture browser console messages to unified log (accessible via system_get_logs)
-    this.setupConsoleLogging(win);
+    // Capture browser console messages using unified console capture
+    // Extract session_id from adapterOptions if available
+    const session_id = adapterOptions?.sessionId || null;
+    setupConsoleCapture(win, { session_id, logger });
 
     // Load the URL with explicit handling for Storyline-style redirect that triggers ERR_ABORTED
     try {
@@ -631,6 +512,7 @@ class RuntimeManager {
         _persistentBySession.delete(session_id);
         _networkRequestsBySession.delete(session_id);
         _telemetryStoreBySession.delete(session_id);
+        clearConsoleMessages(session_id);
       } catch (_) { /* intentionally empty */ }
     }); } catch (_) { /* intentionally empty */ }
     return win;
@@ -819,6 +701,34 @@ class RuntimeManager {
       throw err;
     }
     return store.getDataModelHistory(safeOptions) || { success: false, changes: [], total: 0, hasMore: false };
+  }
+
+  /**
+   * Get console messages from the session buffer (via IPC from Node bridge to Electron child)
+   * @param {string} session_id - Session ID
+   * @param {Object} filters - Optional filters (since_ts, severity)
+   * @returns {Promise<Array>} Array of console messages
+   */
+  static async getConsoleMessagesViaIPC(session_id, filters = {}) {
+    if (!session_id || typeof session_id !== 'string') {
+      const err = new Error('session_id is required');
+      err.code = 'MCP_INVALID_PARAMS';
+      throw err;
+    }
+
+    if (!global.__electronBridge || !global.__electronBridge.sendMessage) {
+      const err = new Error('Electron bridge not available');
+      err.code = 'ELECTRON_REQUIRED';
+      throw err;
+    }
+
+    const result = await global.__electronBridge.sendMessage({
+      id: ++_ipcMessageIdCounter,
+      type: 'runtime_getConsoleMessages',
+      params: { session_id, filters }
+    });
+
+    return result.messages || [];
   }
 
   static async getInitializeState(win, session_id = null) {
@@ -1018,62 +928,6 @@ class RuntimeManager {
     return filtered;
   }
 
-  /**
-   * Set up console logging capture for browser console messages.
-   * Captures all console output from SCORM content and logs to unified log system.
-   * These logs are accessible via system_get_logs MCP tool.
-   */
-  static setupConsoleLogging(win) {
-    if (!win || !win.webContents) return;
-
-    // Map Chromium console levels to our log levels
-    const mapConsoleLevel = (level) => {
-      switch (level) {
-        case 0: return 'debug';  // verbose
-        case 1: return 'info';   // info
-        case 2: return 'warn';   // warning
-        case 3: return 'error';  // error
-        default: return 'info';
-      }
-    };
-
-    // Capture all console messages from SCORM content
-    win.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      let logLevel = mapConsoleLevel(level);
-      const source = sourceId ? `${sourceId}:${line}` : 'scorm-content';
-
-      try {
-        const msgStr = String(message || '');
-
-        // Demote known benign CSP violations from embedded SCORM content to warnings
-        if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
-          logLevel = 'warn';
-        }
-
-        // Filter out benign Chromium warnings
-        const isBenignWarning = logLevel === 'warn' && (
-          msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
-          msgStr.includes("can remove its sandboxing")
-        );
-
-        // Skip benign warnings from logs
-        if (isBenignWarning) return;
-      } catch (_) { /* no-op */ }
-
-      // Log to unified system (accessible via system_get_logs)
-      logger?.[logLevel](`[Browser Console] ${message} (${source})`);
-    });
-
-    // Capture page load errors
-    win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, _isMainFrame) => {
-      logger?.error(`[Browser Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
-    });
-
-    // Capture renderer crashes
-    win.webContents.on('crashed', (event, killed) => {
-      logger?.error(`[Browser Crash] Renderer process crashed. Killed: ${killed}`);
-    });
-  }
 }
 
 module.exports = { RuntimeManager, resolveEntryPathFromManifest };

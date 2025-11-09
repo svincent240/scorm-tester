@@ -221,6 +221,17 @@ For non-catastrophic errors, the GUI **MUST**:
 - Suppression/backoff is visible in NDJSON via events like `RENDERER_BACKOFF_ENTER`, `RENDERER_BACKOFF_ACTIVE`, `RENDERER_COALESCED_DUPLICATES`, and `RENDERER_DEBUG_RATE_LIMIT` (with summaries per window).
 - Logs are cleared on app startup and truncated at a size limit (default 8MB) with single‑file retention.
 
+### 6.2 Browser Console Capture (SCORM Content Errors)
+
+Browser console messages from SCORM content are captured using a unified utility (`src/shared/utils/console-capture.js`) shared with the MCP:
+
+- **Capture mechanism**: Window-manager uses `setupConsoleCapture()` which attaches to Electron's `console-message`, `did-fail-load`, and `crashed` events
+- **Captures everything**: No filtering at capture level; all browser console output from SCORM content is recorded
+- **Error log display**: Messages forwarded to renderer via `renderer-console-error` IPC for display in the GUI error log panel
+- **Categorization**: Messages auto-categorized as `scorm_api`, `syntax`, `runtime`, or `network`
+- **Shared implementation**: Same capture utility used by MCP for `scorm_get_console_errors` tool
+- **Unified logging**: All browser console messages also logged to unified app logs for debugging
+
 ## 7. Architectural Anti-Patterns
 
 To maintain architectural integrity, the following patterns are strictly forbidden:

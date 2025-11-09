@@ -157,6 +157,18 @@ Example minimal MCP client config (conceptual):
   - Parse NDJSON: `jq -c . ./logs/mcp/app.ndjson | head`
   - View human-readable: `tail -f ./logs/mcp/app.log`
 
+### Unified Console Capture Architecture
+
+Browser console messages from SCORM content are captured using a unified utility (`src/shared/utils/console-capture.js`) shared between GUI and MCP:
+
+- **Capture mechanism**: Electron's `console-message`, `did-fail-load`, and `crashed` events
+- **Captures everything**: No filtering at capture level; all console output is recorded
+- **Per-session buffering** (MCP only): Messages stored in session-specific buffers, accessible via IPC
+- **IPC bridge**: Node.js bridge process retrieves console messages from Electron child via `runtime_getConsoleMessages` IPC handler
+- **Categorization**: Messages auto-categorized as `scorm_api`, `syntax`, `runtime`, or `network`
+- **GUI integration**: Same utility powers GUI error log display via `onMessage` callback
+- **No fallbacks**: Fail-fast if Electron bridge unavailable; ensures consistent behavior
+
 ### Fail‑Fast, No Fallbacks, No Silent Errors (Critical)
 
 - This MCP strictly enforces fail‑fast behavior. If any prerequisite is missing (e.g., Electron runtime, SN bridge not initialized, session/runtime not open), the server MUST return a JSON‑RPC error; tools MUST NOT fallback to alternative behaviors or return partial "success".

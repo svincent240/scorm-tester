@@ -14,6 +14,7 @@ const fs = require('fs');
 const BaseService = require('./base-service');
 const MenuBuilder = require('./menu-builder');
 const PathUtils = require('../../shared/utils/path-utils');
+const { setupConsoleCapture } = require('../../shared/utils/console-capture');
 const {
   WINDOW_TYPES,
   WINDOW_STATES,
@@ -328,80 +329,38 @@ class WindowManager extends BaseService {
    * Set up console logging redirection to main log file
    */
   setupConsoleLogging(window) {
-    // Capture all console messages from renderer process
-    window.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      let logLevel = this.mapConsoleLevel(level);
-      const source = sourceId ? `${sourceId}:${line}` : 'renderer';
-      let shouldBroadcastToUI = false;
-
-      try {
-        const msgStr = String(message || '');
-
-        // Demote known benign CSP violations from embedded SCORM content to warnings
-        if (logLevel === 'error' && msgStr.includes("Refused to load the font") && msgStr.includes("data:application/font-woff")) {
-          logLevel = 'warn';
-        }
-
-        // Filter out benign Chromium warnings that should not be surfaced to UI
-        const isBenignWarning = logLevel === 'warn' && (
-          // Iframe sandboxing warning - expected when loading SCORM content
-          msgStr.includes("iframe which has both allow-scripts and allow-same-origin") ||
-          msgStr.includes("can remove its sandboxing")
+    // Use unified console capture utility with callback to broadcast to UI
+    setupConsoleCapture(window, {
+      session_id: null, // GUI doesn't need session buffering
+      logger: this.logger,
+      onMessage: (consoleMsg) => {
+        // Determine if should broadcast to UI (errors and warnings, excluding benign)
+        const isBenignWarning = consoleMsg.level === 'warn' && (
+          consoleMsg.message.includes("iframe which has both allow-scripts and allow-same-origin") ||
+          consoleMsg.message.includes("can remove its sandboxing")
         );
 
-        // Broadcast errors and warnings to renderer UI for visibility (except benign warnings)
-        if ((logLevel === 'error' || logLevel === 'warn') && !isBenignWarning) {
-          shouldBroadcastToUI = true;
-        }
-      } catch (_) { /* no-op */ }
+        const shouldBroadcastToUI = (consoleMsg.level === 'error' || consoleMsg.level === 'warn') && !isBenignWarning;
 
-      this.logger?.[logLevel](`[Renderer Console] ${message} (${source})`);
-
-      // Forward console errors to renderer for UI display
-      if (shouldBroadcastToUI && window && !window.isDestroyed()) {
-        try {
-          window.webContents.send('renderer-console-error', {
-            level: logLevel,
-            message: String(message || ''),
-            source: sourceId || 'unknown',
-            line: line || 0,
-            timestamp: Date.now()
-          });
-        } catch (err) {
-          this.logger?.warn('WindowManager: Failed to broadcast console error to renderer', err?.message || err);
+        // Forward console errors/warnings to renderer for UI display
+        if (shouldBroadcastToUI && window && !window.isDestroyed()) {
+          try {
+            window.webContents.send('renderer-console-error', {
+              level: consoleMsg.level,
+              message: consoleMsg.message,
+              source: consoleMsg.source,
+              line: consoleMsg.line,
+              timestamp: consoleMsg.timestamp,
+              errorCode: consoleMsg.errorCode
+            });
+          } catch (err) {
+            this.logger?.warn('WindowManager: Failed to broadcast console message to renderer', err?.message || err);
+          }
         }
       }
     });
 
-    // Capture JavaScript errors
-    window.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-      this.logger?.error(`[Renderer Load Error] ${errorDescription} (${errorCode}) - URL: ${validatedURL}`);
-
-      // Broadcast load errors to renderer UI
-      if (window && !window.isDestroyed()) {
-        try {
-          window.webContents.send('renderer-console-error', {
-            level: 'error',
-            message: `Failed to load: ${errorDescription}`,
-            source: validatedURL || 'unknown',
-            line: 0,
-            errorCode: errorCode,
-            timestamp: Date.now()
-          });
-        } catch (err) {
-          this.logger?.warn('WindowManager: Failed to broadcast load error to renderer', err?.message || err);
-        }
-      }
-    });
-
-    // Capture unhandled exceptions
-    window.webContents.on('crashed', (event, killed) => {
-      this.logger?.error(`[Renderer Crash] Renderer process crashed. Killed: ${killed}`);
-
-      // Note: Cannot send to crashed window, but log for debugging
-    });
-
-    // Capture DOM ready and script loading
+    // Capture DOM ready and script loading (not part of console capture utility)
     window.webContents.on('dom-ready', () => {
       this.logger?.info('[Renderer] DOM ready');
     });
@@ -410,10 +369,6 @@ class WindowManager extends BaseService {
       this.logger?.info('[Renderer] Page finished loading');
     });
   }
-
-  /**
-   * Map Electron console levels to logger levels
-   */
 
   /**
    * Apply security policies: block unexpected navigations, deny permissions, and enforce CSP
@@ -492,16 +447,6 @@ class WindowManager extends BaseService {
         });
       } catch (_) { /* intentionally empty */ }
     } catch (_) { /* intentionally empty */ }
-  }
-
-  mapConsoleLevel(level) {
-    switch (level) {
-      case 0: return 'debug';  // verbose
-      case 1: return 'info';   // info
-      case 2: return 'warn';   // warning
-      case 3: return 'error';  // error
-      default: return 'info';
-    }
   }
 
   /**

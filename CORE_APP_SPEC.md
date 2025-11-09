@@ -133,5 +133,24 @@ A systematic approach to error handling is mandatory.
   - Tail errors only: `tail -f "~/Library/Application Support/scorm-tester/errors.ndjson"`
   - Parse NDJSON: `jq -c . "~/Library/Application Support/scorm-tester/app.ndjson" | head`
 
+### 6.2 Browser Console Capture (SCORM Content)
+
+Browser console messages from SCORM content are captured using a unified utility shared across GUI and MCP:
+
+- **Location**: `src/shared/utils/console-capture.js`
+- **Usage**: Both GUI (window-manager) and MCP (runtime-manager) use `setupConsoleCapture()`
+- **Captures**: All Electron `console-message`, `did-fail-load`, and `crashed` events
+- **No filtering at capture**: All browser console output is recorded; filtering applied at display/access level
+- **Categorization**: Auto-categorizes messages as `scorm_api`, `syntax`, `runtime`, or `network`
+- **GUI integration**: Messages forwarded to renderer for error log display via `onMessage` callback
+- **MCP integration**: Messages stored in per-session buffers, accessible via IPC (`runtime_getConsoleMessages`)
+- **Unified logging**: All captured messages also logged to main app logs for debugging
+
+## 7. Architectural Anti-Patterns
+
+To maintain architectural integrity, the following patterns are strictly forbidden:
+
+*   **Byp
+
 assing IPC Handler:** Services attempting to communicate with the renderer process outside of the `IpcHandler`.
 *   **Renderer State Dependency:** The main process querying for or depending on state held within the renderer process.

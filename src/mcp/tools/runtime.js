@@ -982,6 +982,7 @@ async function scorm_validate_data_model_state(params = {}) {
 
 /**
  * Get browser console errors from SCORM content
+ * Uses the unified console capture utility that captures ALL console messages
  */
 async function scorm_get_console_errors(params = {}) {
   const session_id = params.session_id;
@@ -1006,68 +1007,25 @@ async function scorm_get_console_errors(params = {}) {
     throw e;
   }
 
-  logger?.debug && logger.debug('[scorm_get_console_errors] Runtime open, fetching console messages');
+  logger?.debug && logger.debug('[scorm_get_console_errors] Runtime open, fetching console messages via IPC');
 
   try {
-    // Get console messages from the browser context via IPC
-    const consoleMessages = await RuntimeManager.executeJS(null, `
-      (() => {
-        // Access stored console messages if available
-        if (window.__scormConsoleMessages) {
-          return window.__scormConsoleMessages;
-        }
-        return [];
-      })()
-    `, session_id);
+    // Get console messages from Electron child via IPC
+    const messages = await RuntimeManager.getConsoleMessagesViaIPC(session_id, { since_ts, severity });
 
-    logger?.debug && logger.debug('[scorm_get_console_errors] Console messages fetched', {
-      messageCount: consoleMessages ? consoleMessages.length : 0,
-      hasMessages: !!(consoleMessages && consoleMessages.length > 0)
-    });
-
-    // Filter by severity and timestamp
-    const severitySet = new Set(Array.isArray(severity) ? severity : [severity]);
-    const filtered = consoleMessages.filter(msg => {
-      if (msg.timestamp < since_ts) return false;
-      if (!severitySet.has(msg.level)) return false;
-      return true;
-    });
-
-    logger?.debug && logger.debug('[scorm_get_console_errors] Messages filtered', {
-      originalCount: consoleMessages.length,
-      filteredCount: filtered.length
-    });
-
-    // Categorize errors
-    const categorized = filtered.map(msg => {
-      let category = 'runtime';
-      const message = msg.message || '';
-
-      if (message.includes('API') || message.includes('SCORM')) {
-        category = 'scorm_api';
-      } else if (message.includes('SyntaxError')) {
-        category = 'syntax';
-      } else if (message.includes('network') || message.includes('fetch') || message.includes('XMLHttpRequest')) {
-        category = 'network';
-      } else if (message.includes('TypeError') || message.includes('ReferenceError')) {
-        category = 'runtime';
-      }
-
-      return {
-        ...msg,
-        category
-      };
+    logger?.debug && logger.debug('[scorm_get_console_errors] Console messages fetched via IPC', {
+      messageCount: messages.length
     });
 
     const result = {
       session_id,
-      error_count: categorized.length,
-      errors: categorized,
+      error_count: messages.length,
+      errors: messages,
       categories: {
-        scorm_api: categorized.filter(e => e.category === 'scorm_api').length,
-        syntax: categorized.filter(e => e.category === 'syntax').length,
-        runtime: categorized.filter(e => e.category === 'runtime').length,
-        network: categorized.filter(e => e.category === 'network').length
+        scorm_api: messages.filter(e => e.category === 'scorm_api').length,
+        syntax: messages.filter(e => e.category === 'syntax').length,
+        runtime: messages.filter(e => e.category === 'runtime').length,
+        network: messages.filter(e => e.category === 'network').length
       }
     };
 
@@ -1075,7 +1033,6 @@ async function scorm_get_console_errors(params = {}) {
       resultKeys: Object.keys(result),
       session_id: result.session_id,
       error_count: result.error_count,
-      hasCategories: !!result.categories,
       categoriesKeys: result.categories ? Object.keys(result.categories) : []
     });
 
