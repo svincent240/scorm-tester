@@ -63,9 +63,9 @@ describe('MCP debugging and diagnostic tools on real course', () => {
     await rpc('tools/call', { name: 'scorm_runtime_open', arguments: { session_id } }, id++);
 
     // Get console errors
-    const consoleErrors = await rpc('tools/call', { 
-      name: 'scorm_get_console_errors', 
-      arguments: { session_id, severity: ['error', 'warning'] } 
+    const consoleErrors = await rpc('tools/call', {
+      name: 'scorm_get_console_errors',
+      arguments: { session_id, severity: ['error', 'warn'] }
     }, id++);
     const consoleData = parseMcpResponse(consoleErrors);
     console.log('[TEST] Console errors response:', JSON.stringify(consoleErrors, null, 2));

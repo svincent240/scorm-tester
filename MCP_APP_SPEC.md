@@ -864,7 +864,7 @@ Shut down resources, close offscreen contexts, and finalize artifacts.
   - description: Validate current data model state against expected values. Returns detailed diff with helpful hints for mismatches (e.g., "Element was never set - check if SetValue was called"). Instant validation instead of manual comparison.
 
 - scorm_get_console_errors
-  - params: { session_id: string, since_ts?: number, severity?: array<"error"|"warning"|"info"> }
+  - params: { session_id: string, since_ts?: number, severity?: array<"error"|"warn"|"info"> }
   - result.data: { session_id: string, error_count: number, errors: array, categories: { scorm_api: number, syntax: number, runtime: number, network: number } }
   - errors: MCP_INVALID_PARAMS, RUNTIME_NOT_OPEN, CONSOLE_ERROR_FETCH_FAILED
   - description: Get browser console errors/warnings from SCORM content. Filters out app-generated messages and categorizes errors by type. Provides stack traces and source locations. Critical for debugging JavaScript errors that cause silent failures.

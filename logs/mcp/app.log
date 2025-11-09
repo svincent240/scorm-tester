@@ -1,13 +1,24 @@
-Log start 2025-11-08T23:39:33.614Z
-2025-11-08T23:39:41.553Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:39:41.560Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:39:41.566Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:39:41.573Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:39:41.579Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:39:41.585Z [DEBUG] [Console Capture] Initialized buffer for session: 5afa8f1565d0049d 
-2025-11-08T23:39:41.666Z [ERROR] [Browser Console] Uncaught SyntaxError: The requested module '../../../framework/js/app/AppActions.js' does not provide an export named 'startSecureAssessment' [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/assessment.js:1","line":1}]
-2025-11-08T23:39:41.677Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:39:41.685Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+Log start 2025-11-09T17:06:45.570Z
+2025-11-09T17:06:45.614Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-09T17:06:45.622Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-09T17:06:45.629Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-09T17:06:45.635Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-09T17:06:45.641Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-09T17:06:45.646Z [DEBUG] [Console Capture] Initialized buffer for session: fba6ac18e82511a6 
+2025-11-09T17:06:45.778Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:43","line":43}]
+2025-11-09T17:06:45.786Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
+2025-11-09T17:06:45.793Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
+2025-11-09T17:06:45.801Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
+2025-11-09T17:06:45.808Z [INFO] SCORM session initialized: scorm_1762708005793_uxdc1tovk 
+2025-11-09T17:06:45.815Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
+2025-11-09T17:06:45.822Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
+2025-11-09T17:06:45.830Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
+2025-11-09T17:06:45.836Z [INFO] [Browser Console] ObjectiveManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:32","line":32}]
+2025-11-09T17:06:45.842Z [INFO] [Browser Console] InteractionManager initialized.  [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:32","line":32}]
+2025-11-09T17:06:45.850Z [INFO] [Browser Console] AccessibilityManager Initialized [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:60","line":60}]
+2025-11-09T17:06:45.855Z [INFO] [Browser Console] FlagManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/flag-manager.js:33","line":33}]
+2025-11-09T17:06:45.861Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
+2025-11-09T17:06:45.872Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
   Policy set or a policy with "unsafe-eval" enabled. This exposes users of
   this app to unnecessary security risks.
 
@@ -15,15 +26,42 @@ For more information and help, consult
 https://electronjs.org/docs/tutorial/security.
 This warning will not show up
 once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:46:14.030Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:46:14.036Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:46:14.042Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:46:14.048Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:46:14.054Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:46:14.060Z [DEBUG] [Console Capture] Initialized buffer for session: c91a262ee3a96bbb 
-2025-11-08T23:46:14.144Z [ERROR] [Browser Console] Uncaught SyntaxError: The requested module './utilities.js' does not provide an export named 'announceToScreenReader' [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/utilities/feedback-system.js:2","line":2}]
-2025-11-08T23:46:14.153Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:46:14.162Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+2025-11-09T17:06:45.885Z [INFO] [Browser Console] NavigationState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationState.js:31","line":31}]
+2025-11-09T17:06:45.896Z [INFO] [Browser Console] NavigationActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:40","line":40}]
+2025-11-09T17:06:45.904Z [INFO] [Browser Console] AppState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppState.js:19","line":19}]
+2025-11-09T17:06:45.911Z [INFO] [Browser Console] AppUI initialized and modals are ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:28","line":28}]
+2025-11-09T17:06:45.917Z [INFO] [Browser Console] Notification system is ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:31","line":31}]
+2025-11-09T17:06:45.927Z [INFO] [Browser Console] AppActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:19","line":19}]
+2025-11-09T17:06:45.934Z [INFO] [Browser Console] Rendering intro slide [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/intro.js:45","line":45}]
+2025-11-09T17:06:45.941Z [INFO] [Browser Console] [AppActions] Session timer started for: intro [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:143","line":143}]
+2025-11-09T17:06:45.949Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:118","line":118}]
+2025-11-09T17:07:53.235Z [INFO] [Browser Console] [AppActions] Session timer started for: assessment [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:143","line":143}]
+2025-11-09T17:07:53.243Z [INFO] [Browser Console] [Assessment] Creating assessment instance [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/assessment.js:129","line":129}]
+2025-11-09T17:07:53.250Z [INFO] [Browser Console] [ViewManager] View changed to 'intro' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]
+2025-11-09T17:07:53.260Z [INFO] [Browser Console] [Assessment] Assessment instance created and rendered [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/assessment.js:135","line":135}]
+2025-11-09T17:07:53.268Z [INFO] [Browser Console] [ViewManager] View changed to 'final-exam' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]
+2025-11-09T17:08:08.833Z [INFO] [Browser Console] NavigationManager: Setting sub-position to 0 [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/navigation-manager.js:89","line":89}]
+2025-11-09T17:08:08.840Z [INFO] [Browser Console] [ViewManager] View changed to 'question' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]
+2025-11-09T17:10:09.414Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-09T17:10:09.422Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-09T17:10:09.430Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-09T17:10:09.438Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-09T17:10:09.446Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-09T17:10:09.454Z [DEBUG] [Console Capture] Initialized buffer for session: 6f3e692987cedaf1 
+2025-11-09T17:10:09.538Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:43","line":43}]
+2025-11-09T17:10:09.547Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
+2025-11-09T17:10:09.555Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
+2025-11-09T17:10:09.563Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
+2025-11-09T17:10:09.577Z [INFO] SCORM session initialized: scorm_1762708209555_1kfe1fjog 
+2025-11-09T17:10:09.589Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
+2025-11-09T17:10:09.596Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
+2025-11-09T17:10:09.607Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
+2025-11-09T17:10:09.615Z [INFO] [Browser Console] ObjectiveManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:32","line":32}]
+2025-11-09T17:10:09.622Z [INFO] [Browser Console] InteractionManager initialized.  [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:32","line":32}]
+2025-11-09T17:10:09.629Z [INFO] [Browser Console] AccessibilityManager Initialized [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:60","line":60}]
+2025-11-09T17:10:09.637Z [INFO] [Browser Console] FlagManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/flag-manager.js:33","line":33}]
+2025-11-09T17:10:09.645Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
+2025-11-09T17:10:09.656Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
   Policy set or a policy with "unsafe-eval" enabled. This exposes users of
   this app to unnecessary security risks.
 
@@ -31,200 +69,19 @@ For more information and help, consult
 https://electronjs.org/docs/tutorial/security.
 This warning will not show up
 once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:46:54.958Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:46:54.965Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:46:54.972Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:46:54.979Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:46:54.986Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:46:54.992Z [DEBUG] [Console Capture] Initialized buffer for session: 7a4feb37aec3bf78 
-2025-11-08T23:46:55.091Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:46:55.098Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:46:55.107Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:46:55.115Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:46:55.123Z [INFO] SCORM session initialized: scorm_1762645615107_q1wcyp50a 
-2025-11-08T23:46:55.134Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:46:55.142Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:46:55.151Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:46:55.159Z [ERROR] [Browser Console] Uncaught ReferenceError: EventBus is not defined [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:33","line":33}]
-2025-11-08T23:46:55.170Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:46:55.178Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:47:47.722Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:47:47.731Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:47:47.739Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:47:47.747Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:47:47.755Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:47:47.761Z [DEBUG] [Console Capture] Initialized buffer for session: 9c43ffdbc69077dc 
-2025-11-08T23:47:47.856Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:47:47.863Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:47:47.871Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:47:47.879Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:47:47.887Z [INFO] SCORM session initialized: scorm_1762645667871_a5gpp33z1 
-2025-11-08T23:47:47.898Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:47:47.906Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:47:47.914Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:47:47.922Z [ERROR] [Browser Console] Uncaught TypeError: stateManager.init is not a function [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:73","line":73}]
-2025-11-08T23:47:47.933Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:47:47.944Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:49:05.327Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:49:05.336Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:49:05.344Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:49:05.352Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:49:05.360Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:49:05.368Z [DEBUG] [Console Capture] Initialized buffer for session: 9462f87816b10a58 
-2025-11-08T23:49:05.452Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:49:05.461Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:49:05.469Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:49:05.476Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:49:05.483Z [INFO] SCORM session initialized: scorm_1762645745469_bblvfmtz3 
-2025-11-08T23:49:05.495Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:49:05.503Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:49:05.511Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:49:05.519Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:49:05.527Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:49:05.535Z [ERROR] [Browser Console] Uncaught (in promise) ReferenceError: EventBus is not defined [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:79","line":79}]
-2025-11-08T23:49:05.546Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:50:29.912Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:50:29.920Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:50:29.927Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:50:29.934Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:50:29.941Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:50:29.948Z [DEBUG] [Console Capture] Initialized buffer for session: ea8f230a7d387c1b 
-2025-11-08T23:50:30.029Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:50:30.036Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:50:30.044Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:50:30.053Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:50:30.061Z [INFO] SCORM session initialized: scorm_1762645830044_tpvgsqihg 
-2025-11-08T23:50:30.070Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:50:30.077Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:50:30.084Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:50:30.091Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:50:30.098Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:50:30.105Z [ERROR] [Browser Console] Uncaught (in promise) Error: StateManager hydration failed: stateManager.hydrateFromSCORM is not a function [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:80","line":80}]
-2025-11-08T23:50:30.115Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:51:43.336Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:51:43.345Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:51:43.353Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:51:43.361Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:51:43.369Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:51:43.377Z [DEBUG] [Console Capture] Initialized buffer for session: dfb5f37249813c89 
-2025-11-08T23:51:43.456Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:51:43.464Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:51:43.471Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:51:43.479Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:51:43.487Z [INFO] SCORM session initialized: scorm_1762645903471_l7vevwkp7 
-2025-11-08T23:51:43.498Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:51:43.503Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:51:43.510Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:51:43.517Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:51:43.524Z [ERROR] [Browser Console] Uncaught (in promise) TypeError: objectiveManager.init is not a function [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:61","line":61}]
-2025-11-08T23:51:43.534Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:53:29.625Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:53:29.633Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:53:29.640Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:53:29.647Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:53:29.654Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:53:29.661Z [DEBUG] [Console Capture] Initialized buffer for session: 0e9c09e857c4d76d 
-2025-11-08T23:53:29.742Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:53:29.751Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:53:29.758Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:53:29.766Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:53:29.773Z [INFO] SCORM session initialized: scorm_1762646009758_ko6zyxv5i 
-2025-11-08T23:53:29.781Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:53:29.788Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:53:29.797Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:53:29.804Z [INFO] [Browser Console] ObjectiveManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:32","line":32}]
-2025-11-08T23:53:29.811Z [INFO] [Browser Console] InteractionManager initialized.  [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:32","line":32}]
-2025-11-08T23:53:29.818Z [INFO] [Browser Console] AccessibilityManager Initialized [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:60","line":60}]
-2025-11-08T23:53:29.825Z [ERROR] [Browser Console] [AccessibilityManager] Initialization failed: ReferenceError: EventBus is not defined [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:63","line":63}]
-2025-11-08T23:53:29.836Z [INFO] [Browser Console] FlagManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/flag-manager.js:33","line":33}]
-2025-11-08T23:53:29.844Z [INFO] [Browser Console] NavigationState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationState.js:31","line":31}]
-2025-11-08T23:53:29.852Z [INFO] [Browser Console] NavigationActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:34","line":34}]
-2025-11-08T23:53:29.860Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:53:29.868Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:53:29.876Z [INFO] [Browser Console] AppState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppState.js:19","line":19}]
-2025-11-08T23:53:29.884Z [INFO] [Browser Console] AppUI initialized and modals are ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:27","line":27}]
-2025-11-08T23:53:29.892Z [INFO] [Browser Console] Notification system is ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:30","line":30}]
-2025-11-08T23:53:29.900Z [INFO] [Browser Console] AppActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:19","line":19}]
-2025-11-08T23:53:29.908Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:53:29.916Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:89","line":89}]
-2025-11-08T23:53:29.924Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:53:29.938Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
-2025-11-08T23:54:24.690Z [DEBUG] SCORM error codes initialized from shared constants: [59]
-2025-11-08T23:54:24.699Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
-2025-11-08T23:54:24.706Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
-2025-11-08T23:54:24.711Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:54:24.718Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
-2025-11-08T23:54:24.725Z [DEBUG] [Console Capture] Initialized buffer for session: 1a7f49a1f1cdf84e 
-2025-11-08T23:54:24.805Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:47","line":47}]
-2025-11-08T23:54:24.812Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
-2025-11-08T23:54:24.820Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
-2025-11-08T23:54:24.827Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
-2025-11-08T23:54:24.834Z [INFO] SCORM session initialized: scorm_1762646064820_3cef2w3p1 
-2025-11-08T23:54:24.843Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
-2025-11-08T23:54:24.851Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
-2025-11-08T23:54:24.858Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
-2025-11-08T23:54:24.865Z [INFO] [Browser Console] ObjectiveManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:32","line":32}]
-2025-11-08T23:54:24.872Z [INFO] [Browser Console] InteractionManager initialized.  [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:32","line":32}]
-2025-11-08T23:54:24.879Z [INFO] [Browser Console] AccessibilityManager Initialized [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:60","line":60}]
-2025-11-08T23:54:24.886Z [INFO] [Browser Console] FlagManager initialized. [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/flag-manager.js:33","line":33}]
-2025-11-08T23:54:24.893Z [INFO] [Browser Console] NavigationState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationState.js:31","line":31}]
-2025-11-08T23:54:24.900Z [INFO] [Browser Console] NavigationActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:34","line":34}]
-2025-11-08T23:54:24.908Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:54:24.916Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:54:24.924Z [INFO] [Browser Console] AppState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppState.js:19","line":19}]
-2025-11-08T23:54:24.931Z [INFO] [Browser Console] AppUI initialized and modals are ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:27","line":27}]
-2025-11-08T23:54:24.939Z [INFO] [Browser Console] Notification system is ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:30","line":30}]
-2025-11-08T23:54:24.947Z [INFO] [Browser Console] AppActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:19","line":19}]
-2025-11-08T23:54:24.955Z [WARN] [Browser Console] Navigation menu element not found. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationUI.js:20","line":20}]
-2025-11-08T23:54:24.963Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:89","line":89}]
-2025-11-08T23:54:24.971Z [DEBUG] Runtime final URL [{"finalURL":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/index.html"}]
-2025-11-08T23:54:24.981Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
-  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
-  this app to unnecessary security risks.
-
-For more information and help, consult
-https://electronjs.org/docs/tutorial/security.
-This warning will not show up
-once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
+2025-11-09T17:10:09.669Z [INFO] [Browser Console] NavigationState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationState.js:31","line":31}]
+2025-11-09T17:10:09.679Z [INFO] [Browser Console] NavigationActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:40","line":40}]
+2025-11-09T17:10:09.687Z [INFO] [Browser Console] AppState initialized: [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppState.js:19","line":19}]
+2025-11-09T17:10:09.694Z [INFO] [Browser Console] AppUI initialized and modals are ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:28","line":28}]
+2025-11-09T17:10:09.702Z [INFO] [Browser Console] Notification system is ready. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:31","line":31}]
+2025-11-09T17:10:09.710Z [INFO] [Browser Console] AppActions initialized. [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:19","line":19}]
+2025-11-09T17:10:09.718Z [INFO] [Browser Console] Rendering intro slide [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/intro.js:45","line":45}]
+2025-11-09T17:10:09.726Z [INFO] [Browser Console] [AppActions] Session timer started for: intro [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:143","line":143}]
+2025-11-09T17:10:09.732Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:118","line":118}]
+2025-11-09T17:10:15.872Z [INFO] [Browser Console] [AppActions] Session timer started for: assessment [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:143","line":143}]
+2025-11-09T17:10:15.880Z [INFO] [Browser Console] [Assessment] Creating assessment instance [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/assessment.js:129","line":129}]
+2025-11-09T17:10:15.888Z [INFO] [Browser Console] [ViewManager] View changed to 'intro' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]
+2025-11-09T17:10:15.895Z [INFO] [Browser Console] [Assessment] Assessment instance created and rendered [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/content/course/slides/assessment.js:135","line":135}]
+2025-11-09T17:10:15.902Z [INFO] [Browser Console] [ViewManager] View changed to 'final-exam' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]
+2025-11-09T17:10:28.377Z [INFO] [Browser Console] NavigationManager: Setting sub-position to 0 [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/managers/navigation-manager.js:89","line":89}]
+2025-11-09T17:10:28.384Z [INFO] [Browser Console] [ViewManager] View changed to 'question' [object Object] [{"source":"file:///Users/seth/Documents/GitHub/SCORM/scorm_template/framework/js/main.js:115","line":115}]

@@ -6,6 +6,9 @@ const os = require("os");
 const crypto = require("crypto");
 const PathUtils = require("../shared/utils/path-utils");
 
+// Maximum number of sessions to keep per course (configurable via env)
+const MAX_SESSIONS_PER_COURSE = parseInt(process.env.SCORM_TESTER_MAX_SESSIONS_PER_COURSE || "10", 10);
+
 class SessionManager {
   constructor() {
     this.sessions = new Map();
@@ -19,11 +22,74 @@ class SessionManager {
     return crypto.randomBytes(8).toString("hex");
   }
 
+  /**
+   * Generate stable hash from course package path for session organization
+   * @param {string} packagePath - Absolute path to course package
+   * @returns {string} 16-character hash
+   */
+  static getCourseHash(packagePath) {
+    const normalized = path.resolve(packagePath);
+    return crypto.createHash("sha256")
+      .update(normalized)
+      .digest("hex")
+      .substring(0, 16);
+  }
+
   getRoot() {
     // Place MCP sessions under canonical temp root
     const root = path.join(PathUtils.getTempRoot(), "mcp_sessions");
     SessionManager.ensureDir(root);
     return root;
+  }
+
+  /**
+   * Get course-specific session folder with rotation
+   * @param {string} packagePath - Course package path
+   * @returns {string} Path to course session folder
+   */
+  getCourseSessionFolder(packagePath) {
+    const courseHash = SessionManager.getCourseHash(packagePath);
+    const courseFolder = path.join(this.getRoot(), courseHash);
+    SessionManager.ensureDir(courseFolder);
+    return courseFolder;
+  }
+
+  /**
+   * Rotate old screenshots in course folder, keeping only the most recent N screenshots
+   * @param {string} screenshotsFolder - Course screenshots folder
+   * @param {number} maxScreenshots - Maximum screenshots to keep (default: MAX_SESSIONS_PER_COURSE)
+   */
+  rotateScreenshots(screenshotsFolder, maxScreenshots = MAX_SESSIONS_PER_COURSE) {
+    try {
+      if (!fs.existsSync(screenshotsFolder)) return;
+
+      // Get all screenshot files (named like "screenshot_*.jpg")
+      const entries = fs.readdirSync(screenshotsFolder, { withFileTypes: true });
+      const screenshots = entries
+        .filter(e => e.isFile() && e.name.startsWith("screenshot_") && e.name.endsWith(".jpg"))
+        .map(e => ({
+          name: e.name,
+          path: path.join(screenshotsFolder, e.name),
+          mtime: fs.statSync(path.join(screenshotsFolder, e.name)).mtime.getTime()
+        }))
+        .sort((a, b) => b.mtime - a.mtime); // Sort by modification time, newest first
+
+      // Delete oldest screenshots if we exceed maxScreenshots
+      if (screenshots.length >= maxScreenshots) {
+        const toDelete = screenshots.slice(maxScreenshots - 1); // Keep maxScreenshots-1, make room for new one
+        for (const file of toDelete) {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (err) {
+            // Best-effort cleanup - don't fail if we can't delete
+            console.warn(`Failed to delete old screenshot ${file.name}: ${err.message}`);
+          }
+        }
+      }
+    } catch (err) {
+      // Best-effort rotation - don't fail screenshot capture if rotation fails
+      console.warn(`Screenshot rotation failed: ${err.message}`);
+    }
   }
 
   getNow() {
@@ -67,6 +133,10 @@ class SessionManager {
       manifestPath = this.validateFolderHasManifest(native);
     }
 
+    // Get course-specific folder for screenshots
+    const courseFolder = this.getCourseSessionFolder(native);
+
+    // Create session workspace (per-session folder for artifacts manifest)
     const id = SessionManager.uid();
     const workspace = path.join(this.getRoot(), id);
     SessionManager.ensureDir(workspace);
@@ -86,6 +156,7 @@ class SessionManager {
       last_activity_at: now,
       timeout_ms: Number(timeout_ms) || 0,
       workspace,
+      course_screenshots_folder: courseFolder, // Shared screenshots folder per course
       artifacts_manifest_path: artifactsManifest,
       events: [],
       next_event_id: 1,

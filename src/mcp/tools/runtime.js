@@ -624,8 +624,14 @@ async function scorm_capture_screenshot(params = {}) {
   let artifactPath = null;
   const s = sessions.sessions.get(session_id);
   if (s && base64) {
-    const rel = `screenshot_${Date.now()}.jpg`; // Use JPEG for compression
-    artifactPath = path.join(s.workspace, rel);
+    // Save screenshot to shared course screenshots folder
+    const screenshotsFolder = s.course_screenshots_folder;
+    const filename = `screenshot_${Date.now()}.jpg`; // Use JPEG for compression
+    artifactPath = path.join(screenshotsFolder, filename);
+
+    // Rotate old screenshots before saving new one
+    sessions.rotateScreenshots(screenshotsFolder);
+
     const imageBuffer = Buffer.from(base64, 'base64');
     fs.writeFileSync(artifactPath, imageBuffer);
     sessions.addArtifact({ session_id, artifact: { type: 'screenshot', path: artifactPath } });
@@ -987,7 +993,7 @@ async function scorm_validate_data_model_state(params = {}) {
 async function scorm_get_console_errors(params = {}) {
   const session_id = params.session_id;
   const since_ts = params.since_ts || 0;
-  const severity = params.severity || ['error', 'warning'];
+  const severity = params.severity || ['error', 'warn'];
 
   logger?.debug && logger.debug('[scorm_get_console_errors] Starting', { session_id, since_ts, severity });
 
@@ -1446,7 +1452,7 @@ async function scorm_get_page_state(params = {}) {
 
   if (include_options.console_errors) {
     promiseIndices.console_errors = promises.length;
-    promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warning'] }));
+    promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warn'] }));
     logger?.info && logger.info('[scorm_get_page_state] Adding console_errors at index', { index: promises.length - 1 });
   }
 
