@@ -930,18 +930,162 @@ class InspectorPanel extends BaseComponent {
 
   renderObjectives() {
     const el = this.tabEls?.objectives; if (!el) return;
-    const rows = Array.isArray(this.state.objectives) ? this.state.objectives : [];
-    const renderRow = (o) => {
-      const id = this._esc(String(o?.id || o?.objectiveId || ''));
-      const successStatus = this._esc(String(o?.success_status ?? o?.satisfied ?? o?.isSatisfied ?? ''));
-      const completionStatus = this._esc(String(o?.completion_status ?? ''));
-      const measure = this._esc(String(o?.measure ?? ''));
-      const score = this._esc(String(o?.score?.scaled ?? o?.score?.raw ?? o?.score ?? o?.rawScore ?? ''));
-      return `<tr><td>${id}</td><td>${successStatus}</td><td>${completionStatus}</td><td>${measure}</td><td>${score}</td></tr>`;
+    const styleBlock = `
+<style data-inspector-objectives>
+.objective-card-list { display: flex; flex-direction: column; gap: 12px; }
+.objective-card { border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 8px; padding: 12px 16px; background: rgba(0, 0, 0, 0.05); }
+@media (prefers-color-scheme: dark) {
+  .objective-card { border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.03); }
+  .objective-detail { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+  .objective-detail--empty { color: rgba(255, 255, 255, 0.65); }
+}
+.objective-card__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.objective-card__title { font-size: 1rem; }
+.objective-card__badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.objective-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; background: rgba(86, 156, 214, 0.18); color: #1a4a78; }
+.objective-badge--completion { background: rgba(181, 206, 168, 0.22); color: #2d4b29; }
+.objective-badge--measure { background: rgba(213, 153, 76, 0.2); color: #5b3f17; }
+@media (prefers-color-scheme: dark) {
+  .objective-badge { color: #c0e5ff; }
+  .objective-badge--completion { color: #d8f1d0; }
+  .objective-badge--measure { color: #f2d5ab; }
+}
+.objective-card__body { padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.objective-card__description { background: rgba(0, 0, 0, 0.04); border-radius: 6px; padding: 12px; border: 1px solid rgba(0, 0, 0, 0.05); }
+@media (prefers-color-scheme: dark) {
+  .objective-card__description { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); }
+}
+.objective-description { display: flex; flex-direction: column; gap: 4px; }
+.objective-description__label { font-weight: 600; font-size: 0.85rem; color: rgba(0, 0, 0, 0.7); }
+@media (prefers-color-scheme: dark) {
+  .objective-description__label { color: rgba(255, 255, 255, 0.75); }
+}
+.objective-description__content { white-space: pre-line; line-height: 1.5; }
+.objective-description__content span { white-space: inherit; }
+.objective-detail { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 8px; padding: 8px 0; border-top: 1px solid rgba(128, 128, 128, 0.2); }
+.objective-detail__key { font-weight: 600; }
+.objective-detail__value { overflow-wrap: anywhere; }
+.objective-detail--empty { color: rgba(128, 128, 128, 0.75); font-style: italic; border-top: none; }
+.objective-sublist { margin: 4px 0 0 0; padding-left: 16px; }
+.objective-sublist li { list-style: disc; margin: 2px 0; }
+</style>
+`;
+    const objectives = Array.isArray(this.state.objectives) ? this.state.objectives : [];
+
+    /**
+     * @param {unknown} value
+     * @returns {string}
+     */
+    const formatValue = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return '<em class="objective-value objective-value--empty">—</em>';
+      }
+      if (typeof value === 'boolean') {
+        return `<span class="objective-value objective-value--boolean">${value ? 'true' : 'false'}</span>`;
+      }
+      if (typeof value === 'number') {
+        return `<span class="objective-value objective-value--number">${this._esc(String(value))}</span>`;
+      }
+      if (typeof value === 'string') {
+        return `<span class="objective-value objective-value--string">${this._esc(value)}</span>`;
+      }
+      if (Array.isArray(value)) {
+        const items = value.map((item, index) => `<li><strong>${this._esc(String(index))}:</strong> ${formatValue(item)}</li>`).join('');
+        return `<ul class="objective-sublist objective-sublist--array">${items}</ul>`;
+      }
+      if (typeof value === 'object') {
+        const entries = Object.entries(/** @type {Record<string, unknown>} */ (value));
+        if (entries.length === 0) {
+          return '<em class="objective-value objective-value--empty">{}</em>';
+        }
+        const rows = entries.map(([key, nested]) => `<li><strong>${this._esc(key)}:</strong> ${formatValue(nested)}</li>`).join('');
+        return `<ul class="objective-sublist objective-sublist--object">${rows}</ul>`;
+      }
+      return `<span class="objective-value objective-value--string">${this._esc(String(value))}</span>`;
     };
-    el.innerHTML = `<div class="tab-section"><h4>Objectives</h4>
-      <table class="kv"><thead><tr><th>ID</th><th>Success Status</th><th>Completion Status</th><th>Measure</th><th>Score</th></tr></thead>
-      <tbody>${rows.slice(0,200).map(renderRow).join('') || '<tr><td colspan="5"><em>No objectives</em></td></tr>'}</tbody></table></div>`;
+
+    /**
+     * @param {Record<string, unknown>} objective
+     * @param {number} index
+     * @returns {string}
+     */
+    const renderCard = (objective, index) => {
+      const obj = /** @type {Record<string, any>} */ (objective);
+      const identifier = obj.id ?? obj.objectiveId ?? obj.identifier ?? `Objective ${index + 1}`;
+      const headerTitle = this._esc(String(identifier));
+
+      /** @type {string[]} */
+      const badges = [];
+      const successValue = obj.success_status ?? obj.satisfied ?? obj.isSatisfied;
+      if (successValue !== undefined && successValue !== null && successValue !== '') {
+        badges.push(`<span class="objective-badge objective-badge--success">Success: ${this._esc(String(successValue))}</span>`);
+      }
+      const completionValue = obj.completion_status ?? obj.completion ?? obj.isCompleted;
+      if (completionValue !== undefined && completionValue !== null && completionValue !== '') {
+        badges.push(`<span class="objective-badge objective-badge--completion">Completion: ${this._esc(String(completionValue))}</span>`);
+      }
+      const progressValue = obj.progress_measure ?? obj.measure ?? obj.progress;
+      if (progressValue !== undefined && progressValue !== null && progressValue !== '') {
+        badges.push(`<span class="objective-badge objective-badge--measure">Progress: ${this._esc(String(progressValue))}</span>`);
+      }
+
+      const handledKeys = new Set([
+        'id', 'objectiveId', 'identifier', 'success_status', 'satisfied', 'isSatisfied',
+        'completion_status', 'completion', 'isCompleted', 'progress_measure', 'measure', 'progress'
+      ]);
+
+      /** @type {Array<{ key: string; value: unknown }>} */
+      const detailEntries = [];
+      /** @type {Array<{ key: string; value: unknown }>} */
+      const descriptionEntries = [];
+
+      Object.entries(obj)
+        .filter(([key]) => !handledKeys.has(key))
+        .forEach(([key, value]) => {
+          const lower = key.toLowerCase();
+          if (lower.includes('description')) {
+            descriptionEntries.push({ key, value });
+          } else {
+            detailEntries.push({ key, value });
+          }
+        });
+
+      const detailHtml = detailEntries
+        .map(({ key, value }) => `<div class="objective-detail"><div class="objective-detail__key">${this._esc(key)}</div><div class="objective-detail__value">${formatValue(value)}</div></div>`)
+        .join('');
+
+      const descriptionHtml = descriptionEntries
+        .map(({ key, value }) => `<div class="objective-description"><div class="objective-description__label">${this._esc(key)}</div><div class="objective-description__content">${formatValue(value)}</div></div>`)
+        .join('');
+
+      const descriptionBlock = descriptionHtml
+        ? `<div class="objective-card__description">${descriptionHtml}</div>`
+        : '';
+
+      const bodyInner = `${descriptionBlock}${detailHtml}`;
+      const bodyContent = bodyInner || '<div class="objective-detail objective-detail--empty"><em>No additional information</em></div>';
+
+      return `<section class="objective-card">
+        <header class="objective-card__header">
+          <strong class="objective-card__title">${headerTitle}</strong>
+          ${badges.length ? `<div class="objective-card__badges">${badges.join('')}</div>` : ''}
+        </header>
+        <div class="objective-card__body">${bodyContent}</div>
+      </section>`;
+    };
+
+    const cards = objectives.slice(0, 200)
+      .filter((objective) => objective && typeof objective === 'object')
+      .map((objective, index) => renderCard(/** @type {Record<string, unknown>} */ (objective), index))
+      .join('');
+
+    el.innerHTML = `<div class="tab-section">
+      ${styleBlock}
+      <h4>Objectives</h4>
+      <div class="objective-card-list">
+        ${cards || '<p><em>No objectives</em></p>'}
+      </div>
+    </div>`;
   }
 
   renderDataModel() {
@@ -1356,6 +1500,7 @@ class InspectorPanel extends BaseComponent {
     this._unsubs = [];
     this._runtimeSubscriptionsBound = false;
     this._subscriptionsBound = false;
+    this._objectiveStylesInjected = false;
     try { this._resizeCleanup?.(); } catch (_) { /* intentionally empty */ }
     super.destroy();
   }

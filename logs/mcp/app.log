@@ -173,3 +173,93 @@ once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line
 2025-11-10T17:09:03.027Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/main.js:145","line":145}]
 2025-11-10T17:09:30.917Z [WARN] [Browser Console] Navigation blocked to slide "final-exam": Complete the required content before starting the exam. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:234","line":234}]
 2025-11-10T17:09:38.455Z [ERROR] [Browser Console] Uncaught (in promise) Error: Wait condition timeout after 3000ms [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/index.html:0","line":0}]
+2025-11-10T18:02:03.752Z [DEBUG] SCORM error codes initialized from shared constants: [59]
+2025-11-10T18:02:03.756Z [DEBUG] ScormErrorHandler initialized with all SCORM error codes 
+2025-11-10T18:02:03.759Z [DEBUG] Data model initialized with all SCORM 2004 4th Edition elements [{"launchMode":"normal"}]
+2025-11-10T18:02:03.762Z [DEBUG] ScormDataModel initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-10T18:02:03.765Z [DEBUG] ScormApiHandler initialized [{"launchMode":"normal","memoryOnlyStorage":false}]
+2025-11-10T18:02:03.768Z [DEBUG] [Console Capture] Initialized buffer for session: ce48918e8cbbee27 
+2025-11-10T18:02:03.961Z [INFO] [Browser Console] [CourseInit] Initializing course modules... [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/main.js:43","line":43}]
+2025-11-10T18:02:03.965Z [INFO] [Browser Console] [SCORM Init] Attempting to initialize SCORM [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:35","line":35}]
+2025-11-10T18:02:03.969Z [DEBUG] Learner information set [{"id":"mcp-learner","name":"MCP Learner"}]
+2025-11-10T18:02:03.972Z [DEBUG] Session data initialized [{"launchMode":"normal","entryMode":"ab-initio"}]
+2025-11-10T18:02:03.975Z [INFO] SCORM session initialized: scorm_1762797723969_3zv8z3xrq 
+2025-11-10T18:02:03.983Z [INFO] [Browser Console] [SCORM Init] Initialization result: true Connected: true [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:42","line":42}]
+2025-11-10T18:02:03.986Z [INFO] [Browser Console] [SCORM Init] initialized flag: true [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:43","line":43}]
+2025-11-10T18:02:03.990Z [INFO] [Browser Console] [SCORM] No suspend data found [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/core/runtime.js:143","line":143}]
+2025-11-10T18:02:03.993Z [INFO] [Browser Console] ObjectiveManager initialized. [object Object] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:33","line":33}]
+2025-11-10T18:02:03.996Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.000Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.003Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.006Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.010Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "visited-intro" to cmi.objectives.0 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.013Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.016Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.020Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.023Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.026Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "core-content" to cmi.objectives.0 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.029Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.033Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.036Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.039Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.043Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "thorough-review" to cmi.objectives.1 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.047Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.051Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.054Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.057Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.061Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "custom-mastery" to cmi.objectives.1 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.064Z [INFO] [Browser Console] [CourseInit] Initialized 4 objective(s) from configuration. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/main.js:81","line":81}]
+2025-11-10T18:02:04.067Z [INFO] [Browser Console] [ObjectiveManager] Criteria tracking enabled for 3 objective(s). [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:140","line":140}]
+2025-11-10T18:02:04.070Z [INFO] [Browser Console] InteractionManager initialized.  [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:32","line":32}]
+2025-11-10T18:02:04.072Z [INFO] [Browser Console] AccessibilityManager Initialized [object Object] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/accessibility-manager.js:60","line":60}]
+2025-11-10T18:02:04.075Z [INFO] [Browser Console] FlagManager initialized. [object Object] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/flag-manager.js:33","line":33}]
+2025-11-10T18:02:04.078Z [INFO] [Browser Console] [ObjectiveManager] Syncing 4 objective(s) to SCORM CMI... [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:290","line":290}]
+2025-11-10T18:02:04.081Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.085Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.088Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.091Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.094Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "core-content" to cmi.objectives.0 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.097Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.102Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.105Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.109Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.112Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "custom-mastery" to cmi.objectives.1 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.115Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.119Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.122Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.125Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.129Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "thorough-review" to cmi.objectives.2 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.133Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.136Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.139Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.142Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.145Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "visited-intro" to cmi.objectives.3 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.149Z [INFO] [Browser Console] [ObjectiveManager] All objectives synced to SCORM CMI. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:296","line":296}]
+2025-11-10T18:02:04.152Z [INFO] [Browser Console] [InteractionManager] Syncing 0 interaction(s) to SCORM CMI... [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:187","line":187}]
+2025-11-10T18:02:04.155Z [INFO] [Browser Console] [InteractionManager] All interactions synced to SCORM CMI. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/interaction-manager.js:243","line":243}]
+2025-11-10T18:02:04.159Z [DEBUG] Runtime final URL [{"finalURL":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/index.html"}]
+2025-11-10T18:02:04.162Z [WARN] [Browser Console] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged. [{"source":"node:electron/js2c/sandbox_bundle:2","line":2}]
+2025-11-10T18:02:04.180Z [INFO] [Browser Console] NavigationState initialized: [object Object] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationState.js:31","line":31}]
+2025-11-10T18:02:04.183Z [INFO] [Browser Console] NavigationActions initialized. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/navigation/NavigationActions.js:50","line":50}]
+2025-11-10T18:02:04.186Z [INFO] [Browser Console] AppState initialized: [object Object] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppState.js:19","line":19}]
+2025-11-10T18:02:04.190Z [INFO] [Browser Console] AppUI initialized and modals are ready. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:33","line":33}]
+2025-11-10T18:02:04.193Z [INFO] [Browser Console] Notification system is ready. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:36","line":36}]
+2025-11-10T18:02:04.196Z [INFO] [Browser Console] Sidebar toggle initialized. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppUI.js:39","line":39}]
+2025-11-10T18:02:04.199Z [INFO] [Browser Console] AppActions initialized. [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:19","line":19}]
+2025-11-10T18:02:04.202Z [INFO] [Browser Console] Rendering intro slide [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/content/course/slides/intro.js:30","line":30}]
+2025-11-10T18:02:04.205Z [INFO] [Browser Console] [AppActions] Session timer started for: intro [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/app/AppActions.js:143","line":143}]
+2025-11-10T18:02:04.209Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.213Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.217Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.220Z [WARN] Cannot refresh navigation availability: SN service not available 
+2025-11-10T18:02:04.224Z [INFO] [Browser Console] [ObjectiveManager] Synced objective "visited-intro" to cmi.objectives.3 [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:271","line":271}]
+2025-11-10T18:02:04.228Z [INFO] [Browser Console] [ObjectiveManager] Objective "visited-intro" completed: slideVisited [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/managers/objective-manager.js:166","line":166}]
+2025-11-10T18:02:04.231Z [INFO] [Browser Console] [CourseInit] Initialization complete [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/js/main.js:145","line":145}]
+2025-11-10T18:02:25.538Z [ERROR] [Browser Console] Uncaught (in promise) Error: Element not found: button[data-action="start"] [{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/index.html:0","line":0}]

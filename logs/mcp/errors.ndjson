@@ -1,2 +1,3 @@
 {"ts":1762788283189,"event":"ERROR_LOG_START","process":"browser"}
 {"ts":1762794578459,"level":"error","msg":"[Browser Console] Uncaught (in promise) Error: Wait condition timeout after 3000ms","args":[{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/index.html:0","line":0}],"context":{},"pid":15848,"process":"browser"}
+{"ts":1762797745542,"level":"error","msg":"[Browser Console] Uncaught (in promise) Error: Element not found: button[data-action=\"start\"]","args":[{"source":"file:///C:/Users/svincent/GitHub/SCORM/scorm_template/framework/index.html:0","line":0}],"context":{},"pid":15848,"process":"browser"}
