@@ -43,6 +43,7 @@ import { rendererLogger } from '../../utils/renderer-logger.js';
  * @typedef {{ api: HTMLElement | null; dm: HTMLElement | null; err: HTMLElement | null; obj: HTMLElement | null; nav: HTMLElement | null }} InspectorSummaryRefs
  * @typedef {{ changes: DataModelChangeEntry[]; total: number; hasMore: boolean; success?: boolean; error?: string }} DataModelHistoryResult
  * @typedef {{ slice: TimelineEntry[]; page: number; pages: number; total: number; pageSize: number }} TimelinePagination
+ * @typedef {ReturnType<typeof createJsonViewer>} JsonViewerResult
  */
 
 
@@ -67,7 +68,7 @@ function recursiveJsonParse(data) {
     return Object.entries(data).reduce((acc, [key, value]) => {
       acc[key] = recursiveJsonParse(value);
       return acc;
-    }, {});
+    }, /** @type {Record<string, any>} */ ({}));
   }
   return data;
 }
@@ -308,8 +309,7 @@ class InspectorPanel extends BaseComponent {
           break;
         }
         case 'objectives': {
-          const obj = await snBridge.getGlobalObjectives();
-          if (obj?.success) this.state.objectives = obj.data || [];
+          await this._refreshTimelineData();
           break;
         }
         case 'ssp': {
@@ -590,6 +590,12 @@ class InspectorPanel extends BaseComponent {
       this._replaceErrors(historyResult.data.errors);
       if (historyResult.data.dataModel) {
         this.state.dataModel = historyResult.data.dataModel;
+        const dmObjectives = historyResult.data.dataModel?.objectives;
+        if (Array.isArray(dmObjectives)) {
+          this.state.objectives = dmObjectives;
+        } else if (!Array.isArray(this.state.objectives)) {
+          this.state.objectives = [];
+        }
       }
       if (Array.isArray(historyResult.data.dataModelChanges)) {
         this._replaceDataModelHistory(historyResult.data.dataModelChanges, {
@@ -927,27 +933,26 @@ class InspectorPanel extends BaseComponent {
     const rows = Array.isArray(this.state.objectives) ? this.state.objectives : [];
     const renderRow = (o) => {
       const id = this._esc(String(o?.id || o?.objectiveId || ''));
-      const satisfied = this._esc(String(o?.satisfied ?? o?.isSatisfied ?? ''));
+      const successStatus = this._esc(String(o?.success_status ?? o?.satisfied ?? o?.isSatisfied ?? ''));
+      const completionStatus = this._esc(String(o?.completion_status ?? ''));
       const measure = this._esc(String(o?.measure ?? ''));
-      const score = this._esc(String(o?.score ?? o?.rawScore ?? ''));
-      return `<tr><td>${id}</td><td>${satisfied}</td><td>${measure}</td><td>${score}</td></tr>`;
+      const score = this._esc(String(o?.score?.scaled ?? o?.score?.raw ?? o?.score ?? o?.rawScore ?? ''));
+      return `<tr><td>${id}</td><td>${successStatus}</td><td>${completionStatus}</td><td>${measure}</td><td>${score}</td></tr>`;
     };
     el.innerHTML = `<div class="tab-section"><h4>Objectives</h4>
-      <table class="kv"><thead><tr><th>ID</th><th>Satisfied</th><th>Measure</th><th>Score</th></tr></thead>
-      <tbody>${rows.slice(0,200).map(renderRow).join('') || '<tr><td colspan="4"><em>No objectives</em></td></tr>'}</tbody></table></div>`;
+      <table class="kv"><thead><tr><th>ID</th><th>Success Status</th><th>Completion Status</th><th>Measure</th><th>Score</th></tr></thead>
+      <tbody>${rows.slice(0,200).map(renderRow).join('') || '<tr><td colspan="5"><em>No objectives</em></td></tr>'}</tbody></table></div>`;
   }
 
   renderDataModel() {
     const el = this.tabEls?.model; if (!el) return;
     const dm = this.state.dataModel || {};
 
-    const { html, controlsHtml, setup } = createJsonViewer(dm, {
+    const { html, controlsHtml, setup } = /** @type {JsonViewerResult} */ (createJsonViewer(dm, {
       showControls: true,
       showCopy: true,
-      title: 'Data Model',
-      expanded: false,
-      maxDepth: 2
-    });
+      title: 'Data Model'
+    }));
 
     el.innerHTML = `
       <div class="tab-section">
@@ -968,13 +973,13 @@ class InspectorPanel extends BaseComponent {
     const el = this.tabEls?.sn; if (!el) return;
     const sn = this.state.sn || {};
 
-    const { html, controlsHtml, setup } = createJsonViewer(sn, {
+    const { html, controlsHtml, setup } = /** @type {JsonViewerResult} */ (createJsonViewer(sn, {
       showControls: true,
       showCopy: true,
       title: 'Sequencing State',
       expanded: false,
       maxDepth: 2
-    });
+    }));
 
     el.innerHTML = `
       <div class="tab-section">
@@ -1068,11 +1073,10 @@ class InspectorPanel extends BaseComponent {
 
   async loadInitialData() {
     try {
-      const [hist, tree, nav, obj, ssp, sn, dmHistory] = await Promise.all([
+      const [hist, tree, nav, ssp, sn, dmHistory] = await Promise.all([
         snBridge.getScormInspectorHistory(),
         snBridge.getActivityTree(),
         snBridge.getNavigationRequests(),
-        snBridge.getGlobalObjectives(),
         snBridge.getSSPBuckets(),
         snBridge.getSnState(),
         snBridge.getScormDataModelHistory({ limit: this._maxDataModelHistory })
@@ -1091,9 +1095,12 @@ class InspectorPanel extends BaseComponent {
       }
       if (tree?.success) this.state.activityTree = tree.data || {};
       if (nav?.success) this.state.navigation = nav.data || [];
-      if (obj?.success) this.state.objectives = obj.data || [];
       if (ssp?.success) this.state.ssp = ssp.data || [];
       if (sn?.success) this.state.sn = sn;
+      if (hist?.success && hist.data?.dataModel) {
+        const dmObjectives = hist.data.dataModel?.objectives;
+        this.state.objectives = Array.isArray(dmObjectives) ? dmObjectives : [];
+      }
       if (dmHistory?.success && Array.isArray(dmHistory.data)) {
         this._replaceDataModelHistory(dmHistory.data, {
           total: typeof dmHistory.total === 'number' ? dmHistory.total : undefined,
@@ -1167,7 +1174,11 @@ class InspectorPanel extends BaseComponent {
     try {
       const offDataModel = snBridge.onScormDataModelUpdated((dataModel) => {
         this.state.dataModel = dataModel || {};
+        if (dataModel?.objectives) {
+          this.state.objectives = dataModel.objectives;
+        }
         if (this.visible && this.activeTab === 'model') this.renderDataModel();
+        if (this.visible && this.activeTab === 'objectives') this.renderObjectives();
         if (this.visible && this.activeTab === 'api') this.renderApiLog();
       });
       this._unsubs.push(offDataModel);
@@ -1280,6 +1291,7 @@ class InspectorPanel extends BaseComponent {
         } else if (target.classList.contains('js-clear-timeline')) {
           void this._clearTimeline();
         } else if (target.classList.contains('js-copy-record')) {
+          if (!(target instanceof HTMLButtonElement)) return;
           const record = target.closest('li')?.getAttribute('data-record');
           if (record) this._copyRecord(target, record);
         } else if (target.classList.contains('js-select-all-methods')) {
@@ -1358,8 +1370,10 @@ class InspectorPanel extends BaseComponent {
         this._replaceHistory([]);
         this._replaceErrors([]);
       }
+      if (dmResult?.success) {
         this._replaceDataModelHistory([]);
-        this.renderApiLog();
+      }
+      this.renderApiLog();
     } catch (error) {
       rendererLogger.error('InspectorPanel: failed to clear timeline', error);
       this.uiState?.showNotification({
@@ -1370,6 +1384,10 @@ class InspectorPanel extends BaseComponent {
     }
   }
 
+  /**
+   * @param {HTMLButtonElement} button
+   * @param {string} payload
+   */
   _copyRecord(button, payload) {
     try {
       navigator.clipboard.writeText(payload).then(() => {
