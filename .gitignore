@@ -58,3 +58,4 @@ hive-mind-prompt-*.txt
 /.claude
 /.saturn
 /memory
+/logs
