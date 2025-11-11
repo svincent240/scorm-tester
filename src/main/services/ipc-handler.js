@@ -338,6 +338,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('open-external', this.handleOpenExternal.bind(this));
       this.registerHandler('path-to-file-url', this.handlePathUtilsToFileUrl.bind(this));
       this.registerHandler('get-app-root', this.handleGetAppRoot.bind(this));
+      this.registerHandler('renderer-clear-console', this.handleRendererClearConsole.bind(this));
       this.registerHandler('path-normalize', this.handlePathNormalize.bind(this));
       this.registerHandler('path-join', this.handlePathJoin.bind(this));
       // SCORM Inspector window management
@@ -1173,6 +1174,31 @@ class IpcHandler extends BaseService {
 
   async handleGetAppRoot(_event) {
     return PathUtils.normalize(path.resolve(__dirname, '../../../'));
+  }
+
+  async handleRendererClearConsole(_event, options = {}) {
+    try {
+      const windowManager = this.getDependency('windowManager');
+      if (!windowManager || typeof windowManager.clearRendererConsole !== 'function') {
+        throw new Error('WindowManager.clearRendererConsole not available');
+      }
+
+      const targetWindowType = typeof options?.windowType === 'string' ? options.windowType : null;
+      const clearedCount = await windowManager.clearRendererConsole(targetWindowType);
+
+      this.logger?.info('IpcHandler: Renderer console cleared on demand', {
+        windowType: targetWindowType || 'all',
+        clearedCount
+      });
+
+      return IPC_RESULT.success({
+        cleared: clearedCount,
+        windowType: targetWindowType || 'all'
+      });
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to clear renderer console:', error);
+      return IPC_RESULT.error(error?.message || 'Failed to clear renderer console');
+    }
   }
 
   async handlePathNormalize(event, filePath) {

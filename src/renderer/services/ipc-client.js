@@ -115,6 +115,14 @@ class IpcClient {
     return api.recentCourses.addOrUpdate(item);
   }
 
+  async clearRendererConsole(/** @type {{ windowType?: string }} */ options = {}) {
+    const api = this._ensureAPI();
+    if (typeof api.clearRendererConsole !== 'function') {
+      throw new Error('electronAPI.clearRendererConsole not available');
+    }
+    return api.clearRendererConsole(options);
+  }
+
   // Event subscriptions
   onMenuEvent(/** @type {any} */ handler) {
     const api = this._ensureAPI();

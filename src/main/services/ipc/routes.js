@@ -576,6 +576,14 @@ module.exports = [
     }
   },
   {
+    channel: 'renderer-clear-console',
+    handlerName: 'handleRendererClearConsole',
+    options: {
+      rateLimitProfile: 'uiSparse',
+      useIpcResult: true
+    }
+  },
+  {
     channel: 'close-course',
     handlerName: 'handleCloseCourse',
     options: {

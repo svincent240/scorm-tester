@@ -927,6 +927,14 @@ class AppManager {
     try {
       this.logger.info('AppManager: Course reload requested');
 
+      // Clear DevTools/browser console so new logs start fresh for the reloaded course
+      try {
+        await ipcClient.clearRendererConsole({ windowType: 'main' });
+        this.logger.info('AppManager: Cleared renderer console prior to reload');
+      } catch (consoleClearError) {
+        this.logger.warn('AppManager: Unable to clear renderer console before reload', consoleClearError?.message || consoleClearError);
+      }
+
       // Clear all errors when reloading a course
       if (this.uiState && typeof this.uiState.clearAllErrors === 'function') {
         this.uiState.clearAllErrors();

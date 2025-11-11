@@ -211,6 +211,49 @@ class WindowManager extends BaseService {
   }
 
   /**
+   * Clear DevTools console output for one or more windows.
+   * Used when the renderer requests a fresh console before reloading a course.
+   * @param {string|null} windowType - Optional window type to target (defaults to all)
+   * @returns {Promise<number>} number of windows cleared
+   */
+  async clearRendererConsole(windowType = null) {
+    const targets = [];
+
+    if (windowType) {
+      const window = this.getWindow(windowType);
+      if (window) {
+        targets.push(window);
+      }
+    } else {
+      targets.push(...this.getAllWindows());
+    }
+
+    let clearedCount = 0;
+
+    for (const window of targets) {
+      try {
+        if (!window || window.isDestroyed()) {
+          continue;
+        }
+
+        const webContents = window.webContents;
+        if (!webContents || webContents.isDestroyed()) {
+          continue;
+        }
+
+        await webContents.executeJavaScript(
+          "typeof console !== 'undefined' && typeof console.clear === 'function' ? console.clear() : undefined;"
+        );
+        clearedCount++;
+      } catch (error) {
+        this.logger?.warn('WindowManager: Failed to clear renderer console', error?.message || error);
+      }
+    }
+
+    return clearedCount;
+  }
+
+  /**
    * Register custom protocol for app resources
    * @private
    */

@@ -185,6 +185,7 @@ const electronAPI = {
   // Development/Debug
   openDevTools: () => safeSend('open-dev-tools'),
   reloadWindow: () => safeSend('reload-window'),
+  clearRendererConsole: (options) => safeInvoke('renderer-clear-console', options),
 
   // SCORM Inspector
   getScormInspectorHistory: () => safeInvoke('scorm-inspector-get-history'),
