@@ -699,7 +699,7 @@ class BaseComponent {
       this.uiState.showNotification({
         message: `${title}: ${message}`,
         type: 'error',
-        duration: 0 // Persistent until dismissed
+        duration: 5000
       });
     } else {
       // Log to app log even if uiState not available

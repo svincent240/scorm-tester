@@ -1276,7 +1276,7 @@ class AppManager {
         this.uiState.showNotification({
           message: `Initialization Error: ${error?.message || 'Unknown error'}`,
           type: 'error',
-          duration: 0
+          duration: 5000
         });
       }
     } catch (_) { /* intentionally empty */ }
@@ -1352,7 +1352,7 @@ class AppManager {
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'error',
-      duration: 0 // Persistent until dismissed
+      duration: 5000
     });
   }
 

@@ -135,7 +135,7 @@ async function initializeApplication() {
       resolvedUiState.showNotification({
         message: `Initialization Error: ${error?.message || 'Unknown error'}`,
         type: 'error',
-        duration: 0
+        duration: 5000
       });
     } catch (_) { /* intentionally empty */ }
 

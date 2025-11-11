@@ -763,7 +763,7 @@ class ContentViewer extends BaseComponent {
       message: message,
       type: 'error',
       details: details,
-      duration: 0 // Persistent until dismissed
+      duration: 5000
     });
 
     // Hide the internal error display as uiState will handle it
@@ -869,7 +869,7 @@ class ContentViewer extends BaseComponent {
       message: `${title}: ${message}`,
       type: 'error',
       details: options.details,
-      duration: 0, // Persistent until dismissed
+      duration: 5000,
       actions: [ // Add actions for retry, reload, reset
         options.showRetry ? { label: 'Retry Loading', handler: () => this.retryLoad() } : null,
         options.showReload ? { label: 'Reload Page', handler: () => location.reload() } : null,
@@ -1091,7 +1091,7 @@ class ContentViewer extends BaseComponent {
     this.uiState.showNotification({
       type: 'error',
       message: detailedMessage,
-      duration: 0
+      duration: 5000
     });
   }
 
