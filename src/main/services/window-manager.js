@@ -423,6 +423,22 @@ class WindowManager extends BaseService {
       // Block new windows/popups
       wc.setWindowOpenHandler(() => ({ action: 'deny' }));
 
+      // Handle beforeunload confirmation dialogs from SCORM content
+      // Prevents application hangs/crashes when content tries to block navigation
+      wc.on('will-prevent-unload', (event) => {
+        try {
+          // Prevent the dialog from showing to avoid application hangs/crashes
+          event.preventDefault();
+
+          // Log for debugging and compliance tracking
+          this.logger?.info('WindowManager: Suppressed beforeunload dialog from SCORM content', {
+            url: wc.getURL()
+          });
+        } catch (error) {
+          this.logger?.warn('WindowManager: Error handling will-prevent-unload', error?.message);
+        }
+      });
+
       // Restrict navigation to our custom protocol only
       wc.on('will-navigate', (event, urlStr) => {
         try {
