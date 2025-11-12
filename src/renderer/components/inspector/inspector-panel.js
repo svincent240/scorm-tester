@@ -754,12 +754,12 @@ class InspectorPanel extends BaseComponent {
       </div>
       <div class="data-model-change__details">
         <div class="data-model-change__value-comparison">
-          <div class="data-model-change__value-row">
-            <span class="data-model-change__label data-model-change__label--prev">Previous:</span>
+          <div class="data-model-change__value-block">
+            <div class="data-model-change__label data-model-change__label--prev">Previous:</div>
             <div class="data-model-change__value-content">${previousValueDisplay}</div>
           </div>
-          <div class="data-model-change__value-row">
-            <span class="data-model-change__label data-model-change__label--new">New:</span>
+          <div class="data-model-change__value-block">
+            <div class="data-model-change__label data-model-change__label--new">New:</div>
             <div class="data-model-change__value-content data-model-change__value-content--new">${newValueDisplay}</div>
           </div>
         </div>
