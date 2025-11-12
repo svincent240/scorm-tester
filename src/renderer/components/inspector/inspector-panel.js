@@ -240,6 +240,9 @@ class InspectorPanel extends BaseComponent {
     let startWidth = 0;
 
     const handleMouseDown = (event) => {
+      // Only respond to left mouse button
+      if (event.button !== 0) return;
+
       isResizing = true;
       startX = event.clientX;
       startWidth = this.element?.offsetWidth || 0;
@@ -250,6 +253,12 @@ class InspectorPanel extends BaseComponent {
 
     const handleMouseMove = (event) => {
       if (!isResizing || !this.element) return;
+
+      // If mouse button is released during move, stop resizing
+      if (event.buttons === 0) {
+        handleMouseUp();
+        return;
+      }
 
       const deltaX = event.clientX - startX;
       const newWidth = Math.max(300, Math.min(window.innerWidth * 0.5, startWidth - deltaX));
@@ -267,11 +276,14 @@ class InspectorPanel extends BaseComponent {
     resizeHandle.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    // Also listen for mouseleave on document to catch edge cases
+    document.addEventListener('mouseleave', handleMouseUp);
 
     this._resizeCleanup = () => {
       resizeHandle.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseleave', handleMouseUp);
     };
   }
 

@@ -27,10 +27,10 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 10px;
+  width: 16px;
   background: transparent;
   cursor: ew-resize;
-  z-index: 1000;
+  z-index: 1001;
   transition: background var(--transition-fast) ease;
   display: flex;
   align-items: center;
@@ -45,26 +45,32 @@
 .inspector-panel__resize-handle::before {
   content: '';
   position: absolute;
-  width: 4px;
-  height: 100px;
+  width: 3px;
+  height: 40px;
   background: var(--border-color);
-  border-radius: 2px;
-  transition: background var(--transition-fast) ease;
+  border-radius: 3px;
+  transition: all var(--transition-fast) ease;
+  opacity: 0.6;
 }
 
 .inspector-panel__resize-handle:hover::before {
   background: var(--primary-color);
+  opacity: 1;
+  width: 4px;
 }
 
 .inspector-panel__container {
   display: flex;
   flex-direction: column;
   padding: var(--spacing-sm) var(--spacing-md);
+  padding-left: 20px;  /* Add extra padding to avoid resize handle */
   /* Smooth transitions for show/hide */
   transition: opacity var(--transition-fast) ease-in-out;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .inspector-panel__header {
