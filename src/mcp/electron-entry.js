@@ -5,6 +5,37 @@
 // It provides runtime services (like offscreen windows) via IPC to the main MCP server.
 
 const { app } = require("electron");
+const { getConsoleMessages } = require('../shared/utils/console-capture');
+
+const MAX_CONSOLE_MESSAGES = 10;
+
+/**
+ * Gets console message counts and a truncated list of messages.
+ * @param {string} session_id - The session ID.
+ * @param {number} since_ts - The timestamp to fetch messages since.
+ * @returns {object|null} A console object or null if no session_id.
+ */
+function getConsolePayload(session_id, since_ts) {
+  if (!session_id) return null;
+
+  const messages = getConsoleMessages(session_id, { since_ts, severity: ['warn', 'error'] });
+  if (!messages) return null;
+
+  const warning_count = messages.filter(m => m.level === 'warn').length;
+  const error_count = messages.filter(m => m.level === 'error').length;
+
+  const payload = {
+    error_count,
+    warning_count,
+  };
+
+  if (messages.length > 0) {
+    payload.messages = messages.slice(0, MAX_CONSOLE_MESSAGES);
+  }
+
+  return payload;
+}
+
 
 async function childMode() {
   // Child mode: Electron provides runtime services via IPC, no stdio MCP server
@@ -26,19 +57,35 @@ async function childMode() {
   }
 
   process.on('message', async (message) => {
+    const before_ts = Date.now();
+    let result;
+    const session_id = message?.params?.session_id;
+
     try {
       if (typeof RuntimeManager.handleIPCMessage !== 'function') {
         throw new Error('RuntimeManager.handleIPCMessage is not a function. Type: ' + typeof RuntimeManager.handleIPCMessage + ', Keys: ' + Object.keys(RuntimeManager).join(', '));
       }
-      const result = await RuntimeManager.handleIPCMessage(message);
+      result = await RuntimeManager.handleIPCMessage(message);
+
+      // Always attach console info if we have a session
+      if (session_id && result && typeof result === 'object') {
+        result.console = getConsolePayload(session_id, before_ts);
+      }
+
       if (process.send) {
         process.send({ id: message.id, result });
       }
     } catch (error) {
+      const payload = { message: error?.message || String(error) };
+      if (error && error.code) payload.code = error.code;
+      if (error && error.data !== undefined) payload.data = error.data;
+
+      // Always attach console info if we have a session
+      if (session_id) {
+        payload.console = getConsolePayload(session_id, before_ts);
+      }
+
       if (process.send) {
-        const payload = { message: error?.message || String(error) };
-        if (error && error.code) payload.code = error.code;
-        if (error && error.data !== undefined) payload.data = error.data;
         process.send({ id: message.id, error: payload });
       }
     }

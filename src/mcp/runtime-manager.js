@@ -272,12 +272,17 @@ class RuntimeManager {
 
           return { result: jsResult.result, success: true };
         } catch (electronError) {
+          const errorMessage = electronError.message || String(electronError);
+          
+          // Handle race conditions where the page navigates away during execution
+          if (errorMessage.includes('disposed') || errorMessage.includes('destroyed') || errorMessage.includes('Render frame was')) {
+            const err = new Error('JavaScript execution failed because the page navigated or was closed. This is common after a click that triggers a page load.');
+            err.code = 'EXECUTION_CONTEXT_DESTROYED';
+            throw err;
+          }
+
           // If executeJavaScript itself fails (e.g., syntax error during parsing),
           // try to extract error details from the error message
-          const errorMessage = electronError.message || String(electronError);
-
-          // Try to parse error type from Electron's error message
-          // Example: "SyntaxError: Unexpected token ';'"
           const errorMatch = errorMessage.match(/^(\w+Error):\s*(.+)$/);
 
           if (errorMatch) {
@@ -861,12 +866,17 @@ class RuntimeManager {
 
       return jsResult.result;
     } catch (electronError) {
-      // If executeJavaScript itself fails (e.g., syntax error during parsing),
-      // try to extract error details from the error message
       const errorMessage = electronError.message || String(electronError);
 
-      // Try to parse error type from Electron's error message
-      // Example: "SyntaxError: Unexpected token ';'"
+      // Handle race conditions where the page navigates away during execution
+      if (errorMessage.includes('disposed') || errorMessage.includes('destroyed') || errorMessage.includes('Render frame was')) {
+        const err = new Error('JavaScript execution failed because the page navigated or was closed. This is common after a click that triggers a page load.');
+        err.code = 'EXECUTION_CONTEXT_DESTROYED';
+        throw err;
+      }
+      
+      // If executeJavaScript itself fails (e.g., syntax error during parsing),
+      // try to extract error details from the error message
       const errorMatch = errorMessage.match(/^(\w+Error):\s*(.+)$/);
 
       if (errorMatch) {

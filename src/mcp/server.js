@@ -61,7 +61,7 @@ const TOOL_META = new Map([
   ["scorm_runtime_status", { description: "Get persistent runtime status (open state, URL, Initialize state, last API call)", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
 
   // SCORM RTE API Methods (requires open runtime)
-  ["scorm_api_call", { description: "Call any SCORM RTE API method (GetValue, SetValue, Commit, Initialize, Terminate, etc.) on persistent runtime", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, args: { type: "array" } }, required: ["session_id", "method"] } }],
+  ["scorm_api_call", { description: "Call any SCORM RTE API method (GetValue, SetValue, Commit, Initialize, Terminate, etc.) on persistent runtime", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, args: { type: "array", items: {} } }, required: ["session_id", "method"] } }],
   ["scorm_data_model_get", { description: "Get multiple data model elements in one call - supports wildcards (e.g., 'cmi.interactions.*') for bulk reading", inputSchema: { type: "object", properties: { session_id: { type: "string" }, elements: { type: "array", items: { type: "string" } }, patterns: { type: "array", items: { type: "string" } }, include_metadata: { type: "boolean" } }, required: ["session_id"] } }],
 
   // Sequencing & Navigation (requires SN bridge initialization)
@@ -98,7 +98,7 @@ const TOOL_META = new Map([
   ["scorm_compare_data_model_snapshots", { description: "Compare two data model snapshots and return detailed diff showing added, changed, unchanged, and removed elements", inputSchema: { type: "object", properties: { before: { type: "object" }, after: { type: "object" } }, required: ["before", "after"] } }],
   ["scorm_wait_for_api_call", { description: "Wait for a specific SCORM API call to occur - eliminates polling and arbitrary delays", inputSchema: { type: "object", properties: { session_id: { type: "string" }, method: { type: "string" }, timeout_ms: { type: "number" } }, required: ["session_id", "method"] } }],
   ["scorm_get_current_page_context", { description: "Get semantic information about current page - slide number, section title, page type, navigation availability", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
-  ["scorm_replay_api_calls", { description: "Replay a sequence of API calls to reproduce behavior - useful for debugging and testing", inputSchema: { type: "object", properties: { session_id: { type: "string" }, calls: { type: "array", items: { type: "object", properties: { method: { type: "string" }, args: { type: "array" } }, required: ["method"] } } }, required: ["session_id", "calls"] } }],
+  ["scorm_replay_api_calls", { description: "Replay a sequence of API calls to reproduce behavior - useful for debugging and testing", inputSchema: { type: "object", properties: { session_id: { type: "string" }, calls: { type: "array", items: { type: "object", properties: { method: { type: "string" }, args: { type: "array", items: {} } }, required: ["method"] } } }, required: ["session_id", "calls"] } }],
   ["scorm_get_page_state", { description: "Get comprehensive page state in a single call - includes page context, interactive elements, data model, console errors, and network requests", inputSchema: { type: "object", properties: { session_id: { type: "string" }, include: { type: "object", properties: { page_context: { type: "boolean" }, interactive_elements: { type: "boolean" }, data_model: { type: "boolean" }, console_errors: { type: "boolean" }, network_requests: { type: "boolean" } } } }, required: ["session_id"] } }],
   ["scorm_get_slide_map", { description: "Get slide map for single-SCO courses - discovers all slides with titles and IDs for easy navigation", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_navigate_to_slide", { description: "Navigate to a specific slide by index, ID, or title substring - works with single-SCO courses", inputSchema: { type: "object", properties: { session_id: { type: "string" }, slide_identifier: { type: ["string", "number"] } }, required: ["session_id", "slide_identifier"] } }],
@@ -120,71 +120,70 @@ const TOOL_META = new Map([
 
   // System Logging & Diagnostics
   ["system_get_logs", { description: "Get recent log entries in NDJSON format - includes browser console errors/warnings and all application logs with filtering by level/timestamp/component", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
-  ["system_set_log_level", { description: "Set application log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
-]);
-
-router.register("scorm_echo", scorm_echo);
-router.register("scorm_session_open", scorm_session_open);
-router.register("scorm_session_status", scorm_session_status);
-router.register("scorm_session_events", scorm_session_events);
-router.register("scorm_session_close", scorm_session_close);
-router.register("scorm_lint_manifest", scorm_lint_manifest);
-router.register("scorm_lint_api_usage", scorm_lint_api_usage);
-router.register("scorm_lint_parent_dom_access", scorm_lint_parent_dom_access);
-router.register("scorm_validate_workspace", scorm_validate_workspace);
-router.register("scorm_lint_sequencing", scorm_lint_sequencing);
-router.register("scorm_validate_compliance", scorm_validate_compliance);
-router.register("scorm_runtime_open", scorm_runtime_open);
-router.register("scorm_runtime_status", scorm_runtime_status);
-router.register("scorm_api_call", scorm_api_call);
-router.register("scorm_data_model_get", scorm_data_model_get);
-router.register("scorm_assessment_interaction_trace", scorm_assessment_interaction_trace);
-router.register("scorm_capture_screenshot", scorm_capture_screenshot);
-router.register("scorm_nav_get_state", scorm_nav_get_state);
-router.register("scorm_nav_next", scorm_nav_next);
-router.register("scorm_nav_previous", scorm_nav_previous);
-router.register("scorm_nav_choice", scorm_nav_choice);
-router.register("scorm_sn_init", scorm_sn_init);
-router.register("scorm_sn_reset", scorm_sn_reset);
-router.register("scorm_trace_sequencing", scorm_trace_sequencing);
-router.register("scorm_get_data_model_history", scorm_get_data_model_history);
-router.register("scorm_get_network_requests", scorm_get_network_requests);
-router.register("scorm_validate_data_model_state", scorm_validate_data_model_state);
-router.register("scorm_get_console_errors", scorm_get_console_errors);
-router.register("scorm_compare_data_model_snapshots", scorm_compare_data_model_snapshots);
-router.register("scorm_wait_for_api_call", scorm_wait_for_api_call);
-router.register("scorm_get_current_page_context", scorm_get_current_page_context);
-router.register("scorm_replay_api_calls", scorm_replay_api_calls);
-router.register("scorm_dom_click", scorm_dom_click);
-router.register("scorm_dom_fill", scorm_dom_fill);
-router.register("scorm_dom_query", scorm_dom_query);
-router.register("scorm_dom_evaluate", scorm_dom_evaluate);
-router.register("scorm_dom_wait_for", scorm_dom_wait_for);
-router.register("scorm_keyboard_type", scorm_keyboard_type);
-router.register("scorm_dom_find_interactive_elements", scorm_dom_find_interactive_elements);
-router.register("scorm_dom_fill_form_batch", scorm_dom_fill_form_batch);
-router.register("scorm_dom_click_by_text", scorm_dom_click_by_text);
-router.register("scorm_get_page_state", scorm_get_page_state);
-router.register("scorm_get_slide_map", scorm_get_slide_map);
-router.register("scorm_navigate_to_slide", scorm_navigate_to_slide);
-router.register("scorm_automation_check_availability", scorm_automation_check_availability);
-router.register("scorm_automation_list_interactions", scorm_automation_list_interactions);
-router.register("scorm_automation_set_response", scorm_automation_set_response);
-router.register("scorm_automation_check_answer", scorm_automation_check_answer);
-router.register("scorm_automation_get_response", scorm_automation_get_response);
-router.register("scorm_automation_get_course_structure", scorm_automation_get_course_structure);
-router.register("scorm_automation_get_current_slide", scorm_automation_get_current_slide);
-router.register("scorm_automation_go_to_slide", scorm_automation_go_to_slide);
-router.register("scorm_automation_get_correct_response", scorm_automation_get_correct_response);
-router.register("scorm_automation_get_last_evaluation", scorm_automation_get_last_evaluation);
-router.register("scorm_automation_check_slide_answers", scorm_automation_check_slide_answers);
-router.register("scorm_automation_get_trace", scorm_automation_get_trace);
-router.register("scorm_automation_clear_trace", scorm_automation_clear_trace);
-router.register("scorm_report", scorm_report);
-// System tools for logs and log level control
-async function system_get_logs(params = {}) {
-  const { tail = 200, levels = [], since_ts = 0, component = null } = params;
-  const file = (logger && logger.ndjsonFile) ? logger.ndjsonFile : (logger && logger.logFile);
+      ["system_set_log_level", { description: "Set application log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
+    ]);  
+  router.register("scorm_echo", scorm_echo);
+  router.register("scorm_session_open", scorm_session_open);
+  router.register("scorm_session_status", scorm_session_status);
+  router.register("scorm_session_events", scorm_session_events);
+  router.register("scorm_session_close", scorm_session_close);
+  router.register("scorm_lint_manifest", scorm_lint_manifest);
+  router.register("scorm_lint_api_usage", scorm_lint_api_usage);
+  router.register("scorm_lint_parent_dom_access", scorm_lint_parent_dom_access);
+  router.register("scorm_validate_workspace", scorm_validate_workspace);
+  router.register("scorm_lint_sequencing", scorm_lint_sequencing);
+  router.register("scorm_validate_compliance", scorm_validate_compliance);
+  router.register("scorm_runtime_open", scorm_runtime_open);
+  router.register("scorm_runtime_status", scorm_runtime_status);
+  router.register("scorm_api_call", scorm_api_call);
+  router.register("scorm_data_model_get", scorm_data_model_get);
+  router.register("scorm_assessment_interaction_trace", scorm_assessment_interaction_trace);
+  router.register("scorm_capture_screenshot", scorm_capture_screenshot);
+  router.register("scorm_nav_get_state", scorm_nav_get_state);
+  router.register("scorm_nav_next", scorm_nav_next);
+  router.register("scorm_nav_previous", scorm_nav_previous);
+  router.register("scorm_nav_choice", scorm_nav_choice);
+  router.register("scorm_sn_init", scorm_sn_init);
+  router.register("scorm_sn_reset", scorm_sn_reset);
+  router.register("scorm_trace_sequencing", scorm_trace_sequencing);
+  router.register("scorm_get_data_model_history", scorm_get_data_model_history);
+  router.register("scorm_get_network_requests", scorm_get_network_requests);
+  router.register("scorm_validate_data_model_state", scorm_validate_data_model_state);
+  router.register("scorm_get_console_errors", scorm_get_console_errors);
+  router.register("scorm_compare_data_model_snapshots", scorm_compare_data_model_snapshots);
+  router.register("scorm_wait_for_api_call", scorm_wait_for_api_call);
+  router.register("scorm_get_current_page_context", scorm_get_current_page_context);
+  router.register("scorm_replay_api_calls", scorm_replay_api_calls);
+  router.register("scorm_dom_click", scorm_dom_click);
+  router.register("scorm_dom_fill", scorm_dom_fill);
+  router.register("scorm_dom_query", scorm_dom_query);
+  router.register("scorm_dom_evaluate", scorm_dom_evaluate);
+  router.register("scorm_dom_wait_for", scorm_dom_wait_for);
+  router.register("scorm_keyboard_type", scorm_keyboard_type);
+  router.register("scorm_dom_find_interactive_elements", scorm_dom_find_interactive_elements);
+  router.register("scorm_dom_fill_form_batch", scorm_dom_fill_form_batch);
+  router.register("scorm_dom_click_by_text", scorm_dom_click_by_text);
+  router.register("scorm_get_page_state", scorm_get_page_state);
+  router.register("scorm_get_slide_map", scorm_get_slide_map);
+  router.register("scorm_navigate_to_slide", scorm_navigate_to_slide);
+  router.register("scorm_automation_check_availability", scorm_automation_check_availability);
+  router.register("scorm_automation_list_interactions", scorm_automation_list_interactions);
+  router.register("scorm_automation_set_response", scorm_automation_set_response);
+  router.register("scorm_automation_check_answer", scorm_automation_check_answer);
+  router.register("scorm_automation_get_response", scorm_automation_get_response);
+  router.register("scorm_automation_get_course_structure", scorm_automation_get_course_structure);
+  router.register("scorm_automation_get_current_slide", scorm_automation_get_current_slide);
+  router.register("scorm_automation_go_to_slide", scorm_automation_go_to_slide);
+  router.register("scorm_automation_get_correct_response", scorm_automation_get_correct_response);
+  router.register("scorm_automation_get_last_evaluation", scorm_automation_get_last_evaluation);
+  router.register("scorm_automation_check_slide_answers", scorm_automation_check_slide_answers);
+  router.register("scorm_automation_get_trace", scorm_automation_get_trace);
+  router.register("scorm_automation_clear_trace", scorm_automation_clear_trace);
+  router.register("scorm_report", scorm_report);  
+  // System tools for logs and log level control
+  async function system_get_logs(params = {}) {
+    const { tail = 200, levels = [], since_ts = 0, component = null } = params;
+    const file = (logger && logger.ndjsonFile) ? logger.ndjsonFile : (logger && logger.logFile);
   if (!file) return { logs: [], note: 'No log file available' };
 
   const logDir = logger && logger.ndjsonFile ? path.dirname(logger.ndjsonFile) : null;

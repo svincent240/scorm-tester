@@ -26,7 +26,7 @@ Adhere to this structure to ensure code is placed correctly.
   - **`services/`**: UI-specific services (`UIState`, `EventBus`, `ScormClient`).
   - **`boot/`**: Application startup and initialization for the renderer.
 - **`src/mcp/`**: AI Agent Interface (Machine-to-Machine Control Protocol).
-  - Contains the Node.js server, tool definitions, and Electron runtime entry.
+  - Contains the Node.js server, tool definitions (in `src/mcp/server.js`), and Electron runtime entry.
 - **`src/shared/`**: Code shared between **all** processes.
   - This is the primary location for code reuse to avoid redundancy.
 - **`tests/`**: All tests. Follow the existing structure for new tests.
