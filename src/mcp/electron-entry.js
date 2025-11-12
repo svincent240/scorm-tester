@@ -7,13 +7,11 @@
 const { app } = require("electron");
 const { getConsoleMessages } = require('../shared/utils/console-capture');
 
-const MAX_CONSOLE_MESSAGES = 10;
-
 /**
- * Gets console message counts and a truncated list of messages.
+ * Gets console message counts (without full messages to avoid token bloat).
  * @param {string} session_id - The session ID.
  * @param {number} since_ts - The timestamp to fetch messages since.
- * @returns {object|null} A console object or null if no session_id.
+ * @returns {object|null} A console object with counts only, or null if no session_id.
  */
 function getConsolePayload(session_id, since_ts) {
   if (!session_id) return null;
@@ -24,18 +22,11 @@ function getConsolePayload(session_id, since_ts) {
   const warning_count = messages.filter(m => m.level === 'warn').length;
   const error_count = messages.filter(m => m.level === 'error').length;
 
-  const payload = {
+  return {
     error_count,
-    warning_count,
+    warning_count
   };
-
-  if (messages.length > 0) {
-    payload.messages = messages.slice(0, MAX_CONSOLE_MESSAGES);
-  }
-
-  return payload;
 }
-
 
 async function childMode() {
   // Child mode: Electron provides runtime services via IPC, no stdio MCP server
@@ -67,7 +58,7 @@ async function childMode() {
       }
       result = await RuntimeManager.handleIPCMessage(message);
 
-      // Always attach console info if we have a session
+      // Always attach console error/warning counts (but not full messages)
       if (session_id && result && typeof result === 'object') {
         result.console = getConsolePayload(session_id, before_ts);
       }
@@ -80,7 +71,7 @@ async function childMode() {
       if (error && error.code) payload.code = error.code;
       if (error && error.data !== undefined) payload.data = error.data;
 
-      // Always attach console info if we have a session
+      // Always attach console error/warning counts (but not full messages)
       if (session_id) {
         payload.console = getConsolePayload(session_id, before_ts);
       }
