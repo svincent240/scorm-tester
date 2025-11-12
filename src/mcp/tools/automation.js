@@ -82,7 +82,7 @@ function getExpectedResponseFormat(type) {
   const formats = {
     'true-false': 'boolean (true or false)',
     'choice': 'string (single answer ID like "a") or array of strings (multiple answers like ["a", "c"])',
-    'fill-in': 'string (the text answer)',
+    'fill-in': 'string (single blank) or object (multi-blank like {"blank_0": "answer1", "blank_1": "answer2"})',
     'long-fill-in': 'string (the text answer)',
     'matching': 'array of objects with source/target pairs like [{source: "1", target: "a"}, {source: "2", target: "b"}]',
     'performance': 'string (the response text)',
@@ -159,6 +159,44 @@ function validateResponseFormat(response, type, id) {
       break;
       
     case 'fill-in':
+      // Fill-in can be either string (single blank) or object (multi-blank)
+      if (typeof response !== 'string' && (typeof response !== 'object' || response === null || Array.isArray(response))) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${Array.isArray(response) ? 'array' : typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = Array.isArray(response) ? 'array' : typeof response;
+        throw e;
+      }
+      // If it's an object, validate that values are strings (blank IDs -> answers)
+      if (typeof response === 'object' && !Array.isArray(response)) {
+        const nonStringValues = Object.entries(response).filter(([_, value]) => typeof value !== 'string');
+        if (nonStringValues.length > 0) {
+          const e = new Error(
+            `Invalid response format for interaction '${id}' (type: ${type}). ` +
+            `Expected: ${expectedFormat}. ` +
+            `Got: object with non-string values. All blank answers must be strings. ` +
+            `Invalid entries: ${JSON.stringify(Object.fromEntries(nonStringValues))}`
+          );
+          e.code = 'INVALID_RESPONSE_FORMAT';
+          e.name = 'AutomationAPIError';
+          e.interactionId = id;
+          e.interactionType = type;
+          e.expectedFormat = expectedFormat;
+          e.receivedValue = response;
+          e.receivedType = 'object with non-string values';
+          throw e;
+        }
+      }
+      break;
+      
     case 'long-fill-in':
     case 'performance':
     case 'likert':

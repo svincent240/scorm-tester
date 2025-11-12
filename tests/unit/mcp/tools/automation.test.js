@@ -997,7 +997,45 @@ describe('MCP Template Automation Tools', () => {
       });
     });
 
-    test('fill-in validation error shows string format', async () => {
+    test('fill-in accepts string for single-blank', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }])
+        .mockResolvedValueOnce({ success: true }); // setResponse
+
+      await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'fill-q',
+        response: 'correct answer'
+      });
+
+      // Verify the IIFE pattern was used correctly
+      const setResponseCall = RuntimeManager.executeJS.mock.calls[2];
+      expect(setResponseCall[2]).toBe('test'); // session_id is third parameter
+      expect(setResponseCall[1]).toContain('SCORMAutomation.setResponse("fill-q", responseValue)');
+      expect(setResponseCall[1]).toContain('const responseValue = "correct answer"');
+    });
+
+    test('fill-in accepts object for multi-blank', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }])
+        .mockResolvedValueOnce({ success: true }); // setResponse
+
+      await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'fill-q',
+        response: { blank_0: 'answer1', blank_1: 'answer2' }
+      });
+
+      // Verify the IIFE pattern was used correctly
+      const setResponseCall = RuntimeManager.executeJS.mock.calls[2];
+      expect(setResponseCall[2]).toBe('test'); // session_id is third parameter
+      expect(setResponseCall[1]).toContain('SCORMAutomation.setResponse("fill-q", responseValue)');
+      expect(setResponseCall[1]).toContain('{"blank_0":"answer1","blank_1":"answer2"}');
+    });
+
+    test('fill-in rejects number', async () => {
       RuntimeManager.executeJS = jest.fn()
         .mockResolvedValueOnce(true) // API check
         .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]);
@@ -1006,15 +1044,52 @@ describe('MCP Template Automation Tools', () => {
         scorm_automation_set_response({
           session_id: 'test',
           id: 'fill-q',
-          response: 42 // Invalid: should be string
+          response: 42
         })
       ).rejects.toMatchObject({
         code: 'INVALID_RESPONSE_FORMAT',
         interactionId: 'fill-q',
         interactionType: 'fill-in',
-        expectedFormat: 'string (the text answer)',
-        receivedType: 'number',
-        message: expect.stringContaining('Expected: string (the text answer)')
+        receivedType: 'number'
+      });
+    });
+
+    test('fill-in rejects array', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'fill-q',
+          response: ['answer1', 'answer2']
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'fill-q',
+        interactionType: 'fill-in',
+        receivedType: 'array'
+      });
+    });
+
+    test('fill-in rejects object with non-string values', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'fill-q',
+          response: { blank_0: 'answer1', blank_1: 123 }
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'fill-q',
+        interactionType: 'fill-in',
+        receivedType: 'object with non-string values',
+        message: expect.stringContaining('All blank answers must be strings')
       });
     });
 
