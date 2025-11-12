@@ -455,7 +455,14 @@ async function scorm_automation_set_response(params = {}) {
       payload: { id, response, interactionType } 
     });
 
-    const expression = `window.SCORMAutomation.setResponse('${id.replace(/'/g, "\\'")}', ${JSON.stringify(response)})`;
+    // Use a more robust approach: pass response via closure to avoid string escaping issues
+    // This ensures objects remain objects and aren't accidentally stringified
+    const expression = `
+      (function() {
+        const responseValue = ${JSON.stringify(response)};
+        return window.SCORMAutomation.setResponse(${JSON.stringify(id)}, responseValue);
+      })()
+    `;
     const result = await RuntimeManager.executeJS(null, expression, session_id);
 
     return {

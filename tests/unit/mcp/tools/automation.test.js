@@ -235,13 +235,18 @@ describe('MCP Template Automation Tools', () => {
         interactionType: 'choice'
       });
 
-      // Verify the JavaScript expression was properly constructed and escaped
-      const call = RuntimeManager.executeJS.mock.calls[2]; // Now third call (0: API check, 1: listInteractions, 2: setResponse)
-      expect(call[1]).toContain("window.SCORMAutomation.setResponse('q1'");
-      expect(call[1]).toContain('"answer-a"');
+      // Verify the JavaScript expression uses IIFE pattern and JSON.stringify
+      const call = RuntimeManager.executeJS.mock.calls[2]; // Third call (0: API check, 1: listInteractions, 2: setResponse)
+      const expression = call[1];
+      
+      expect(expression).toContain('(function()');
+      expect(expression).toContain('const responseValue =');
+      expect(expression).toContain('window.SCORMAutomation.setResponse');
+      expect(expression).toContain('"q1"');
+      expect(expression).toContain('"answer-a"');
     });
 
-    test('scorm_automation_set_response escapes single quotes in id', async () => {
+    test('scorm_automation_set_response properly escapes ID with special characters', async () => {
       RuntimeManager.executeJS = jest.fn()
         .mockResolvedValueOnce(true) // API check
         .mockResolvedValueOnce([{ id: "q'1", type: 'fill-in' }]) // listInteractions call for validation
@@ -253,8 +258,12 @@ describe('MCP Template Automation Tools', () => {
         response: 'answer'
       });
 
-      const call = RuntimeManager.executeJS.mock.calls[2]; // Now third call
-      expect(call[1]).toContain("q\\'1");
+      const call = RuntimeManager.executeJS.mock.calls[2]; // Third call
+      const expression = call[1];
+      
+      // With JSON.stringify, quotes are properly escaped
+      expect(expression).toContain('"q\'1"'); // JSON.stringify escapes the single quote
+      expect(expression).toContain('window.SCORMAutomation.setResponse');
     });
 
     test('scorm_automation_set_response validates true-false interaction format', async () => {
@@ -347,6 +356,169 @@ describe('MCP Template Automation Tools', () => {
 
       expect(result.success).toBe(true);
       expect(result.interactionType).toBe('matching');
+    });
+
+    test('scorm_automation_set_response properly serializes complex objects for drag-drop', async () => {
+      const complexResponse = {
+        drops: [
+          { dropZoneId: 'zone1', itemId: 'item-a' },
+          { dropZoneId: 'zone2', itemId: 'item-b' },
+          { dropZoneId: 'zone3', itemId: 'item-c' }
+        ]
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'dd-1', type: 'other' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'dd-1',
+        response: complexResponse
+      });
+
+      expect(result.success).toBe(true);
+
+      // Verify the expression uses IIFE and JSON.stringify to preserve object structure
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Should use IIFE pattern
+      expect(expression).toContain('(function()');
+      expect(expression).toContain('const responseValue =');
+      expect(expression).toContain('window.SCORMAutomation.setResponse');
+      
+      // Should contain the serialized object structure
+      expect(expression).toContain('"drops"');
+      expect(expression).toContain('"dropZoneId"');
+      expect(expression).toContain('"itemId"');
+    });
+
+    test('scorm_automation_set_response handles nested objects correctly', async () => {
+      const nestedResponse = {
+        answers: {
+          section1: ['a', 'b'],
+          section2: ['c', 'd']
+        },
+        metadata: {
+          attempts: 2,
+          timestamp: 1234567890
+        }
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'complex-q', type: 'other' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'complex-q',
+        response: nestedResponse
+      });
+
+      expect(result.success).toBe(true);
+
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Verify nested structure is properly serialized
+      expect(expression).toContain('"section1"');
+      expect(expression).toContain('"section2"');
+      expect(expression).toContain('"metadata"');
+      expect(expression).toContain('"attempts"');
+    });
+
+    test('scorm_automation_set_response handles array responses', async () => {
+      const arrayResponse = ['choice-a', 'choice-c', 'choice-e'];
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'multi-choice', type: 'choice' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'multi-choice',
+        response: arrayResponse
+      });
+
+      expect(result.success).toBe(true);
+
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Verify array is properly serialized
+      expect(expression).toContain('["choice-a","choice-c","choice-e"]');
+    });
+
+    test('scorm_automation_set_response handles boolean responses', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'tf-1', type: 'true-false' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'tf-1',
+        response: true
+      });
+
+      expect(result.success).toBe(true);
+
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Verify boolean is properly serialized
+      expect(expression).toContain('const responseValue = true');
+    });
+
+    test('scorm_automation_set_response handles null and undefined edge cases', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q-null', type: 'other' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'q-null',
+        response: null
+      });
+
+      expect(result.success).toBe(true);
+
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Verify null is properly serialized
+      expect(expression).toContain('const responseValue = null');
+    });
+
+    test('scorm_automation_set_response escapes special characters in object values', async () => {
+      const responseWithSpecialChars = {
+        text: 'Answer with "quotes" and \'apostrophes\' and \n newlines'
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'special', type: 'other' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'special',
+        response: responseWithSpecialChars
+      });
+
+      expect(result.success).toBe(true);
+
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      
+      // Verify JSON.stringify properly escapes special characters
+      expect(expression).toContain('\\n'); // newline escaped
+      expect(expression).toContain('\\"'); // quotes escaped
     });
 
     test('scorm_automation_set_response works when interaction metadata not available', async () => {
@@ -634,6 +806,246 @@ describe('MCP Template Automation Tools', () => {
         type: 'automation:list_interactions',
         payload: {}
       });
+    });
+  });
+
+  describe('Response Format Validation Error Messages', () => {
+    test('true-false validation error provides helpful guidance', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'tf-q', type: 'true-false' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'tf-q',
+          response: 'yes' // Invalid: should be boolean
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        name: 'AutomationAPIError',
+        interactionId: 'tf-q',
+        interactionType: 'true-false',
+        expectedFormat: 'boolean (true or false)',
+        receivedValue: 'yes',
+        receivedType: 'string',
+        message: expect.stringContaining('Expected: boolean (true or false)')
+      });
+    });
+
+    test('choice validation error shows expected string or array format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'choice-q', type: 'choice' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'choice-q',
+          response: { answer: 'a' } // Invalid: should be string or array
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'choice-q',
+        interactionType: 'choice',
+        expectedFormat: expect.stringContaining('string (single answer ID'),
+        message: expect.stringContaining('Expected: string')
+      });
+    });
+
+    test('choice validation error detects non-string array items', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'mc-q', type: 'choice' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'mc-q',
+          response: ['a', 2, 'c'] // Invalid: array contains number
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'mc-q',
+        interactionType: 'choice',
+        receivedType: 'array with non-string items',
+        message: expect.stringContaining('array containing non-string values')
+      });
+    });
+
+    test('numeric validation error shows number or string format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'num-q', type: 'numeric' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'num-q',
+          response: [42] // Invalid: array instead of number
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'num-q',
+        interactionType: 'numeric',
+        expectedFormat: 'number or string representing a numeric value',
+        message: expect.stringContaining('Expected: number or string')
+      });
+    });
+
+    test('numeric validation error detects non-numeric strings', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'num-q', type: 'numeric' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'num-q',
+          response: 'not-a-number'
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'num-q',
+        interactionType: 'numeric',
+        receivedType: 'non-numeric string',
+        message: expect.stringContaining('non-numeric string')
+      });
+    });
+
+    test('matching validation error shows required object structure', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'match-q', type: 'matching' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'match-q',
+          response: 'a-1,b-2' // Invalid: should be array of objects
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'match-q',
+        interactionType: 'matching',
+        expectedFormat: expect.stringContaining('array of objects with source/target pairs'),
+        message: expect.stringContaining('Expected: array of objects')
+      });
+    });
+
+    test('matching validation error detects missing source/target properties', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'match-q', type: 'matching' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'match-q',
+          response: [
+            { source: '1', target: 'a' },
+            { source: '2' }, // Missing target
+            { target: 'c' }  // Missing source
+          ]
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'match-q',
+        interactionType: 'matching',
+        receivedType: 'array with invalid matching pairs',
+        message: expect.stringContaining("Each item must have 'source' and 'target' properties")
+      });
+    });
+
+    test('sequencing validation error shows array of strings format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'seq-q', type: 'sequencing' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'seq-q',
+          response: 'step1,step2,step3' // Invalid: should be array
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'seq-q',
+        interactionType: 'sequencing',
+        expectedFormat: expect.stringContaining('array of strings in order'),
+        message: expect.stringContaining('Expected: array of strings')
+      });
+    });
+
+    test('sequencing validation error detects non-string array items', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'seq-q', type: 'sequencing' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'seq-q',
+          response: ['step1', 2, 'step3'] // Invalid: contains number
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'seq-q',
+        interactionType: 'sequencing',
+        receivedType: 'array with non-string items',
+        message: expect.stringContaining('array containing non-string values')
+      });
+    });
+
+    test('fill-in validation error shows string format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'fill-q',
+          response: 42 // Invalid: should be string
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'fill-q',
+        interactionType: 'fill-in',
+        expectedFormat: 'string (the text answer)',
+        receivedType: 'number',
+        message: expect.stringContaining('Expected: string (the text answer)')
+      });
+    });
+
+    test('validation errors include all diagnostic information', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce([{ id: 'test-q', type: 'true-false' }]);
+
+      try {
+        await scorm_automation_set_response({
+          session_id: 'test',
+          id: 'test-q',
+          response: 1
+        });
+        throw new Error('Expected validation error to be thrown');
+      } catch (error) {
+        // Verify all diagnostic properties are present
+        expect(error).toHaveProperty('code', 'INVALID_RESPONSE_FORMAT');
+        expect(error).toHaveProperty('name', 'AutomationAPIError');
+        expect(error).toHaveProperty('interactionId', 'test-q');
+        expect(error).toHaveProperty('interactionType', 'true-false');
+        expect(error).toHaveProperty('expectedFormat');
+        expect(error).toHaveProperty('receivedValue', 1);
+        expect(error).toHaveProperty('receivedType', 'number');
+        
+        // Verify error message is comprehensive
+        expect(error.message).toContain('test-q');
+        expect(error.message).toContain('true-false');
+        expect(error.message).toContain('Expected:');
+        expect(error.message).toContain('Got:');
+      }
     });
   });
 });

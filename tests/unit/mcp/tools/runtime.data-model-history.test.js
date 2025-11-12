@@ -163,7 +163,7 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
   });
 
   describe('Response Handling', () => {
-    test('should return successful result with changes', async () => {
+    test('should return summary by default without changes array', async () => {
       const mockChanges = [
         {
           element: 'cmi.location',
@@ -193,19 +193,46 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       expect(result).toEqual({
         success: true,
         session_id: 'session-1',
-        data: {
-          changes: mockChanges,
-          total: 2,
-          has_more: false
-        },
+        change_count: 2,
+        total_changes: 2,
+        has_more: false,
         filters_applied: {
           since_ts: null,
           element_prefix: null,
           change_session_id: null,
-          limit: null,
+          limit: 50,
           offset: 0
         }
       });
+      
+      // Should NOT include changes array by default
+      expect(result.changes).toBeUndefined();
+    });
+
+    test('should include changes array when include_changes is true', async () => {
+      const mockChanges = [
+        {
+          element: 'cmi.location',
+          previousValue: 'page-1',
+          newValue: 'page-2',
+          timestamp: 1000
+        }
+      ];
+
+      RuntimeManager.getDataModelHistory.mockResolvedValue({
+        success: true,
+        changes: mockChanges,
+        total: 1,
+        hasMore: false
+      });
+
+      const result = await scorm_get_data_model_history({
+        session_id: 'session-1',
+        include_changes: true
+      });
+
+      expect(result.changes).toEqual(mockChanges);
+      expect(result.change_count).toBe(1);
     });
 
     test('should handle empty result', async () => {
@@ -223,16 +250,14 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       expect(result).toEqual({
         success: true,
         session_id: 'session-1',
-        data: {
-          changes: [],
-          total: 0,
-          has_more: false
-        },
+        change_count: 0,
+        total_changes: 0,
+        has_more: false,
         filters_applied: {
           since_ts: null,
           element_prefix: null,
           change_session_id: null,
-          limit: null,
+          limit: 50,
           offset: 0
         }
       });
@@ -251,9 +276,27 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
         limit: 50
       });
 
-      expect(result.data.total).toBe(500);
-      expect(result.data.has_more).toBe(true);
-      expect(result.data.changes.length).toBe(50);
+      expect(result.total_changes).toBe(500);
+      expect(result.has_more).toBe(true);
+      expect(result.change_count).toBe(50);
+    });
+
+    test('should default limit to 50 when not specified', async () => {
+      RuntimeManager.getDataModelHistory.mockResolvedValue({
+        success: true,
+        changes: [],
+        total: 0,
+        hasMore: false
+      });
+
+      await scorm_get_data_model_history({
+        session_id: 'session-1'
+      });
+
+      expect(RuntimeManager.getDataModelHistory).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({ limit: 50 })
+      );
     });
   });
 
@@ -340,7 +383,9 @@ describe('MCP Tool: scorm_get_data_model_history', () => {
       });
 
       // Should handle undefined and return safe defaults
-      expect(result.data.changes).toBeDefined();
+      expect(result.change_count).toBe(0);
+      expect(result.total_changes).toBe(0);
+      expect(result.has_more).toBe(false);
     });
   });
 });

@@ -208,6 +208,32 @@ This section provides a complete, categorized list of all available MCP tools.
 **Reporting:**
 *   `scorm_report`
 
+### 7.4. Token Efficiency & Data Retrieval Best Practices
+
+To prevent excessive token usage, certain MCP tools return summary data by default and require explicit flags to retrieve full details:
+
+**`scorm_get_data_model_history`:**
+
+- **Default Behavior**: Returns `change_count`, `total_changes`, and `has_more` with a limit of 50 changes
+- **Full Details**: Set `include_changes: true` to receive the complete `changes` array
+- **Pagination**: Use `offset` and `limit` parameters for controlled data retrieval
+- **Filtering**: Use `element_prefix`, `since_ts`, or `change_session_id` to narrow results
+
+**`scorm_get_console_errors`:**
+
+- **Default Behavior**: Returns `error_count` and categorized counts (scorm_api, syntax, runtime, network) with a limit of 50 errors
+- **Full Details**: Set `include_errors: true` to receive the complete `errors` array
+- **Filtering**: Use `severity` (error/warn/info) and `since_ts` to narrow results
+- **Limit**: Specify `limit` parameter to control number of errors returned (default: 50)
+
+**`system_get_logs`:**
+
+- **Default Behavior**: Returns last 200 log entries
+- **Control**: Use `tail` parameter to specify number of entries (default: 200)
+- **Filtering**: Use `levels`, `since_ts`, and `component` to narrow results
+
+AI agents **MUST** start with summary calls and only request full details when debugging specific issues.
+
 ## 8. Architectural Anti-Patterns (Forbidden)
 
 - Placing business logic in the GUI (renderer) process.

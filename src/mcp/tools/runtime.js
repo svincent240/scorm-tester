@@ -995,7 +995,7 @@ async function scorm_get_console_errors(params = {}) {
   const since_ts = params.since_ts || 0;
   const severity = params.severity || ['error', 'warn'];
   const include_errors = params.include_errors === true;
-  const limit = params.limit ? parseInt(params.limit, 10) : null;
+  const limit = params.limit ? parseInt(params.limit, 10) : 50;
 
   logger?.debug && logger.debug('[scorm_get_console_errors] Starting', { session_id, since_ts, severity, include_errors, limit });
 
@@ -1037,11 +1037,7 @@ async function scorm_get_console_errors(params = {}) {
     };
 
     if (include_errors) {
-      if (limit && limit > 0) {
-        result.errors = messages.slice(-limit);
-      } else {
-        result.errors = messages;
-      }
+      result.errors = messages.slice(-limit);
     }
 
     logger?.debug && logger.debug('[scorm_get_console_errors] Returning result', {
@@ -1461,7 +1457,7 @@ async function scorm_get_page_state(params = {}) {
 
   if (include_options.console_errors) {
     promiseIndices.console_errors = promises.length;
-    promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warn'] }));
+    promises.push(scorm_get_console_errors({ session_id, severity: ['error', 'warn'], include_errors: true }));
     logger?.info && logger.info('[scorm_get_page_state] Adding console_errors at index', { index: promises.length - 1 });
   }
 
@@ -1799,7 +1795,9 @@ async function scorm_get_data_model_history(params = {}) {
     throw e;
   }
 
+  const include_changes = params.include_changes === true;
   const filters = {};
+  
   if (params.since_ts != null) {
     const since = Number(params.since_ts);
     if (Number.isFinite(since)) filters.sinceTs = since;
@@ -1814,9 +1812,12 @@ async function scorm_get_data_model_history(params = {}) {
     filters.sessionId = String(params.change_session_id);
   }
 
+  // Default limit is 50 to prevent token bloat
   if (params.limit != null) {
     const limit = Number(params.limit);
     if (Number.isFinite(limit) && limit >= 0) filters.limit = limit;
+  } else {
+    filters.limit = 50;
   }
 
   if (params.offset != null) {
@@ -1845,20 +1846,23 @@ async function scorm_get_data_model_history(params = {}) {
     since_ts: filters.sinceTs ?? null,
     element_prefix: Array.isArray(filters.elementPrefix) ? filters.elementPrefix : (filters.elementPrefix ?? null),
     change_session_id: filters.sessionId ?? null,
-    limit: filters.limit ?? null,
+    limit: filters.limit ?? 50,
     offset: filters.offset ?? 0
   };
 
   const payload = {
     success,
     session_id,
-    data: {
-      changes,
-      total,
-      has_more: hasMore
-    },
+    change_count: changes.length,
+    total_changes: total,
+    has_more: hasMore,
     filters_applied: filtersApplied
   };
+
+  // Only include full changes array if explicitly requested
+  if (include_changes) {
+    payload.changes = changes;
+  }
 
   if (!success) {
     payload.error = result?.error || 'Telemetry store reported failure';
