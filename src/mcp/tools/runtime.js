@@ -1545,27 +1545,8 @@ async function scorm_get_slide_map(params = {}) {
         const slides = [];
         let discoveryMethod = null;
 
-        // Strategy 1: Check for JavaScript course frameworks (window.Course, window.CourseConfig)
-        if (window.Course && typeof window.Course.countSlides === 'function') {
-          const count = window.Course.countSlides();
-          for (let i = 0; i < count; i++) {
-            const title = typeof window.Course.getSlideName === 'function'
-              ? window.Course.getSlideName(i)
-              : null;
-            const slideObj = window.CourseConfig?.slides?.[i];
-            slides.push({
-              index: i,
-              id: slideObj?.id || null,
-              title: title || slideObj?.title || null,
-              selector: null,
-              visible: i === (window.courseState?.getState?.()?.currentSlide || 0)
-            });
-          }
-          discoveryMethod = 'javascript_framework';
-        }
-
-        // Strategy 2: Check for Storyline/Articulate frame.json data
-        if (slides.length === 0 && window.frameData?.nav_data?.outline?.links) {
+        // Strategy 1: Check for Storyline/Articulate frame.json data
+        if (window.frameData?.nav_data?.outline?.links) {
           const extractSlides = (links, parentIndex = 0) => {
             links.forEach((link, idx) => {
               if (link.type === 'slide' && link.slideid) {
@@ -1586,7 +1567,7 @@ async function scorm_get_slide_map(params = {}) {
           discoveryMethod = 'storyline_framedata';
         }
 
-        // Strategy 3: Look for slide containers with data attributes (DOM-based)
+        // Strategy 2: Look for slide containers with data attributes (DOM-based)
         if (slides.length === 0) {
           document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]').forEach((slide, idx) => {
             const slideData = {
@@ -1610,7 +1591,7 @@ async function scorm_get_slide_map(params = {}) {
           }
         }
 
-        // Strategy 4: If no slides found, look for sections
+        // Strategy 3: If no slides found, look for sections
         if (slides.length === 0) {
           document.querySelectorAll('section, [role="region"]').forEach((section, idx) => {
             slides.push({
@@ -1675,74 +1656,8 @@ async function scorm_navigate_to_slide(params = {}) {
     const script = `
       (() => {
         const identifier = ${JSON.stringify(slide_identifier)};
-        let targetIndex = null;
-        let targetId = null;
-        let navigationMethod = null;
 
-        // Strategy 1: JavaScript framework navigation (window.Course)
-        if (window.Course && typeof window.Course.countSlides === 'function') {
-          const count = window.Course.countSlides();
-
-          // Match by numeric index
-          if (typeof identifier === 'number') {
-            if (identifier >= 0 && identifier < count) {
-              targetIndex = identifier;
-            }
-          }
-          // Match by ID or title substring
-          else if (typeof identifier === 'string') {
-            const searchText = identifier.toLowerCase();
-            for (let i = 0; i < count; i++) {
-              const slideObj = window.CourseConfig?.slides?.[i];
-              const title = typeof window.Course.getSlideName === 'function'
-                ? window.Course.getSlideName(i)
-                : null;
-
-              // Match by ID
-              if (slideObj?.id === identifier) {
-                targetIndex = i;
-                targetId = slideObj.id;
-                break;
-              }
-
-              // Match by title substring
-              const titleText = (title || slideObj?.title || '').toLowerCase();
-              if (titleText.includes(searchText)) {
-                targetIndex = i;
-                targetId = slideObj?.id;
-                break;
-              }
-            }
-          }
-
-          if (targetIndex !== null) {
-            // Use the framework's navigation method
-            if (window.courseRuntime && typeof window.courseRuntime.goToSlide === 'function') {
-              window.courseRuntime.goToSlide(targetIndex);
-              navigationMethod = 'framework_courseRuntime';
-            } else if (window.courseState && typeof window.courseState.setState === 'function') {
-              window.courseState.setState({ currentSlide: targetIndex });
-              if (window.Course.renderSlide && typeof window.Course.renderSlide === 'function') {
-                const contentEl = document.getElementById('content') || document.querySelector('main');
-                if (contentEl) {
-                  window.Course.renderSlide(contentEl, targetIndex);
-                }
-              }
-              navigationMethod = 'framework_manual';
-            }
-
-            if (navigationMethod) {
-              return {
-                success: true,
-                method: navigationMethod,
-                slide_index: targetIndex,
-                slide_id: targetId
-              };
-            }
-          }
-        }
-
-        // Strategy 2: DOM-based navigation (fallback)
+        // DOM-based navigation - discover slides via standard selectors
         let slides = Array.from(document.querySelectorAll('[data-slide], [data-slide-id], [class*="slide-"]'));
         if (slides.length === 0) {
           slides = Array.from(document.querySelectorAll('section, [role="region"]'));
@@ -1750,11 +1665,11 @@ async function scorm_navigate_to_slide(params = {}) {
 
         let targetSlide = null;
 
-        // Try to match by index
+        // Match by numeric index
         if (typeof identifier === 'number') {
           targetSlide = slides[identifier];
         }
-        // Try to match by ID or title
+        // Match by ID or title substring
         else if (typeof identifier === 'string') {
           targetSlide = slides.find(s => s.id === identifier);
 
@@ -1771,7 +1686,6 @@ async function scorm_navigate_to_slide(params = {}) {
           throw new Error('Slide not found: ' + identifier);
         }
 
-        // DOM-based navigation methods
         // Try navigation buttons first
         const navButtons = document.querySelectorAll('[data-slide-nav], [class*="slide-nav"]');
         const targetButton = Array.from(navButtons).find(btn =>

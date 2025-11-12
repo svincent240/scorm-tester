@@ -103,8 +103,8 @@ Before writing new code, check `src/shared/` for existing solutions.
     - **Validation**: `scorm_validate_workspace`, `scorm_lint_manifest`.
     - **Runtime Lifecycle**: `scorm_runtime_open`, `scorm_attempt_initialize`.
     - **Runtime Interaction**: `scorm_api_call`, `scorm_data_model_get`, `scorm_capture_screenshot`, `scorm_nav_get_state`.
-    - **DOM & Browser Testing**: `scorm_dom_click`, `scorm_dom_fill`, `scorm_dom_query`, `scorm_dom_evaluate`.
-    - **Template Automation**: `scorm_automation_*` tools wrap `scorm_dom_evaluate` to call `window.SCORMAutomation` API when available.
+    - **DOM & Browser Testing**: `scorm_dom_*` tools (click, fill, query, evaluate), `scorm_get_slide_map`, `scorm_navigate_to_slide` - pure DOM, no API dependencies.
+    - **Template Automation**: `scorm_automation_*` tools require `window.SCORMAutomation` API - includes `scorm_automation_go_to_slide`, `scorm_automation_get_course_structure`.
 
 ### 7.2. Template Automation Tools
 
@@ -116,13 +116,14 @@ Before writing new code, check `src/shared/` for existing solutions.
 - If unavailable, throw `AUTOMATION_API_NOT_AVAILABLE` error immediately
 - No automatic fallback to DOM tools - AI agent must explicitly choose between automation and DOM tools
 - `scorm_automation_check_availability` must be called first to determine strategy
+- Navigation: Use `scorm_automation_go_to_slide` for automation API, `scorm_navigate_to_slide` for pure DOM
 
 **Error Codes**: `AUTOMATION_API_NOT_AVAILABLE`, `AUTOMATION_API_ERROR`, `INVALID_INTERACTION_ID`
 
 **Tool Groups**:
 
 - **Core**: Check availability, list/set/get/check interactions
-- **Navigation**: Get structure/slide, navigate
+- **Navigation**: Get structure/slide, navigate (requires `window.SCORMAutomation`)
 - **Advanced**: Get correct answers, last evaluation, check slide answers
 - **Debug**: Get/clear trace logs
 
