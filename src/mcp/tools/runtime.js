@@ -994,8 +994,10 @@ async function scorm_get_console_errors(params = {}) {
   const session_id = params.session_id;
   const since_ts = params.since_ts || 0;
   const severity = params.severity || ['error', 'warn'];
+  const include_errors = params.include_errors === true;
+  const limit = params.limit ? parseInt(params.limit, 10) : null;
 
-  logger?.debug && logger.debug('[scorm_get_console_errors] Starting', { session_id, since_ts, severity });
+  logger?.debug && logger.debug('[scorm_get_console_errors] Starting', { session_id, since_ts, severity, include_errors, limit });
 
   if (!session_id || typeof session_id !== 'string') {
     const e = new Error('session_id is required');
@@ -1026,7 +1028,6 @@ async function scorm_get_console_errors(params = {}) {
     const result = {
       session_id,
       error_count: messages.length,
-      errors: messages,
       categories: {
         scorm_api: messages.filter(e => e.category === 'scorm_api').length,
         syntax: messages.filter(e => e.category === 'syntax').length,
@@ -1034,6 +1035,14 @@ async function scorm_get_console_errors(params = {}) {
         network: messages.filter(e => e.category === 'network').length
       }
     };
+
+    if (include_errors) {
+      if (limit && limit > 0) {
+        result.errors = messages.slice(-limit);
+      } else {
+        result.errors = messages;
+      }
+    }
 
     logger?.debug && logger.debug('[scorm_get_console_errors] Returning result', {
       resultKeys: Object.keys(result),
