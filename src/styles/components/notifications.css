@@ -268,10 +268,7 @@
   }
 }
 
-/* Accessibility */
-.notification[role="alert"] {
-  /* Screen readers will announce this */
-}
+/* Accessibility - Screen readers will announce role="alert" notifications */
 
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
@@ -476,20 +473,27 @@
 .error-badge {
   display: none;
   align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  background: var(--warning-bg);
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(245, 158, 11, 0.1);
   border: 1px solid var(--warning-color);
   border-radius: var(--border-radius-full);
   cursor: pointer;
   transition: all var(--transition-fast);
   user-select: none;
+  height: 26px;
+  min-height: 26px;
 }
 
 .error-badge:hover {
   background: var(--warning-color);
+  color: white;
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
+}
+
+.error-badge:hover .error-badge__label {
+  color: white;
 }
 
 .error-badge:active {
@@ -497,22 +501,23 @@
 }
 
 .error-badge__icon {
-  font-size: var(--font-size-md);
+  font-size: 14px;
   line-height: 1;
 }
 
 .error-badge__count {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   color: var(--danger-color);
-  min-width: 20px;
+  min-width: 16px;
   text-align: center;
 }
 
 .error-badge__label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--text-color);
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
 }
 
 /* ========================================

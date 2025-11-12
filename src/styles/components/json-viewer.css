@@ -79,7 +79,7 @@
 .json-object,
 .json-array {
   position: relative;
-  margin-left: var(--spacing-md, 16px);
+  margin-left: 4px;
 }
 
 .json-toggle {
@@ -122,7 +122,7 @@
 /* Expanded state */
 .json-expanded > .json-content {
   display: block;
-  margin-left: var(--spacing-md, 16px);
+  margin-left: 8px;
   margin-top: var(--spacing-xxs, 2px);
   margin-bottom: var(--spacing-xxs, 2px);
 }

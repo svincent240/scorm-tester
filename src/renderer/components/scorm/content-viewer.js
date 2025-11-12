@@ -1228,34 +1228,11 @@ class ContentViewer extends BaseComponent {
 
   /**
    * Show browse mode indicator
+   * Note: Hidden to save space in the UI - browse mode is still active
    */
   showBrowseModeIndicator() {
-    if (!this.browseModeIndicator) {
-      this.browseModeIndicator = document.createElement('div');
-      this.browseModeIndicator.className = 'content-viewer__browse-mode-indicator';
-      this.browseModeIndicator.innerHTML = '🔍 Browse Mode Active - Data Not Tracked';
-      this.browseModeIndicator.style.cssText = `
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(255, 193, 7, 0.9);
-        color: #000;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-        z-index: 1000;
-        pointer-events: none;
-      `;
-
-      if (this.element) {
-        this.element.appendChild(this.browseModeIndicator);
-      }
-    }
-
-    if (this.browseModeIndicator) {
-      this.browseModeIndicator.style.display = 'block';
-    }
+    // Indicator hidden to save space - browse mode functionality still works
+    // The browse mode button in the navigation bar provides sufficient visual indication
   }
 
   /**

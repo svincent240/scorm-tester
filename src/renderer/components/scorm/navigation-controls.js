@@ -860,22 +860,11 @@ class NavigationControls extends BaseComponent {
 
   /**
    * Show browse mode indicator (SCORM-compliant)
+   * Note: Hidden to save space in the UI - browse mode is still active
    */
   showBrowseModeIndicator() {
-    if (this.titleElement && !this.browseModeIndicator) {
-      this.browseModeIndicator = document.createElement('div');
-      this.browseModeIndicator.className = 'browse-mode-indicator';
-      this.browseModeIndicator.innerHTML = '🔍 Browse Mode - Data Not Tracked';
-
-      // Insert after title element
-      if (this.titleElement.parentNode) {
-        this.titleElement.parentNode.insertBefore(this.browseModeIndicator, this.titleElement.nextSibling);
-      }
-    }
-
-    if (this.browseModeIndicator) {
-      this.browseModeIndicator.style.display = 'block';
-    }
+    // Indicator hidden to save space - browse mode functionality still works
+    // The browse mode button itself provides sufficient visual indication
   }
 
   /**

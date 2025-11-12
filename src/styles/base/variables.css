@@ -164,20 +164,6 @@
   --transition-transform: transform var(--transition-base);
   --transition-all: all var(--transition-base);
   
-  /* Z-Index Scale */
-  --z-index-dropdown: 1000;
-  --z-index-sticky: 1020;
-  --z-index-fixed: 1030;
-  --z-index-modal-backdrop: 1040;
-  --z-index-modal: 1050;
-  --z-index-popover: 1060;
-  --z-index-tooltip: 1070;
-  --z-index-toast: 1080;
-
-  /* Content chrome layers */
-  --z-content-header: 95;
-  --z-content-stage: 10;
-  
   /* Breakpoints */
   --breakpoint-xs: 0;
   --breakpoint-sm: 576px;
@@ -309,22 +295,27 @@
 :root {
   --container-max-width: 1200px;
 
-  /* Normalize spacing scale usage (8px base rhythm) */
-  --spacing-xs: var(--spacing-1);
-  --spacing-sm: var(--spacing-2);
-  --spacing-md: var(--spacing-3);
-  --spacing-lg: var(--spacing-4);
-  --spacing-xl: var(--spacing-6);
-
-  --z-header: 100;
+  /* Consolidated Z-Index Scale */
+  --z-base: 1;
+  --z-content-stage: 10;
   --z-sidebar: 90;
+  --z-content-header: 95;
+  --z-header: 100;
   --z-inspector: 80;
   --z-overlay: 1000;
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-toast: 1080;
 
-  --header-height: 52px;   /* slimmer header */
-  --footer-height: 52px;   /* match header */
-  --navigation-controls-height: 44px;  /* slimmer nav */
-  --progress-tracking-height: 28px;    /* slimmer progress row */
+  --header-height: 42px;   /* compact header */
+  --footer-height: 42px;   /* match header */
+  --navigation-controls-height: 36px;  /* compact nav */
+  --progress-tracking-height: 24px;    /* compact progress row */
   --transition-normal: var(--transition-base);
   --transition-fast: 0.15s ease-in-out;
 
