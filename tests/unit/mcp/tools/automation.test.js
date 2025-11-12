@@ -1018,6 +1018,141 @@ describe('MCP Template Automation Tools', () => {
       });
     });
 
+    test('drag-drop validation error shows object format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'dd-q', type: 'drag-drop' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'dd-q',
+          response: ['item1', 'item2'] // Invalid: should be object
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'dd-q',
+        interactionType: 'drag-drop',
+        expectedFormat: expect.stringContaining('object with {itemId: zoneId}'),
+        receivedType: 'array',
+        message: expect.stringContaining('Expected: object with {itemId: zoneId}')
+      });
+    });
+
+    test('drag-drop validation error detects non-string zone IDs', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'dd-q', type: 'drag-drop' }]);
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'dd-q',
+          response: { item1: 'zone-a', item2: 123 } // Invalid: zone ID must be string
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        interactionId: 'dd-q',
+        interactionType: 'drag-drop',
+        receivedType: 'object with non-string values',
+        message: expect.stringContaining('All zone IDs must be strings')
+      });
+    });
+
+    test('drag-drop validation accepts valid object format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'dd-q', type: 'drag-drop' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'dd-q',
+        response: { 
+          'user-interface': 'presentation',
+          'business-logic': 'application',
+          'data-access': 'data'
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBe('drag-drop');
+    });
+
+    test('scorm_automation_set_response parses stringified JSON objects', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'dd-q', type: 'drag-drop' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      // Simulate MCP client sending JSON as string
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'dd-q',
+        response: '{"user-interface": "presentation", "business-logic": "application"}'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBe('drag-drop');
+      
+      // Verify the expression contains the parsed object, not the string
+      const call = RuntimeManager.executeJS.mock.calls[2];
+      const expression = call[1];
+      expect(expression).toContain('"user-interface"');
+      expect(expression).toContain('"presentation"');
+    });
+
+    test('scorm_automation_set_response parses stringified JSON arrays', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'mc-q', type: 'choice' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      // Simulate MCP client sending JSON array as string
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'mc-q',
+        response: '["a", "c", "e"]'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBe('choice');
+    });
+
+    test('scorm_automation_set_response handles malformed JSON gracefully', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      // Malformed JSON should be treated as a regular string
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'fill-q',
+        response: '{not valid json}'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBe('fill-in');
+    });
+
+    test('scorm_automation_set_response preserves string responses that look like JSON', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'fill-q', type: 'fill-in' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      // String that happens to look like JSON but is a legitimate answer
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'fill-q',
+        response: '{"this is my answer"}'
+      });
+
+      expect(result.success).toBe(true);
+      // Should remain as string since JSON.parse would fail
+    });
+
     test('validation errors include all diagnostic information', async () => {
       RuntimeManager.executeJS = jest.fn()
         .mockResolvedValueOnce(true)

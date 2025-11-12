@@ -89,6 +89,7 @@ function getExpectedResponseFormat(type) {
     'sequencing': 'array of strings in order like ["step1", "step2", "step3"]',
     'likert': 'string (the selected scale value)',
     'numeric': 'number or string representing a numeric value',
+    'drag-drop': 'object with {itemId: zoneId} pairs (e.g., {"item1": "zone-a", "item2": "zone-b"})',
     'other': 'format depends on the specific interaction implementation'
   };
   
@@ -281,6 +282,43 @@ function validateResponseFormat(response, type, id) {
       }
       break;
       
+    case 'drag-drop': {
+      if (!response || typeof response !== 'object' || Array.isArray(response)) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${Array.isArray(response) ? 'array' : typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = Array.isArray(response) ? 'array' : typeof response;
+        throw e;
+      }
+      // Validate that all values are strings (zone IDs)
+      const nonStringValues = Object.entries(response).filter(([_, value]) => typeof value !== 'string');
+      if (nonStringValues.length > 0) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: object with non-string values. All zone IDs must be strings. ` +
+          `Invalid entries: ${JSON.stringify(Object.fromEntries(nonStringValues))}`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = 'object with non-string values';
+        throw e;
+      }
+      break;
+    }
+      
     // For 'other' type, we can't validate - let the template handle it
     case 'other':
     default:
@@ -396,7 +434,7 @@ async function scorm_automation_list_interactions(params = {}) {
 async function scorm_automation_set_response(params = {}) {
   const session_id = params.session_id;
   const id = params.id;
-  const response = params.response;
+  let response = params.response;
 
   await validateRuntimeSession(session_id);
 
@@ -412,14 +450,38 @@ async function scorm_automation_set_response(params = {}) {
     throw e;
   }
 
+  // Handle stringified JSON objects from MCP clients
+  // Some MCP clients may send JSON objects as strings, especially for complex types
+  if (typeof response === 'string' && (response.trim().startsWith('{') || response.trim().startsWith('['))) {
+    try {
+      const parsed = JSON.parse(response);
+      logger.debug('Parsed stringified JSON response', {
+        session_id,
+        id,
+        originalType: 'string',
+        parsedType: Array.isArray(parsed) ? 'array' : typeof parsed
+      });
+      response = parsed;
+    } catch (parseErr) {
+      // If parsing fails, it might be a legitimate string response (e.g., for fill-in)
+      // Continue with the original string value
+      logger.debug('Response appears to be JSON but failed to parse, treating as string', {
+        session_id,
+        id,
+        error: parseErr.message
+      });
+    }
+  }
+
   const available = await checkAutomationAPI(session_id);
   if (!available) {
     throw createAPINotAvailableError('scorm_automation_set_response');
   }
 
+  // Get interaction metadata to validate response format
+  let interactionType = null;
+  
   try {
-    // Get interaction metadata to validate response format
-    let interactionType = null;
     try {
       const interactionsResult = await RuntimeManager.executeJS(
         null,
@@ -494,10 +556,27 @@ async function scorm_automation_set_response(params = {}) {
       stack: err.stack 
     });
     
-    const e = new Error(`Failed to set response for interaction '${id}': ${err.message}`);
+    // Provide enhanced error message for drag-drop interactions
+    let errorMessage = `Failed to set response for interaction '${id}': ${err.message}`;
+    if (interactionType === 'drag-drop' && err.message.includes('expects an object')) {
+      errorMessage += `\n\nDrag-drop troubleshooting:\n` +
+        `- Your response format: ${JSON.stringify(response)}\n` +
+        `- Expected format: {itemId: zoneId} (e.g., {"item1": "zone-a"})\n` +
+        `- Common issues:\n` +
+        `  1. Item IDs may be case-sensitive\n` +
+        `  2. Zone IDs must match exactly as defined in the template\n` +
+        `  3. The template may require all draggable items to be assigned\n` +
+        `  4. Some templates expect a wrapper object like {items: {...}}\n` +
+        `\nTry using scorm_automation_list_interactions to see the exact structure expected, ` +
+        `or scorm_automation_get_correct_response to see the correct answer format.`;
+    }
+    
+    const e = new Error(errorMessage);
     e.code = 'AUTOMATION_API_ERROR';
     e.name = 'AutomationAPIError';
     e.interactionId = id;
+    e.interactionType = interactionType;
+    e.responseProvided = response;
     e.originalError = err;
     throw e;
   }
