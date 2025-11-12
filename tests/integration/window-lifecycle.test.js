@@ -298,10 +298,6 @@ describe('Window Management Integration Tests', () => {
       expect(windowManager.getWindow(WINDOW_TYPES.MAIN)).toBeNull();
     });
 
-    test.skip('should handle webContents destruction in broadcasting (legacy inspector window removed)', async () => {
-      // Inspector window removed in GUI rewrite; test skipped per new architecture
-    });
-
     test('should handle window send errors gracefully', async () => {
       const mainWindow = await windowManager.createMainWindow();
 

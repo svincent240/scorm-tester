@@ -131,12 +131,17 @@ class ScormDataModel {
     }
 
     const str = typeof value === 'string' ? value : String(value);
+    const originalLength = str.length;
     const originalBytes = Buffer.byteLength(str, 'utf8');
+    
+    const maxLength = this.changeConfig?.maxValueLength || 2048;
+    const truncated = originalLength > maxLength;
+    const truncatedValue = truncated ? str.substring(0, maxLength) : str;
 
     return {
-      value: str,
-      truncated: false,
-      originalLength: str.length,
+      value: truncatedValue,
+      truncated,
+      originalLength,
       originalBytes
     };
   }

@@ -1,29 +1,5 @@
 const assert = require('assert');
-let TokenBucketRateLimiter = null;
-try { TokenBucketRateLimiter = require('../../../../src/main/services/ipc/rate-limiter'); } catch (_) { /* removed per Phase 1 */ }
 const createSingleflight = require('../../../../src/shared/utils/singleflight');
-const ScormInspectorTelemetryStore = require('../../../../src/main/services/scorm-inspector/scorm-inspector-telemetry-store');
-
-const suiteRL = TokenBucketRateLimiter ? describe : describe.skip;
-
-suiteRL('IPC - RateLimiter', function() {
-  it('allows within limit and blocks when exceeded', function() {
-    const rl = new TokenBucketRateLimiter();
-    // create a tiny profile for test purposes
-    rl.profiles.test = { windowMs: 1000, max: 2 };
-    const sender = { id: 's1' };
-    const ch = 'test-channel';
-    assert.strictEqual(rl.allow(sender, ch, { profile: 'test' }), true);
-    assert.strictEqual(rl.allow(sender, ch, { profile: 'test' }), true);
-    assert.strictEqual(rl.allow(sender, ch, { profile: 'test' }), false);
-  });
-
-  it('snBypass channels are never limited', function() {
-    const rl = new TokenBucketRateLimiter();
-    const sender = { id: 's1' };
-    assert.strictEqual(rl.allow(sender, 'sn:getStatus', {}), true);
-  });
-});
 
 describe('IPC - Singleflight', function() {
   it('coalesces concurrent calls with same key', async function() {
@@ -37,11 +13,4 @@ describe('IPC - Singleflight', function() {
     assert.strictEqual(r2, 'ok');
     assert.strictEqual(runCount, 1);
   });
-});
-
-describe('ScormInspectorTelemetryStore', function() {
-});
-
-describe('FileManager (stubs)', function() {
-  it.todo('add tests for extractZipWithValidation (requires zip fixtures)');
 });
