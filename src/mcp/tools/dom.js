@@ -81,12 +81,21 @@ async function scorm_dom_click(params = {}) {
 
       // Ensure all returned values are JSON-serializable primitives
       // to avoid CDP structured clone errors
+      let classNameValue = null;
+      if (el.className) {
+        if (typeof el.className === 'object' && el.className.baseVal !== undefined) {
+          classNameValue = String(el.className.baseVal || '');
+        } else {
+          classNameValue = String(el.className || '');
+        }
+      }
+
       return {
         success: true,
         element: {
           tagName: String(el.tagName || ''),
           id: el.id ? String(el.id) : null,
-          className: el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null,
+          className: classNameValue,
           textContent: el.textContent ? String(el.textContent).substring(0, 100) : null
         }
       };
@@ -210,13 +219,23 @@ async function scorm_dom_fill(params = {}) {
       }
 
       // Ensure all returned values are JSON-serializable primitives
+      // Force all values to primitives to avoid Electron cloning errors
+      let classNameValue = null;
+      if (el.className) {
+        if (typeof el.className === 'object' && el.className.baseVal !== undefined) {
+          classNameValue = String(el.className.baseVal || '');
+        } else {
+          classNameValue = String(el.className || '');
+        }
+      }
+
       return {
         success: true,
         element: {
           tagName: String(el.tagName || ''),
           type: el.type ? String(el.type) : null,
           id: el.id ? String(el.id) : null,
-          className: el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null,
+          className: classNameValue,
           value: el.value !== undefined ? String(el.value) : null,
           checked: el.checked !== undefined ? Boolean(el.checked) : null
         }
@@ -291,7 +310,16 @@ async function scorm_dom_query(params = {}) {
           result.attributes[attr.name] = attr.value;
         }
         result.id = el.id || null;
-        result.className = el.className ? (typeof el.className === 'object' ? el.className.baseVal : el.className) : null;
+        // Force className to string to avoid cloning errors with SVGAnimatedString
+        if (el.className) {
+          if (typeof el.className === 'object' && el.className.baseVal !== undefined) {
+            result.className = String(el.className.baseVal || '');
+          } else {
+            result.className = String(el.className || '');
+          }
+        } else {
+          result.className = null;
+        }
       }
 
       // Get visibility state
@@ -606,13 +634,22 @@ async function scorm_keyboard_type(params = {}) {
       targetEl.dispatchEvent(new Event('change', { bubbles: true }));
 
       // Ensure all returned values are JSON-serializable primitives
+      let classNameValue = null;
+      if (targetEl.className) {
+        if (typeof targetEl.className === 'object' && targetEl.className.baseVal !== undefined) {
+          classNameValue = String(targetEl.className.baseVal || '');
+        } else {
+          classNameValue = String(targetEl.className || '');
+        }
+      }
+
       return {
         success: true,
         characters_typed: text.length,
         element: {
           tagName: String(targetEl.tagName || ''),
           id: targetEl.id ? String(targetEl.id) : null,
-          className: targetEl.className ? (typeof targetEl.className === 'object' ? targetEl.className.baseVal : targetEl.className) : null,
+          className: classNameValue,
           value: targetEl.value !== undefined ? String(targetEl.value) : null
         }
       };
@@ -730,7 +767,16 @@ async function scorm_dom_find_interactive_elements(params = {}) {
 
           // Infer purpose from text/class
           const lowerText = text.toLowerCase();
-          const className = (btn.className && typeof btn.className === 'object' ? btn.className.baseVal : btn.className) || '';
+          // Force className to string to avoid cloning errors with SVGAnimatedString
+          let className = '';
+          if (btn.className) {
+            if (typeof btn.className === 'object' && btn.className.baseVal !== undefined) {
+              className = String(btn.className.baseVal || '');
+            } else {
+              className = String(btn.className || '');
+            }
+          }
+          
           if (lowerText.includes('next') || className.includes('next')) {
             btnData.purpose = 'navigation_next';
           } else if (lowerText.includes('prev') || lowerText.includes('back') || className.includes('prev')) {
@@ -955,12 +1001,21 @@ async function scorm_dom_click_by_text(params = {}) {
       match.click();
 
       // Ensure all returned values are JSON-serializable primitives
+      let classNameValue = null;
+      if (match.className) {
+        if (typeof match.className === 'object' && match.className.baseVal !== undefined) {
+          classNameValue = String(match.className.baseVal || '');
+        } else {
+          classNameValue = String(match.className || '');
+        }
+      }
+
       return {
         clicked: true,
         element: {
           tagName: String(match.tagName || ''),
           id: match.id ? String(match.id) : null,
-          className: match.className ? (typeof match.className === 'object' ? match.className.baseVal : match.className) : null,
+          className: classNameValue,
           textContent: match.textContent ? String(match.textContent).substring(0, 100) : null
         }
       };

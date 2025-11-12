@@ -239,10 +239,11 @@ class RuntimeManager {
         // instead of Electron's generic "Script failed to execute" message
         // Use eval() to catch syntax errors that would otherwise fail during parsing
         // Use JSON.stringify to safely embed the script without escaping issues
+        // IMPORTANT: The script may return a Promise, so we need to await it
         const wrappedScript = `
-          (() => {
+          (async () => {
             try {
-              const __result = eval(${JSON.stringify(message.params.script)});
+              const __result = await eval(${JSON.stringify(message.params.script)});
               return { success: true, result: __result };
             } catch (__error) {
               return {
@@ -833,10 +834,11 @@ class RuntimeManager {
     // Wrap script in try-catch to capture actual JavaScript errors
     // Use eval() to catch syntax errors that would otherwise fail during parsing
     // Use JSON.stringify to safely embed the script without escaping issues
+    // IMPORTANT: The script may return a Promise, so we need to await it
     const wrappedScript = `
-      (() => {
+      (async () => {
         try {
-          const __result = eval(${JSON.stringify(script)});
+          const __result = await eval(${JSON.stringify(script)});
           return { success: true, result: __result };
         } catch (__error) {
           return {
