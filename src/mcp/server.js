@@ -12,6 +12,7 @@ const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_se
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
 const { scorm_runtime_open, scorm_runtime_status, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
 const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
+const { scorm_automation_check_availability, scorm_automation_list_interactions, scorm_automation_set_response, scorm_automation_check_answer, scorm_automation_get_response, scorm_automation_get_course_structure, scorm_automation_get_current_slide, scorm_automation_go_to_slide, scorm_automation_get_correct_response, scorm_automation_get_last_evaluation, scorm_automation_check_slide_answers, scorm_automation_get_trace, scorm_automation_clear_trace } = require("./tools/automation");
 
 const getLogger = require('../shared/utils/logger.js');
 const fs = require('fs');
@@ -102,6 +103,21 @@ const TOOL_META = new Map([
   ["scorm_get_slide_map", { description: "Get slide map for single-SCO courses - discovers all slides with titles and IDs for easy navigation", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_navigate_to_slide", { description: "Navigate to a specific slide by index, ID, or title substring - works with single-SCO courses", inputSchema: { type: "object", properties: { session_id: { type: "string" }, slide_identifier: { type: ["string", "number"] } }, required: ["session_id", "slide_identifier"] } }],
 
+  // Template Automation API (requires compatible SCORM template with window.SCORMAutomation)
+  ["scorm_automation_check_availability", { description: "Check if Template Automation API is available in the current course - call this first before using other automation tools", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_list_interactions", { description: "List all registered interactive elements on the current slide using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_set_response", { description: "Set response for a specific interaction using Template Automation API - response format must match interaction type", inputSchema: { type: "object", properties: { session_id: { type: "string" }, id: { type: "string" }, response: {} }, required: ["session_id", "id", "response"] } }],
+  ["scorm_automation_check_answer", { description: "Trigger evaluation for a single interaction using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, id: { type: "string" } }, required: ["session_id", "id"] } }],
+  ["scorm_automation_get_response", { description: "Get current response value for a specific interaction using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, id: { type: "string" } }, required: ["session_id", "id"] } }],
+  ["scorm_automation_get_course_structure", { description: "Get course slide structure as defined in course-config.js using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_get_current_slide", { description: "Get ID of currently active slide using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_go_to_slide", { description: "Navigate to specific slide using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, slideId: { type: "string" } }, required: ["session_id", "slideId"] } }],
+  ["scorm_automation_get_correct_response", { description: "Get correct answer for an interaction (requires exposeCorrectAnswers enabled) using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, id: { type: "string" } }, required: ["session_id", "id"] } }],
+  ["scorm_automation_get_last_evaluation", { description: "Get last evaluation result without re-triggering evaluation using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, id: { type: "string" } }, required: ["session_id", "id"] } }],
+  ["scorm_automation_check_slide_answers", { description: "Evaluate all interactions on specified slide (or current slide if omitted) using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" }, slideId: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_get_trace", { description: "Get automation action trace log using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_automation_clear_trace", { description: "Clear automation action trace log using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+
   // System Logging & Diagnostics
   ["system_get_logs", { description: "Get recent log entries in NDJSON format - includes browser console errors/warnings and all application logs with filtering by level/timestamp/component", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
   ["system_set_log_level", { description: "Set application log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
@@ -151,6 +167,19 @@ router.register("scorm_dom_click_by_text", scorm_dom_click_by_text);
 router.register("scorm_get_page_state", scorm_get_page_state);
 router.register("scorm_get_slide_map", scorm_get_slide_map);
 router.register("scorm_navigate_to_slide", scorm_navigate_to_slide);
+router.register("scorm_automation_check_availability", scorm_automation_check_availability);
+router.register("scorm_automation_list_interactions", scorm_automation_list_interactions);
+router.register("scorm_automation_set_response", scorm_automation_set_response);
+router.register("scorm_automation_check_answer", scorm_automation_check_answer);
+router.register("scorm_automation_get_response", scorm_automation_get_response);
+router.register("scorm_automation_get_course_structure", scorm_automation_get_course_structure);
+router.register("scorm_automation_get_current_slide", scorm_automation_get_current_slide);
+router.register("scorm_automation_go_to_slide", scorm_automation_go_to_slide);
+router.register("scorm_automation_get_correct_response", scorm_automation_get_correct_response);
+router.register("scorm_automation_get_last_evaluation", scorm_automation_get_last_evaluation);
+router.register("scorm_automation_check_slide_answers", scorm_automation_check_slide_answers);
+router.register("scorm_automation_get_trace", scorm_automation_get_trace);
+router.register("scorm_automation_clear_trace", scorm_automation_clear_trace);
 router.register("scorm_report", scorm_report);
 // System tools for logs and log level control
 async function system_get_logs(params = {}) {
@@ -237,6 +266,19 @@ router.register("scorm_dom_query", scorm_dom_query);
 router.register("scorm_dom_evaluate", scorm_dom_evaluate);
 router.register("scorm_dom_wait_for", scorm_dom_wait_for);
 router.register("scorm_keyboard_type", scorm_keyboard_type);
+router.register("scorm_automation_check_availability", scorm_automation_check_availability);
+router.register("scorm_automation_list_interactions", scorm_automation_list_interactions);
+router.register("scorm_automation_set_response", scorm_automation_set_response);
+router.register("scorm_automation_check_answer", scorm_automation_check_answer);
+router.register("scorm_automation_get_response", scorm_automation_get_response);
+router.register("scorm_automation_get_course_structure", scorm_automation_get_course_structure);
+router.register("scorm_automation_get_current_slide", scorm_automation_get_current_slide);
+router.register("scorm_automation_go_to_slide", scorm_automation_go_to_slide);
+router.register("scorm_automation_get_correct_response", scorm_automation_get_correct_response);
+router.register("scorm_automation_get_last_evaluation", scorm_automation_get_last_evaluation);
+router.register("scorm_automation_check_slide_answers", scorm_automation_check_slide_answers);
+router.register("scorm_automation_get_trace", scorm_automation_get_trace);
+router.register("scorm_automation_clear_trace", scorm_automation_clear_trace);
 
   // JSON-RPC helpers (for MCP-compatible clients like Kilo Code)
   function writeJSONRPCResult(id, result) {
