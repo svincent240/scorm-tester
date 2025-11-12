@@ -49,7 +49,7 @@ async function scorm_dom_click(params = {}) {
         const start = Date.now();
         while (!document.querySelector(selector)) {
           if (Date.now() - start > waitTimeout) {
-            throw new Error('Element not found: ' + selector);
+            throw new Error('Element not found after waiting: ' + selector);
           }
           await new Promise(r => setTimeout(r, 100));
         }
@@ -57,7 +57,13 @@ async function scorm_dom_click(params = {}) {
 
       const el = document.querySelector(selector);
       if (!el) {
+        // This error is more direct and will be caught by the enhanced error handler
         throw new Error('Element not found: ' + selector);
+      }
+      
+      // Pre-click validation: Check if the element is connected to the DOM
+      if (!el.isConnected) {
+        throw new Error('Element is not connected to the DOM: ' + selector);
       }
 
       // Scroll element into view
@@ -93,7 +99,15 @@ async function scorm_dom_click(params = {}) {
     sessions.emit && sessions.emit({ session_id, type: 'dom:click_complete', payload: { selector } });
     return result;
   } catch (err) {
-    const e = new Error(`DOM click failed: ${err.message}`);
+    let message = `DOM click failed: ${err.message}`;
+    // Provide a more helpful error message for common race conditions
+    if (err.message.includes('Element not found') || err.message.includes('not connected to the DOM')) {
+        message = 'DOM click failed: Element may have been removed or page navigated. Consider using scorm_dom_wait_for before clicking.';
+    } else if (err.message.includes('clone')) { // Catch the original "structured clone" error
+        message = 'DOM click failed due to a browser error (structured clone). This can happen if the page navigates away unexpectedly during the operation.';
+    }
+    
+    const e = new Error(message);
     e.code = 'DOM_CLICK_FAILED';
     throw e;
   }
