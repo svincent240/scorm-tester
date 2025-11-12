@@ -218,6 +218,7 @@ describe('MCP Template Automation Tools', () => {
     test('scorm_automation_set_response sets interaction response', async () => {
       RuntimeManager.executeJS = jest.fn()
         .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q1', type: 'choice' }]) // listInteractions call for validation
         .mockResolvedValueOnce(true); // setResponse call
 
       const result = await scorm_automation_set_response({
@@ -230,11 +231,12 @@ describe('MCP Template Automation Tools', () => {
         available: true,
         success: true,
         id: 'q1',
-        response: 'answer-a'
+        response: 'answer-a',
+        interactionType: 'choice'
       });
 
       // Verify the JavaScript expression was properly constructed and escaped
-      const call = RuntimeManager.executeJS.mock.calls[1];
+      const call = RuntimeManager.executeJS.mock.calls[2]; // Now third call (0: API check, 1: listInteractions, 2: setResponse)
       expect(call[1]).toContain("window.SCORMAutomation.setResponse('q1'");
       expect(call[1]).toContain('"answer-a"');
     });
@@ -242,6 +244,7 @@ describe('MCP Template Automation Tools', () => {
     test('scorm_automation_set_response escapes single quotes in id', async () => {
       RuntimeManager.executeJS = jest.fn()
         .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: "q'1", type: 'fill-in' }]) // listInteractions call for validation
         .mockResolvedValueOnce(true); // setResponse call
 
       await scorm_automation_set_response({
@@ -250,8 +253,117 @@ describe('MCP Template Automation Tools', () => {
         response: 'answer'
       });
 
-      const call = RuntimeManager.executeJS.mock.calls[1];
+      const call = RuntimeManager.executeJS.mock.calls[2]; // Now third call
       expect(call[1]).toContain("q\\'1");
+    });
+
+    test('scorm_automation_set_response validates true-false interaction format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q1', type: 'true-false' }]); // listInteractions call
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'q1',
+          response: 'true' // Should be boolean, not string
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        name: 'AutomationAPIError',
+        interactionId: 'q1',
+        interactionType: 'true-false'
+      });
+    });
+
+    test('scorm_automation_set_response validates choice interaction format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q2', type: 'choice' }]); // listInteractions call
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'q2',
+          response: 123 // Should be string or array of strings
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        name: 'AutomationAPIError',
+        interactionId: 'q2',
+        interactionType: 'choice'
+      });
+    });
+
+    test('scorm_automation_set_response validates numeric interaction format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q3', type: 'numeric' }]); // listInteractions call
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'q3',
+          response: true // Should be number or numeric string
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        name: 'AutomationAPIError',
+        interactionId: 'q3',
+        interactionType: 'numeric'
+      });
+    });
+
+    test('scorm_automation_set_response validates matching interaction format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q4', type: 'matching' }]); // listInteractions call
+
+      await expect(
+        scorm_automation_set_response({
+          session_id: 'test',
+          id: 'q4',
+          response: [{ source: '1' }] // Missing 'target' property
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+        name: 'AutomationAPIError',
+        interactionId: 'q4',
+        interactionType: 'matching'
+      });
+    });
+
+    test('scorm_automation_set_response accepts valid matching format', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce([{ id: 'q4', type: 'matching' }]) // listInteractions call
+        .mockResolvedValueOnce(true); // setResponse call
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'q4',
+        response: [{ source: '1', target: 'a' }, { source: '2', target: 'b' }]
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBe('matching');
+    });
+
+    test('scorm_automation_set_response works when interaction metadata not available', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(null) // listInteractions returns null
+        .mockResolvedValueOnce(true); // setResponse call succeeds anyway
+
+      const result = await scorm_automation_set_response({
+        session_id: 'test',
+        id: 'q5',
+        response: 'any-value'
+      });
+
+      // Should succeed even without validation when metadata not available
+      expect(result.success).toBe(true);
+      expect(result.interactionType).toBeUndefined();
     });
 
     test('scorm_automation_check_answer evaluates interaction', async () => {

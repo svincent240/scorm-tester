@@ -73,6 +73,222 @@ function createAPINotAvailableError(toolName) {
   return e;
 }
 
+/**
+ * Helper: Get expected response format description for an interaction type
+ * @param {string} type - Interaction type
+ * @returns {string} - Human-readable description of expected format
+ */
+function getExpectedResponseFormat(type) {
+  const formats = {
+    'true-false': 'boolean (true or false)',
+    'choice': 'string (single answer ID like "a") or array of strings (multiple answers like ["a", "c"])',
+    'fill-in': 'string (the text answer)',
+    'long-fill-in': 'string (the text answer)',
+    'matching': 'array of objects with source/target pairs like [{source: "1", target: "a"}, {source: "2", target: "b"}]',
+    'performance': 'string (the response text)',
+    'sequencing': 'array of strings in order like ["step1", "step2", "step3"]',
+    'likert': 'string (the selected scale value)',
+    'numeric': 'number or string representing a numeric value',
+    'other': 'format depends on the specific interaction implementation'
+  };
+  
+  return formats[type] || 'unknown - consult the course template documentation';
+}
+
+/**
+ * Helper: Validate response format matches interaction type
+ * @param {any} response - The response value to validate
+ * @param {string} type - The interaction type
+ * @param {string} id - The interaction ID (for error messages)
+ * @throws {Error} - If response format is invalid
+ */
+function validateResponseFormat(response, type, id) {
+  const expectedFormat = getExpectedResponseFormat(type);
+  
+  switch (type) {
+    case 'true-false':
+      if (typeof response !== 'boolean') {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      break;
+      
+    case 'choice':
+      if (typeof response !== 'string' && !Array.isArray(response)) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      if (Array.isArray(response) && !response.every(item => typeof item === 'string')) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: array containing non-string values (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = 'array with non-string items';
+        throw e;
+      }
+      break;
+      
+    case 'fill-in':
+    case 'long-fill-in':
+    case 'performance':
+    case 'likert':
+      if (typeof response !== 'string') {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      break;
+      
+    case 'numeric':
+      if (typeof response !== 'number' && typeof response !== 'string') {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      if (typeof response === 'string' && isNaN(Number(response))) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: non-numeric string (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = 'non-numeric string';
+        throw e;
+      }
+      break;
+      
+    case 'matching': {
+      if (!Array.isArray(response)) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      const invalidMatchItems = response.filter(item => 
+        !item || typeof item !== 'object' || !('source' in item) || !('target' in item)
+      );
+      if (invalidMatchItems.length > 0) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: array with invalid matching pairs. Each item must have 'source' and 'target' properties.`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = 'array with invalid matching pairs';
+        throw e;
+      }
+      break;
+    }
+      
+    case 'sequencing':
+      if (!Array.isArray(response)) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: ${typeof response} (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = typeof response;
+        throw e;
+      }
+      if (!response.every(item => typeof item === 'string')) {
+        const e = new Error(
+          `Invalid response format for interaction '${id}' (type: ${type}). ` +
+          `Expected: ${expectedFormat}. ` +
+          `Got: array containing non-string values (${JSON.stringify(response)})`
+        );
+        e.code = 'INVALID_RESPONSE_FORMAT';
+        e.name = 'AutomationAPIError';
+        e.interactionId = id;
+        e.interactionType = type;
+        e.expectedFormat = expectedFormat;
+        e.receivedValue = response;
+        e.receivedType = 'array with non-string items';
+        throw e;
+      }
+      break;
+      
+    // For 'other' type, we can't validate - let the template handle it
+    case 'other':
+    default:
+      // No validation for unknown types
+      break;
+  }
+}
+
 // ============================================================================
 // CORE INTERACTION TOOLS
 // ============================================================================
@@ -202,10 +418,41 @@ async function scorm_automation_set_response(params = {}) {
   }
 
   try {
+    // Get interaction metadata to validate response format
+    let interactionType = null;
+    try {
+      const interactionsResult = await RuntimeManager.executeJS(
+        null,
+        'window.SCORMAutomation.listInteractions()',
+        session_id
+      );
+      
+      if (Array.isArray(interactionsResult)) {
+        const interaction = interactionsResult.find(i => i.id === id);
+        if (interaction && interaction.type) {
+          interactionType = interaction.type;
+          // Validate response format if we know the type
+          validateResponseFormat(response, interactionType, id);
+        }
+      }
+    } catch (validationErr) {
+      // If validation failed, re-throw the validation error
+      if (validationErr.code === 'INVALID_RESPONSE_FORMAT') {
+        throw validationErr;
+      }
+      // If we couldn't get interaction metadata, log but continue
+      // (the template will validate and provide its own error)
+      logger.debug('Could not retrieve interaction metadata for validation', {
+        session_id,
+        id,
+        error: validationErr.message
+      });
+    }
+
     sessions.emit && sessions.emit({ 
       session_id, 
       type: 'automation:set_response', 
-      payload: { id, response } 
+      payload: { id, response, interactionType } 
     });
 
     const expression = `window.SCORMAutomation.setResponse('${id.replace(/'/g, "\\'")}', ${JSON.stringify(response)})`;
@@ -215,9 +462,23 @@ async function scorm_automation_set_response(params = {}) {
       available: true,
       success: result,
       id,
-      response
+      response,
+      ...(interactionType && { interactionType })
     };
   } catch (err) {
+    // If it's already a validation error, just re-throw with additional context
+    if (err.code === 'INVALID_RESPONSE_FORMAT') {
+      logger.error('Response format validation failed', {
+        session_id,
+        id,
+        response,
+        interactionType: err.interactionType,
+        expectedFormat: err.expectedFormat,
+        receivedType: err.receivedType
+      });
+      throw err;
+    }
+
     logger.error('Error setting response', { 
       session_id, 
       id,
