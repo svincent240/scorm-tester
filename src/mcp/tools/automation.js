@@ -1123,6 +1123,222 @@ async function scorm_automation_clear_trace(params = {}) {
 }
 
 // ============================================================================
+// ENGAGEMENT TRACKING TOOLS
+// ============================================================================
+
+/**
+ * Get engagement tracking state for current slide
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Engagement state
+ */
+async function scorm_engagement_get_state({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_engagement_get_state');
+  }
+
+  try {
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getEngagementState()',
+      session_id
+    );
+
+    return {
+      available: true,
+      state: result
+    };
+  } catch (err) {
+    logger.error('Error getting engagement state', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get engagement state: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Get user-friendly engagement progress for current slide
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Engagement progress with percentage and items
+ */
+async function scorm_engagement_get_progress({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_engagement_get_progress');
+  }
+
+  try {
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getEngagementProgress()',
+      session_id
+    );
+
+    return {
+      available: true,
+      progress: result
+    };
+  } catch (err) {
+    logger.error('Error getting engagement progress', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get engagement progress: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Manually mark a tab as viewed (for testing purposes)
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {string} params.tab_id - Tab identifier to mark as viewed
+ * @returns {Promise<Object>} - Success indicator
+ */
+async function scorm_engagement_mark_tab_viewed({ session_id, tab_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_engagement_mark_tab_viewed');
+  }
+
+  if (!tab_id || typeof tab_id !== 'string') {
+    const e = new Error('tab_id is required and must be a string');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  try {
+    const expression = `window.SCORMAutomation.markTabViewed('${tab_id.replace(/'/g, "\\'")}')`;
+    await RuntimeManager.executeJS(null, expression, session_id);
+
+    return {
+      available: true,
+      success: true,
+      tab_id
+    };
+  } catch (err) {
+    logger.error('Error marking tab as viewed', { 
+      session_id, 
+      tab_id,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to mark tab as viewed: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Manually set scroll depth percentage (for testing purposes)
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {number} params.percentage - Scroll depth percentage (0-100)
+ * @returns {Promise<Object>} - Success indicator
+ */
+async function scorm_engagement_set_scroll_depth({ session_id, percentage }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_engagement_set_scroll_depth');
+  }
+
+  if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+    const e = new Error('percentage must be a number between 0 and 100');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  try {
+    const expression = `window.SCORMAutomation.setScrollDepth(${percentage})`;
+    await RuntimeManager.executeJS(null, expression, session_id);
+
+    return {
+      available: true,
+      success: true,
+      percentage
+    };
+  } catch (err) {
+    logger.error('Error setting scroll depth', { 
+      session_id, 
+      percentage,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to set scroll depth: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Reset engagement tracking for current slide (for testing purposes)
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Success indicator
+ */
+async function scorm_engagement_reset({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_engagement_reset');
+  }
+
+  try {
+    await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.resetEngagement()',
+      session_id
+    );
+
+    return {
+      available: true,
+      success: true
+    };
+  } catch (err) {
+    logger.error('Error resetting engagement', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to reset engagement: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1139,5 +1355,10 @@ module.exports = {
   scorm_automation_get_last_evaluation,
   scorm_automation_check_slide_answers,
   scorm_automation_get_trace,
-  scorm_automation_clear_trace
+  scorm_automation_clear_trace,
+  scorm_engagement_get_state,
+  scorm_engagement_get_progress,
+  scorm_engagement_mark_tab_viewed,
+  scorm_engagement_set_scroll_depth,
+  scorm_engagement_reset
 };

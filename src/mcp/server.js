@@ -12,7 +12,7 @@ const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_se
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
 const { scorm_runtime_open, scorm_runtime_status, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide } = require("./tools/runtime");
 const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
-const { scorm_automation_check_availability, scorm_automation_list_interactions, scorm_automation_set_response, scorm_automation_check_answer, scorm_automation_get_response, scorm_automation_get_course_structure, scorm_automation_get_current_slide, scorm_automation_go_to_slide, scorm_automation_get_correct_response, scorm_automation_get_last_evaluation, scorm_automation_check_slide_answers, scorm_automation_get_trace, scorm_automation_clear_trace } = require("./tools/automation");
+const { scorm_automation_check_availability, scorm_automation_list_interactions, scorm_automation_set_response, scorm_automation_check_answer, scorm_automation_get_response, scorm_automation_get_course_structure, scorm_automation_get_current_slide, scorm_automation_go_to_slide, scorm_automation_get_correct_response, scorm_automation_get_last_evaluation, scorm_automation_check_slide_answers, scorm_automation_get_trace, scorm_automation_clear_trace, scorm_engagement_get_state, scorm_engagement_get_progress, scorm_engagement_mark_tab_viewed, scorm_engagement_set_scroll_depth, scorm_engagement_reset } = require("./tools/automation");
 
 const getLogger = require('../shared/utils/logger.js');
 const fs = require('fs');
@@ -118,6 +118,13 @@ const TOOL_META = new Map([
   ["scorm_automation_get_trace", { description: "Get automation action trace log using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
   ["scorm_automation_clear_trace", { description: "Clear automation action trace log using Template Automation API", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
 
+  // Engagement Tracking (requires compatible SCORM template with engagement tracking enabled)
+  ["scorm_engagement_get_state", { description: "Get engagement tracking state for current slide - includes completion status, requirements config, and tracked metrics (tabs viewed, interactions completed, scroll depth, time spent)", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_engagement_get_progress", { description: "Get user-friendly engagement progress for current slide - returns percentage complete and list of requirement items with completion status", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_engagement_mark_tab_viewed", { description: "Manually mark a tab as viewed (for testing purposes) - simulates user viewing a tab to test engagement tracking", inputSchema: { type: "object", properties: { session_id: { type: "string" }, tab_id: { type: "string" } }, required: ["session_id", "tab_id"] } }],
+  ["scorm_engagement_set_scroll_depth", { description: "Manually set scroll depth percentage (for testing purposes) - simulates user scrolling to test engagement tracking", inputSchema: { type: "object", properties: { session_id: { type: "string" }, percentage: { type: "number", minimum: 0, maximum: 100 } }, required: ["session_id", "percentage"] } }],
+  ["scorm_engagement_reset", { description: "Reset engagement state for current slide (for testing purposes) - clears all tracked engagement metrics", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+
   // System Logging & Diagnostics
   ["system_get_logs", { description: "Get recent log entries in NDJSON format - includes browser console errors/warnings and all application logs with filtering by level/timestamp/component", inputSchema: { type: "object", properties: { tail: { type: "number" }, levels: { type: "array", items: { type: "string" } }, since_ts: { type: "number" }, component: { type: "string" } } } }],
       ["system_set_log_level", { description: "Set application log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
@@ -179,6 +186,11 @@ const TOOL_META = new Map([
   router.register("scorm_automation_check_slide_answers", scorm_automation_check_slide_answers);
   router.register("scorm_automation_get_trace", scorm_automation_get_trace);
   router.register("scorm_automation_clear_trace", scorm_automation_clear_trace);
+  router.register("scorm_engagement_get_state", scorm_engagement_get_state);
+  router.register("scorm_engagement_get_progress", scorm_engagement_get_progress);
+  router.register("scorm_engagement_mark_tab_viewed", scorm_engagement_mark_tab_viewed);
+  router.register("scorm_engagement_set_scroll_depth", scorm_engagement_set_scroll_depth);
+  router.register("scorm_engagement_reset", scorm_engagement_reset);
   router.register("scorm_report", scorm_report);  
   // System tools for logs and log level control
   async function system_get_logs(params = {}) {

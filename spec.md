@@ -205,6 +205,14 @@ This section provides a complete, categorized list of all available MCP tools.
 *   `scorm_automation_get_trace`
 *   `scorm_automation_clear_trace`
 
+**Engagement Tracking (requires compatible SCORM template with engagement tracking enabled):**
+
+*   `scorm_engagement_get_state`
+*   `scorm_engagement_get_progress`
+*   `scorm_engagement_mark_tab_viewed`
+*   `scorm_engagement_set_scroll_depth`
+*   `scorm_engagement_reset`
+
 **Reporting:**
 *   `scorm_report`
 

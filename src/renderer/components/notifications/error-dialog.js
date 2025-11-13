@@ -255,7 +255,11 @@ export class ErrorDialog extends BaseComponent {
     if (logs && logs.entries) {
       lines.push('=== Recent Log Entries ===');
       logs.entries.forEach(entry => {
-        lines.push(`[${entry.timestamp}] ${entry.level}: ${entry.message}`);
+        // NDJSON format uses 'ts' (millisecond timestamp), 'level', and 'msg' properties
+        const timestamp = entry.ts ? new Date(entry.ts).toISOString() : (entry.timestamp || 'unknown');
+        const level = entry.level || 'unknown';
+        const message = entry.msg || entry.message || 'no message';
+        lines.push(`[${timestamp}] ${level}: ${message}`);
       });
     }
     
