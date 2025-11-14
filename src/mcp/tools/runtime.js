@@ -1765,6 +1765,47 @@ async function scorm_navigate_to_slide(params = {}) {
   }
 }
 
+/**
+ * Set viewport size for content window
+ */
+async function scorm_set_viewport_size(params = {}) {
+  const { width, height } = params;
+
+  if (typeof width !== 'number' || typeof height !== 'number') {
+    const e = new Error("width and height are required and must be numbers");
+    e.code = "MCP_INVALID_PARAMS";
+    throw e;
+  }
+
+  if (width < 320 || height < 240) {
+    const e = new Error("Minimum viewport size is 320x240");
+    e.code = "MCP_INVALID_PARAMS";
+    throw e;
+  }
+
+  if (width > 7680 || height > 4320) {
+    const e = new Error("Maximum viewport size is 7680x4320");
+    e.code = "MCP_INVALID_PARAMS";
+    throw e;
+  }
+
+  try {
+    const result = await RuntimeManager.setViewportSize({ width, height });
+    
+    return {
+      success: true,
+      size: { width, height },
+      message: `Viewport size set to ${width}×${height}`
+    };
+  } catch (error) {
+    logger?.error('Failed to set viewport size:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to set viewport size'
+    };
+  }
+}
+
 module.exports = {
   scorm_runtime_open,
   scorm_runtime_status,
@@ -1796,7 +1837,8 @@ module.exports = {
   scorm_replay_api_calls,
   scorm_get_page_state,
   scorm_get_slide_map,
-  scorm_navigate_to_slide
+  scorm_navigate_to_slide,
+  scorm_set_viewport_size
 };
 
 /**

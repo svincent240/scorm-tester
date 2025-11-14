@@ -590,5 +590,22 @@ module.exports = [
       rateLimitProfile: 'default',
       useIpcResult: true
     }
+  },
+  {
+    channel: 'viewport:set-size',
+    handlerName: 'handleViewportSetSize',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
+  },
+  {
+    channel: 'viewport:get-size',
+    handlerName: 'handleViewportGetSize',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
   }
 ];

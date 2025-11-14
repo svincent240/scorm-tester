@@ -57,6 +57,9 @@ class ScormService extends BaseService {
     // Active workflows
     this.activeWorkflows = new Map();
     this.eventEmitter = new EventEmitter(); // Add EventEmitter to ScormService
+    
+    // Viewport size tracking
+    this.viewportSize = { width: 1366, height: 768 }; // Default desktop size
   }
 
   /**
@@ -1810,6 +1813,53 @@ class ScormService extends BaseService {
         error: error.message
       };
     }
+  }
+
+  /**
+   * Set viewport size for content window
+   * @param {Object} size - Viewport size
+   * @param {number} size.width - Width in pixels
+   * @param {number} size.height - Height in pixels
+   * @returns {Object} Result of operation
+   */
+  setViewportSize(size) {
+    try {
+      if (!size || typeof size.width !== 'number' || typeof size.height !== 'number') {
+        return {
+          success: false,
+          error: 'Invalid viewport size'
+        };
+      }
+
+      this.viewportSize = { width: size.width, height: size.height };
+      
+      // Broadcast to all windows
+      const windowManager = this.getDependency('windowManager');
+      if (windowManager?.broadcastToAllWindows) {
+        windowManager.broadcastToAllWindows('viewport:size-changed', this.viewportSize);
+      }
+
+      this.logger?.info('Viewport size updated', this.viewportSize);
+      
+      return {
+        success: true,
+        size: this.viewportSize
+      };
+    } catch (error) {
+      this.logger?.error('Failed to set viewport size:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Get current viewport size
+   * @returns {Object} Current viewport size
+   */
+  getViewportSize() {
+    return { ...this.viewportSize };
   }
 }
 

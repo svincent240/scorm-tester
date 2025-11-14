@@ -39,6 +39,15 @@ const WINDOW_TYPES = {
 };
 
 /**
+ * Viewport Size Presets
+ */
+const VIEWPORT_PRESETS = {
+  DESKTOP: { width: 1366, height: 768, label: 'Desktop' },
+  TABLET: { width: 1024, height: 1366, label: 'Tablet' },
+  MOBILE: { width: 390, height: 844, label: 'Mobile' }
+};
+
+/**
  * Window States
  */
 const WINDOW_STATES = {
@@ -174,7 +183,10 @@ const SERVICE_EVENTS = {
   SCORM_SESSION_CREATED: 'scorm:session_created',
   SCORM_SESSION_TERMINATED: 'scorm:session_terminated',
   SCORM_WORKFLOW_STARTED: 'scorm:workflow_started',
-  SCORM_WORKFLOW_COMPLETED: 'scorm:workflow_completed'
+  SCORM_WORKFLOW_COMPLETED: 'scorm:workflow_completed',
+  
+  // Viewport events
+  VIEWPORT_SIZE_CHANGED: 'viewport:size_changed'
 };
 
 /**
@@ -281,6 +293,7 @@ Object.freeze(SERVICE_STATES);
 Object.freeze(SERVICE_TYPES);
 Object.freeze(WINDOW_TYPES);
 Object.freeze(WINDOW_STATES);
+Object.freeze(VIEWPORT_PRESETS);
 Object.freeze(IPC_CHANNELS);
 Object.freeze(FILE_OPERATIONS);
 Object.freeze(SERVICE_DEFAULTS);
@@ -294,6 +307,7 @@ module.exports = {
   SERVICE_TYPES,
   WINDOW_TYPES,
   WINDOW_STATES,
+  VIEWPORT_PRESETS,
   IPC_CHANNELS,
   FILE_OPERATIONS,
   SERVICE_DEFAULTS,

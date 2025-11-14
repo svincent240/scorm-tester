@@ -77,6 +77,13 @@ export async function initialize() {
       } catch (_) { /* intentionally empty */ }
     });
 
+    // Forward viewport size changes from main process to EventBus
+    ipcClient.on('viewport:size-changed', (data) => {
+      try {
+        eventBus.emit('viewport:size-changed', data);
+      } catch (_) { /* intentionally empty */ }
+    });
+
     rendererLogger.info('ipc-events-forwarder: initialized');
     return { success: true };
   } catch (e) {

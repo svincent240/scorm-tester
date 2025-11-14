@@ -161,6 +161,25 @@ class RuntimeManager {
         return { success: true };
       }
 
+      case 'viewport_set_size': {
+        // Store viewport size for future use when creating windows
+        const { width, height } = message.params;
+        if (typeof width !== 'number' || typeof height !== 'number') {
+          const err = new Error('width and height are required');
+          err.code = 'MCP_INVALID_PARAMS';
+          throw err;
+        }
+
+        // Store default viewport size (used by resolveViewport in runtime.js)
+        if (!this._defaultViewport) {
+          this._defaultViewport = {};
+        }
+        this._defaultViewport.width = width;
+        this._defaultViewport.height = height;
+
+        return { success: true, size: { width, height } };
+      }
+
       case 'telemetry_getDataModelHistory': {
         const sessionId = String(message.params?.session_id || '');
         if (!sessionId) {
@@ -938,6 +957,35 @@ class RuntimeManager {
     }
 
     return filtered;
+  }
+
+  /**
+   * Set viewport size for content window
+   * @param {object} size - Viewport size {width, height}
+   * @returns {Promise<object>} Result of operation
+   */
+  static async setViewportSize(size) {
+    if (!this.isSupported) {
+      throw new Error('Viewport size control requires Electron runtime');
+    }
+
+    const bridge = global.__electronBridge;
+    if (!bridge || !bridge.ipcSend) {
+      throw new Error('Electron bridge not available');
+    }
+
+    // Send IPC message to main process
+    const message = {
+      type: 'viewport_set_size',
+      params: size
+    };
+
+    try {
+      const result = await bridge.ipcSend(message);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to set viewport size: ${error.message}`);
+    }
   }
 
 }

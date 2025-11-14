@@ -46,6 +46,9 @@ class AppManager {
     this.currentActivity = null;
     this.previousActivity = null;
 
+    // Viewport state tracking
+    this.isMobileView = false;
+
     // Lazy, safe logger reference with no-op fallback
     this.logger = {
       info: () => {},
@@ -648,6 +651,13 @@ class AppManager {
     eventBus.on('course:close:request', () => {
       this.handleCourseClose().catch(error => {
         try { this.logger.error('AppManager: Course close error (menu intent)', error?.message || error); } catch (_) { /* intentionally empty */ }
+      });
+    });
+
+    // Viewport toggle handler
+    eventBus.on('viewport:toggle-mobile:request', () => {
+      this.handleViewportToggle().catch(error => {
+        try { this.logger.error('AppManager: Viewport toggle error', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
 
@@ -2460,6 +2470,42 @@ class AppManager {
     });
 
     return null;
+  }
+
+  /**
+   * Handle viewport toggle between desktop and mobile
+   */
+  async handleViewportToggle() {
+    try {
+      // Toggle state
+      this.isMobileView = !this.isMobileView;
+
+      // Define viewport presets
+      const DESKTOP = { width: 1366, height: 768 };
+      const MOBILE = { width: 390, height: 844 };
+
+      const targetSize = this.isMobileView ? MOBILE : DESKTOP;
+
+      // Call IPC to set viewport size
+      const result = await ipcClient.invoke('viewport:set-size', targetSize);
+
+      if (result.success) {
+        this.logger?.info('Viewport toggled', { 
+          mode: this.isMobileView ? 'mobile' : 'desktop',
+          size: targetSize 
+        });
+
+        // Update button label
+        const mobileBtn = document.querySelector('#hc-mobile-toggle');
+        if (mobileBtn) {
+          mobileBtn.textContent = this.isMobileView ? '🖥️ Desktop' : '📱 Mobile';
+        }
+      } else {
+        this.logger?.error('Failed to set viewport size', result.error);
+      }
+    } catch (error) {
+      this.logger?.error('Viewport toggle failed', error?.message || error);
+    }
   }
 
   /**

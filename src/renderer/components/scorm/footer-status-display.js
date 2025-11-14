@@ -35,6 +35,7 @@ class FooterStatusDisplay extends BaseComponent {
       <span id="footer-status-text" class="footer-status__text">Not Started</span>
       <span id="footer-score" class="footer-status__score">--</span>
       <span id="footer-time" class="footer-status__time">00:00:00</span>
+      <span id="footer-viewport" class="footer-status__viewport" title="Current viewport size">1366×768</span>
     `;
   }
 
@@ -42,6 +43,18 @@ class FooterStatusDisplay extends BaseComponent {
     this.subscribe('progress:updated', this.handleProgressUpdated);
     // Also react to session updates for elapsed time display
     this.subscribe('session:updated', this.handleSessionUpdated);
+    // Listen for viewport size changes
+    this.subscribe('viewport:size-changed', this.handleViewportSizeChanged);
+  }
+
+  handleViewportSizeChanged(data) {
+    const size = data?.data || data;
+    if (!this.element || !size) return;
+    
+    const footerViewport = this.element.querySelector('#footer-viewport');
+    if (footerViewport && size.width && size.height) {
+      footerViewport.textContent = `${size.width}×${size.height}`;
+    }
   }
 
   handleProgressUpdated(data) {

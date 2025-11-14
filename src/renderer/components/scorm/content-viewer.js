@@ -157,6 +157,32 @@ class ContentViewer extends BaseComponent {
 
     // Listen for browse mode changes
     this.subscribe('browseMode:changed', this.handleBrowseModeChanged);
+
+    // Listen for viewport size changes
+    this.subscribe('viewport:size-changed', this.handleViewportSizeChanged);
+  }
+
+  /**
+   * Handle viewport size changes
+   */
+  handleViewportSizeChanged(data) {
+    const size = data?.data || data;
+    if (!size || !size.width || !size.height) return;
+
+    try {
+      // Apply size to container
+      const container = this.find('.content-viewer__container');
+      if (container) {
+        container.style.maxWidth = `${size.width}px`;
+        container.style.maxHeight = `${size.height}px`;
+        container.style.margin = '0 auto';
+        container.style.border = size.width < 1000 ? '1px solid #ccc' : 'none';
+      }
+
+      this.logger?.info('ContentViewer: Viewport size changed', size);
+    } catch (error) {
+      this.logger?.error('ContentViewer: Failed to apply viewport size', error);
+    }
   }
 
   /**

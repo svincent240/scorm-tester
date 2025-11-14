@@ -379,6 +379,10 @@ class IpcHandler extends BaseService {
 
       // Direct renderer logging channels already registered in _registerCriticalHandlers()
 
+      // Viewport management handlers
+      this.registerHandler('viewport:set-size', this.handleViewportSetSize.bind(this));
+      this.registerHandler('viewport:get-size', this.handleViewportGetSize.bind(this));
+
       this.recordOperation('registerHandlers', true);
 
     } catch (error) {
@@ -2280,6 +2284,56 @@ class IpcHandler extends BaseService {
         success: false,
         error: error.message,
         entries: []
+      };
+    }
+  }
+
+  /**
+   * Handle viewport set size request
+   */
+  async handleViewportSetSize(event, size) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          success: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      return scormService.setViewportSize(size);
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to set viewport size:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Handle viewport get size request
+   */
+  async handleViewportGetSize(event) {
+    try {
+      const scormService = this.getDependency('scormService');
+      if (!scormService) {
+        return {
+          success: false,
+          error: 'SCORM service not available'
+        };
+      }
+
+      const size = scormService.getViewportSize();
+      return {
+        success: true,
+        size
+      };
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to get viewport size:', error);
+      return {
+        success: false,
+        error: error.message
       };
     }
   }

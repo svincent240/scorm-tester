@@ -35,10 +35,12 @@ class HeaderControls extends BaseComponent {
         <button class="btn btn--secondary btn--sm" id="hc-open-folder" title="Open Folder">Open Folder</button>
         <button class="btn btn--secondary btn--sm" id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
         <button class="btn btn--secondary btn--sm" id="hc-inspector" title="Toggle Inspector">Inspector</button>
+        <button class="btn btn--secondary btn--sm" id="hc-mobile-toggle" title="Toggle Mobile View">📱 Mobile</button>
       </div>
     `;
 
     this.reloadBtn = this.element.querySelector('#course-reload-btn');
+    this.mobileToggleBtn = this.element.querySelector('#hc-mobile-toggle');
   }
 
   bindEvents() {
@@ -68,6 +70,10 @@ class HeaderControls extends BaseComponent {
           break;
         case 'hc-inspector':
           this.eventBus.emit('ui:inspector:toggle-request');
+          break;
+        case 'hc-mobile-toggle':
+          try { rendererLogger.info('HeaderControls: emit viewport:toggle-mobile:request'); } catch (_) { /* intentionally empty */ }
+          this.eventBus.emit('viewport:toggle-mobile:request');
           break;
       }
     });
