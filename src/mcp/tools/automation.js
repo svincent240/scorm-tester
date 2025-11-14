@@ -1339,6 +1339,288 @@ async function scorm_engagement_reset({ session_id }) {
 }
 
 // ============================================================================
+// INTERACTION METADATA & VERSION TOOLS
+// ============================================================================
+
+/**
+ * Get metadata for a specific interaction
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {string} params.id - Interaction ID
+ * @returns {Promise<Object>} - Interaction metadata
+ */
+async function scorm_automation_get_interaction_metadata({ session_id, id }) {
+  await validateRuntimeSession(session_id);
+
+  if (!id || typeof id !== 'string') {
+    const e = new Error('id parameter is required and must be a string');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_interaction_metadata');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_interaction_metadata', 
+      payload: { id } 
+    });
+
+    const expression = `window.SCORMAutomation.getInteractionMetadata('${id.replace(/'/g, "\\'")}')`;
+    const result = await RuntimeManager.executeJS(null, expression, session_id);
+
+    return {
+      available: true,
+      metadata: result,
+      id
+    };
+  } catch (err) {
+    logger.error('Error getting interaction metadata', { 
+      session_id, 
+      id,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get metadata for interaction '${id}': ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.interactionId = id;
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Get API version information
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Version information including API version, phase, and features
+ */
+async function scorm_automation_get_version({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_version');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_version', 
+      payload: {} 
+    });
+
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getVersion()',
+      session_id
+    );
+
+    return {
+      available: true,
+      version: result
+    };
+  } catch (err) {
+    logger.error('Error getting API version', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get API version: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+// ============================================================================
+// LAYOUT & STYLE INTROSPECTION TOOLS
+// ============================================================================
+
+/**
+ * Get a simplified layout tree of the current slide's structure
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {number} [params.max_depth=3] - Maximum depth to traverse (default: 3)
+ * @returns {Promise<Object>} - Layout tree with key elements
+ */
+async function scorm_automation_get_layout_tree({ session_id, max_depth = 3 }) {
+  await validateRuntimeSession(session_id);
+
+  if (max_depth !== undefined && (typeof max_depth !== 'number' || max_depth < 1 || max_depth > 10)) {
+    const e = new Error('max_depth must be a number between 1 and 10');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_layout_tree');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_layout_tree', 
+      payload: { max_depth } 
+    });
+
+    const result = await RuntimeManager.executeJS(
+      null,
+      `window.SCORMAutomation.getLayoutTree()`,
+      session_id
+    );
+
+    return {
+      available: true,
+      layout: result
+    };
+  } catch (err) {
+    logger.error('Error getting layout tree', { 
+      session_id, 
+      max_depth,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get layout tree: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Get detailed layout and style information for a specific element
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {string} params.testid - The data-testid attribute value
+ * @returns {Promise<Object>} - Element details including bounding box and computed styles
+ */
+async function scorm_automation_get_element_details({ session_id, testid }) {
+  await validateRuntimeSession(session_id);
+
+  if (!testid || typeof testid !== 'string') {
+    const e = new Error('testid parameter is required and must be a string');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_element_details');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_element_details', 
+      payload: { testid } 
+    });
+
+    const expression = `window.SCORMAutomation.getElementDetails('${testid.replace(/'/g, "\\'")}')`;
+    const result = await RuntimeManager.executeJS(null, expression, session_id);
+
+    return {
+      available: true,
+      details: result,
+      testid
+    };
+  } catch (err) {
+    logger.error('Error getting element details', { 
+      session_id, 
+      testid,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get details for element with testid '${testid}': ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.testid = testid;
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Validate the current page layout and return potential issues
+ * Returns issues categorized as errors or warnings, including:
+ * - Off-screen content (partially or fully outside viewport)
+ * - Overlapping interactive elements
+ * - Text overflow (vertical/horizontal clipping)
+ * - Low color contrast (WCAG AA violations)
+ * - Zero-size visible elements
+ * 
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Array of layout issues with type, category, message, and affected elements
+ */
+async function scorm_automation_validate_page_layout({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_validate_page_layout');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:validate_page_layout', 
+      payload: {} 
+    });
+
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.validatePageLayout()',
+      session_id
+    );
+
+    const issues = result || [];
+    const errorCount = issues.filter(i => i.type === 'error').length;
+    const warningCount = issues.filter(i => i.type === 'warning').length;
+
+    return {
+      available: true,
+      issues,
+      summary: {
+        total: issues.length,
+        errors: errorCount,
+        warnings: warningCount,
+        categories: {
+          layout: issues.filter(i => i.category === 'layout').length,
+          content: issues.filter(i => i.category === 'content').length,
+          accessibility: issues.filter(i => i.category === 'accessibility').length,
+          structure: issues.filter(i => i.category === 'structure').length
+        }
+      }
+    };
+  } catch (err) {
+    logger.error('Error validating page layout', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to validate page layout: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1356,6 +1638,11 @@ module.exports = {
   scorm_automation_check_slide_answers,
   scorm_automation_get_trace,
   scorm_automation_clear_trace,
+  scorm_automation_get_interaction_metadata,
+  scorm_automation_get_version,
+  scorm_automation_get_layout_tree,
+  scorm_automation_get_element_details,
+  scorm_automation_validate_page_layout,
   scorm_engagement_get_state,
   scorm_engagement_get_progress,
   scorm_engagement_mark_tab_viewed,

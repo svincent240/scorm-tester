@@ -122,10 +122,12 @@ Before writing new code, check `src/shared/` for existing solutions.
 
 **Tool Groups**:
 
-- **Core**: Check availability, list/set/get/check interactions
+- **Core**: Check availability, list/set/get/check interactions, get interaction metadata
 - **Navigation**: Get structure/slide, navigate (requires `window.SCORMAutomation`)
 - **Advanced**: Get correct answers, last evaluation, check slide answers
 - **Debug**: Get/clear trace logs
+- **Introspection**: Get API version, layout tree, element details, validate page layout
+- **Layout & Accessibility**: Detect off-screen content, overlapping elements, text overflow, WCAG contrast violations, zero-size elements
 
 ### 7.3. Comprehensive List of MCP Tools
 
@@ -204,6 +206,11 @@ This section provides a complete, categorized list of all available MCP tools.
 *   `scorm_automation_check_slide_answers`
 *   `scorm_automation_get_trace`
 *   `scorm_automation_clear_trace`
+*   `scorm_automation_get_interaction_metadata`
+*   `scorm_automation_get_version`
+*   `scorm_automation_get_layout_tree`
+*   `scorm_automation_get_element_details`
+*   `scorm_automation_validate_page_layout`
 
 **Engagement Tracking (requires compatible SCORM template with engagement tracking enabled):**
 
@@ -233,6 +240,12 @@ To prevent excessive token usage, certain MCP tools return summary data by defau
 - **Full Details**: Set `include_errors: true` to receive the complete `errors` array
 - **Filtering**: Use `severity` (error/warn/info) and `since_ts` to narrow results
 - **Limit**: Specify `limit` parameter to control number of errors returned (default: 50)
+
+**Navigation Tools (`scorm_nav_next`, `scorm_nav_previous`, `scorm_nav_choice`):**
+
+- **Default Behavior**: Returns success/applicable status plus `error_count` and categorized error counts
+- **Purpose**: Allows agents to detect runtime issues immediately after navigation without separate error query
+- **Error Categories**: Same as `scorm_get_console_errors` (scorm_api, syntax, runtime, network)
 
 **`system_get_logs`:**
 

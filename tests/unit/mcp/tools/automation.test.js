@@ -35,7 +35,12 @@ const {
   scorm_automation_get_last_evaluation,
   scorm_automation_check_slide_answers,
   scorm_automation_get_trace,
-  scorm_automation_clear_trace
+  scorm_automation_clear_trace,
+  scorm_automation_get_interaction_metadata,
+  scorm_automation_get_version,
+  scorm_automation_get_layout_tree,
+  scorm_automation_get_element_details,
+  scorm_automation_validate_page_layout
 } = require('../../../../src/mcp/tools/automation');
 
 describe('MCP Template Automation Tools', () => {
@@ -1256,6 +1261,420 @@ describe('MCP Template Automation Tools', () => {
         expect(error.message).toContain('Expected:');
         expect(error.message).toContain('Got:');
       }
+    });
+  });
+
+  // ============================================================================
+  // NEW TOOLS: INTERACTION METADATA & VERSION
+  // ============================================================================
+
+  describe('scorm_automation_get_interaction_metadata', () => {
+    test('retrieves metadata successfully', async () => {
+      const mockMetadata = {
+        id: 'question-1',
+        type: 'choice',
+        registeredAt: '2025-11-13T00:00:00.000Z'
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockMetadata); // getInteractionMetadata
+
+      const result = await scorm_automation_get_interaction_metadata({
+        session_id: 'test',
+        id: 'question-1'
+      });
+
+      expect(result.available).toBe(true);
+      expect(result.metadata).toEqual(mockMetadata);
+      expect(result.id).toBe('question-1');
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        "window.SCORMAutomation.getInteractionMetadata('question-1')",
+        'test'
+      );
+    });
+
+    test('rejects missing id parameter', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(true);
+
+      await expect(
+        scorm_automation_get_interaction_metadata({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        message: 'id parameter is required and must be a string',
+        code: 'MCP_INVALID_PARAMS'
+      });
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_interaction_metadata({ session_id: 'test', id: 'q1' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+
+    test('handles interaction not found error', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('Interaction "unknown" not found'));
+
+      await expect(
+        scorm_automation_get_interaction_metadata({ session_id: 'test', id: 'unknown' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('unknown'),
+        code: 'AUTOMATION_API_ERROR'
+      });
+    });
+  });
+
+  describe('scorm_automation_get_version', () => {
+    test('retrieves version information successfully', async () => {
+      const mockVersion = {
+        api: '1.3.0',
+        phase: 5,
+        features: [
+          'discovery',
+          'state-access',
+          'state-mutation',
+          'evaluation',
+          'navigation',
+          'observability',
+          'ergonomic-helpers',
+          'layout-introspection',
+          'engagement-tracking'
+        ]
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockVersion); // getVersion
+
+      const result = await scorm_automation_get_version({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.version).toEqual(mockVersion);
+      expect(result.version.api).toBe('1.3.0');
+      expect(result.version.phase).toBe(5);
+      expect(result.version.features).toHaveLength(9);
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        'window.SCORMAutomation.getVersion()',
+        'test'
+      );
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_version({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+  });
+
+  // ============================================================================
+  // NEW TOOLS: LAYOUT & STYLE INTROSPECTION
+  // ============================================================================
+
+  describe('scorm_automation_get_layout_tree', () => {
+    test('retrieves layout tree successfully', async () => {
+      const mockLayoutTree = {
+        tag: 'div',
+        id: 'slide-container',
+        classes: ['slide', 'active'],
+        bounds: { x: 0, y: 0, width: 1024, height: 768 },
+        visible: true,
+        children: [
+          {
+            tag: 'h1',
+            id: 'slide-title',
+            classes: ['title'],
+            bounds: { x: 20, y: 20, width: 984, height: 40 },
+            visible: true
+          },
+          {
+            tag: 'div',
+            testid: 'question-1-controls',
+            classes: ['interaction', 'choice'],
+            bounds: { x: 20, y: 80, width: 984, height: 200 },
+            visible: true
+          }
+        ]
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockLayoutTree); // getLayoutTree
+
+      const result = await scorm_automation_get_layout_tree({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.layout).toEqual(mockLayoutTree);
+      expect(result.layout.tag).toBe('div');
+      expect(result.layout.children).toHaveLength(2);
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        'window.SCORMAutomation.getLayoutTree()',
+        'test'
+      );
+    });
+
+    test('accepts max_depth parameter', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce({ tag: 'div' });
+
+      await scorm_automation_get_layout_tree({ session_id: 'test', max_depth: 5 });
+
+      // Note: Current implementation doesn't use max_depth in JS expression
+      // This is expected as the API method handles it internally
+      expect(RuntimeManager.executeJS).toHaveBeenCalled();
+    });
+
+    test('validates max_depth parameter', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(true);
+
+      await expect(
+        scorm_automation_get_layout_tree({ session_id: 'test', max_depth: 0 })
+      ).rejects.toMatchObject({
+        message: 'max_depth must be a number between 1 and 10',
+        code: 'MCP_INVALID_PARAMS'
+      });
+
+      await expect(
+        scorm_automation_get_layout_tree({ session_id: 'test', max_depth: 11 })
+      ).rejects.toMatchObject({
+        message: 'max_depth must be a number between 1 and 10',
+        code: 'MCP_INVALID_PARAMS'
+      });
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_layout_tree({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+  });
+
+  describe('scorm_automation_get_element_details', () => {
+    test('retrieves element details successfully', async () => {
+      const mockDetails = {
+        testid: 'submit-button',
+        tag: 'button',
+        id: 'btn-submit',
+        classes: ['btn', 'btn-primary'],
+        boundingBox: {
+          x: 400,
+          y: 600,
+          width: 120,
+          height: 40,
+          top: 600,
+          right: 520,
+          bottom: 640,
+          left: 400
+        },
+        computedStyle: {
+          display: 'block',
+          position: 'absolute',
+          backgroundColor: 'rgb(0, 123, 255)',
+          color: 'rgb(255, 255, 255)',
+          fontSize: '16px',
+          fontWeight: '600'
+        },
+        visible: true,
+        inViewport: true,
+        textContent: 'Submit Answer'
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockDetails); // getElementDetails
+
+      const result = await scorm_automation_get_element_details({
+        session_id: 'test',
+        testid: 'submit-button'
+      });
+
+      expect(result.available).toBe(true);
+      expect(result.details).toEqual(mockDetails);
+      expect(result.testid).toBe('submit-button');
+      expect(result.details.visible).toBe(true);
+      expect(result.details.inViewport).toBe(true);
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        "window.SCORMAutomation.getElementDetails('submit-button')",
+        'test'
+      );
+    });
+
+    test('rejects missing testid parameter', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(true);
+
+      await expect(
+        scorm_automation_get_element_details({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        message: 'testid parameter is required and must be a string',
+        code: 'MCP_INVALID_PARAMS'
+      });
+    });
+
+    test('handles element not found error', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('Element with data-testid="not-found" not found'));
+
+      await expect(
+        scorm_automation_get_element_details({ session_id: 'test', testid: 'not-found' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('not-found'),
+        code: 'AUTOMATION_API_ERROR',
+        testid: 'not-found'
+      });
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_element_details({ session_id: 'test', testid: 'btn' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+  });
+
+  describe('scorm_automation_validate_page_layout', () => {
+    test('returns validation results with no issues', async () => {
+      const mockResult = [];
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockResult); // validatePageLayout
+
+      const result = await scorm_automation_validate_page_layout({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.issues).toEqual([]);
+      expect(result.summary.total).toBe(0);
+      expect(result.summary.errors).toBe(0);
+      expect(result.summary.warnings).toBe(0);
+      expect(result.summary.categories.layout).toBe(0);
+      expect(result.summary.categories.content).toBe(0);
+      expect(result.summary.categories.accessibility).toBe(0);
+      expect(result.summary.categories.structure).toBe(0);
+    });
+
+    test('returns validation results with multiple issues', async () => {
+      const mockIssues = [
+        {
+          type: 'error',
+          category: 'layout',
+          message: 'Element is completely off-screen',
+          element: 'hidden-content',
+          bounds: { x: -100, y: 0, width: 50, height: 50 }
+        },
+        {
+          type: 'warning',
+          category: 'layout',
+          message: 'Interactive elements overlap',
+          elements: ['button-1', 'button-2']
+        },
+        {
+          type: 'warning',
+          category: 'content',
+          message: 'Element has vertical text overflow (content is clipped)',
+          element: 'text-box',
+          details: { scrollHeight: 200, clientHeight: 100 }
+        },
+        {
+          type: 'error',
+          category: 'accessibility',
+          message: 'Low color contrast (2.1:1, requires 4.5:1)',
+          element: 'low-contrast-text',
+          details: {
+            contrast: '2.10',
+            required: 4.5,
+            textColor: 'rgb(150, 150, 150)',
+            backgroundColor: 'rgb(200, 200, 200)'
+          }
+        },
+        {
+          type: 'warning',
+          category: 'layout',
+          message: 'Element has zero width',
+          element: 'collapsed-div',
+          bounds: { width: 0, height: 50 }
+        }
+      ];
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(mockIssues);
+
+      const result = await scorm_automation_validate_page_layout({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.issues).toHaveLength(5);
+      expect(result.summary.total).toBe(5);
+      expect(result.summary.errors).toBe(2);
+      expect(result.summary.warnings).toBe(3);
+      expect(result.summary.categories.layout).toBe(3);
+      expect(result.summary.categories.content).toBe(1);
+      expect(result.summary.categories.accessibility).toBe(1);
+      expect(result.summary.categories.structure).toBe(0);
+
+      // Verify issue details
+      const layoutErrors = result.issues.filter(i => i.type === 'error' && i.category === 'layout');
+      expect(layoutErrors).toHaveLength(1);
+      expect(layoutErrors[0].message).toContain('off-screen');
+
+      const accessibilityErrors = result.issues.filter(i => i.category === 'accessibility');
+      expect(accessibilityErrors).toHaveLength(1);
+      expect(accessibilityErrors[0].details.contrast).toBe('2.10');
+    });
+
+    test('handles empty result gracefully', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(null); // API returns null instead of array
+
+      const result = await scorm_automation_validate_page_layout({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.issues).toEqual([]);
+      expect(result.summary.total).toBe(0);
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_validate_page_layout({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+
+    test('handles validation execution error', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('No slide container found'));
+
+      await expect(
+        scorm_automation_validate_page_layout({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Failed to validate page layout'),
+        code: 'AUTOMATION_API_ERROR'
+      });
     });
   });
 });

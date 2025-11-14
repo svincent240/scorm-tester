@@ -485,7 +485,23 @@ async function scorm_nav_next(params = {}) {
     throw e;
   }
 
-  return { success: true, applicable: true };
+  // Get console error counts to provide immediate visibility into runtime issues
+  let error_count = 0;
+  let categories = { scorm_api: 0, syntax: 0, runtime: 0, network: 0 };
+  try {
+    const messages = await RuntimeManager.getConsoleMessagesViaIPC(session_id, {});
+    error_count = messages.length;
+    categories = {
+      scorm_api: messages.filter(e => e.category === 'scorm_api').length,
+      syntax: messages.filter(e => e.category === 'syntax').length,
+      runtime: messages.filter(e => e.category === 'runtime').length,
+      network: messages.filter(e => e.category === 'network').length
+    };
+  } catch (_) {
+    // Ignore error count failures - navigation succeeded
+  }
+
+  return { success: true, applicable: true, error_count, categories };
 }
 
 /**
@@ -526,7 +542,23 @@ async function scorm_nav_previous(params = {}) {
     throw e;
   }
 
-  return { success: true, applicable: true };
+  // Get console error counts to provide immediate visibility into runtime issues
+  let error_count = 0;
+  let categories = { scorm_api: 0, syntax: 0, runtime: 0, network: 0 };
+  try {
+    const messages = await RuntimeManager.getConsoleMessagesViaIPC(session_id, {});
+    error_count = messages.length;
+    categories = {
+      scorm_api: messages.filter(e => e.category === 'scorm_api').length,
+      syntax: messages.filter(e => e.category === 'syntax').length,
+      runtime: messages.filter(e => e.category === 'runtime').length,
+      network: messages.filter(e => e.category === 'network').length
+    };
+  } catch (_) {
+    // Ignore error count failures - navigation succeeded
+  }
+
+  return { success: true, applicable: true, error_count, categories };
 }
 
 /**
@@ -569,7 +601,23 @@ async function scorm_nav_choice(params = {}) {
     throw e;
   }
 
-  return { success: true, applicable: true };
+  // Get console error counts to provide immediate visibility into runtime issues
+  let error_count = 0;
+  let categories = { scorm_api: 0, syntax: 0, runtime: 0, network: 0 };
+  try {
+    const messages = await RuntimeManager.getConsoleMessagesViaIPC(session_id, {});
+    error_count = messages.length;
+    categories = {
+      scorm_api: messages.filter(e => e.category === 'scorm_api').length,
+      syntax: messages.filter(e => e.category === 'syntax').length,
+      runtime: messages.filter(e => e.category === 'runtime').length,
+      network: messages.filter(e => e.category === 'network').length
+    };
+  } catch (_) {
+    // Ignore error count failures - navigation succeeded
+  }
+
+  return { success: true, applicable: true, error_count, categories };
 }
 
 async function scorm_sn_init(params = {}) {
