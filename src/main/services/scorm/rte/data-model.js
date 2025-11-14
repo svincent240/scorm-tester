@@ -1139,7 +1139,7 @@ class ScormDataModel {
       const timeoutMs = options.timeoutMs || (30 * 60 * 1000); // 30 minutes default
 
       this.browseSession = {
-        id: `browse_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `browse_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
         startTime: new Date(),
         lastActivity: new Date(),
         launchMode: 'browse',

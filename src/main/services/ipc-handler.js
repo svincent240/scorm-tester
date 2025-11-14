@@ -105,9 +105,9 @@ class IpcHandler extends BaseService {
       if (telemetry) {
         this.telemetryStore = telemetry;
         // Ensure clean telemetry state on startup when telemetryStore is provided
-        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (_) { /* intentionally empty */ }
+        try { if (typeof this.telemetryStore.clear === 'function') { this.telemetryStore.clear(); } } catch (e) { this.logger?.warn('Failed to clear telemetry store', { error: e?.message }); }
       }
-    } catch (_) { /* intentionally empty */ }
+    } catch (e) { this.logger?.warn('Failed to wire telemetry dependency', { error: e?.message }); }
 
 
     // NOTE: SCORM API call broadcasting is handled by ScormInspectorTelemetryStore.storeApiCall()
@@ -150,7 +150,7 @@ class IpcHandler extends BaseService {
     try {
       const snSnapshot = this.getDependency('snSnapshotService');
       if (snSnapshot) this.snSnapshotService = snSnapshot;
-    } catch (_) { /* intentionally empty */ }
+    } catch (e) { this.logger?.warn('Failed to wire snSnapshotService dependency', { error: e?.message }); }
 
     // Phase 1: Disable server-side IPC rate limiting (moved to client-side shaping)
     this.rateLimiter = null;
@@ -179,8 +179,8 @@ class IpcHandler extends BaseService {
       if (this.snSnapshotService && typeof this.snSnapshotService.stopPolling === 'function') {
         this.snSnapshotService.stopPolling();
       }
-    } catch (_) {
-      // swallow to keep shutdown clean
+    } catch (e) {
+      this.logger?.warn('Failed to stop SN polling during shutdown', { error: e?.message });
     }
 
     // 1) Terminate SCORM sessions FIRST (best-effort, silent)
@@ -249,12 +249,12 @@ class IpcHandler extends BaseService {
             }
           }
         } catch (e) {
-          try { this.logger?.warn('Failed to reload window', e?.message || String(e)); } catch (_) { /* intentionally empty */ }
+          try { this.logger?.warn('Failed to reload window', e?.message || String(e)); } catch (logErr) { /* Cannot log if logger itself failed */ }
         }
       });
 
     } catch (e) {
-      // Even if this fails, continue with other handlers
+      this.logger?.warn('Failed to register course selection handler', { error: e?.message });
     }
   }
 

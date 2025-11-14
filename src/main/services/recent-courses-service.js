@@ -216,7 +216,7 @@ class RecentCoursesService extends BaseService {
 
       // Write atomically: write to temp file then rename
       // Use shorter random string for Windows compatibility and to avoid long path issues
-      const randomId = Math.random().toString(36).substr(2, 6);
+      const randomId = Math.random().toString(36).substring(2, 8);
       const tempPath = `${this.recentsFilePath}.tmp.${Date.now()}.${randomId}`;
 
       await fs.writeFile(tempPath, JSON.stringify(this._items, null, 2), 'utf8');

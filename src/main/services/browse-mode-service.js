@@ -160,7 +160,7 @@ class BrowseModeService extends EventEmitter {
    * @private
    */
   createBrowseSession(options = {}) {
-    const sessionId = `browse_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = `browse_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     
     const session = {
       id: sessionId,

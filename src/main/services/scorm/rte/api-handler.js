@@ -783,7 +783,7 @@ class ScormApiHandler {
    * @returns {string} Unique session ID
    */
   generateSessionId() {
-    return `scorm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `scorm_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**

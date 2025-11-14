@@ -208,6 +208,8 @@ This section provides a complete, categorized list of all available MCP tools.
 *   `scorm_automation_clear_trace`
 *   `scorm_automation_get_interaction_metadata`
 *   `scorm_automation_get_version`
+*   `scorm_automation_get_page_layout`
+*   `scorm_automation_get_layout_flow`
 *   `scorm_automation_get_layout_tree`
 *   `scorm_automation_get_element_details`
 *   `scorm_automation_validate_page_layout`

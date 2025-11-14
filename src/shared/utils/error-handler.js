@@ -142,7 +142,7 @@ class ErrorHandler {
    */
   static createScormErrorEntry(error, classification, context) {
     return {
-      id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `error-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       timestamp: Date.now(),
       method: context.scormApiMethod || 'system',
       parameters: context.element ? [context.element] : [],

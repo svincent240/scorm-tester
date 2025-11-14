@@ -38,6 +38,8 @@ const {
   scorm_automation_clear_trace,
   scorm_automation_get_interaction_metadata,
   scorm_automation_get_version,
+  scorm_automation_get_page_layout,
+  scorm_automation_get_layout_flow,
   scorm_automation_get_layout_tree,
   scorm_automation_get_element_details,
   scorm_automation_validate_page_layout
@@ -637,11 +639,36 @@ describe('MCP Template Automation Tools', () => {
       expect(result).toEqual({
         available: true,
         success: true,
-        slideId: 'slide-3'
+        slideId: 'slide-3',
+        context: null
       });
 
       const call = RuntimeManager.executeJS.mock.calls[1];
       expect(call[1]).toContain("window.SCORMAutomation.goToSlide('slide-3')");
+    });
+
+    test('scorm_automation_go_to_slide accepts optional context parameter', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(true); // goToSlide call
+
+      const context = { mode: 'review', skipIntro: true };
+      const result = await scorm_automation_go_to_slide({
+        session_id: 'test',
+        slideId: 'slide-5',
+        context
+      });
+
+      expect(result).toEqual({
+        available: true,
+        success: true,
+        slideId: 'slide-5',
+        context
+      });
+
+      const call = RuntimeManager.executeJS.mock.calls[1];
+      expect(call[1]).toContain("window.SCORMAutomation.goToSlide('slide-5'");
+      expect(call[1]).toContain(JSON.stringify(context));
     });
   });
 
@@ -1380,6 +1407,174 @@ describe('MCP Template Automation Tools', () => {
   // ============================================================================
   // NEW TOOLS: LAYOUT & STYLE INTROSPECTION
   // ============================================================================
+
+  describe('scorm_automation_get_page_layout', () => {
+    test('retrieves comprehensive page layout successfully', async () => {
+      const mockPageLayout = {
+        tree: {
+          tag: 'div',
+          testid: 'slide-container',
+          visualWeight: 100,
+          importance: 'primary',
+          bounds: { x: 0, y: 0, width: 1024, height: 768 },
+          children: [
+            {
+              tag: 'h1',
+              testid: 'slide-title',
+              visualWeight: 80,
+              importance: 'primary',
+              bounds: { x: 20, y: 20, width: 984, height: 40 }
+            }
+          ]
+        },
+        viewport: { width: 1024, height: 768 },
+        patterns: [
+          { type: 'horizontal-row', elements: ['nav-prev', 'nav-next', 'nav-exit'] }
+        ],
+        relationships: [
+          { type: 'above', element: 'title', other: 'content', gap: 20 }
+        ],
+        readableDescription: 'Horizontal row at top with nav-prev, nav-next, nav-exit. Large heading at middle center (primary importance).'
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockPageLayout); // getPageLayout
+
+      const result = await scorm_automation_get_page_layout({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.layout).toEqual(mockPageLayout);
+      expect(result.layout.tree).toBeDefined();
+      expect(result.layout.viewport).toBeDefined();
+      expect(result.layout.patterns).toHaveLength(1);
+      expect(result.layout.relationships).toHaveLength(1);
+      expect(result.layout.readableDescription).toContain('Horizontal row');
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        'window.SCORMAutomation.getPageLayout()',
+        'test'
+      );
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_page_layout({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+
+    test('handles execution error appropriately', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('Layout tree analysis failed'));
+
+      await expect(
+        scorm_automation_get_page_layout({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Failed to get page layout'),
+        code: 'AUTOMATION_API_ERROR'
+      });
+    });
+  });
+
+  describe('scorm_automation_get_layout_flow', () => {
+    test('retrieves navigation flow analysis successfully', async () => {
+      const mockLayoutFlow = {
+        readingOrder: [
+          { order: 1, testid: 'title', position: { x: 20, y: 20 } },
+          { order: 2, testid: 'content', position: { x: 20, y: 80 } },
+          { order: 3, testid: 'nav-buttons', position: { x: 20, y: 700 } }
+        ],
+        keyboardFlow: [
+          { tabOrder: 1, testid: 'btn1', canReceiveFocus: true },
+          { tabOrder: 2, testid: 'btn2', canReceiveFocus: true },
+          { tabOrder: 3, testid: 'btn3', canReceiveFocus: true }
+        ],
+        attentionFlow: [
+          { testid: 'heading', prominence: 85 },
+          { testid: 'callout-box', prominence: 70 },
+          { testid: 'body-text', prominence: 40 }
+        ],
+        analysis: {
+          readingOrderMatchesTabOrder: false,
+          hasCustomTabOrder: true
+        }
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true) // API check
+        .mockResolvedValueOnce(mockLayoutFlow); // getLayoutFlow
+
+      const result = await scorm_automation_get_layout_flow({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.flow).toEqual(mockLayoutFlow);
+      expect(result.flow.readingOrder).toHaveLength(3);
+      expect(result.flow.keyboardFlow).toHaveLength(3);
+      expect(result.flow.attentionFlow).toHaveLength(3);
+      expect(result.flow.analysis.readingOrderMatchesTabOrder).toBe(false);
+      expect(result.flow.analysis.hasCustomTabOrder).toBe(true);
+      expect(RuntimeManager.executeJS).toHaveBeenCalledWith(
+        null,
+        'window.SCORMAutomation.getLayoutFlow()',
+        'test'
+      );
+    });
+
+    test('detects when reading order matches tab order', async () => {
+      const mockLayoutFlow = {
+        readingOrder: [
+          { order: 1, testid: 'element1', position: { x: 0, y: 0 } },
+          { order: 2, testid: 'element2', position: { x: 0, y: 100 } }
+        ],
+        keyboardFlow: [
+          { tabOrder: 1, testid: 'element1', canReceiveFocus: true },
+          { tabOrder: 2, testid: 'element2', canReceiveFocus: true }
+        ],
+        attentionFlow: [],
+        analysis: {
+          readingOrderMatchesTabOrder: true,
+          hasCustomTabOrder: false
+        }
+      };
+
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(mockLayoutFlow);
+
+      const result = await scorm_automation_get_layout_flow({ session_id: 'test' });
+
+      expect(result.available).toBe(true);
+      expect(result.flow.analysis.readingOrderMatchesTabOrder).toBe(true);
+    });
+
+    test('throws error when API not available', async () => {
+      RuntimeManager.executeJS = jest.fn().mockResolvedValue(false);
+
+      await expect(
+        scorm_automation_get_layout_flow({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        code: 'AUTOMATION_API_NOT_AVAILABLE'
+      });
+    });
+
+    test('handles execution error appropriately', async () => {
+      RuntimeManager.executeJS = jest.fn()
+        .mockResolvedValueOnce(true)
+        .mockRejectedValueOnce(new Error('Flow analysis failed'));
+
+      await expect(
+        scorm_automation_get_layout_flow({ session_id: 'test' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Failed to get layout flow'),
+        code: 'AUTOMATION_API_ERROR'
+      });
+    });
+  });
 
   describe('scorm_automation_get_layout_tree', () => {
     test('retrieves layout tree successfully', async () => {

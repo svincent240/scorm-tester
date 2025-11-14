@@ -824,6 +824,7 @@ async function scorm_automation_get_current_slide(params = {}) {
 async function scorm_automation_go_to_slide(params = {}) {
   const session_id = params.session_id;
   const slideId = params.slideId;
+  const context = params.context;
 
   await validateRuntimeSession(session_id);
 
@@ -842,21 +843,27 @@ async function scorm_automation_go_to_slide(params = {}) {
     sessions.emit && sessions.emit({ 
       session_id, 
       type: 'automation:go_to_slide', 
-      payload: { slideId } 
+      payload: { slideId, context } 
     });
 
-    const expression = `window.SCORMAutomation.goToSlide('${slideId.replace(/'/g, "\\'")}')`;
+    // Build expression with optional context parameter
+    const expression = context
+      ? `window.SCORMAutomation.goToSlide('${slideId.replace(/'/g, "\\'")}'', ${JSON.stringify(context)})`
+      : `window.SCORMAutomation.goToSlide('${slideId.replace(/'/g, "\\'")}')`;
+    
     const result = await RuntimeManager.executeJS(null, expression, session_id);
 
     return {
       available: true,
       success: result,
-      slideId
+      slideId,
+      context: context || null
     };
   } catch (err) {
     logger.error('Error navigating to slide', { 
       session_id, 
       slideId,
+      context,
       error: err.message,
       stack: err.stack 
     });
@@ -1446,6 +1453,99 @@ async function scorm_automation_get_version({ session_id }) {
 // ============================================================================
 
 /**
+ * Get comprehensive page layout in a single call (AI-optimized)
+ * Returns tree structure, viewport info, patterns, relationships, and readable description
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Comprehensive layout data including tree, viewport, patterns, relationships, readableDescription
+ */
+async function scorm_automation_get_page_layout({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_page_layout');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_page_layout', 
+      payload: {} 
+    });
+
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getPageLayout()',
+      session_id
+    );
+
+    return {
+      available: true,
+      layout: result
+    };
+  } catch (err) {
+    logger.error('Error getting page layout', { 
+      session_id,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get page layout: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Get navigation flow analysis (reading order, keyboard flow, attention flow)
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Flow analysis including readingOrder, keyboardFlow, attentionFlow, and analysis
+ */
+async function scorm_automation_get_layout_flow({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_layout_flow');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_layout_flow', 
+      payload: {} 
+    });
+
+    const result = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getLayoutFlow()',
+      session_id
+    );
+
+    return {
+      available: true,
+      flow: result
+    };
+  } catch (err) {
+    logger.error('Error getting layout flow', { 
+      session_id,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get layout flow: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
  * Get a simplified layout tree of the current slide's structure
  * @param {Object} params - Parameters object
  * @param {string} params.session_id - Session ID
@@ -1640,6 +1740,8 @@ module.exports = {
   scorm_automation_clear_trace,
   scorm_automation_get_interaction_metadata,
   scorm_automation_get_version,
+  scorm_automation_get_page_layout,
+  scorm_automation_get_layout_flow,
   scorm_automation_get_layout_tree,
   scorm_automation_get_element_details,
   scorm_automation_validate_page_layout,

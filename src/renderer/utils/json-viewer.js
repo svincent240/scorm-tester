@@ -7,6 +7,8 @@
  * Provides expand/collapse functionality for nested objects and arrays.
  */
 
+import { rendererLogger } from './renderer-logger.js';
+
 /**
  * Escape HTML to prevent XSS
  * @param {string} str - String to escape
@@ -207,7 +209,7 @@ export function createJsonViewer(data, options = {}) {
     maxDepth = 2
   } = options;
 
-  const viewerId = `json-viewer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const viewerId = `json-viewer-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jsonHtml = renderJsonViewer(data, { expanded, maxDepth });
 
   const controlsHtml = showControls ? `
@@ -280,7 +282,7 @@ export function createJsonViewer(data, options = {}) {
             copyBtn.textContent = originalText;
           }, 1000);
         } catch (err) {
-          console.error('Failed to copy JSON:', err);
+          rendererLogger.error('Failed to copy JSON to clipboard', { error: err?.message });
         }
       });
     }
