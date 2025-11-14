@@ -78,7 +78,7 @@ export async function initialize() {
     });
 
     // Forward viewport size changes from main process to EventBus
-    ipcClient.on('viewport:size-changed', (data) => {
+    ipcClient.onViewportSizeChanged((data) => {
       try {
         eventBus.emit('viewport:size-changed', data);
       } catch (_) { /* intentionally empty */ }

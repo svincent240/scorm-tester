@@ -173,10 +173,28 @@ class ContentViewer extends BaseComponent {
       // Apply size to container
       const container = this.find('.content-viewer__container');
       if (container) {
-        container.style.maxWidth = `${size.width}px`;
-        container.style.maxHeight = `${size.height}px`;
-        container.style.margin = '0 auto';
-        container.style.border = size.width < 1000 ? '1px solid #ccc' : 'none';
+        // Check if this is desktop mode (1366x768 or similar large size)
+        const isDesktopMode = size.width >= 1200;
+        
+        if (isDesktopMode) {
+          // Desktop mode - remove all constraints to use full window
+          container.style.width = '';
+          container.style.height = '';
+          container.style.maxWidth = '';
+          container.style.maxHeight = '';
+          container.style.margin = '';
+          container.style.border = '';
+          container.style.overflow = '';
+        } else {
+          // Mobile/tablet mode - apply size constraints
+          container.style.width = `${size.width}px`;
+          container.style.height = `${size.height}px`;
+          container.style.maxWidth = `${size.width}px`;
+          container.style.maxHeight = `${size.height}px`;
+          container.style.margin = '0 auto';
+          container.style.border = '1px solid #ccc';
+          container.style.overflow = 'auto';
+        }
       }
 
       this.logger?.info('ContentViewer: Viewport size changed', size);

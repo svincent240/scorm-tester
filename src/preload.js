@@ -172,6 +172,7 @@ const electronAPI = {
   onScormInspectorDataUpdated: (callback) => safeOn('scorm-inspector-data-updated', callback),
   onScormInspectorErrorUpdated: (callback) => safeOn('scorm-inspector-error-updated', callback),
   onRendererConsoleError: (callback) => safeOn('renderer-console-error', callback),
+  onViewportSizeChanged: (callback) => safeOn('viewport:size-changed', callback),
 
   // Utility
   pathUtils: {

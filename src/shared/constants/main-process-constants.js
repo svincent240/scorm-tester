@@ -43,7 +43,7 @@ const WINDOW_TYPES = {
  */
 const VIEWPORT_PRESETS = {
   DESKTOP: { width: 1366, height: 768, label: 'Desktop' },
-  TABLET: { width: 1024, height: 1366, label: 'Tablet' },
+  TABLET: { width: 1024, height: 768, label: 'Tablet' },
   MOBILE: { width: 390, height: 844, label: 'Mobile' }
 };
 

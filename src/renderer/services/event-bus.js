@@ -151,17 +151,17 @@ class EventBus {
         if (isABAB) {
           const benignPair = (
             (a === 'state:changed' && b === 'ui:updated') || (a === 'ui:updated' && b === 'state:changed') ||
-            (a === 'navigation:availability:updated' && b === 'navigation:completed') || (a === 'navigation:completed' && b === 'navigation:availability:updated')
+            (a === 'navigation:availability:updated' && b === 'navigation:completed') || (a === 'navigation:completed' && b === 'navigation:availability:updated') ||
+            (a === 'viewport:toggle-mobile:request' && b === 'viewport:size-changed') || (a === 'viewport:size-changed' && b === 'viewport:toggle-mobile:request')
           );
-          import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
-            if (benignPair) {
-              rendererLogger.warn(`EventBus: Benign ABAB pattern '${a}' <-> '${b}', dropping '${event}' to avoid spurious loop`);
-            } else {
+          if (!benignPair) {
+            import('../utils/renderer-logger.js').then(({ rendererLogger }) => {
               rendererLogger.error(`EventBus: Detected repeating cycle '${a}' <-> '${b}', dropping '${event}'`);
-            }
-          }).catch(() => { /* no-op */ });
-          this._inFlightCounts.set(event, currentDepth - 1);
-          return;
+            }).catch(() => { /* no-op */ });
+            this._inFlightCounts.set(event, currentDepth - 1);
+            return;
+          }
+          // Benign pair detected - allow event to continue
         }
       }
     } catch (_) { /* no-op */ }

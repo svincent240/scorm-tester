@@ -212,6 +212,14 @@ class IpcClient {
     return api.onRendererConsoleError(handler);
   }
 
+  onViewportSizeChanged(/** @type {any} */ handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onViewportSizeChanged !== 'function') {
+      throw new Error('electronAPI.onViewportSizeChanged not available');
+    }
+    return api.onViewportSizeChanged(handler);
+  }
+
   onCourseLoaded(/** @type {any} */ handler) {
     const api = this._ensureAPI();
     if (typeof api.onCourseLoaded !== 'function') {

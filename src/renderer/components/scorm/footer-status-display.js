@@ -26,6 +26,17 @@ class FooterStatusDisplay extends BaseComponent {
         this.handleProgressUpdated(progressData);
       }
     } catch (_) { /* intentionally empty */ }
+
+    // Fetch and display initial viewport size
+    try {
+      const { ipcClient } = await import('../../../renderer/services/ipc-client.js');
+      const result = await ipcClient.invoke('viewport:get-size');
+      if (result && result.success && result.size) {
+        this.handleViewportSizeChanged(result.size);
+      }
+    } catch (error) {
+      this.logger?.warn('Failed to fetch initial viewport size', error);
+    }
   }
 
   renderContent() {
