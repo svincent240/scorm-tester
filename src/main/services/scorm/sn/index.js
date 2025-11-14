@@ -766,6 +766,7 @@ class ScormSNService {
    */
   getSequencingState() {
     const currentActivity = this.activityTreeManager.currentActivity;
+    const treeStats = this.activityTreeManager.getTreeStats();
 
     return {
       sessionState: this.sessionState,
@@ -781,7 +782,8 @@ class ScormSNService {
       presentation: currentActivity?.presentation || null,
       hiddenControls: this.getHiddenControlsForCurrentActivity(),
       globalObjectives: this.rollupManager.getAllGlobalObjectives(),
-      activityTreeStats: this.activityTreeManager.getTreeStats()
+      activityTreeStats: treeStats,
+      isSingleSCO: treeStats.launchableActivities === 1
     };
   }
 

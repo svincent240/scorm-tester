@@ -157,25 +157,28 @@ class NavigationControls extends BaseComponent {
             class="navigation-controls__btn navigation-controls__btn--previous" 
             id="${this.elementId}-previous"
             disabled
-            title="Previous Activity (respects course sequencing)"
+            style="display: none;"
+            title="Previous SCO (respects course sequencing)"
             aria-describedby="${this.elementId}-prev-status"
           >
-            ← Previous Activity
+            ← Previous SCO
           </button>
           
           <button 
             class="navigation-controls__btn navigation-controls__btn--next" 
             id="${this.elementId}-next"
             disabled
-            title="Next Activity (respects course sequencing)"
+            style="display: none;"
+            title="Next SCO (respects course sequencing)"
             aria-describedby="${this.elementId}-next-status"
           >
-            Next Activity →
+            Next SCO →
           </button>
           
           <button 
             class="navigation-controls__btn navigation-controls__btn--menu" 
             id="${this.elementId}-menu"
+            style="display: none;"
             title="Toggle Course Menu"
           >
             📚 Course Menu
@@ -681,18 +684,30 @@ class NavigationControls extends BaseComponent {
   updateButtonStates() {
     const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
     const navState = this.uiState?.getState('navigationState') || {};
+    const isSingleSCO = navState.isSingleSCO;
     const hiddenControls = navState.hiddenControls || [];
+
+    // If we don't have isSingleSCO info yet, keep buttons hidden
+    if (isSingleSCO === undefined) {
+      return;
+    }
 
     // In learner mode, respect hideLMSUI settings from manifest
     const hidePrevious = !browseMode && hiddenControls.includes('previous');
     const hideNext = !browseMode && hiddenControls.includes('continue');
 
-    // Trust SN service for navigation availability
+    // For single-SCO courses, keep buttons hidden
+    if (isSingleSCO) {
+      if (this.previousBtn) this.previousBtn.style.display = 'none';
+      if (this.nextBtn) this.nextBtn.style.display = 'none';
+      return;
+    }
+
+    // Multi-SCO course: show buttons
     const canNavigatePrevious = browseMode || !!this.navigationState.canNavigatePrevious;
     const canNavigateNext = browseMode || !!this.navigationState.canNavigateNext;
 
     if (this.previousBtn) {
-      // Hide button if manifest specifies hideLMSUI for previous
       if (hidePrevious) {
         this.previousBtn.style.display = 'none';
       } else {
@@ -702,9 +717,9 @@ class NavigationControls extends BaseComponent {
         this.previousBtn.classList.toggle('nav-available', canNavigatePrevious);
 
         const title = browseMode
-          ? 'Previous Activity (Browse Mode - Unrestricted Navigation)'
+          ? 'Previous SCO (Browse Mode - Unrestricted Navigation)'
           : canNavigatePrevious
-            ? 'Previous Activity (SCORM sequencing allows)'
+            ? 'Previous SCO (SCORM sequencing allows)'
             : 'Previous navigation blocked by SCORM rules';
 
         this.previousBtn.title = title;
@@ -713,7 +728,6 @@ class NavigationControls extends BaseComponent {
     }
 
     if (this.nextBtn) {
-      // Hide button if manifest specifies hideLMSUI for continue
       if (hideNext) {
         this.nextBtn.style.display = 'none';
       } else {
@@ -723,9 +737,9 @@ class NavigationControls extends BaseComponent {
         this.nextBtn.classList.toggle('nav-available', canNavigateNext);
 
         const title = browseMode
-          ? 'Next Activity (Browse Mode - Unrestricted Navigation)'
+          ? 'Next SCO (Browse Mode - Unrestricted Navigation)'
           : canNavigateNext
-            ? 'Next Activity (SCORM sequencing allows)'
+            ? 'Next SCO (SCORM sequencing allows)'
             : 'Next navigation blocked by SCORM rules';
 
         this.nextBtn.title = title;
@@ -747,7 +761,31 @@ class NavigationControls extends BaseComponent {
    * Update menu button
    */
   updateMenuButton() {
-    if (this.menuBtn) {
+    if (!this.menuBtn) return;
+
+    const navState = this.uiState?.getState('navigationState') || {};
+    const isSingleSCO = navState.isSingleSCO;
+    const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
+
+    // Always show in browse mode (sidebar is always available)
+    if (browseMode) {
+      this.menuBtn.style.display = '';
+      this.menuBtn.textContent = this.navigationState.menuVisible ? '✕ Hide Menu' : '📚 Course Menu';
+      this.menuBtn.classList.toggle('active', this.navigationState.menuVisible);
+      return;
+    }
+
+    // For learner mode: wait for isSingleSCO info, then show/hide accordingly
+    if (isSingleSCO === undefined) {
+      // Keep hidden until we know if it's single or multi-SCO
+      return;
+    }
+
+    // Learner mode: hide for single-SCO, show for multi-SCO
+    if (isSingleSCO) {
+      this.menuBtn.style.display = 'none';
+    } else {
+      this.menuBtn.style.display = '';
       this.menuBtn.textContent = this.navigationState.menuVisible ? '✕ Hide Menu' : '📚 Course Menu';
       this.menuBtn.classList.toggle('active', this.navigationState.menuVisible);
     }
@@ -820,12 +858,12 @@ class NavigationControls extends BaseComponent {
 
     // Update button labels and behavior for browse mode
     if (browseModeEnabled) {
-      if (this.previousBtn) {
-        this.previousBtn.title = 'Previous Activity (Browse Mode - Unrestricted Navigation)';
+      if (this.previousBtn && this.previousBtn.style.display !== 'none') {
+        this.previousBtn.title = 'Previous SCO (Browse Mode - Unrestricted Navigation)';
         this.previousBtn.classList.add('nav-browse-mode');
       }
-      if (this.nextBtn) {
-        this.nextBtn.title = 'Next Activity (Browse Mode - Unrestricted Navigation)';
+      if (this.nextBtn && this.nextBtn.style.display !== 'none') {
+        this.nextBtn.title = 'Next SCO (Browse Mode - Unrestricted Navigation)';
         this.nextBtn.classList.add('nav-browse-mode');
       }
 
@@ -833,11 +871,11 @@ class NavigationControls extends BaseComponent {
       this.showBrowseModeIndicator();
     } else {
       if (this.previousBtn) {
-        this.previousBtn.title = 'Previous Activity (respects course sequencing)';
+        this.previousBtn.title = 'Previous SCO (respects course sequencing)';
         this.previousBtn.classList.remove('nav-browse-mode');
       }
       if (this.nextBtn) {
-        this.nextBtn.title = 'Next Activity (respects course sequencing)';
+        this.nextBtn.title = 'Next SCO (respects course sequencing)';
         this.nextBtn.classList.remove('nav-browse-mode');
       }
 
@@ -845,8 +883,9 @@ class NavigationControls extends BaseComponent {
       this.hideBrowseModeIndicator();
     }
     
-    // Update button states to reflect browse mode navigation availability
+    // Update button states and menu button to reflect browse mode navigation availability
     this.updateButtonStates();
+    this.updateMenuButton();
   }
 
   /**

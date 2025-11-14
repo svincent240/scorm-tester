@@ -229,14 +229,14 @@ class AppManager {
             </div>
           </header>
           <main class="app-main">
-            <aside id="app-sidebar" class="app-sidebar">
+            <aside id="app-sidebar" class="app-sidebar app-sidebar--hidden">
               <div class="sidebar">
                 <div class="sidebar__content">
                   <div id="course-outline"></div>
                 </div>
               </div>
             </aside>
-            <section class="app-content">
+            <section class="app-content app-content--full-width">
               <div id="recent-courses"></div>
               <div id="content-viewer"></div>
               <div id="inspector-panel"></div>
@@ -772,10 +772,12 @@ class AppManager {
         const normalized = this.normalizeAvailableNavigation(available);
         const presentation = status?.presentation || null;
         const hiddenControls = status?.hiddenControls || [];
+        const isSingleSCO = status?.isSingleSCO || false;
         this.uiState.updateNavigation({
           ...normalized,
           presentation,
           hiddenControls,
+          isSingleSCO,
           _fromComponent: true
         });
       } catch (e) {
@@ -830,11 +832,13 @@ class AppManager {
     eventBus.on('course:loaded', () => {
       // Do not start yet, wait for Initialize event from ContentViewer (via scormAPIBridge) if available
       // But if absent, attempt delayed start
-      setTimeout(() => {
+      setTimeout(async () => {
         if (!this._snInitialized) {
           this._snInitialized = true; // optimistic start
           this.startSnPolling();
         }
+        // Refresh navigation from SN service to get activityTreeStats
+        await this.refreshNavigationFromSNService();
       }, 1500);
     });
 
@@ -1665,7 +1669,8 @@ class AppManager {
   }
 
   /**
-   * Update sidebar visibility based on course sequencing and browse mode
+   * Update sidebar visibility based on course sequencing on initial course load
+   * Note: Browse mode switching does NOT toggle sidebar - only course loading does
    * @param {Array<string>} availableNavigation - Available navigation types from SN service
    */
   async updateSidebarVisibilityFromNavigation(availableNavigation) {
@@ -1673,12 +1678,13 @@ class AppManager {
       const browseMode = this.uiState?.getState('browseMode')?.enabled || false;
       const choiceAvailable = Array.isArray(availableNavigation) && availableNavigation.includes('choice');
 
-      // Determine if sidebar should be visible
+      // Determine if sidebar should be visible (only applies to course load, not mode switching)
       let shouldShowSidebar = false;
 
       if (browseMode) {
-        // Browse mode: always show sidebar (unrestricted navigation)
-        shouldShowSidebar = true;
+        // Browse mode: don't auto-show sidebar, just make button available
+        // User can manually toggle sidebar with the button
+        return;
       } else if (choiceAvailable) {
         // Learner mode with choice: show sidebar (course allows menu navigation)
         shouldShowSidebar = true;
@@ -1909,10 +1915,12 @@ class AppManager {
         const normalized = this.normalizeAvailableNavigation(state.availableNavigation);
         const presentation = state.presentation || null;
         const hiddenControls = state.hiddenControls || [];
+        const isSingleSCO = state.isSingleSCO || false;
         this.uiState.updateNavigation({
           ...normalized,
           presentation,
           hiddenControls,
+          isSingleSCO,
           _fromComponent: true
         });
         // Update sidebar visibility based on navigation availability
