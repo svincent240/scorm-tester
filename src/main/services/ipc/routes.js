@@ -607,5 +607,13 @@ module.exports = [
       rateLimitProfile: 'default',
       useIpcResult: true
     }
+  },
+  {
+    channel: 'window:get-content-bounds',
+    handlerName: 'handleGetWindowContentBounds',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true
+    }
   }
 ];

@@ -3,7 +3,7 @@
 .inspector-panel {
   position: relative;
   background: var(--bg-primary);
-  border-left: 1px solid var(--border-color);
+  border-left: none;  /* Hidden by default */
   z-index: var(--z-inspector, 10);
   /* Ensure panel doesn't take space when hidden */
   min-width: 0;
@@ -20,6 +20,7 @@
 /* When panel is visible, show it with proper width */
 .inspector-panel.inspector-panel--visible {
   width: 400px;  /* Default width when visible */
+  border-left: 1px solid var(--border-color);  /* Show border only when visible */
 }
 
 .inspector-panel__resize-handle {
@@ -32,10 +33,15 @@
   cursor: ew-resize;
   z-index: 1001;
   transition: background var(--transition-fast) ease;
-  display: flex;
+  display: none;  /* Hidden by default when panel is closed */
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+}
+
+/* Show resize handle only when panel is visible */
+.inspector-panel--visible .inspector-panel__resize-handle {
+  display: flex;
 }
 
 .inspector-panel__resize-handle:hover {

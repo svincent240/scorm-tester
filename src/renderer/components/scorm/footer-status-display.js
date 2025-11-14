@@ -27,15 +27,15 @@ class FooterStatusDisplay extends BaseComponent {
       }
     } catch (_) { /* intentionally empty */ }
 
-    // Fetch and display initial viewport size
+    // Get actual window size on startup (not stored viewport preset)
     try {
       const { ipcClient } = await import('../../../renderer/services/ipc-client.js');
-      const result = await ipcClient.invoke('viewport:get-size');
-      if (result && result.success && result.size) {
-        this.handleViewportSizeChanged(result.size);
+      const result = await ipcClient.invoke('window:get-content-bounds');
+      if (result && result.success && result.bounds) {
+        this.handleViewportSizeChanged({ width: result.bounds.width, height: result.bounds.height });
       }
     } catch (error) {
-      this.logger?.warn('Failed to fetch initial viewport size', error);
+      this.logger?.warn('Failed to fetch initial window size', error);
     }
   }
 

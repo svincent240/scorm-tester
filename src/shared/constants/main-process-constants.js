@@ -89,8 +89,8 @@ const SERVICE_DEFAULTS = {
     mainWindow: {
       width: 1500,     // Increased to accommodate all sections without scrolling
       height: 1000,    // Increased to fit Learning Progress section comfortably
-      minWidth: 1100,  // Increased minimum to ensure proper layout
-      minHeight: 800,  // Increased to prevent section cut-off
+      minWidth: 200,   // Extremely small for maximum flexibility
+      minHeight: 200,  // Extremely small for maximum flexibility
       // Enable webSecurity by default to avoid insecure renderer warnings.
       // Feature flags and privileged scheme registration can be used to
       // allow storage-capable origins when needed (see USE_STORAGE_CAPABLE_ORIGIN).

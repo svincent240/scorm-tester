@@ -382,6 +382,7 @@ class IpcHandler extends BaseService {
       // Viewport management handlers
       this.registerHandler('viewport:set-size', this.handleViewportSetSize.bind(this));
       this.registerHandler('viewport:get-size', this.handleViewportGetSize.bind(this));
+      this.registerHandler('window:get-content-bounds', this.handleGetWindowContentBounds.bind(this));
 
       this.recordOperation('registerHandlers', true);
 
@@ -2331,6 +2332,41 @@ class IpcHandler extends BaseService {
       };
     } catch (error) {
       this.logger?.error('IpcHandler: Failed to get viewport size:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Handle get window content bounds request
+   */
+  async handleGetWindowContentBounds(event) {
+    try {
+      const windowManager = this.getDependency('windowManager');
+      if (!windowManager) {
+        return {
+          success: false,
+          error: 'Window manager not available'
+        };
+      }
+
+      const mainWindow = windowManager.getWindow('main');
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return {
+          success: false,
+          error: 'Main window not available'
+        };
+      }
+
+      const bounds = mainWindow.getContentBounds();
+      return {
+        success: true,
+        bounds: { width: bounds.width, height: bounds.height }
+      };
+    } catch (error) {
+      this.logger?.error('IpcHandler: Failed to get window content bounds:', error);
       return {
         success: false,
         error: error.message

@@ -335,6 +335,32 @@ class WindowManager extends BaseService {
         windowId: mainWindow.id
       });
     });
+
+    // Track window resize to update viewport display
+    // Use throttling to avoid excessive updates during rapid resizing
+    let resizeTimeout = null;
+    mainWindow.on('resize', () => {
+      // Clear any pending update
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      
+      // Schedule update with a small delay to batch rapid resize events
+      resizeTimeout = setTimeout(() => {
+        try {
+          const bounds = mainWindow.getContentBounds();
+          
+          // Broadcast actual window size to renderer for display
+          // Note: This is for display purposes only. ScormService maintains
+          // the viewport preset (desktop/mobile/tablet) separately.
+          const actualWindowSize = { width: bounds.width, height: bounds.height };
+          this.broadcastToAllWindows('viewport:size-changed', actualWindowSize);
+          this.logger?.debug('WindowManager: Window resized, broadcasting size for display', actualWindowSize);
+        } catch (error) {
+          this.logger?.warn('WindowManager: Failed to handle resize event', error?.message);
+        }
+      }, 100); // 100ms throttle delay
+    });
   }
 
   /**
