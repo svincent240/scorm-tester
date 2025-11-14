@@ -9,8 +9,29 @@ import { rendererLogger } from '../utils/renderer-logger.js';
  */
 export async function initialize() {
   try {
-    ipcClient.onActivityProgressUpdated((data) => {
-      try { eventBus.emit('activity:progress:updated', data); } catch (_) { /* intentionally empty */ }
+    ipcClient.onActivityProgressUpdated(async (data) => {
+      try { 
+        eventBus.emit('activity:progress:updated', data); 
+        
+        // Update UIState with complete progress data from main process
+        // Main process assembles complete snapshot per architectural spec
+        const { uiState: uiStatePromise } = await import('./ui-state.js');
+        const uiState = await uiStatePromise;
+        
+        // Parse numeric values that come as strings from SCORM data model
+        const progressUpdate = {
+          completionStatus: data.completionStatus,
+          successStatus: data.successStatus,
+          scoreRaw: data.scoreRaw ? (parseFloat(data.scoreRaw) || null) : null,
+          progressMeasure: data.progressMeasure ? (parseFloat(data.progressMeasure) || 0) : 0,
+          sessionTime: data.sessionTime || '',
+          totalTime: data.totalTime || '',
+          location: data.location || '',
+          suspendData: data.suspendData || ''
+        };
+        
+        uiState.updateProgress(progressUpdate);
+      } catch (_) { /* intentionally empty */ }
     });
 
     ipcClient.onObjectivesUpdated((data) => {

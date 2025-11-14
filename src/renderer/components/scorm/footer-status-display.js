@@ -18,6 +18,14 @@ class FooterStatusDisplay extends BaseComponent {
   async setup() {
     // Use uiState instance provided by BaseComponent.loadDependencies()
     // No re-awaiting or reassignment to avoid clobbering the instance.
+    
+    // Fetch and display initial progress state
+    try {
+      const progressData = this.uiState.getState('progressData');
+      if (progressData) {
+        this.handleProgressUpdated(progressData);
+      }
+    } catch (_) { /* intentionally empty */ }
   }
 
   renderContent() {

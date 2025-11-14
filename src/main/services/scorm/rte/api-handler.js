@@ -879,12 +879,20 @@ class ScormApiHandler {
   _emitProgressUpdateEvent(element, value) {
    try {
      if (this.telemetryStore && typeof this.telemetryStore.broadcastToAllWindows === 'function') {
+       // Assemble complete progress snapshot in main process per architectural spec
+       // Main process is the single source of truth and should push complete state
        const progressData = {
          activityId: this.getCurrentActivityId(),
          element,
          value,
          completionStatus: this.dataModel.getValue('cmi.completion_status'),
          successStatus: this.dataModel.getValue('cmi.success_status'),
+         scoreRaw: this.dataModel.getValue('cmi.score.raw'),
+         progressMeasure: this.dataModel.getValue('cmi.progress_measure'),
+         sessionTime: this.dataModel.getValue('cmi.session_time'),
+         totalTime: this.dataModel.getValue('cmi.total_time'),
+         location: this.dataModel.getValue('cmi.location'),
+         suspendData: this.dataModel.getValue('cmi.suspend_data'),
          timestamp: Date.now()
        };
        this.telemetryStore.broadcastToAllWindows('activity:progress:updated', progressData);
