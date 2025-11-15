@@ -1,11 +1,11 @@
 # Soft Reload Feature Implementation
 
 **Date:** November 14, 2025  
-**Status:** Implemented but Limited by Architecture
+**Status:** FUTURE (Implementation attempted but Limited by Architecture)
 
 ## Summary
 
-Implemented a "soft reload" button that refreshes course content while preserving SCORM session state. The feature works correctly from a SCORM API perspective but is limited by the application's file serving architecture.
+Attempted to implement a "soft reload" button that refreshes course content while preserving SCORM session state. The feature works correctly from a SCORM API perspective but is limited by the application's file serving architecture.
 
 ## What Was Implemented
 
@@ -214,14 +214,3 @@ But it's **limited by architecture**:
 - ❌ Requires hard reload to sync source changes
 
 The feature is valuable for **editing temp files directly** or **quick testing**, but not sufficient for a full hot-reload development workflow without architectural changes to file serving.
-
-## Revert Instructions
-
-If reverting, remove/revert these changes:
-1. Soft reload button from `header-controls.js`
-2. `softReload()` method from `content-viewer.js`
-3. Modified `Initialize()` logic in `scorm-client.js` (keep the `rendererLogger` import)
-4. `handleSoftReload()` from `app-manager.js`
-5. Event listener for `course:soft-reload:request` in `app-manager.js`
-
-Keep the `rendererLogger` import in `scorm-client.js` as it may be used elsewhere.
