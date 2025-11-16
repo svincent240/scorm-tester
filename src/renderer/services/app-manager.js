@@ -941,6 +941,9 @@ class AppManager {
     try {
       this.logger.info('AppManager: Course reload requested');
 
+      // Close error list panel if it's open
+      this.eventBus.emit('error-list:close');
+
       // Clear DevTools/browser console so new logs start fresh for the reloaded course
       try {
         await ipcClient.clearRendererConsole({ windowType: 'main' });

@@ -54,6 +54,12 @@ export class ErrorListPanel extends BaseComponent {
         this.toggle();
       });
       this.unsubscribeFunctions.push(unsubscribeToggle);
+
+      // Listen for close event (e.g., from course reload)
+      const unsubscribeClose = this.eventBus.on('error-list:close', () => {
+        this.close();
+      });
+      this.unsubscribeFunctions.push(unsubscribeClose);
     }
   }
 
