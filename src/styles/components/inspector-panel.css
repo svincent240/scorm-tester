@@ -1150,3 +1150,87 @@
   flex-direction: column;
   gap: var(--spacing-xs);
 }
+
+/* Data Model Size Summary */
+.data-model-sizes {
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.sizes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.sizes-table thead th {
+  text-align: left;
+  padding: var(--spacing-xs);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sizes-table tbody td {
+  padding: var(--spacing-xs);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sizes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sizes-table .size-value {
+  text-align: right;
+  font-family: var(--font-family-monospace);
+  font-weight: 600;
+}
+
+.sizes-table .size-limit {
+  text-align: left;
+  font-family: var(--font-family-monospace);
+  color: var(--text-secondary);
+  padding-left: 0;
+}
+
+.sizes-table .size-percent {
+  text-align: right;
+  font-family: var(--font-family-monospace);
+  font-weight: 600;
+  min-width: 50px;
+}
+
+/* Size status colors */
+.sizes-table .size-ok {
+  color: var(--text-primary);
+}
+
+.sizes-table .size-warning {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.sizes-table .size-danger {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  font-weight: 600;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .sizes-table .size-warning {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+  }
+  
+  .sizes-table .size-danger {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+  }
+}

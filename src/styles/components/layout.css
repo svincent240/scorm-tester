@@ -823,6 +823,92 @@
 .footer-status__score { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .footer-status__time { font-variant-numeric: tabular-nums; }
 
+/* Suspend Data Counter */
+.footer-status__suspend-data {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.footer-status__suspend-data .footer-status__label {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.footer-status__suspend-data .footer-status__value {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+}
+
+.footer-status__suspend-data .footer-status__limit {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Warning state - approaching limit (80-95%) */
+.footer-status__suspend-data--warning {
+  background: rgba(213, 153, 76, 0.15);
+  border-color: rgba(213, 153, 76, 0.4);
+}
+
+.footer-status__suspend-data--warning .footer-status__value {
+  color: #d5994c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .footer-status__suspend-data--warning {
+    background: rgba(213, 153, 76, 0.2);
+    border-color: rgba(213, 153, 76, 0.5);
+  }
+  
+  .footer-status__suspend-data--warning .footer-status__value {
+    color: #f2d5ab;
+  }
+}
+
+/* Danger state - critical limit (95%+) */
+.footer-status__suspend-data--danger {
+  background: rgba(244, 67, 54, 0.15);
+  border-color: rgba(244, 67, 54, 0.4);
+  animation: suspend-data-pulse 2s ease-in-out infinite;
+}
+
+.footer-status__suspend-data--danger .footer-status__value {
+  color: #f44336;
+  font-weight: var(--font-weight-bold);
+}
+
+@media (prefers-color-scheme: dark) {
+  .footer-status__suspend-data--danger {
+    background: rgba(244, 67, 54, 0.25);
+    border-color: rgba(244, 67, 54, 0.6);
+  }
+  
+  .footer-status__suspend-data--danger .footer-status__value {
+    color: #ff6b6b;
+  }
+}
+
+@keyframes suspend-data-pulse {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+  }
+  50% { 
+    opacity: 0.9;
+    box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.2);
+  }
+}
+
 /* High Contrast Mode */
 @media (prefers-contrast: high) {
   .app-header,

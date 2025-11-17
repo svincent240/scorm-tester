@@ -5,6 +5,10 @@ import { BaseComponent } from '../base-component.js';
 class FooterStatusDisplay extends BaseComponent {
   constructor(elementId, options = {}) {
     super(elementId, options);
+    
+    // Track suspend data limits based on LMS profile
+    this.suspendDataLimit = 4096; // Conservative limit for legacy LMS compatibility
+    this.suspendDataLength = 0;
   }
 
   getDefaultOptions() {
@@ -46,6 +50,10 @@ class FooterStatusDisplay extends BaseComponent {
       <span id="footer-status-text" class="footer-status__text">Not Started</span>
       <span id="footer-score" class="footer-status__score">--</span>
       <span id="footer-time" class="footer-status__time">00:00:00</span>
+      <span id="footer-suspend-data" class="footer-status__suspend-data" title="Suspend data usage">
+        <span class="footer-status__label">Suspend:</span>
+        <span id="footer-suspend-count" class="footer-status__value">0</span>/<span id="footer-suspend-limit" class="footer-status__limit">64000</span>
+      </span>
       <span id="footer-viewport" class="footer-status__viewport" title="Current viewport size">1366×768</span>
     `;
   }
@@ -56,6 +64,10 @@ class FooterStatusDisplay extends BaseComponent {
     this.subscribe('session:updated', this.handleSessionUpdated);
     // Listen for viewport size changes
     this.subscribe('viewport:size-changed', this.handleViewportSizeChanged);
+    // Listen for data model changes to track suspend data (use UI-scoped event from ScormClient)
+    this.subscribe('ui:scorm:dataChanged', this.handleDataModelChanged);
+    // Listen for session info to get LMS profile limits
+    this.subscribe('session:info', this.handleSessionInfo);
   }
 
   handleViewportSizeChanged(data) {
@@ -127,6 +139,68 @@ class FooterStatusDisplay extends BaseComponent {
 
   formatScore(score) {
     return (score !== null && score !== undefined) ? `${score}` : '--';
+  }
+
+  handleDataModelChanged(data) {
+    const changeData = data?.data || data;
+    if (!this.element || !changeData) return;
+
+    // Track suspend_data length
+    if (changeData.element === 'cmi.suspend_data') {
+      const newValue = changeData.value || '';
+      this.suspendDataLength = newValue.length;
+      this.updateSuspendDataDisplay();
+    }
+  }
+
+  handleSessionInfo(data) {
+    const sessionInfo = data?.data || data;
+    if (!sessionInfo) return;
+
+    // Update suspend data limit based on LMS profile
+    if (sessionInfo.lmsProfile) {
+      const profileLimits = {
+        'litmos': 4096,
+        'generic': 4096,
+        'moodle': 65536,
+        'scormcloud': 65536
+      };
+      this.suspendDataLimit = profileLimits[sessionInfo.lmsProfile] || 64000;
+      this.updateSuspendDataDisplay();
+    }
+  }
+
+  updateSuspendDataDisplay() {
+    if (!this.element) return;
+
+    const countEl = this.element.querySelector('#footer-suspend-count');
+    const limitEl = this.element.querySelector('#footer-suspend-limit');
+    const containerEl = this.element.querySelector('#footer-suspend-data');
+
+    if (countEl) {
+      countEl.textContent = this.suspendDataLength.toString();
+    }
+
+    if (limitEl) {
+      limitEl.textContent = this.suspendDataLimit.toString();
+    }
+
+    if (containerEl) {
+      // Visual warnings based on usage percentage
+      const usagePercent = (this.suspendDataLength / this.suspendDataLimit) * 100;
+      
+      containerEl.classList.remove('footer-status__suspend-data--warning', 'footer-status__suspend-data--danger');
+      
+      if (usagePercent >= 95) {
+        containerEl.classList.add('footer-status__suspend-data--danger');
+        containerEl.title = `Suspend data critical: ${this.suspendDataLength}/${this.suspendDataLimit} chars (${usagePercent.toFixed(1)}%)`;
+      } else if (usagePercent >= 80) {
+        containerEl.classList.add('footer-status__suspend-data--warning');
+        containerEl.title = `Suspend data high: ${this.suspendDataLength}/${this.suspendDataLimit} chars (${usagePercent.toFixed(1)}%)`;
+      } else {
+        containerEl.title = `Suspend data usage: ${this.suspendDataLength}/${this.suspendDataLimit} chars (${usagePercent.toFixed(1)}%)`;
+      }
+    }
   }
 }
 

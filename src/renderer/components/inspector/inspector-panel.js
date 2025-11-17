@@ -1104,6 +1104,9 @@ class InspectorPanel extends BaseComponent {
     const el = this.tabEls?.model; if (!el) return;
     const dm = this.state.dataModel || {};
 
+    // Calculate sizes for key fields with conservative limits
+    const sizeInfo = this._calculateDataModelSizes(dm);
+
     const { html, controlsHtml, setup } = /** @type {JsonViewerResult} */ (createJsonViewer(dm, {
       showControls: true,
       showCopy: true,
@@ -1116,6 +1119,7 @@ class InspectorPanel extends BaseComponent {
           <h4>Data Model</h4>
           ${controlsHtml}
         </div>
+        ${sizeInfo}
         <div class="tab-section__content">
           ${html}
         </div>
@@ -1123,6 +1127,100 @@ class InspectorPanel extends BaseComponent {
 
     // Setup event handlers for the JSON viewer
     setup(el);
+  }
+
+  /**
+   * Calculate sizes of data model fields relative to conservative limits
+   * @param {Record<string, any>} dm - Data model object
+   * @returns {string} HTML string with size summary
+   * @private
+   */
+  _calculateDataModelSizes(dm) {
+    // Data model structure: { coreData: {...}, interactions: [...], objectives: [...] }
+    const coreData = dm.coreData || {};
+    const interactions = dm.interactions || [];
+
+    const fields = [
+      { key: 'cmi.suspend_data', label: 'Suspend Data', limit: 4096 },
+      { key: 'cmi.location', label: 'Location', limit: 1000 },
+      { key: 'cmi.learner_name', label: 'Learner Name', limit: 250 },
+      { key: 'cmi.learner_id', label: 'Learner ID', limit: 250 }
+    ];
+
+    // Check for interactions
+    let interactionSizes = [];
+    for (let i = 0; i < Math.min(interactions.length, 10); i++) {
+      const interaction = interactions[i];
+      if (interaction) {
+        if (interaction.id) {
+          interactionSizes.push({
+            label: `Interaction[${i}].id`,
+            size: String(interaction.id).length,
+            limit: 4000
+          });
+        }
+        if (interaction.learner_response) {
+          interactionSizes.push({
+            label: `Interaction[${i}].response`,
+            size: String(interaction.learner_response).length,
+            limit: 4000
+          });
+        }
+      }
+    }
+
+    // Calculate sizes for main fields
+    const sizes = fields.map(field => {
+      const value = coreData[field.key];
+      const size = value ? String(value).length : 0;
+      const percent = field.limit > 0 ? Math.round((size / field.limit) * 100) : 0;
+      
+      let statusClass = 'size-ok';
+      if (percent >= 95) statusClass = 'size-danger';
+      else if (percent >= 80) statusClass = 'size-warning';
+      
+      return { ...field, size, percent, statusClass };
+    }).concat(interactionSizes.map(item => ({
+      label: item.label,
+      size: item.size,
+      limit: item.limit,
+      percent: Math.round((item.size / item.limit) * 100),
+      statusClass: item.size / item.limit >= 0.95 ? 'size-danger' : 
+                   item.size / item.limit >= 0.80 ? 'size-warning' : 'size-ok'
+    })));
+
+    // Only show fields that have data
+    const nonEmptySizes = sizes.filter(s => s.size > 0);
+    
+    if (nonEmptySizes.length === 0) {
+      return '<div class="data-model-sizes"><em>No data stored yet</em></div>';
+    }
+
+    const rows = nonEmptySizes.map(s => `
+      <tr class="${s.statusClass}">
+        <td>${this._esc(s.label)}</td>
+        <td class="size-value">${s.size}</td>
+        <td class="size-limit">/ ${s.limit}</td>
+        <td class="size-percent">${s.percent}%</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="data-model-sizes">
+        <table class="sizes-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th colspan="2">Size</th>
+              <th>Usage</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   renderSnState() {
