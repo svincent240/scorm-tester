@@ -16,7 +16,6 @@ const IpcHandler = require('./services/ipc-handler');
 const FileManager = require('./services/file-manager');
 const ScormService = require('./services/scorm-service');
 const RecentCoursesService = require('./services/recent-courses-service');
-const AutomationBridgeService = require('./services/automation-bridge-service');
 
 const AppStateService = require('./services/app-state');
 
@@ -181,17 +180,6 @@ class MainProcess {
     }
     this.services.set('appState', appState);
 
-    const automationBridgeService = new AutomationBridgeService(this.errorHandler, this.logger, {
-      frameSelector: '#content-frame'
-    });
-    const automationDeps = new Map([
-      ['windowManager', windowManager]
-    ]);
-    if (!await automationBridgeService.initialize(automationDeps)) {
-      throw new Error('AutomationBridgeService initialization failed');
-    }
-    this.services.set('automationBridgeService', automationBridgeService);
-
     // IPC handler (depends on many services including telemetry and SN snapshot)
     const ipcHandler = new IpcHandler(this.errorHandler, this.logger, { IPC_REFACTOR_ENABLED: true });
     const ipcDependencies = new Map([
@@ -202,7 +190,6 @@ class MainProcess {
       ['telemetryStore', telemetryStore],
       ['snSnapshotService', snSnapshotService],
       ['appState', appState],
-      ['automationBridgeService', automationBridgeService],
     ]);
     if (!await ipcHandler.initialize(ipcDependencies)) {
       throw new Error('IpcHandler initialization failed');
@@ -306,7 +293,7 @@ class MainProcess {
     }
 
     try {
-  const shutdownOrder = ['ipcHandler', 'automationBridgeService', 'scormService', 'recentCoursesService', 'fileManager', 'windowManager'];
+      const shutdownOrder = ['ipcHandler', 'scormService', 'recentCoursesService', 'fileManager', 'windowManager'];
 
       for (const serviceName of shutdownOrder) {
         const service = this.services.get(serviceName);

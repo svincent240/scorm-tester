@@ -16,19 +16,6 @@ import { showNotification, removeNotification } from './ui-state.notifications.j
 // setupDebugMirroring removed - SCORM Inspector architecture handles content analysis
 
 /**
- * @typedef {Object} AutomationState
- * @property {string|null} [sessionId]
- * @property {boolean} [available]
- * @property {string|null} [version]
- * @property {Object|null} [structure]
- * @property {Object|null} [currentSlide]
- * @property {number|null} [lastCheckedAt]
- * @property {Error|string|null} [lastError]
- * @property {boolean|null} [probing]
- * @property {string|null} [lastProbeReason]
- */
-
-/**
  * UI State Manager Class
  *
  * Centralized state management with event-driven updates and persistence.
@@ -252,43 +239,6 @@ class UIStateManager {
       // Release guard after current microtask
       setTimeout(() => { this._emittingProgress = false; }, 0);
     }
-  }
-
-  /**
-   * Update automation bridge state and emit automation events
-   * @param {Partial<AutomationState>} [automationData={}]
-   */
-  updateAutomationState(automationData = {}) {
-    const automationState = /** @type {any} */ (this.state);
-    const previous = automationState.automation || {};
-    const hasProbingUpdate = Object.prototype.hasOwnProperty.call(automationData, 'probing');
-
-    const next = {
-      sessionId: automationData.sessionId ?? previous.sessionId ?? null,
-      available: automationData.available ?? previous.available ?? false,
-      version: automationData.version ?? previous.version ?? null,
-      structure: automationData.structure ?? previous.structure ?? null,
-      currentSlide: automationData.currentSlide ?? previous.currentSlide ?? null,
-      lastCheckedAt: automationData.lastCheckedAt ?? previous.lastCheckedAt ?? null,
-      lastError: automationData.lastError ?? previous.lastError ?? null,
-      probing: hasProbingUpdate ? automationData.probing ?? null : (previous.probing ?? false),
-      lastProbeReason: automationData.lastProbeReason ?? previous.lastProbeReason ?? null
-    };
-
-    this.setState({ automation: next });
-    this.eventBus?.emit('automation:state:updated', { ...next });
-  }
-
-  /**
-   * Reset automation state slice to defaults
-   * @param {string} [reason='manual']
-   */
-  resetAutomationState(reason = 'manual') {
-    const baseState = /** @type {any} */ (this.getInitialState());
-    const base = (baseState?.automation) || {};
-    const next = { ...base };
-    this.setState({ automation: next });
-    this.eventBus?.emit('automation:state:reset', { reason, state: { ...next } });
   }
 
   /**

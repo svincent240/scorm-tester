@@ -320,34 +320,6 @@ module.exports = [
     }
   },
   {
-    channel: 'automation:probe',
-    handlerName: 'handleAutomationProbe',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
-  },
-  {
-    channel: 'automation:get-state',
-    handlerName: 'handleAutomationGetState',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
-  },
-  {
-    channel: 'automation:navigate',
-    handlerName: 'handleAutomationNavigate',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true,
-      debounceMs: 100
-    }
-  },
-  {
     channel: 'open-external',
     handlerName: 'handleOpenExternal',
     options: {

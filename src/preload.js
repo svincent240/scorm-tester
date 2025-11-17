@@ -128,14 +128,6 @@ const electronAPI = {
   scormGetDiagnostic: (sessionId, errorCode) => safeInvoke('scorm-get-diagnostic', sessionId, errorCode),
   loadModule: (modulePath) => safeInvoke('load-module', modulePath), // New method
 
-  // Automation bridge helpers
-  automation: {
-    probe: (sessionId, metadata = {}) => safeInvoke('automation:probe', { sessionId, metadata }),
-    getState: (sessionId) => safeInvoke('automation:get-state', sessionId),
-    navigate: (sessionId, slideId, context = null) => safeInvoke('automation:navigate', { sessionId, slideId, context }),
-    onStateUpdate: (callback) => safeOn('automation:state-update', callback)
-  },
-
   // Session Management
   createSession: (courseData) => safeInvoke('create-session', courseData),
   getSession: (sessionId) => safeInvoke('get-session', sessionId),

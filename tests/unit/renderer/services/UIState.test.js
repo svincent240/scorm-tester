@@ -6,18 +6,6 @@
 import { UIStateManager } from '../../../../src/renderer/services/ui-state.js';
 import { getInitialUIState } from '../../../../src/renderer/services/ui-state.initial.js';
 
-const baseAutomationState = {
-  sessionId: null,
-  available: false,
-  version: null,
-  structure: null,
-  currentSlide: null,
-  lastCheckedAt: null,
-  lastError: null,
-  probing: false,
-  lastProbeReason: null
-};
-
 // Mock dependencies
 jest.mock('../../../../src/renderer/services/ui-state.helpers.js', () => ({
   deepMerge: (obj1, obj2) => ({ ...obj1, ...obj2 }),
@@ -36,7 +24,6 @@ jest.mock('../../../../src/renderer/services/ui-state.initial.js', () => ({
   getInitialUIState: jest.fn(() => ({
     ui: { theme: 'dark', devModeEnabled: false },
     progressData: null,
-    automation: { ...baseAutomationState }
   })),
 }));
 
@@ -61,7 +48,7 @@ describe('UIState Service', () => {
       },
       safeLoadPersistedUI: jest.fn(),
       safePersistState: jest.fn(),
-  getInitialUIState: getInitialUIState,
+      getInitialUIState: getInitialUIState,
       showNotification: jest.fn(),
       removeNotification: jest.fn(),
       rendererLogger: {
@@ -144,23 +131,5 @@ describe('UIState Service', () => {
 
     expect(subscriber).not.toHaveBeenCalled();
     expect(mockEventBus.emit).not.toHaveBeenCalledWith('state:changed', expect.any(Object));
-  });
-
-  test('updateAutomationState merges automation slice and emits event', () => {
-    uiState.updateAutomationState({ sessionId: 'session-1', available: true, probing: true, lastProbeReason: 'test' });
-
-    expect(uiState.getState('automation.sessionId')).toBe('session-1');
-    expect(uiState.getState('automation.available')).toBe(true);
-    expect(mockEventBus.emit).toHaveBeenCalledWith('automation:state:updated', expect.objectContaining({ sessionId: 'session-1' }));
-  });
-
-  test('resetAutomationState restores defaults and emits reset event', () => {
-    uiState.setState({ automation: { sessionId: 'session-2', available: true } });
-
-    uiState.resetAutomationState('test-reason');
-
-    expect(uiState.getState('automation.sessionId')).toBeNull();
-    expect(uiState.getState('automation.available')).toBe(false);
-    expect(mockEventBus.emit).toHaveBeenCalledWith('automation:state:reset', expect.objectContaining({ reason: 'test-reason' }));
   });
 });
