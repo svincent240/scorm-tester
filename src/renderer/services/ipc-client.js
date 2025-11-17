@@ -98,6 +98,39 @@ class IpcClient {
     return api.processScormManifest(unifiedPath, manifestContent);
   }
 
+  // Automation bridge helpers
+  async automationProbe(/** @type {string} */ sessionId, /** @type {any} */ metadata = {}) {
+    const api = this._ensureAPI();
+    if (!api.automation || typeof api.automation.probe !== 'function') {
+      throw new Error('electronAPI.automation.probe not available');
+    }
+    return api.automation.probe(sessionId, metadata);
+  }
+
+  async automationGetState(/** @type {string} */ sessionId) {
+    const api = this._ensureAPI();
+    if (!api.automation || typeof api.automation.getState !== 'function') {
+      throw new Error('electronAPI.automation.getState not available');
+    }
+    return api.automation.getState(sessionId);
+  }
+
+  async automationNavigate(/** @type {string} */ sessionId, /** @type {string} */ slideId, /** @type {any} */ context = null) {
+    const api = this._ensureAPI();
+    if (!api.automation || typeof api.automation.navigate !== 'function') {
+      throw new Error('electronAPI.automation.navigate not available');
+    }
+    return api.automation.navigate(sessionId, slideId, context);
+  }
+
+  onAutomationStateUpdate(/** @type {(state: any) => void} */ handler) {
+    const api = this._ensureAPI();
+    if (!api.automation || typeof api.automation.onStateUpdate !== 'function') {
+      throw new Error('electronAPI.automation.onStateUpdate not available');
+    }
+    return api.automation.onStateUpdate(handler);
+  }
+
   // Recents
   async recentCoursesGet() {
     const api = this._ensureAPI();

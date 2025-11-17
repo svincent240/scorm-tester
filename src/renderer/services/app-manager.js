@@ -57,6 +57,12 @@ class AppManager {
       debug: () => {}
     };
 
+    // Automation bridge tracking
+    this.currentAutomationSessionId = null;
+    this._automationBridgeSetup = false;
+    this._automationProbeInFlight = null;
+    this._automationSessionUnsubscribe = null;
+
     // Initialize logger asynchronously but safely
     try {
       import('../utils/renderer-logger.js')
@@ -134,6 +140,9 @@ class AppManager {
 
       // Start syncing centralized UI settings to main AppState
       try { this.setupUiSettingsSync(); } catch (_) { /* intentionally empty */ }
+
+      // Wire renderer automation bridge listeners/state sync
+      try { this.setupAutomationBridgeIntegration(); } catch (_) { /* intentionally empty */ }
 
       // Configure EventBus debug mode based on UIState (Step 8)
       try {
@@ -224,6 +233,7 @@ class AppManager {
             <div class="header">
               <div class="header__nav">
                 <div id="navigation-controls"></div>
+                <div id="automation-navigation-controls"></div>
               </div>
               <div class="header__actions">
                 <div id="error-badge"></div>
@@ -287,6 +297,8 @@ class AppManager {
     const InspectorPanel = _modInspector.InspectorPanel;
     const _modHeader = await import('../components/header-controls.js');
     const HeaderControls = _modHeader.HeaderControls;
+    const _modAutoNav = await import('../components/scorm/automation-navigation-controls.js');
+    const AutomationNavigationControls = _modAutoNav.default;
 
     // Notification components
     const _modNotifContainer = await import('../components/notifications/notification-container.js');
@@ -320,6 +332,7 @@ class AppManager {
       { name: 'headerControls', class: HeaderControls, elementId: 'header-controls', required: true },
       { name: 'contentViewer', class: ContentViewer, elementId: 'content-viewer', required: true },
       { name: 'navigationControls', class: NavigationControls, elementId: 'navigation-controls', required: true },
+      { name: 'automationNavigationControls', class: AutomationNavigationControls, elementId: 'automation-navigation-controls', required: false },
       { name: 'footerProgressBar', class: FooterProgressBar, elementId: 'footer-progress', required: true },
       { name: 'footerStatusDisplay', class: FooterStatusDisplay, elementId: 'footer-status', required: true },
       { name: 'courseOutline', class: CourseOutline, elementId: 'course-outline', required: true },
@@ -478,6 +491,8 @@ class AppManager {
         // Fallback to old notification system if UIState not available
         this.showError('Course Loading Error', errorMessage);
       }
+
+      this.clearAutomationState('course-load-error');
     });
 
     eventBus.on('course:loaded', (courseData) => {
@@ -523,6 +538,10 @@ class AppManager {
     });
 
     // SCORM events
+    eventBus.on('ui:scorm:initialized', () => {
+      this.handleAutomationScormInitialized();
+    });
+
     eventBus.on('ui:scorm:dataChanged', (data) => {
       // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
@@ -1105,6 +1124,7 @@ class AppManager {
    * Handle course cleared event
    */
   handleCourseCleared() {
+    this.clearAutomationState('course-cleared');
 
       // Show and refresh recent courses when no course is loaded
       try {
@@ -1235,6 +1255,171 @@ class AppManager {
       // Non-critical error, just log it
       this.logger.warn('AppManager: Error cleaning up terminated session', error);
     }
+  }
+
+  /**
+   * Setup renderer-side automation bridge listeners and state synchronization
+   */
+  setupAutomationBridgeIntegration() {
+    if (this._automationBridgeSetup || !this.uiState) {
+      return;
+    }
+
+    this._automationBridgeSetup = true;
+
+    try {
+      ipcClient.onAutomationStateUpdate((state) => {
+        try { this.handleAutomationStateBroadcast(state); } catch (error) {
+          try { this.logger.warn('AppManager: automation state broadcast failed', error?.message || error); } catch (_) { /* intentionally empty */ }
+        }
+      });
+    } catch (error) {
+      try { this.logger.warn('AppManager: Failed to register automation state listener', error?.message || error); } catch (_) { /* intentionally empty */ }
+    }
+
+    try {
+      ipcClient.onCourseLoaded((payload) => {
+        try { this.handleAutomationCourseLoaded(payload); } catch (error) {
+          try { this.logger.warn('AppManager: automation course-loaded handler failed', error?.message || error); } catch (_) { /* intentionally empty */ }
+        }
+      });
+    } catch (error) {
+      try { this.logger.warn('AppManager: Failed to register automation course-loaded listener', error?.message || error); } catch (_) { /* intentionally empty */ }
+    }
+
+    try {
+      if (typeof this.uiState.subscribe === 'function') {
+        this._automationSessionUnsubscribe = this.uiState.subscribe((nextSession) => {
+          this.handleAutomationSessionValue(nextSession);
+        }, 'currentSession');
+      }
+    } catch (error) {
+      try { this.logger.warn('AppManager: Failed to subscribe to automation session state', error?.message || error); } catch (_) { /* intentionally empty */ }
+    }
+  }
+
+  handleAutomationCourseLoaded(payload = {}) {
+    const sessionId = payload?.sessionId;
+    if (!sessionId) {
+      try { this.logger.warn('AppManager: automation course load payload missing sessionId'); } catch (_) { /* intentionally empty */ }
+      return;
+    }
+
+    this.currentAutomationSessionId = sessionId;
+    const reason = payload?.isResume ? 'course-resume' : 'course-load';
+    try {
+      this.uiState.updateAutomationState({
+        sessionId,
+        available: false,
+        structure: payload?.structure || null,
+        currentSlide: null,
+        lastError: null,
+        probing: true,
+        lastProbeReason: reason,
+        lastCheckedAt: Date.now()
+      });
+    } catch (_) { /* intentionally empty */ }
+
+    this.triggerAutomationProbe(reason);
+  }
+
+  handleAutomationStateBroadcast(state) {
+    if (!state || !this.uiState) {
+      return;
+    }
+
+    const reason = state.reason || 'main-push';
+    const normalized = { ...state };
+    delete normalized.reason;
+    normalized.probing = false;
+    normalized.lastProbeReason = reason;
+
+    if (normalized.sessionId) {
+      this.currentAutomationSessionId = normalized.sessionId;
+    }
+
+    try {
+      this.uiState.updateAutomationState(normalized);
+    } catch (error) {
+      try { this.logger.warn('AppManager: Failed to apply automation state broadcast', error?.message || error); } catch (_) { /* intentionally empty */ }
+    }
+  }
+
+  handleAutomationSessionValue(nextSessionId) {
+    if (!nextSessionId) {
+      if (this.currentAutomationSessionId) {
+        this.clearAutomationState('session-cleared');
+      }
+      return;
+    }
+
+    if (this.currentAutomationSessionId === nextSessionId) {
+      return;
+    }
+
+    this.currentAutomationSessionId = nextSessionId;
+    try { this.uiState.updateAutomationState({ sessionId: nextSessionId }); } catch (_) { /* intentionally empty */ }
+  }
+
+  clearAutomationState(reason = 'manual') {
+    this.currentAutomationSessionId = null;
+    if (this.uiState && typeof this.uiState.resetAutomationState === 'function') {
+      try { this.uiState.resetAutomationState(reason); } catch (_) { /* intentionally empty */ }
+    }
+  }
+
+  async triggerAutomationProbe(reason = 'manual') {
+    if (!this.currentAutomationSessionId) {
+      return;
+    }
+
+    if (this._automationProbeInFlight) {
+      return this._automationProbeInFlight;
+    }
+
+    const sessionId = this.currentAutomationSessionId;
+    try {
+      this.uiState.updateAutomationState({
+        sessionId,
+        probing: true,
+        lastProbeReason: reason,
+        lastCheckedAt: Date.now()
+      });
+    } catch (_) { /* intentionally empty */ }
+
+    const probe = (async () => {
+      try {
+        const result = await ipcClient.automationProbe(sessionId, { reason });
+        if (result?.success && result.state) {
+          this.uiState.updateAutomationState({
+            ...result.state,
+            probing: false,
+            lastProbeReason: reason
+          });
+        } else {
+          this.uiState.updateAutomationState({ probing: false, lastProbeReason: reason });
+        }
+      } catch (error) {
+        try {
+          this.logger.warn('AppManager: Automation probe failed', error?.message || error);
+        } catch (_) { /* intentionally empty */ }
+        this.uiState.updateAutomationState({
+          probing: false,
+          lastError: error?.message || String(error),
+          lastProbeReason: reason,
+          lastCheckedAt: Date.now()
+        });
+      } finally {
+        this._automationProbeInFlight = null;
+      }
+    })();
+
+    this._automationProbeInFlight = probe;
+    return probe;
+  }
+
+  handleAutomationScormInitialized() {
+    this.triggerAutomationProbe('scorm-initialized');
   }
 
   /**

@@ -13,10 +13,26 @@
 
 const sessions = require("../session");
 const { RuntimeManager } = require("../runtime-manager");
+const {
+  automationCheckAvailability,
+  automationGetCourseStructure,
+  automationGetCurrentSlide,
+  automationGoToSlide,
+  createAutomationNotAvailableError
+} = require('../../shared/automation/navigation');
+const createAPINotAvailableError = createAutomationNotAvailableError;
 const getLogger = require('../../shared/utils/logger.js');
 
 // Initialize logger
 const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
+
+function getAutomationExecutor(session_id) {
+  return (expression) => RuntimeManager.executeJS(
+    null,
+    expression,
+    session_id
+  );
+}
 
 /**
  * Helper: Check if window.SCORMAutomation API is available
@@ -24,13 +40,14 @@ const logger = getLogger(process.env.SCORM_TESTER_LOG_DIR);
  * @returns {Promise<boolean>} - True if API is available
  */
 async function checkAutomationAPI(session_id) {
+  const execute = getAutomationExecutor(session_id);
   try {
-    const result = await RuntimeManager.executeJS(
-      null, 
-      'typeof window.SCORMAutomation !== "undefined" && window.SCORMAutomation !== null',
-      session_id
-    );
-    return result === true;
+    const { available } = await automationCheckAvailability({
+      execute,
+      logger,
+      sessionId: session_id
+    });
+    return !!available;
   } catch (err) {
     logger.debug('Error checking automation API availability', { session_id, error: err.message });
     return false;
@@ -55,22 +72,6 @@ async function validateRuntimeSession(session_id) {
     e.code = 'RUNTIME_NOT_OPEN';
     throw e;
   }
-}
-
-/**
- * Helper: Create automation API not available error
- * @param {string} toolName - Name of the tool that requires the API
- * @returns {Error} - Structured error object
- */
-function createAPINotAvailableError(toolName) {
-  const e = new Error(
-    `Template Automation API not available. The window.SCORMAutomation object is not present in this course. ` +
-    `Use DOM manipulation tools (scorm_dom_*) as an alternative.`
-  );
-  e.code = 'AUTOMATION_API_NOT_AVAILABLE';
-  e.name = 'AutomationAPIError';
-  e.tool = toolName;
-  return e;
 }
 
 /**
@@ -736,7 +737,8 @@ async function scorm_automation_get_course_structure(params = {}) {
 
   await validateRuntimeSession(session_id);
 
-  const available = await checkAutomationAPI(session_id);
+  const execute = getAutomationExecutor(session_id);
+  const { available } = await automationCheckAvailability({ execute, logger, sessionId: session_id });
   if (!available) {
     throw createAPINotAvailableError('scorm_automation_get_course_structure');
   }
@@ -748,15 +750,11 @@ async function scorm_automation_get_course_structure(params = {}) {
       payload: {} 
     });
 
-    const result = await RuntimeManager.executeJS(
-      null,
-      'window.SCORMAutomation.getCourseStructure()',
-      session_id
-    );
+    const { structure } = await automationGetCourseStructure({ execute, logger, sessionId: session_id });
 
     return {
       available: true,
-      structure: result
+      structure
     };
   } catch (err) {
     logger.error('Error getting course structure', { 
@@ -781,7 +779,8 @@ async function scorm_automation_get_current_slide(params = {}) {
 
   await validateRuntimeSession(session_id);
 
-  const available = await checkAutomationAPI(session_id);
+  const execute = getAutomationExecutor(session_id);
+  const { available } = await automationCheckAvailability({ execute, logger, sessionId: session_id });
   if (!available) {
     throw createAPINotAvailableError('scorm_automation_get_current_slide');
   }
@@ -793,15 +792,11 @@ async function scorm_automation_get_current_slide(params = {}) {
       payload: {} 
     });
 
-    const result = await RuntimeManager.executeJS(
-      null,
-      'window.SCORMAutomation.getCurrentSlide()',
-      session_id
-    );
+    const { slideId } = await automationGetCurrentSlide({ execute, logger, sessionId: session_id });
 
     return {
       available: true,
-      slideId: result
+      slideId
     };
   } catch (err) {
     logger.error('Error getting current slide', { 
@@ -834,7 +829,8 @@ async function scorm_automation_go_to_slide(params = {}) {
     throw e;
   }
 
-  const available = await checkAutomationAPI(session_id);
+  const execute = getAutomationExecutor(session_id);
+  const { available } = await automationCheckAvailability({ execute, logger, sessionId: session_id });
   if (!available) {
     throw createAPINotAvailableError('scorm_automation_go_to_slide');
   }
@@ -846,16 +842,17 @@ async function scorm_automation_go_to_slide(params = {}) {
       payload: { slideId, context } 
     });
 
-    // Build expression with optional context parameter
-    const expression = context
-      ? `window.SCORMAutomation.goToSlide('${slideId.replace(/'/g, "\\'")}'', ${JSON.stringify(context)})`
-      : `window.SCORMAutomation.goToSlide('${slideId.replace(/'/g, "\\'")}')`;
-    
-    const result = await RuntimeManager.executeJS(null, expression, session_id);
+    const result = await automationGoToSlide({
+      execute,
+      logger,
+      sessionId: session_id,
+      slideId,
+      context
+    });
 
     return {
       available: true,
-      success: result,
+      success: result.success,
       slideId,
       context: context || null
     };

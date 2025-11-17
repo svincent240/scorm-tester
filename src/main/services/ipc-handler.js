@@ -58,7 +58,8 @@ class IpcHandler extends BaseService {
     this.rateLimitMap = new Map();
     this.securityConfig = SECURITY_CONFIG.IPC;
     // Removed this.handlerMethods = new IpcHandlers(this);
-    this.rateLimitCleanupInterval = null;
+  this.rateLimitCleanupInterval = null;
+  this.automationBridgeService = null;
 
     // No local telemetry buffer: telemetry is delegated to ScormInspectorTelemetryStore (constructed in main)
     this.maxHistorySize = 5000;
@@ -74,7 +75,8 @@ class IpcHandler extends BaseService {
   validateDependencies() {
     const fileManager = this.getDependency('fileManager');
     const scormService = this.getDependency('scormService');
-    const windowManager = this.getDependency('windowManager');
+  const windowManager = this.getDependency('windowManager');
+  const automationBridgeService = this.getDependency('automationBridgeService');
 
     if (!fileManager) {
       this.logger?.error('IpcHandler: FileManager dependency missing');
@@ -88,6 +90,11 @@ class IpcHandler extends BaseService {
 
     if (!windowManager) {
       this.logger?.error('IpcHandler: WindowManager dependency missing');
+      return false;
+    }
+
+    if (!automationBridgeService) {
+      this.logger?.error('IpcHandler: AutomationBridgeService dependency missing');
       return false;
     }
 
@@ -151,6 +158,14 @@ class IpcHandler extends BaseService {
       const snSnapshot = this.getDependency('snSnapshotService');
       if (snSnapshot) this.snSnapshotService = snSnapshot;
     } catch (e) { this.logger?.warn('Failed to wire snSnapshotService dependency', { error: e?.message }); }
+
+    try {
+      const automationBridge = this.getDependency('automationBridgeService');
+      if (automationBridge) {
+        this.automationBridgeService = automationBridge;
+      }
+    } catch (e) {
+      this.logger?.warn('Failed to wire automationBridgeService dependency', { error: e?.message }); }
 
     // Phase 1: Disable server-side IPC rate limiting (moved to client-side shaping)
     this.rateLimiter = null;
@@ -333,6 +348,11 @@ class IpcHandler extends BaseService {
       this.registerHandler('apply-lms-profile', this.handleApplyLmsProfile.bind(this));
       this.registerHandler('get-lms-profiles', this.handleGetLmsProfiles.bind(this));
       this.registerHandler('run-test-scenario', this.handleRunTestScenario.bind(this));
+
+  // Automation bridge handlers
+  this.registerHandler('automation:probe', this.handleAutomationProbe.bind(this));
+  this.registerHandler('automation:get-state', this.handleAutomationGetState.bind(this));
+  this.registerHandler('automation:navigate', this.handleAutomationNavigate.bind(this));
 
       // Utility handlers
       this.registerHandler('open-external', this.handleOpenExternal.bind(this));
@@ -1079,6 +1099,79 @@ class IpcHandler extends BaseService {
   async handleRunTestScenario(event, sessionId, scenarioType) {
     const scormService = this.getDependency('scormService');
     return await scormService.runTestScenario(sessionId, scenarioType);
+  }
+
+  _getAutomationBridge() {
+    if (this.automationBridgeService) {
+      return this.automationBridgeService;
+    }
+    try {
+      const svc = this.getDependency('automationBridgeService');
+      if (svc) {
+        this.automationBridgeService = svc;
+        return svc;
+      }
+    } catch (error) {
+      this.logger?.warn('IpcHandler: Failed to resolve automationBridgeService dependency', error?.message || error);
+    }
+    return null;
+  }
+
+  async handleAutomationProbe(_event, payload = {}) {
+    const automation = this._getAutomationBridge();
+    if (!automation) {
+      return { success: false, error: 'automation_bridge_unavailable' };
+    }
+
+    const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId : null;
+    if (!sessionId) {
+      return { success: false, error: 'session_id_required' };
+    }
+
+    try {
+      return await automation.probeAutomation(sessionId, { reason: payload?.reason || payload?.metadata?.reason });
+    } catch (error) {
+      this.logger?.error('IpcHandler: automation probe failed', error?.message || error);
+      return { success: false, error: error?.message || String(error) };
+    }
+  }
+
+  async handleAutomationGetState(_event, sessionId) {
+    const automation = this._getAutomationBridge();
+    if (!automation) {
+      return { success: false, error: 'automation_bridge_unavailable' };
+    }
+    if (!sessionId || typeof sessionId !== 'string') {
+      return { success: false, error: 'session_id_required' };
+    }
+    const state = automation.getState(sessionId);
+    return { success: true, state: state || null };
+  }
+
+  async handleAutomationNavigate(_event, payload = {}) {
+    const automation = this._getAutomationBridge();
+    if (!automation) {
+      return { success: false, error: 'automation_bridge_unavailable' };
+    }
+    const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId : null;
+    const slideId = typeof payload?.slideId === 'string' ? payload.slideId : null;
+    if (!sessionId) {
+      return { success: false, error: 'session_id_required' };
+    }
+    if (!slideId) {
+      return { success: false, error: 'slide_id_required' };
+    }
+    try {
+      const result = await automation.navigateToSlide({
+        sessionId,
+        slideId,
+        context: payload?.context || null
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      this.logger?.error('IpcHandler: automation navigation failed', error?.message || error);
+      return { success: false, error: error?.message || String(error) };
+    }
   }
 
   // Utility handlers
@@ -2315,7 +2408,7 @@ class IpcHandler extends BaseService {
   /**
    * Handle viewport get size request
    */
-  async handleViewportGetSize(event) {
+  async handleViewportGetSize(_event) {
     try {
       const scormService = this.getDependency('scormService');
       if (!scormService) {
@@ -2342,7 +2435,7 @@ class IpcHandler extends BaseService {
   /**
    * Handle get window content bounds request
    */
-  async handleGetWindowContentBounds(event) {
+  async handleGetWindowContentBounds(_event) {
     try {
       const windowManager = this.getDependency('windowManager');
       if (!windowManager) {

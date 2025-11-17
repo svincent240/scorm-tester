@@ -41,6 +41,19 @@ export function getInitialUIState() {
       suspendData: null
     },
 
+    // Automation bridge state
+    automation: {
+      sessionId: null,
+      available: false,
+      version: null,
+      structure: null,
+      currentSlide: null,
+      lastCheckedAt: null,
+      lastError: null,
+      probing: false,
+      lastProbeReason: null
+    },
+
     // UI state
     ui: {
       theme: 'default',
