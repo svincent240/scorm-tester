@@ -30,6 +30,10 @@ class AppManager {
     // Track startup errors for diagnostic purposes
     this.startupErrors = [];
 
+    // Generate unique instance ID for this app instance
+    // Allows multiple app instances to run same course without session conflicts
+    this.instanceId = 'instance_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
     // BUG-003 FIX: Navigation state machine
     this.navigationState = 'IDLE'; // IDLE, PROCESSING, LOADING
     this.navigationQueue = [];
@@ -45,6 +49,9 @@ class AppManager {
     // BUG-004 FIX: SCORM lifecycle tracking integration
     this.currentActivity = null;
     this.previousActivity = null;
+
+    // Track reload state to pass through course loading flow
+    this.isReloading = false;
 
     // Viewport state tracking
     this.isMobileView = false;
@@ -955,7 +962,7 @@ class AppManager {
         this.logger.info('AppManager: Cleared all errors for course reload');
       }
 
-      // Get current course data
+      // Get current course data BEFORE shutdown
       const courseLoader = this.services.get('courseLoader');
       if (!courseLoader) {
         throw new Error('Course loader service not available');
@@ -968,27 +975,9 @@ class AppManager {
         return;
       }
 
-      // Handle forceNew: clear saved session data if requested
-      if (options && options.forceNew) {
-        try {
-          const courseId = currentCourse.structure?.identifier;
-          if (courseId) {
-            this.logger.info(`AppManager: Force new session requested, clearing saved session for ${courseId}`);
-            await ipcClient.invoke('scorm:clear-saved-session', { courseId });
-          } else {
-            this.logger.warn('AppManager: Cannot clear session, course identifier not found');
-          }
-        } catch (clearError) {
-          this.logger.error('AppManager: Failed to clear saved session', clearError);
-          // Continue with reload even if clear fails
-        }
-      }
-
-      // DO NOT reset SCORM client here - the old content needs a valid session
-      // to handle its unload events (which typically call Commit/Terminate).
-      // The scormClient will be reset in ContentViewer.teardownScormAPIs()
-      // AFTER the old content has been unloaded.
-
+      // Store course source for reload after shutdown
+      const { originalFilePath, path: folderPath } = currentCourse;
+      
       // Set loading state on the reload button
       const reloadBtn = document.getElementById('course-reload-btn');
       if (reloadBtn) {
@@ -998,12 +987,63 @@ class AppManager {
           // Change SVG to loading spinner
           svg.innerHTML = '<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416"><animate attributeName="stroke-dashoffset" dur="1s" repeatCount="indefinite" values="31.416;0"/></circle>';
         }
-        reloadBtn.title = 'Reloading...';
+        reloadBtn.title = 'Shutting down course...';
       }
 
-      // Determine course type and reload accordingly
-      const { originalFilePath, path: folderPath } = currentCourse;
+      // STEP 1: UNIFIED SHUTDOWN - Use the same clean shutdown process as Close button
+      // This ensures proper Terminate() call and data persistence
+      this.logger.info('AppManager: Starting unified shutdown for reload');
+      
+      const contentViewer = this.components.get('contentViewer');
+      if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
+        this.logger.info('AppManager: Calling course API_1484_11.Terminate() for reload shutdown');
+        // Set exit to suspend so user can resume (unless forceNew is specified)
+        if (!options.forceNew) {
+          try {
+            contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
+          } catch (_) { /* Course might not support this, that's ok */ }
+        }
+        contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
+        // The normal terminate flow will handle persistence
+        this.logger.info('AppManager: Terminate called, waiting for persistence to complete');
+        // Give terminate time to complete and persist data
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } else if (contentViewer?.iframe?.contentWindow?.API) {
+        // SCORM 1.2
+        this.logger.info('AppManager: Calling course API.LMSFinish() for reload shutdown');
+        if (!options.forceNew) {
+          try {
+            contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
+          } catch (_) { /* Course might not support this, that's ok */ }
+        }
+        contentViewer.iframe.contentWindow.API.LMSFinish('');
+        this.logger.info('AppManager: LMSFinish called, waiting for persistence to complete');
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } else {
+        // No course API found - close via IPC
+        this.logger.info('AppManager: No course API found, calling close-course IPC for shutdown');
+        const result = await ipcClient.invoke('close-course');
+        if (result && !result.success) {
+          throw new Error(result.error || 'Failed to shutdown course');
+        }
+      }
 
+      this.logger.info('AppManager: Unified shutdown complete, data persisted to disk');
+
+      // STEP 2: Track reload flags
+      // forceNew flag will be passed to content viewer to skip JSON loading
+      // No need to delete JSON - we just skip the load step
+
+      // Track that we're reloading so we can pass proper flags to content viewer
+      this._isReloading = true;
+      this._reloadOptions = options || {};
+
+      // Update button text
+      if (reloadBtn) {
+        reloadBtn.title = 'Loading course...';
+      }
+
+      // STEP 3: RELOAD - Start the course load process
       if (originalFilePath) {
         // Reload from ZIP file
         this.logger.info('AppManager: Reloading from ZIP file', originalFilePath);
@@ -1046,6 +1086,8 @@ class AppManager {
       // Like a real LMS: Tell the course to terminate itself via its SCORM API
       // The course iframe has the API injected, so we just call it
       const contentViewer = this.components.get('contentViewer');
+      let apiCalled = false;
+
       if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
         this.logger.info('AppManager: Calling course API_1484_11.Terminate()');
         // Set exit to suspend so user can resume where they left off (standard LMS behavior)
@@ -1053,7 +1095,7 @@ class AppManager {
           contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
         } catch (_) { /* Course might not support this, that's ok */ }
         contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
-        // The normal terminate flow will handle everything (persistence, events, etc.)
+        apiCalled = true;
       } else if (contentViewer?.iframe?.contentWindow?.API) {
         // SCORM 1.2
         this.logger.info('AppManager: Calling course API.LMSFinish()');
@@ -1061,15 +1103,25 @@ class AppManager {
           contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
         } catch (_) { /* Course might not support this, that's ok */ }
         contentViewer.iframe.contentWindow.API.LMSFinish('');
-      } else {
-        // No course loaded or API not ready - just close via IPC
-        this.logger.info('AppManager: No course API found, calling close-course IPC');
-        const result = await ipcClient.invoke('close-course');
-        if (result && !result.success) {
-          const errorMsg = (result && result.error) || 'Unknown error closing course';
-          this.showError('Close Course Failed', errorMsg);
-        }
+        apiCalled = true;
       }
+
+      if (apiCalled) {
+        // If we called the API, give it time to process the async termination (persistence)
+        // ScormClient uses a 200ms delay before sending asyncTerminate
+        // We wait 1000ms to be safe, then force close the course
+        this.logger.info('AppManager: Waiting for termination persistence before closing...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Always close the course via IPC to ensure UI cleanup and backend session closure
+      this.logger.info('AppManager: Calling close-course IPC');
+      const result = await ipcClient.invoke('close-course');
+      if (result && !result.success) {
+        const errorMsg = (result && result.error) || 'Unknown error closing course';
+        this.showError('Close Course Failed', errorMsg);
+      }
+      
     } catch (error) {
       this.logger.error('AppManager: Error closing course:', error);
       this.showError('Close Course Failed', error.message || 'Unknown error');
@@ -1089,7 +1141,12 @@ class AppManager {
       if (contentViewer && courseData.launchUrl) {
         try {
           this.logger.debug('AppManager: Instructing ContentViewer.loadContent with launchUrl');
-          contentViewer.loadContent(courseData.launchUrl);
+          // Pass forceNew flag if specified (for new session after clear)
+          const loadOptions = this._reloadOptions?.forceNew ? { forceNew: true } : {};
+          contentViewer.loadContent(courseData.launchUrl, loadOptions);
+          // Reset reload state after passing options
+          this._isReloading = false;
+          this._reloadOptions = {};
         } catch (e) {
           this.logger.error('AppManager: ContentViewer.loadContent threw', e?.message || e);
         }
@@ -1133,6 +1190,11 @@ class AppManager {
    * Handle course cleared event
    */
   handleCourseCleared() {
+      // Skip UI updates if we're in the middle of a reload
+      if (this._isReloading) {
+        this.logger.info('AppManager: Course cleared during reload - skipping UI updates');
+        return;
+      }
 
       // Show and refresh recent courses when no course is loaded
       try {

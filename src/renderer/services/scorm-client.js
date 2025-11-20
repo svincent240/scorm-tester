@@ -102,6 +102,27 @@ class ScormClient {
   }
 
   /**
+   * Prime the local cache with initial data
+   * @param {Object} data - Key-value pairs of SCORM data
+   */
+  primeCache(data) {
+    if (!data || typeof data !== 'object') return;
+    
+    try {
+      for (const [key, value] of Object.entries(data)) {
+        // Only cache string values to match SCORM spec
+        if (value !== null && value !== undefined) {
+          this.localCache.set(key, String(value));
+          // Also update UI state for this element
+          this.updateUIFromElement(key, String(value));
+        }
+      }
+    } catch (e) {
+      console.warn('[ScormClient] Failed to prime cache:', e);
+    }
+  }
+
+  /**
    * Initialize SCORM session
    * @param {string} sessionId - Session identifier
    * @returns {string} "true" or "false"

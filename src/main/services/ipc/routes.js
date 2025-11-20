@@ -599,14 +599,6 @@ module.exports = [
       rateLimitProfile: 'default',
       useIpcResult: true
     }
-  },
-  {
-    channel: 'scorm:clear-saved-session',
-    handlerName: 'handleScormClearSavedSession',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
   }
+  // scorm:clear-saved-session removed - use forceNew flag instead of deletion
 ];

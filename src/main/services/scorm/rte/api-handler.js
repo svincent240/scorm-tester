@@ -161,7 +161,10 @@ class ScormApiHandler {
       }
 
       // Initialize session
-      this.sessionId = this.generateSessionId();
+      // Only generate a new sessionId if one wasn't already set by ScormService
+      if (!this.sessionId) {
+        this.sessionId = this.generateSessionId();
+      }
       this.startTime = new Date();
       this.isInitialized = true;
       this.isTerminated = false;
@@ -265,6 +268,9 @@ class ScormApiHandler {
 
       // Calculate session time
       this.calculateSessionTime();
+      
+      // Clear cmi.entry as per SCORM 2004 spec (RTE sets it on next Initialize)
+      this._setInternalDataModelValue('cmi.entry', '', { source: 'internal:terminate' });
 
       // Update session state
       this.isTerminated = true;
@@ -592,9 +598,13 @@ class ScormApiHandler {
    * @private
    */
   initializeSessionData() {
-    // Set entry mode based on previous session state
-    const entryMode = this.determineEntryMode();
-    this._setInternalDataModelValue('cmi.entry', entryMode, { source: 'internal:session-init' });
+    // Set entry mode based on previous session state (but only if not already set by restoreData)
+    const currentEntry = this.dataModel.getValue('cmi.entry');
+    let entryMode = currentEntry;
+    if (currentEntry !== 'resume') {
+      entryMode = this.determineEntryMode();
+      this._setInternalDataModelValue('cmi.entry', entryMode, { source: 'internal:session-init' });
+    }
 
     // Set credit mode (could come from launch parameters)
     this._setInternalDataModelValue('cmi.credit', 'credit', { source: 'internal:session-init' });
@@ -633,9 +643,22 @@ class ScormApiHandler {
       return 'ab-initio';
     }
 
+    // Check if entry mode was already set by restoreData (from LMS resume)
+    const currentEntry = this.dataModel.getValue('cmi.entry');
+    if (currentEntry === 'resume') {
+      this.logger?.info('Entry mode already set to "resume" by data restoration');
+      return 'resume';
+    }
+
     // Check if there's previous suspend data
     const suspendData = this.dataModel.getValue('cmi.suspend_data');
     const completionStatus = this.dataModel.getValue('cmi.completion_status');
+
+    this.logger?.debug('Determining entry mode:', {
+      hasSuspendData: !!suspendData,
+      completionStatus,
+      currentEntry
+    });
 
     if (suspendData && completionStatus !== 'completed') {
       return 'resume';

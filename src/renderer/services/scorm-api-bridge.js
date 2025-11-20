@@ -28,6 +28,14 @@ class ScormAPIBridge {
   }
 
   /**
+   * Set session ID (must be called before content loads)
+   * @param {string} sessionId - Session ID from main process
+   */
+  setSessionId(sessionId) {
+    this.sessionId = sessionId;
+  }
+
+  /**
    * Execute SCORM method and return result synchronously
    */
   executeScormMethod(method, params) {
@@ -39,8 +47,9 @@ class ScormAPIBridge {
       switch (method) {
         case 'Initialize':
         case 'LMSInitialize':
+          // Session ID must be pre-set by LMS before content loads
           if (!this.sessionId) {
-            this.sessionId = 'session_' + Date.now();
+            return 'false'; // Error: session not initialized by LMS
           }
           return this._scormClient.Initialize(this.sessionId);
         case 'Terminate':

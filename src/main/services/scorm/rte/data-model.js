@@ -1001,6 +1001,51 @@ class ScormDataModel {
   }
 
   /**
+   * Restore data from a previous session (for LMS resume functionality)
+   * @param {Object} savedData - Data object from getAllData()
+   */
+  restoreData(savedData) {
+    if (!savedData || typeof savedData !== 'object') {
+      this.logger?.warn('ScormDataModel.restoreData: Invalid data provided');
+      return;
+    }
+
+    const previousSuppress = this.suppressChangeEvents;
+    this.suppressChangeEvents = true;
+    
+    try {
+      // Restore core data model values
+      if (savedData.coreData && typeof savedData.coreData === 'object') {
+        for (const [key, value] of Object.entries(savedData.coreData)) {
+          this.data.set(key, value);
+        }
+      }
+
+      // Restore collections
+      if (Array.isArray(savedData.interactions)) {
+        this.interactions = [...savedData.interactions];
+      }
+      if (Array.isArray(savedData.objectives)) {
+        this.objectives = [...savedData.objectives];
+      }
+      if (Array.isArray(savedData.commentsFromLearner)) {
+        this.commentsFromLearner = [...savedData.commentsFromLearner];
+      }
+      if (Array.isArray(savedData.commentsFromLms)) {
+        this.commentsFromLms = [...savedData.commentsFromLms];
+      }
+
+      // Set entry mode to resume
+      this.data.set('cmi.entry', 'resume');
+      this.data.set('cmi.core.entry', 'resume');
+
+      this.logger?.info('ScormDataModel: Data restored from previous session');
+    } finally {
+      this.suppressChangeEvents = previousSuppress;
+    }
+  }
+
+  /**
    * Get objectives data for event emission
    * @returns {Array} Array of objectives data
    */

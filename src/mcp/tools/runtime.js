@@ -251,23 +251,18 @@ async function scorm_api_call(params = {}) {
       // Get exit type from data model
       const exitValue = await RuntimeManager.callAPI(null, 'GetValue', ['cmi.exit'], session_id).catch(() => '');
       
-      if (exitValue === 'suspend') {
-        // Get all data from runtime and save for resume
-        const allElements = await expandDataModelPattern(session_id, 'cmi.*');
-        const data = {};
-        for (const element of allElements) {
-          try {
-            const value = await RuntimeManager.callAPI(null, 'GetValue', [element], session_id);
-            if (value) data[element] = value;
-          } catch (_) { /* skip elements that can't be read */ }
-        }
-        await sessionStore.saveSession(courseId, data, namespace);
-        mcpLogger?.info(`MCP: Session ${session_id} suspended - data saved for resume`);
-      } else {
-        // Not suspended - clean up any existing save
-        await sessionStore.deleteSession(courseId, namespace);
-        mcpLogger?.info(`MCP: Session ${session_id} terminated without suspend (exit=${exitValue}) - data cleared`);
+      // Always save data on Terminate - persistence happens regardless of exit value
+      // If exit !== 'suspend', the startup process will skip loading the JSON
+      const allElements = await expandDataModelPattern(session_id, 'cmi.*');
+      const data = {};
+      for (const element of allElements) {
+        try {
+          const value = await RuntimeManager.callAPI(null, 'GetValue', [element], session_id);
+          if (value) data[element] = value;
+        } catch (_) { /* skip elements that can't be read */ }
       }
+      await sessionStore.saveSession(courseId, data, namespace);
+      mcpLogger?.info(`MCP: Session ${session_id} terminated - data saved (exit=${exitValue})`);
     } catch (err) {
       // Don't fail the Terminate call if persistence fails
       console.warn('MCP: Failed to handle persistence after Terminate:', err.message);

@@ -36,6 +36,7 @@ const mockRteInstance = {
   Initialize: jest.fn(),
   dataModel: {
     _setInternalValue: jest.fn(),
+    restoreData: jest.fn(),
     getAllData: jest.fn().mockReturnValue({ coreData: { 'cmi.suspend_data': 'test' } })
   },
   eventEmitter: {
@@ -97,51 +98,69 @@ describe('ScormService Resume Logic', () => {
   });
 
   describe('initializeSession with Resume', () => {
-    it('should delete session if forceNew is true', async () => {
-      await scormService.initializeSession('session-1', { forceNew: true });
-      
-      expect(mockSessionStore.deleteSession).toHaveBeenCalledWith('course-1', 'gui');
-    });
-
-    it('should resume session if cmi.exit is suspend', async () => {
+    it('should NOT load session if forceNew is true', async () => {
       mockSessionStore.loadSession.mockResolvedValue({
         'cmi.exit': 'suspend',
         'cmi.suspend_data': 'some_data'
       });
 
+      await scormService.initializeSession('session-1', { forceNew: true });
+      
+      // Verify loadSession was NOT called (forceNew skips loading)
+      expect(mockSessionStore.loadSession).not.toHaveBeenCalled();
+      // Verify data was NOT injected
+      expect(mockRteInstance.dataModel._setInternalValue).not.toHaveBeenCalledWith('cmi.suspend_data', 'some_data');
+    });
+
+    it('should resume session if cmi.exit is suspend', async () => {
+      const savedData = {
+        coreData: {
+          'cmi.exit': 'suspend',
+          'cmi.suspend_data': 'some_data'
+        },
+        interactions: [],
+        objectives: []
+      };
+      mockSessionStore.loadSession.mockResolvedValue(savedData);
+
       await scormService.initializeSession('session-1');
 
-      // Verify data injection
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.suspend_data', 'some_data');
-      // Verify entry mode set to resume
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.entry', 'resume');
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.core.entry', 'resume');
+      // Verify restoreData was called with complete data object
+      expect(mockRteInstance.dataModel.restoreData).toHaveBeenCalledWith(savedData);
     });
 
     it('should NOT resume session if cmi.exit is not suspend', async () => {
-      mockSessionStore.loadSession.mockResolvedValue({
-        'cmi.exit': 'logout',
-        'cmi.suspend_data': 'some_data'
-      });
+      const savedData = {
+        coreData: {
+          'cmi.exit': 'logout',
+          'cmi.suspend_data': 'some_data'
+        },
+        interactions: [],
+        objectives: []
+      };
+      mockSessionStore.loadSession.mockResolvedValue(savedData);
 
       await scormService.initializeSession('session-1');
 
-      // Verify data injection did NOT happen for suspend_data
-      expect(mockRteInstance.dataModel._setInternalValue).not.toHaveBeenCalledWith('cmi.suspend_data', 'some_data');
-      // Verify entry mode set to ab-initio
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.entry', 'ab-initio');
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.core.entry', 'ab-initio');
+      // Verify restoreData was NOT called (exit != suspend)
+      expect(mockRteInstance.dataModel.restoreData).not.toHaveBeenCalled();
     });
 
     it('should handle SCORM 1.2 cmi.core.exit', async () => {
-      mockSessionStore.loadSession.mockResolvedValue({
-        'cmi.core.exit': 'suspend',
-        'cmi.suspend_data': 'some_data'
-      });
+      const savedData = {
+        coreData: {
+          'cmi.core.exit': 'suspend',
+          'cmi.suspend_data': 'some_data'
+        },
+        interactions: [],
+        objectives: []
+      };
+      mockSessionStore.loadSession.mockResolvedValue(savedData);
 
       await scormService.initializeSession('session-1');
 
-      expect(mockRteInstance.dataModel._setInternalValue).toHaveBeenCalledWith('cmi.entry', 'resume');
+      // Verify restoreData was called
+      expect(mockRteInstance.dataModel.restoreData).toHaveBeenCalledWith(savedData);
     });
   });
 
@@ -231,10 +250,12 @@ describe('ScormService Resume Logic', () => {
 
       await scormService.terminate('session-1');
 
-      // Should always save data regardless of exit type
+      // Should always save complete data object regardless of exit type
       expect(mockSessionStore.saveSession).toHaveBeenCalledWith(
         'course-1',
-        expect.objectContaining({ 'cmi.suspend_data': 'test_data' }),
+        expect.objectContaining({ 
+          coreData: expect.objectContaining({ 'cmi.suspend_data': 'test_data' })
+        }),
         'gui'
       );
     });
@@ -286,10 +307,12 @@ describe('ScormService Resume Logic', () => {
 
       await scormService.terminate('session-2');
 
-      // Should always save data - resume logic will check exit value
+      // Should always save complete data object - resume logic will check exit value
       expect(mockSessionStore.saveSession).toHaveBeenCalledWith(
         'course-1',
-        expect.objectContaining({ 'cmi.exit': 'normal' }),
+        expect.objectContaining({ 
+          coreData: expect.objectContaining({ 'cmi.exit': 'normal' })
+        }),
         'gui'
       );
     });

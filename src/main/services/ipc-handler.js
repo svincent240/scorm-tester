@@ -586,8 +586,12 @@ class IpcHandler extends BaseService {
   // --- Start of merged IpcHandlers methods ---
 
   // SCORM API handlers
-  async handleScormInitialize(event, sessionId, options = {}) {
+  async handleScormInitialize(event, payload = {}) {
     const scormService = this.getDependency('scormService');
+    const { sessionId, ...options } = payload;
+    if (!sessionId) {
+      return { success: false, reason: 'Session ID is required' };
+    }
     return await scormService.initializeSession(sessionId, options);
   }
 
@@ -2241,18 +2245,6 @@ class IpcHandler extends BaseService {
     }
   }
 
-  async handleScormClearSavedSession(event, { courseId, namespace }) {
-    const scormService = this.getDependency('scormService');
-    if (!scormService) {
-      return { success: false, error: 'SCORM service not available' };
-    }
-    try {
-      await scormService.clearSavedSession(courseId, namespace);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
 }
 
 module.exports = IpcHandler;

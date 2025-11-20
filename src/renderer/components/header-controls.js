@@ -34,12 +34,14 @@ class HeaderControls extends BaseComponent {
         <button class="btn btn--secondary btn--sm" id="hc-open-zip" title="Open SCORM Zip">Open ZIP</button>
         <button class="btn btn--secondary btn--sm" id="hc-open-folder" title="Open Folder">Open Folder</button>
         <button class="btn btn--secondary btn--sm" id="course-reload-btn" title="Reload Current Course" disabled>Reload</button>
+        <button class="btn btn--secondary btn--sm" id="hc-close-course" title="Close Course" disabled>Close</button>
         <button class="btn btn--secondary btn--sm" id="hc-inspector" title="Toggle Inspector">Inspector</button>
         <button class="btn btn--secondary btn--sm" id="hc-mobile-toggle" title="Toggle Mobile View">📱 Mobile</button>
       </div>
     `;
 
     this.reloadBtn = this.element.querySelector('#course-reload-btn');
+    this.closeBtn = this.element.querySelector('#hc-close-course');
     this.mobileToggleBtn = this.element.querySelector('#hc-mobile-toggle');
   }
 
@@ -68,6 +70,10 @@ class HeaderControls extends BaseComponent {
           try { rendererLogger.info('HeaderControls: emit course:reload:request', { forceNew: event.shiftKey }); } catch (_) { /* intentionally empty */ }
           this.eventBus.emit('course:reload:request', { forceNew: event.shiftKey });
           break;
+        case 'hc-close-course':
+          try { rendererLogger.info('HeaderControls: emit course:close:request'); } catch (_) { /* intentionally empty */ }
+          this.eventBus.emit('course:close:request');
+          break;
         case 'hc-inspector':
           this.eventBus.emit('ui:inspector:toggle-request');
           break;
@@ -83,10 +89,12 @@ class HeaderControls extends BaseComponent {
     // Enable/disable reload button based on course load state
     this.subscribe('course:loaded', () => {
       if (this.reloadBtn) this.reloadBtn.disabled = false;
+      if (this.closeBtn) this.closeBtn.disabled = false;
     });
 
     this.subscribe('course:cleared', () => {
       if (this.reloadBtn) this.reloadBtn.disabled = true;
+      if (this.closeBtn) this.closeBtn.disabled = true;
     });
   }
 }

@@ -12,11 +12,34 @@ async function scorm_open_course(params) {
   const sessionResult = await sessions.open({ package_path, timeout_ms });
   const { session_id } = sessionResult;
   
-  // Step 2: Open runtime (loads course and auto-initializes)
-  const { RuntimeManager } = require('../runtime-manager');
+  // Step 2: Resolve entry path and course ID from manifest
+  const { RuntimeManager, resolveEntryPathFromManifest, getManifestIdentifier } = require('../runtime-manager');
+  const s = sessions.sessions.get(session_id);
+  if (!s) {
+    const e = new Error(`Session ${session_id} not found after creation`);
+    e.code = 'MCP_UNKNOWN_SESSION';
+    throw e;
+  }
+  
+  const entryPath = await resolveEntryPathFromManifest(s.package_path);
+  if (!entryPath) {
+    const e = new Error('No launchable entry found via CAM');
+    e.code = 'MANIFEST_LAUNCH_NOT_FOUND';
+    throw e;
+  }
+  
+  const courseId = await getManifestIdentifier(s.package_path) || 'unknown_course';
+  const forceNew = !!s.new_attempt;
+  
+  // Step 3: Open runtime (loads course and auto-initializes)
   await RuntimeManager.openPersistent({ 
     session_id, 
-    viewport: viewport || { width: 1024, height: 768 }
+    entryPath,
+    viewport: viewport || { width: 1024, height: 768 },
+    adapterOptions: {
+      courseId,
+      forceNew
+    }
   });
   
   return {
@@ -34,10 +57,11 @@ async function scorm_close_course(params) {
 }
 
 /**
- * Reload course: Close then re-open (atomic operation)
+ * Reload course: Unified shutdown then startup (matches GUI reload pattern)
+ * Uses same Terminate-based shutdown as close, then re-opens automatically
  */
 async function scorm_reload_course(params) {
-  const { session_id, package_path, viewport } = params || {};
+  const { session_id, package_path, viewport, force_new } = params || {};
   
   if (!session_id) {
     const e = new Error('session_id required for reload');
@@ -45,21 +69,28 @@ async function scorm_reload_course(params) {
     throw e;
   }
   
-  // Close existing
+  // PHASE 1: Unified shutdown (same as close - calls Terminate, saves JSON)
   await scorm_close_course({ session_id });
   
-  // Re-open with same package
+  // PHASE 2: Startup (exactly like initial open)
+  // Re-open with same package - forceNew flag skips JSON loading if set
   if (!package_path) {
     const e = new Error('package_path required for reload');
     e.code = 'MCP_INVALID_PARAMS';
     throw e;
   }
   
-  return scorm_open_course({ package_path, viewport });
+  return scorm_open_course({ 
+    package_path, 
+    viewport,
+    new_attempt: force_new // Hard reset flag - skips JSON loading without deletion
+  });
 }
 
 /**
- * Clear saved session data (for hard reset)
+ * Clear saved session data (manual cleanup tool only)
+ * Note: This is for manual cleanup/testing. Normal hard reset should use
+ * forceNew flag in scorm_open_course which skips JSON loading without deletion.
  */
 async function scorm_clear_saved_data(params) {
   const { package_path } = params || {};
@@ -91,7 +122,7 @@ async function scorm_clear_saved_data(params) {
   const sessionStore = new SessionStore({ namespace: 'mcp' });
   await sessionStore.deleteSession(courseId, 'mcp');
   
-  return { success: true, course_id: courseId };
+  return { success: true, course_id: courseId, note: 'Manual deletion only - prefer forceNew flag for hard reset' };
 }
 
 /**

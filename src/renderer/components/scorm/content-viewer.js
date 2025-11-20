@@ -338,7 +338,41 @@ class ContentViewer extends BaseComponent {
     this.currentUrl = processedUrl;
     this.loadStartTime = Date.now();
 
+    // Initialize session with main process BEFORE loading content (LMS pattern)
+    // The main process checks for suspended session automatically
+    let sessionId;
+    let initialScormData = null;
     try {
+      const { ipcClient } = await import('../../services/ipc-client.js');
+      // Get the app instance ID to create a session unique to this app instance.
+      // This allows multiple app instances to run the same course without conflicts,
+      // while keeping the session consistent within this instance for resume.
+      const { appManager } = await import('../../services/app-manager.js');
+      const instanceId = appManager?.instanceId || 'default';
+      sessionId = 'session_' + instanceId;
+      
+      const sessionResult = await ipcClient.invoke('scorm-initialize', {
+        sessionId: sessionId,
+        forceNew: options.forceNew || false
+      });
+      
+      if (!sessionResult || !sessionResult.success) {
+        throw new Error(sessionResult?.reason || 'Failed to initialize session');
+      }
+
+      // Prime the SCORM client cache with initial data to prevent race conditions
+      // where the course calls GetValue before the async initialization completes
+      // Store it temporarily to apply AFTER teardownScormAPIs()
+      if (sessionResult.initialData) {
+        initialScormData = sessionResult.initialData;
+      }
+      
+      this.logger?.info('ContentViewer: Session initialized by main process', { sessionId });
+    } catch (error) {
+      this.logger?.error('ContentViewer: Failed to initialize session', error);
+      this.showError('Failed to initialize session', error.message);
+      return;
+    }    try {
       this.showLoading();
       this.clearError();
 
@@ -380,6 +414,22 @@ class ContentViewer extends BaseComponent {
 
       // Detach any previous SCORM API bindings to avoid stray calls from the old content
       this.teardownScormAPIs();
+
+      // Pass session ID to bridge BEFORE setting up APIs (LMS pattern)
+      const { scormAPIBridge } = await import('../../services/scorm-api-bridge.js');
+      scormAPIBridge.setSessionId(sessionId);
+
+      // Apply primed cache data if available (must be done after teardown/reset)
+      if (initialScormData) {
+        try {
+          scormClient.primeCache(initialScormData);
+          this.logger?.info('ContentViewer: Primed SCORM cache with initial data', { 
+            keys: Object.keys(initialScormData).length 
+          });
+        } catch (e) {
+          this.logger?.warn('ContentViewer: Failed to prime SCORM cache', e);
+        }
+      }
 
       // Setup SCORM APIs BEFORE iframe loads
       this.setupScormAPIs();
@@ -638,6 +688,7 @@ class ContentViewer extends BaseComponent {
    * Teardown SCORM APIs to prevent stray calls from previous content during transitions
    * - Resets scormClient to clear session state (isInitialized, sessionId, caches, timers)
    * - Detaches bridge from scormClient
+   * - Clears session ID from bridge
    * - Mutates existing API objects to inert stubs that return "false" without emitting errors
    *
    * CRITICAL TIMING: This must be called AFTER the old content has been unloaded
@@ -650,6 +701,9 @@ class ContentViewer extends BaseComponent {
       // Reset scormClient to clear previous session state
       // This ensures isInitialized is false so new content can call Initialize()
       try { scormClient.reset(); } catch (_) { /* intentionally empty */ }
+
+      // Clear session ID from bridge (new session will be created on next load)
+      try { scormAPIBridge.setSessionId(null); } catch (_) { /* intentionally empty */ }
 
       // Detach bridge from client so any lingering calls do not reach scormClient
       try { scormAPIBridge.setScormClient(null); } catch (_) { /* intentionally empty */ }

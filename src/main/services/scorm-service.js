@@ -147,30 +147,20 @@ class ScormService extends BaseService {
    * @param {string} sessionId - Session identifier
    * @param {Object} options - Session options
    * @param {string} options.launchMode - Launch mode ('normal', 'browse', 'review')
+   * @param {boolean} options.forceNew - Force new session (skip resume)
    * @param {boolean} options.memoryOnlyStorage - Use memory-only storage
    * @returns {Promise<Object>} Initialization result
    */
   async initializeSession(sessionId, options = {}) {
     try {
       this.logger?.info(`ScormService: Initializing SCORM session: ${sessionId}`, {
-        forceNew: options.forceNew || false,
-        reload: options.reload || false
+        forceNew: options.forceNew || false
       });
       
-      // Handle reload: terminate existing session gracefully, then continue with new init
-      if (options.reload && this.sessions.has(sessionId)) {
-        this.logger?.info(`ScormService: Reload requested - terminating existing session ${sessionId}`);
-        await this.terminate(sessionId);
-        // Session is now cleaned up, continue with fresh initialization below
-      }
-      
-      // Check if session already exists (after handling reload)
+      // Check if session already exists - shouldn't happen after proper shutdown
       if (this.sessions.has(sessionId)) {
-        return {
-          success: false,
-          errorCode: '103', // Already initialized
-          reason: 'Session already initialized'
-        };
+        this.logger?.warn(`ScormService: Session ${sessionId} already exists - cleaning up old session first`);
+        await this.terminate(sessionId);
       }
       
       // Check session limit
@@ -187,13 +177,9 @@ class ScormService extends BaseService {
         id: sessionId,
         startTime: new Date(),
         state: 'initialized',
-        apiCalls: [],
-        errors: [],
         lmsProfile: null,
         lastActivity: Date.now(),
-        launchMode: options.launchMode || 'normal',
-        browseMode: options.launchMode === 'browse',
-        memoryOnlyStorage: options.memoryOnlyStorage || false
+        launchMode: options.launchMode || 'normal'
       };
       
       this.sessions.set(sessionId, session);
@@ -213,18 +199,8 @@ class ScormService extends BaseService {
             try { this.rteInstances.delete(id); } catch (_) { /* intentionally empty */ }
           },
           persistSessionData: (id, data) => {
-            // Prefer telemetryStore for persistence/inspection
-            try {
-              const telemetry = this.getDependency && this.getDependency('telemetryStore');
-              if (telemetry && typeof telemetry.storeApiCall === 'function') {
-                telemetry.storeApiCall({ type: 'rte:commit', sessionId: id, data, timestamp: Date.now() });
-                return true;
-              }
-            } catch (e) {
-              this.logger?.warn('ScormService: telemetry store persist failed', e?.message || e);
-            }
-            // Fallback: log and succeed
-            this.logger?.info('ScormService: Persist session data (no telemetry store):', id);
+            // Called by RTE on Commit() - actual disk persistence happens in terminate()
+            this.logger?.debug(`ScormService: RTE Commit called for session ${id}`);
             return true;
           },
           getLearnerInfo: () => {
@@ -244,61 +220,41 @@ class ScormService extends BaseService {
 
         const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
 
-        // --- HYDRATION LOGIC START ---
-        // Unified startup process: Always check for saved data, conditionally restore
+        // Set sessionId BEFORE Initialize() so registerSession uses the correct ID
+        rte.sessionId = sessionId;
+
+        // --- HYDRATION: Load JSON if exists, restore only if exit=suspend ---
         const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
         const namespace = this.config.sessionNamespace;
 
-        // Always check for saved session data (unless forceNew skips it)
-        // Note: forceNew doesn't delete the file, just skips loading it
-        // The file will be naturally overwritten on the next save
-        const storedData = options.forceNew ? null : await this.sessionStore.loadSession(courseId, namespace);
-        let entryMode = 'ab-initio';
-        let dataToRestore = null;
-
-        if (options.forceNew) {
-            this.logger?.info(`ScormService: forceNew flag set - starting fresh (will overwrite saved data on next save)`);
-        } else if (storedData) {
-            // Check exit status to determine if resume is appropriate
-            // SCORM 2004: cmi.exit, SCORM 1.2: cmi.core.exit
-            const exit = storedData['cmi.exit'] || storedData['cmi.core.exit'];
+        // Skip loading entirely if forceNew flag is set (hard reset)
+        if (!options.forceNew) {
+          const savedData = await this.sessionStore.loadSession(courseId, namespace);
+          
+          this.logger?.debug(`ScormService: Loaded saved data for ${courseId}:`, {
+            hasData: !!savedData,
+            hasCoreData: !!savedData?.coreData,
+            exit: savedData?.coreData?.['cmi.exit'] || savedData?.coreData?.['cmi.core.exit']
+          });
+          
+          if (savedData && savedData.coreData && rte.dataModel) {
+            // Check exit status from saved data - only resume if suspended
+            const exit = savedData.coreData['cmi.exit'] || savedData.coreData['cmi.core.exit'];
             if (exit === 'suspend') {
-                entryMode = 'resume';
-                dataToRestore = storedData;
-                this.logger?.info(`ScormService: Resume - restoring session for ${courseId} (exit=suspend, namespace: ${namespace})`);
+              // Restore complete data snapshot - no manipulation, straight restore
+              rte.dataModel.restoreData(savedData);
+              this.logger?.info(`ScormService: Restored data model from saved session (courseId=${courseId})`);
             } else {
-                this.logger?.info(`ScormService: Saved data found but exit='${exit}' (not suspend), starting fresh`);
+              this.logger?.info(`ScormService: Not resuming - exit was '${exit}' not 'suspend'`);
             }
+          }
         } else {
-            this.logger?.info(`ScormService: No saved data found for ${courseId}, starting fresh (ab-initio)`);
+          this.logger?.info(`ScormService: Hard reset - skipping JSON load for ${courseId}`);
         }
+        // --- END HYDRATION ---
 
-        if (entryMode === 'resume' && dataToRestore) {
-             // Inject stored data into RTE before Initialize
-             for (const [key, value] of Object.entries(dataToRestore)) {
-                 if (rte.dataModel && typeof rte.dataModel._setInternalValue === 'function') {
-                     rte.dataModel._setInternalValue(key, value);
-                 }
-             }
-             // Set entry mode to resume
-             if (rte.dataModel) {
-                 rte.dataModel._setInternalValue('cmi.entry', 'resume');
-                 rte.dataModel._setInternalValue('cmi.core.entry', 'resume');
-             }
-        } else {
-             // Ensure entry mode is ab-initio
-             if (rte.dataModel) {
-                 rte.dataModel._setInternalValue('cmi.entry', 'ab-initio');
-                 rte.dataModel._setInternalValue('cmi.core.entry', 'ab-initio');
-             }
-        }
-        // --- HYDRATION LOGIC END ---
-
-        // Initialize RTE session and then bind its internal session id to our session id for mapping
+        // Initialize RTE session (data model already hydrated if needed)
         try { rte.Initialize(''); } catch (_) { /* intentionally empty */ }
-        // Override generated sessionId with our provided sessionId for consistency
-        try { rte.sessionId = sessionId; } catch (_) { /* intentionally empty */ }
-        this.rteInstances.set(sessionId, rte);
         // Subscribe to scorm-api-call-logged events from this RTE instance
         rte.eventEmitter.on('scorm-api-call-logged', (payload) => {
           this.eventEmitter.emit('scorm-api-call-logged', payload);
@@ -331,12 +287,26 @@ class ScormService extends BaseService {
       });
       this.recordOperation('initializeSession', true);
 
+      // Extract initial data for client-side caching to prevent race conditions
+      let initialData = {};
+      try {
+        const rte = this.rteInstances.get(sessionId);
+        if (rte && rte.dataModel && typeof rte.dataModel.getAllData === 'function') {
+          const allData = rte.dataModel.getAllData();
+          // Flatten core data for easy caching
+          initialData = { ...allData.coreData };
+        }
+      } catch (e) {
+        this.logger?.warn('ScormService: Failed to extract initial data for caching', e);
+      }
+
       return {
         success: true,
         errorCode: '0',
         sessionId: sessionId,
         launchMode: options.launchMode || 'normal',
-        browseMode: options.launchMode === 'browse'
+        browseMode: options.launchMode === 'browse',
+        initialData
       };
       
     } catch (error) {
@@ -534,12 +504,11 @@ class ScormService extends BaseService {
           let data = {};
           if (rte && rte.dataModel && typeof rte.dataModel.getAllData === 'function') {
               const allData = rte.dataModel.getAllData();
-              if (allData.coreData) {
-                  data = allData.coreData;
-              }
+              // Save the complete data structure (coreData + collections) for proper restoration
+              data = allData;
           }
-          // Save session data asynchronously
-          this.sessionStore.saveSession(courseId, data, namespace).catch(err => {
+          // Save session data - await to prevent race conditions with terminate()
+          await this.sessionStore.saveSession(courseId, data, namespace).catch(err => {
               this.logger?.error(`ScormService: Failed to persist session data for ${courseId} (namespace: ${namespace}):`, err);
           });
       }
@@ -586,16 +555,12 @@ class ScormService extends BaseService {
       }
       session.__terminating = true;
 
-      // Log API call
-      this.logApiCall(session, 'Terminate', '', '', '0');
-
-      // Collect session data before termination for exit summary
-      const exitData = await this.collectExitData(sessionId, exitValue);
+      // Get RTE reference BEFORE calling Terminate (which will unregister it)
+      const rte = this.rteInstances.get(sessionId);
 
       // Perform RTE termination if present
       let rteSuccess = true;
       try {
-        const rte = this.rteInstances.get(sessionId);
         if (rte && typeof rte.Terminate === 'function') {
           const res = rte.Terminate('');
           rteSuccess = (res === 'true');
@@ -605,37 +570,21 @@ class ScormService extends BaseService {
         rteSuccess = false;
       }
 
-      // Process navigation request after termination (SCORM 2004 4th Edition requirement)
-      await this.processNavigationRequestAfterTermination(sessionId);
-
-      // Update session state
-      const preState = session.state;
-      session.state = 'terminated';
-      session.endTime = new Date();
-
-      // Store exit data in session for resume functionality
-      session.exitData = exitData;
-
-      // Always persist session data on shutdown - read from RTE memory
-      // Resume logic will check cmi.exit value to decide whether to restore
-      const exitType = exitData.exitType;
-      const courseId = session.courseInfo?.identifier || this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+      // Always save complete data model state to disk (resume logic checks cmi.exit on next init)
+      const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
       const namespace = this.config.sessionNamespace;
-      const rte = this.rteInstances.get(sessionId);
       
       if (rte?.dataModel) {
         const allData = rte.dataModel.getAllData();
-        await this.sessionStore.saveSession(courseId, allData.coreData, namespace);
-        this.logger?.info(`ScormService: Session ${sessionId} terminated (exit=${exitType}) - data saved (prevState=${preState})`);
+        await this.sessionStore.saveSession(courseId, allData, namespace);
+        this.logger?.info(`ScormService: Session ${sessionId} terminated - data model saved to disk`);
       }
 
-      // Cleanup session from memory immediately after persistence
+      // Cleanup session from memory
       this.sessions.delete(sessionId);
       this.rteInstances.delete(sessionId);
-      this.logger?.info(`ScormService: Session ${sessionId} cleaned up from memory`);
 
       this.recordOperation('terminate', rteSuccess);
-
       return { success: rteSuccess, errorCode: '0' };
  
     } catch (error) {
@@ -817,14 +766,6 @@ class ScormService extends BaseService {
   }
  
    /**
-    * @deprecated Resume logic is now handled automatically in initializeSession via SessionStore.
-    */
-   async resumeSession(oldSessionId, options = {}) {
-       this.logger?.warn('ScormService: resumeSession is deprecated. Use initializeSession with auto-hydration.');
-       return { success: false, errorCode: '101', reason: 'Deprecated' };
-   }
-
-   /**
     * Get session data
     * @param {string} sessionId - Session identifier
     * @returns {Object|null} Session data or null
@@ -967,18 +908,6 @@ class ScormService extends BaseService {
   }
 
   /**
-   * Clear saved session data from disk
-   * @param {string} courseId - Course identifier
-   * @param {string} [namespace] - Session namespace (defaults to config.sessionNamespace)
-   * @returns {Promise<boolean>} True if cleared
-   */
-  async clearSavedSession(courseId, namespace) {
-    const ns = namespace || this.config.sessionNamespace;
-    this.logger?.info(`ScormService: Clearing saved session for ${courseId} (namespace: ${ns})`);
-    return await this.sessionStore.deleteSession(courseId, ns);
-  }
-
-  /**
    * Initialize SCORM service components
    * @private
    */
@@ -1094,14 +1023,7 @@ class ScormService extends BaseService {
       errorCode
     };
     
-    // Keep session-local trace for quick inspection
-    try {
-      session.apiCalls.push(logEntry);
-    } catch (_) {
-      // ignore push failures to avoid breaking API paths
-    }
-    
-    // Publish to telemetry store when available (preferred)
+    // Publish to telemetry store when available
     try {
       const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
       if (telemetryStore && typeof telemetryStore.storeApiCall === 'function') {
@@ -1114,24 +1036,9 @@ class ScormService extends BaseService {
           errorCode,
           timestamp: logEntry.timestamp
         });
-        return;
       }
     } catch (e) {
-      this.logger?.warn('ScormService: telemetryStore.storeApiCall failed, falling back to direct notify', e?.message || e);
-    }
-    
-    // Fallback: directly notify debug window (legacy behavior)
-    try {
-      this.notifyDebugWindow('api-call', {
-        sessionId: session.id,
-        method,
-        parameter,
-        value,
-        errorCode,
-        timestamp: logEntry.timestamp
-      });
-    } catch (_) {
-      // swallow to avoid breaking runtime
+      this.logger?.debug('ScormService: telemetryStore.storeApiCall failed', e?.message || e);
     }
   }
 
