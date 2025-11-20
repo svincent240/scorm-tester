@@ -37,6 +37,7 @@ class ScormService extends BaseService {
     // Configuration
     this.config = {
       ...SERVICE_DEFAULTS.SCORM_SERVICE,
+      sessionNamespace: 'gui', // Default namespace
       ...options
     };
     
@@ -236,13 +237,14 @@ class ScormService extends BaseService {
         // --- HYDRATION LOGIC START ---
         // Attempt to restore session data from SessionStore
         const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+        const namespace = this.config.sessionNamespace;
         
         if (options.forceNew) {
-            await this.sessionStore.deleteSession(courseId);
-            this.logger?.info(`ScormService: Forced new session, deleted storage for ${courseId}`);
+            await this.sessionStore.deleteSession(courseId, namespace);
+            this.logger?.info(`ScormService: Forced new session, deleted storage for ${courseId} (namespace: ${namespace})`);
         }
 
-        const storedData = await this.sessionStore.loadSession(courseId);
+        const storedData = await this.sessionStore.loadSession(courseId, namespace);
         let entryMode = 'ab-initio';
         let dataToRestore = null;
 
@@ -252,7 +254,7 @@ class ScormService extends BaseService {
             if (exit === 'suspend') {
                 entryMode = 'resume';
                 dataToRestore = storedData;
-                this.logger?.info(`ScormService: Resuming session for ${courseId}`);
+                this.logger?.info(`ScormService: Resuming session for ${courseId} (namespace: ${namespace})`);
             } else {
                 this.logger?.info(`ScormService: stored session found but exit='${exit}', starting new`);
             }
@@ -515,6 +517,7 @@ class ScormService extends BaseService {
       // --- PERSISTENCE LOGIC START ---
       if (success) {
           const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+          const namespace = this.config.sessionNamespace;
           let data = {};
           if (rte && rte.dataModel && typeof rte.dataModel.getAllData === 'function') {
               const allData = rte.dataModel.getAllData();
@@ -523,8 +526,8 @@ class ScormService extends BaseService {
               }
           }
           // Save session data asynchronously
-          this.sessionStore.saveSession(courseId, data).catch(err => {
-              this.logger?.error(`ScormService: Failed to persist session data for ${courseId}:`, err);
+          this.sessionStore.saveSession(courseId, data, namespace).catch(err => {
+              this.logger?.error(`ScormService: Failed to persist session data for ${courseId} (namespace: ${namespace}):`, err);
           });
       }
       // --- PERSISTENCE LOGIC END ---
@@ -938,6 +941,18 @@ class ScormService extends BaseService {
       this.recordOperation('runTestScenario', false);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Clear saved session data from disk
+   * @param {string} courseId - Course identifier
+   * @param {string} [namespace] - Session namespace (defaults to config.sessionNamespace)
+   * @returns {Promise<boolean>} True if cleared
+   */
+  async clearSavedSession(courseId, namespace) {
+    const ns = namespace || this.config.sessionNamespace;
+    this.logger?.info(`ScormService: Clearing saved session for ${courseId} (namespace: ${ns})`);
+    return await this.sessionStore.deleteSession(courseId, ns);
   }
 
   /**

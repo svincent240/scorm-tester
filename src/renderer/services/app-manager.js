@@ -642,8 +642,8 @@ class AppManager {
       });
     });
 
-    eventBus.on('course:reload:request', () => {
-      this.handleCourseReload().catch(error => {
+    eventBus.on('course:reload:request', (options) => {
+      this.handleCourseReload(options).catch(error => {
         try { this.logger.error('AppManager: Course reload error (header intent)', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
@@ -936,10 +936,12 @@ class AppManager {
 
   /**
    * Handle course reload request
+   * @param {Object} options - Reload options
+   * @param {boolean} [options.forceNew] - Whether to force a new session (clear saved data)
    */
-  async handleCourseReload() {
+  async handleCourseReload(options = {}) {
     try {
-      this.logger.info('AppManager: Course reload requested');
+      this.logger.info('AppManager: Course reload requested', options);
 
       // Close error list panel if it's open
       this.eventBus.emit('error-list:close');
@@ -969,6 +971,22 @@ class AppManager {
         this.logger.warn('AppManager: No course currently loaded');
         this.showError('Reload Failed', 'No course is currently loaded');
         return;
+      }
+
+      // Handle forceNew: clear saved session data if requested
+      if (options && options.forceNew) {
+        try {
+          const courseId = currentCourse.structure?.identifier;
+          if (courseId) {
+            this.logger.info(`AppManager: Force new session requested, clearing saved session for ${courseId}`);
+            await ipcClient.invoke('scorm:clear-saved-session', { courseId });
+          } else {
+            this.logger.warn('AppManager: Cannot clear session, course identifier not found');
+          }
+        } catch (clearError) {
+          this.logger.error('AppManager: Failed to clear saved session', clearError);
+          // Continue with reload even if clear fails
+        }
       }
 
       // DO NOT reset SCORM client here - the old content needs a valid session

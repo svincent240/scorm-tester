@@ -7,6 +7,8 @@ const ScormApiHandler = require("../main/services/scorm/rte/api-handler");
 const ScormInspectorTelemetryStore = require("../main/services/scorm-inspector/scorm-inspector-telemetry-store");
 const { ScormSNService } = require("../main/services/scorm/sn");
 const ManifestParser = require("../main/services/scorm/cam/manifest-parser");
+const SessionStore = require("../main/services/session-store");
+const ErrorHandler = require("../shared/utils/error-handler");
 
 // Use the shared logger to write to log files (not stderr, to avoid polluting MCP protocol)
 const getLogger = require('../shared/utils/logger');
@@ -176,21 +178,73 @@ function ensureIpcHandlers() {
   ipcRegistered = true;
 }
 
-function installRealAdapterForWindow(win, options = {}) {
+async function installRealAdapterForWindow(win, options = {}) {
   if (!electron || !win || !win.webContents) return false;
   try {
     ensureIpcHandlers();
+    
+    // Initialize SessionStore
+    const errorHandler = new ErrorHandler(mcpLogger);
+    const sessionStore = new SessionStore(errorHandler, mcpLogger);
+    await sessionStore.initialize();
+
+    const courseId = options.courseId || 'unknown_course';
+    const namespace = 'mcp';
+    
+    if (options.forceNew) {
+        await sessionStore.deleteSession(courseId, namespace);
+        mcpLogger?.info(`MCP: Forced new session, deleted storage for ${courseId}`);
+    }
+
+    // Load session data
+    const storedData = await sessionStore.loadSession(courseId, namespace);
+
     // Minimal telemetry store (no window broadcast in MCP runtime)
     const telemetryStore = new ScormInspectorTelemetryStore({ enableBroadcast: false, logger: mcpLogger });
-    // Minimal session manager for persistence and learner info
+    
+    // Session manager with persistence
     const sessionManager = {
       registerSession: () => true,
       unregisterSession: () => { /* no-op in MCP runtime */ },
-      persistSessionData: () => true,
+      persistSessionData: async (id, data) => {
+          let cmiData = {};
+          if (data && data.data && data.data.coreData) {
+              cmiData = data.data.coreData;
+          }
+          return await sessionStore.saveSession(courseId, cmiData, namespace);
+      },
       getLearnerInfo: () => ({ id: 'mcp-learner', name: 'MCP Learner' })
     };
+    
     // Create a SCORM API handler instance for this window
     const handler = new ScormApiHandler(sessionManager, /* logger */ mcpLogger, options, telemetryStore, /* scormService */ null);
+    
+    // Hydrate handler
+    if (storedData) {
+        const exit = storedData['cmi.exit'] || storedData['cmi.core.exit'];
+        if (exit === 'suspend') {
+            mcpLogger?.info(`MCP: Resuming session for ${courseId}`);
+            // Inject stored data
+            for (const [key, value] of Object.entries(storedData)) {
+                 if (handler.dataModel && typeof handler.dataModel._setInternalValue === 'function') {
+                     handler.dataModel._setInternalValue(key, value);
+                 }
+            }
+            // Set entry mode
+            if (handler.dataModel) {
+                 handler.dataModel._setInternalValue('cmi.entry', 'resume');
+                 handler.dataModel._setInternalValue('cmi.core.entry', 'resume');
+            }
+        } else {
+            mcpLogger?.info(`MCP: stored session found but exit='${exit}', starting new`);
+            // Ensure entry mode is ab-initio
+             if (handler.dataModel) {
+                 handler.dataModel._setInternalValue('cmi.entry', 'ab-initio');
+                 handler.dataModel._setInternalValue('cmi.core.entry', 'ab-initio');
+             }
+        }
+    }
+
     handlerByWC.set(win.webContents.id, handler);
     telemetryStoreByWC.set(win.webContents.id, telemetryStore);
     // Cleanup on close

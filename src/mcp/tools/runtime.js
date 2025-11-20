@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const ManifestParser = require("../../main/services/scorm/cam/manifest-parser");
 const sessions = require("../session");
-const { RuntimeManager, resolveEntryPathFromManifest } = require("../runtime-manager");
+const { RuntimeManager, resolveEntryPathFromManifest, getManifestIdentifier } = require("../runtime-manager");
 const getLogger = require('../../shared/utils/logger.js');
 const { scorm_dom_find_interactive_elements } = require('./dom');
 
@@ -186,8 +186,21 @@ async function scorm_runtime_open(params = {}) {
   const viewport = resolveViewport(params.viewport);
   const entryPath = await resolveEntryPathFromManifest(s.package_path);
   if (!entryPath) { const e = new Error('No launchable entry found via CAM'); e.code = 'MANIFEST_LAUNCH_NOT_FOUND'; throw e; }
+  
+  // Get course identifier for session persistence
+  const courseId = await getManifestIdentifier(s.package_path) || 'unknown_course';
+  const forceNew = !!s.new_attempt;
+
   sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_open_start', payload: { entryPath, viewport} });
-  const win = await RuntimeManager.openPersistent({ session_id, entryPath, viewport });
+  const win = await RuntimeManager.openPersistent({ 
+    session_id, 
+    entryPath, 
+    viewport,
+    adapterOptions: {
+      courseId,
+      forceNew
+    }
+  });
   const finalURL = RuntimeManager.getURL(win);
   sessions.emit && sessions.emit({ session_id, type: 'runtime:persistent_opened', payload: { url: finalURL || null } });
 

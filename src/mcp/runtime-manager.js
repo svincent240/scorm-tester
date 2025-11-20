@@ -425,7 +425,7 @@ class RuntimeManager {
     const url = 'file://' + entryPath;
     // Always attach real adapter bridge per window BEFORE loading URL to avoid missing handler races
     let telemetryStore = null;
-    try { telemetryStore = installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) { /* intentionally empty */ }
+    try { telemetryStore = await installRealAdapterForWindow(win, adapterOptions || {}); } catch (_) { /* intentionally empty */ }
     if (telemetryStore) {
       try { win.__scormTelemetryStore = telemetryStore; } catch (_) { /* intentionally empty */ }
     }
@@ -990,5 +990,17 @@ class RuntimeManager {
 
 }
 
-module.exports = { RuntimeManager, resolveEntryPathFromManifest };
+async function getManifestIdentifier(workspace) {
+  const manifestPath = path.join(workspace, "imsmanifest.xml");
+  if (!fs.existsSync(manifestPath)) return null;
+  const parser = new ManifestParser({ setError: () => {} });
+  try {
+    const parsed = await parser.parseManifestFile(manifestPath);
+    return parsed?.identifier || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+module.exports = { RuntimeManager, resolveEntryPathFromManifest, getManifestIdentifier };
 

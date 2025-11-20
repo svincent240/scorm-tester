@@ -65,8 +65,8 @@ class HeaderControls extends BaseComponent {
           this.eventBus.emit('course:open-folder:request');
           break;
         case 'course-reload-btn':
-          try { rendererLogger.info('HeaderControls: emit course:reload:request'); } catch (_) { /* intentionally empty */ }
-          this.eventBus.emit('course:reload:request');
+          try { rendererLogger.info('HeaderControls: emit course:reload:request', { forceNew: event.shiftKey }); } catch (_) { /* intentionally empty */ }
+          this.eventBus.emit('course:reload:request', { forceNew: event.shiftKey });
           break;
         case 'hc-inspector':
           this.eventBus.emit('ui:inspector:toggle-request');

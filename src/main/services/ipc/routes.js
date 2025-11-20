@@ -607,5 +607,14 @@ module.exports = [
       rateLimitProfile: 'default',
       useIpcResult: true
     }
+  },
+  {
+    channel: 'scorm:clear-saved-session',
+    handlerName: 'handleScormClearSavedSession',
+    options: {
+      rateLimitProfile: 'default',
+      useIpcResult: true,
+      validateArgs: true
+    }
   }
 ];

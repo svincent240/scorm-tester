@@ -124,7 +124,7 @@ class SessionManager {
     return manifest;
   }
 
-  open({ package_path, execution = {}, timeout_ms = 0 } = {}) {
+  open({ package_path, execution = {}, timeout_ms = 0, new_attempt = false } = {}) {
     const { native, type } = this.resolvePackageInfo(package_path);
 
     // Minimal validation for directories
@@ -155,6 +155,7 @@ class SessionManager {
       created_at: now,
       last_activity_at: now,
       timeout_ms: Number(timeout_ms) || 0,
+      new_attempt: !!new_attempt,
       workspace,
       course_screenshots_folder: courseFolder, // Shared screenshots folder per course
       artifacts_manifest_path: artifactsManifest,
@@ -164,7 +165,7 @@ class SessionManager {
     this.sessions.set(id, session);
 
     // Emit an event for open
-    this._emit(session, "session:open", { package_type: type });
+    this._emit(session, "session:open", { package_type: type, new_attempt: !!new_attempt });
 
     return {
       session_id: id,

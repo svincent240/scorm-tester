@@ -2270,6 +2270,19 @@ class IpcHandler extends BaseService {
       };
     }
   }
+
+  async handleScormClearSavedSession(event, { courseId, namespace }) {
+    const scormService = this.getDependency('scormService');
+    if (!scormService) {
+      return { success: false, error: 'SCORM service not available' };
+    }
+    try {
+      await scormService.clearSavedSession(courseId, namespace);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = IpcHandler;
