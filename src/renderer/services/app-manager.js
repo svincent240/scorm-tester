@@ -243,7 +243,7 @@ class AppManager {
               <div id="recent-courses"></div>
               <div id="content-viewer"></div>
               <div id="inspector-panel"></div>
-              <div id="course-exit-summary"></div>
+
             </section>
           </main>
           <footer class="app-footer" id="app-footer">
@@ -297,8 +297,7 @@ class AppManager {
     const ErrorBadge = _modErrorBadge.ErrorBadge;
     const _modErrorListPanel = await import('../components/notifications/error-list-panel.js');
     const ErrorListPanel = _modErrorListPanel.ErrorListPanel;
-    const _modCourseExitSummary = await import('../components/scorm/course-exit-summary.js');
-    const CourseExitSummary = _modCourseExitSummary.CourseExitSummary;
+
 
     // Optional components (lazy/conditional import)
     let ProgressTracking = null;
@@ -329,7 +328,7 @@ class AppManager {
       { name: 'errorDialog', class: ErrorDialog, elementId: 'error-dialog', required: true },
       { name: 'errorBadge', class: ErrorBadge, elementId: 'error-badge', required: true },
       { name: 'errorListPanel', class: ErrorListPanel, elementId: 'error-list-panel', required: true },
-      { name: 'courseExitSummary', class: CourseExitSummary, elementId: 'course-exit-summary', required: true },
+
     ];
 
     // Add optional component configs conditionally
@@ -490,20 +489,10 @@ class AppManager {
       this.handleCourseCleared();
     });
 
-    eventBus.on('course:exited', (exitData) => {
-      try { this.logger.info('AppManager: Course exited event received'); } catch (_) { /* intentionally empty */ }
-      this.handleCourseExit(exitData);
-    });
-
     eventBus.on('course:test-resume', (data) => {
       try { this.logger.info('AppManager: Test resume event received'); } catch (_) { /* intentionally empty */ }
       try { rendererLogger.info('AppManager: [DIAG] course:test-resume received', { sessionId: data?.sessionId }); } catch (_) { /* intentionally empty */ }
       this.handleTestResume(data);
-    });
-
-    eventBus.on('course:exit-summary-closed', (data) => {
-      try { this.logger.info('AppManager: Exit summary closed event received'); } catch (_) { /* intentionally empty */ }
-      this.handleExitSummaryClosed(data);
     });
 
     eventBus.on('course:loadStart', () => {
@@ -1054,17 +1043,32 @@ class AppManager {
     try {
       this.logger.info('AppManager: Course close requested');
 
-      // Call IPC to close the course using the imported ipcClient module
-      // The main process will broadcast 'course-closed' which will trigger
-      // the cleanup in the onCourseClosed listener above
-      const result = await ipcClient.invoke('close-course');
-      if (result && result.success) {
-        this.logger.info('AppManager: Course close IPC call succeeded');
-        // Note: Actual cleanup happens in onCourseClosed broadcast listener
+      // Like a real LMS: Tell the course to terminate itself via its SCORM API
+      // The course iframe has the API injected, so we just call it
+      const contentViewer = this.components.get('contentViewer');
+      if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
+        this.logger.info('AppManager: Calling course API_1484_11.Terminate()');
+        // Set exit to suspend so user can resume where they left off (standard LMS behavior)
+        try {
+          contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
+        } catch (_) { /* Course might not support this, that's ok */ }
+        contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
+        // The normal terminate flow will handle everything (persistence, events, etc.)
+      } else if (contentViewer?.iframe?.contentWindow?.API) {
+        // SCORM 1.2
+        this.logger.info('AppManager: Calling course API.LMSFinish()');
+        try {
+          contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
+        } catch (_) { /* Course might not support this, that's ok */ }
+        contentViewer.iframe.contentWindow.API.LMSFinish('');
       } else {
-        const errorMsg = (result && result.error) || 'Unknown error closing course';
-        this.logger.error('AppManager: Failed to close course:', errorMsg);
-        this.showError('Close Course Failed', errorMsg);
+        // No course loaded or API not ready - just close via IPC
+        this.logger.info('AppManager: No course API found, calling close-course IPC');
+        const result = await ipcClient.invoke('close-course');
+        if (result && !result.success) {
+          const errorMsg = (result && result.error) || 'Unknown error closing course';
+          this.showError('Close Course Failed', errorMsg);
+        }
       }
     } catch (error) {
       this.logger.error('AppManager: Error closing course:', error);
@@ -1154,40 +1158,7 @@ class AppManager {
     }
   }
 
-  /**
-   * Handle course exit event from main process
-   * @param {Object} exitData - Exit data from ScormService
-   */
-  async handleCourseExit(exitData) {
-    try {
-      this.logger.info('AppManager: Course exit event received', {
-        sessionId: exitData.sessionId,
-        completionStatus: exitData.completionStatus,
-        successStatus: exitData.successStatus,
-        exitType: exitData.exitType
-      });
 
-      // Hide the course content when it exits
-      const contentViewer = this.services.get('contentViewer');
-      if (contentViewer) {
-        // Clear the iframe content
-        contentViewer.clearContent();
-      }
-
-      // Get the already-initialized CourseExitSummary component
-      const courseExitSummary = this.components.get('courseExitSummary');
-      if (!courseExitSummary) {
-        this.logger.error('AppManager: CourseExitSummary component not found');
-        return;
-      }
-
-      // Show the exit summary
-      courseExitSummary.show(exitData);
-
-    } catch (error) {
-      this.logger.error('AppManager: Error handling course exit', error);
-    }
-  }
 
   /**
    * Handle test resume request
@@ -1232,30 +1203,7 @@ class AppManager {
     }
   }
 
-  /**
-   * Handle exit summary closed (cleanup terminated session)
-   * @param {Object} data - Close data with sessionId
-   */
-  async handleExitSummaryClosed(data) {
-    try {
-      if (!data?.sessionId) {
-        return;
-      }
 
-      this.logger.info('AppManager: Exit summary closed, cleaning up session', {
-        sessionId: data.sessionId
-      });
-
-      // Request session cleanup from main process
-      await ipcClient.invoke('scorm:cleanup-terminated-session', {
-        sessionId: data.sessionId
-      });
-
-    } catch (error) {
-      // Non-critical error, just log it
-      this.logger.warn('AppManager: Error cleaning up terminated session', error);
-    }
-  }
 
   /**
    * Setup error handlers

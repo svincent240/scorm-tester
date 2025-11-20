@@ -231,6 +231,49 @@ async function scorm_api_call(params = {}) {
   if (!session_id || typeof session_id !== 'string') { const e = new Error('session_id is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
   if (!method || typeof method !== 'string') { const e = new Error('method is required'); e.code = 'MCP_INVALID_PARAMS'; throw e; }
   const res = await RuntimeManager.callAPI(null, method, args, session_id);
+  
+  // Handle persistence after Terminate completes
+  if (method === 'Terminate' && res === 'true') {
+    try {
+      const SessionStore = require('../../main/services/session-store');
+      const { getLogger } = require('../../shared/utils/logger');
+      const mcpLogger = getLogger('MCP');
+      const sessionStore = new SessionStore(null, mcpLogger);
+      await sessionStore.initialize();
+      
+      // Get session metadata to determine courseId and namespace
+      const SessionManager = require('../session');
+      const sessionMgr = SessionManager.getInstance ? SessionManager.getInstance() : null;
+      const session = sessionMgr?.sessions?.get(session_id);
+      const courseId = session?.course_id || 'unknown_course';
+      const namespace = session?.namespace || 'mcp';
+      
+      // Get exit type from data model
+      const exitValue = await RuntimeManager.callAPI(null, 'GetValue', ['cmi.exit'], session_id).catch(() => '');
+      
+      if (exitValue === 'suspend') {
+        // Get all data from runtime and save for resume
+        const allElements = await expandDataModelPattern(session_id, 'cmi.*');
+        const data = {};
+        for (const element of allElements) {
+          try {
+            const value = await RuntimeManager.callAPI(null, 'GetValue', [element], session_id);
+            if (value) data[element] = value;
+          } catch (_) { /* skip elements that can't be read */ }
+        }
+        await sessionStore.saveSession(courseId, data, namespace);
+        mcpLogger?.info(`MCP: Session ${session_id} suspended - data saved for resume`);
+      } else {
+        // Not suspended - clean up any existing save
+        await sessionStore.deleteSession(courseId, namespace);
+        mcpLogger?.info(`MCP: Session ${session_id} terminated without suspend (exit=${exitValue}) - data cleared`);
+      }
+    } catch (err) {
+      // Don't fail the Terminate call if persistence fails
+      console.warn('MCP: Failed to handle persistence after Terminate:', err.message);
+    }
+  }
+  
   return { result: String(res || '') };
 }
 

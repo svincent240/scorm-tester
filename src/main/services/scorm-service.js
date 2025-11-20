@@ -152,9 +152,19 @@ class ScormService extends BaseService {
    */
   async initializeSession(sessionId, options = {}) {
     try {
-      this.logger?.info(`ScormService: Initializing SCORM session: ${sessionId}`);
+      this.logger?.info(`ScormService: Initializing SCORM session: ${sessionId}`, {
+        forceNew: options.forceNew || false,
+        reload: options.reload || false
+      });
       
-      // Check if session already exists
+      // Handle reload: terminate existing session gracefully, then continue with new init
+      if (options.reload && this.sessions.has(sessionId)) {
+        this.logger?.info(`ScormService: Reload requested - terminating existing session ${sessionId}`);
+        await this.terminate(sessionId);
+        // Session is now cleaned up, continue with fresh initialization below
+      }
+      
+      // Check if session already exists (after handling reload)
       if (this.sessions.has(sessionId)) {
         return {
           success: false,
@@ -235,29 +245,32 @@ class ScormService extends BaseService {
         const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
 
         // --- HYDRATION LOGIC START ---
-        // Attempt to restore session data from SessionStore
+        // Unified startup process: Always check for saved data, conditionally restore
         const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
         const namespace = this.config.sessionNamespace;
-        
-        if (options.forceNew) {
-            await this.sessionStore.deleteSession(courseId, namespace);
-            this.logger?.info(`ScormService: Forced new session, deleted storage for ${courseId} (namespace: ${namespace})`);
-        }
 
-        const storedData = await this.sessionStore.loadSession(courseId, namespace);
+        // Always check for saved session data (unless forceNew skips it)
+        // Note: forceNew doesn't delete the file, just skips loading it
+        // The file will be naturally overwritten on the next save
+        const storedData = options.forceNew ? null : await this.sessionStore.loadSession(courseId, namespace);
         let entryMode = 'ab-initio';
         let dataToRestore = null;
 
-        if (storedData) {
-            // Check exit status (SCORM 2004: cmi.exit, SCORM 1.2: cmi.core.exit)
+        if (options.forceNew) {
+            this.logger?.info(`ScormService: forceNew flag set - starting fresh (will overwrite saved data on next save)`);
+        } else if (storedData) {
+            // Check exit status to determine if resume is appropriate
+            // SCORM 2004: cmi.exit, SCORM 1.2: cmi.core.exit
             const exit = storedData['cmi.exit'] || storedData['cmi.core.exit'];
             if (exit === 'suspend') {
                 entryMode = 'resume';
                 dataToRestore = storedData;
-                this.logger?.info(`ScormService: Resuming session for ${courseId} (namespace: ${namespace})`);
+                this.logger?.info(`ScormService: Resume - restoring session for ${courseId} (exit=suspend, namespace: ${namespace})`);
             } else {
-                this.logger?.info(`ScormService: stored session found but exit='${exit}', starting new`);
+                this.logger?.info(`ScormService: Saved data found but exit='${exit}' (not suspend), starting fresh`);
             }
+        } else {
+            this.logger?.info(`ScormService: No saved data found for ${courseId}, starting fresh (ab-initio)`);
         }
 
         if (entryMode === 'resume' && dataToRestore) {
@@ -600,17 +613,27 @@ class ScormService extends BaseService {
       session.state = 'terminated';
       session.endTime = new Date();
 
-      // Emit course exit event with collected data
-      this.emitCourseExitEvent(sessionId, exitData);
-
-      // Keep session in memory for potential resume testing (don't delete immediately)
-      // The session cleanup interval will remove it after timeout
       // Store exit data in session for resume functionality
       session.exitData = exitData;
 
-      // Keep RTE instance in memory for resume (don't delete it yet)
-      // It will be cleaned up when the session is explicitly cleaned up or times out
-      this.logger?.info(`ScormService: Session ${sessionId} terminated (prevState=${preState}), RTE and data preserved for resume testing`);
+      // Always persist session data on shutdown - read from RTE memory
+      // Resume logic will check cmi.exit value to decide whether to restore
+      const exitType = exitData.exitType;
+      const courseId = session.courseInfo?.identifier || this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+      const namespace = this.config.sessionNamespace;
+      const rte = this.rteInstances.get(sessionId);
+      
+      if (rte?.dataModel) {
+        const allData = rte.dataModel.getAllData();
+        await this.sessionStore.saveSession(courseId, allData.coreData, namespace);
+        this.logger?.info(`ScormService: Session ${sessionId} terminated (exit=${exitType}) - data saved (prevState=${preState})`);
+      }
+
+      // Cleanup session from memory immediately after persistence
+      this.sessions.delete(sessionId);
+      this.rteInstances.delete(sessionId);
+      this.logger?.info(`ScormService: Session ${sessionId} cleaned up from memory`);
+
       this.recordOperation('terminate', rteSuccess);
 
       return { success: rteSuccess, errorCode: '0' };
@@ -1313,32 +1336,7 @@ class ScormService extends BaseService {
     }
   }
 
-  /**
-   * Emit course exit event to renderer
-   * @private
-   * @param {string} sessionId - Session identifier
-   * @param {Object} exitData - Exit data object
-   */
-  emitCourseExitEvent(sessionId, exitData) {
-    try {
-      this.logger?.info(`ScormService: Emitting course:exited event for session ${sessionId}`, {
-        completionStatus: exitData.completionStatus,
-        successStatus: exitData.successStatus,
-        exitType: exitData.exitType,
-        navigationRequest: exitData.navigationRequest
-      });
 
-      // Emit to renderer via windowManager
-      const windowManager = this.getDependency('windowManager');
-      if (windowManager?.broadcastToAllWindows) {
-        windowManager.broadcastToAllWindows('course:exited', exitData);
-      } else {
-        this.logger?.warn('ScormService: WindowManager not available for course:exited event');
-      }
-    } catch (error) {
-      this.logger?.error(`ScormService: Error emitting course exit event for session ${sessionId}:`, error);
-    }
-  }
 
   /**
    * Process navigation request after SCO termination (SCORM 2004 4th Edition requirement)

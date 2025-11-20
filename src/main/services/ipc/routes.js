@@ -64,15 +64,7 @@ module.exports = [
     }
   },
 
-  {
-    channel: 'scorm:cleanup-terminated-session',
-    handlerName: 'handleScormCleanupTerminatedSession',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
-  },
+
   {
     channel: 'browse-mode-enable',
     handlerName: 'handleBrowseModeEnable',

@@ -1,0 +1,108 @@
+{
+  "course/slides/assessment.js": {
+    "file": "assets/assessment.js",
+    "name": "assessment",
+    "src": "course/slides/assessment.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "course/slides/content.js": {
+    "file": "assets/content.js",
+    "name": "content",
+    "src": "course/slides/content.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "course/slides/intro.js": {
+    "file": "assets/intro.js",
+    "name": "intro",
+    "src": "course/slides/intro.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "course/slides/remedial.js": {
+    "file": "assets/remedial.js",
+    "name": "remedial",
+    "src": "course/slides/remedial.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "course/slides/summary.js": {
+    "file": "assets/summary.js",
+    "name": "summary",
+    "src": "course/slides/summary.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "course/slides/ui-demo.js": {
+    "file": "assets/ui-demo.js",
+    "name": "ui-demo",
+    "src": "course/slides/ui-demo.js",
+    "isDynamicEntry": true
+  },
+  "framework/index.html": {
+    "file": "assets/main.js",
+    "name": "main",
+    "src": "framework/index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "course/slides/assessment.js",
+      "course/slides/content.js",
+      "course/slides/intro.js",
+      "course/slides/remedial.js",
+      "course/slides/summary.js",
+      "course/slides/ui-demo.js",
+      "framework/js/automation/index.js",
+      "framework/js/dev/CourseLinter.js",
+      "framework/js/managers/score-manager.js"
+    ],
+    "css": [
+      "assets/main.css"
+    ]
+  },
+  "framework/js/automation/index.js": {
+    "file": "assets/index.js",
+    "name": "index",
+    "src": "framework/js/automation/index.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  },
+  "framework/js/dev/CourseLinter.js": {
+    "file": "assets/CourseLinter.js",
+    "name": "CourseLinter",
+    "src": "framework/js/dev/CourseLinter.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ],
+    "dynamicImports": [
+      "course/slides/assessment.js",
+      "course/slides/content.js",
+      "course/slides/intro.js",
+      "course/slides/remedial.js",
+      "course/slides/summary.js",
+      "course/slides/ui-demo.js"
+    ]
+  },
+  "framework/js/managers/score-manager.js": {
+    "file": "assets/score-manager.js",
+    "name": "score-manager",
+    "src": "framework/js/managers/score-manager.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "framework/index.html"
+    ]
+  }
+}

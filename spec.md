@@ -134,21 +134,18 @@ Before writing new code, check `src/shared/` for existing solutions.
 This section provides a complete, categorized list of all available MCP tools.
 
 **Session Management:**
-*   `scorm_session_open`
-*   `scorm_session_status`
-*   `scorm_session_events`
-*   `scorm_session_close`
+*   `scorm_session_open` - Opens a session and creates isolated workspace
+*   `scorm_session_status` - Get session state and timestamps
+*   `scorm_session_events` - Poll event stream for background operations
+*   `scorm_session_close` - **Unified shutdown path**: Sets cmi.exit='suspend', calls Terminate(), saves data, and closes runtime
 
 **Runtime Management:**
-*   `scorm_runtime_open`
-*   `scorm_runtime_status`
-*   `scorm_runtime_close`
+*   `scorm_runtime_open` - Opens offscreen browser and auto-initializes SCORM content
+*   `scorm_runtime_status` - Get runtime state (open, Initialize status, last API call)
 
-**SCORM API & Attempt Lifecycle:**
-*   `scorm_attempt_initialize`
-*   `scorm_attempt_terminate`
-*   `scorm_api_call`
-*   `scorm_data_model_get`
+**SCORM API Calls:**
+*   `scorm_api_call` - Call any SCORM API method (Initialize, GetValue, SetValue, Commit, Terminate, etc.)
+*   `scorm_data_model_get` - Bulk read data model elements with wildcard support
 
 **Sequencing & Navigation (SN):**
 *   `scorm_nav_get_state`

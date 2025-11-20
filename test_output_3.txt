@@ -1,0 +1,236 @@
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [chromium] › e2e/resume-workflow.spec.ts:28:7 › Resume Workflow E2E Test › navigate to slide 2, reload, and resume back to slide 2
+[1A[2K[chromium] › e2e/resume-workflow.spec.ts:28:7 › Resume Workflow E2E Test › navigate to slide 2, reload, and resume back to slide 2
+Starting resume workflow test...
+
+[1A[2KLoading course from: /Users/seth/Documents/GitHub/scorm-tester/references/real_course_examples/dist
+
+[1A[2KCourse loaded successfully.
+
+[1A[2KCourse content visible.
+
+[1A[2KNext button found.
+
+[1A[2KClicking Next button...
+
+[1A[2KNavigated to Slide 2 (Previous button enabled).
+
+[1A[2KReloading course via GUI button...
+
+[1A[2KWaiting for Resume Prompt...
+
+[1A[2KModal not visible. Dumping logs...
+
+[1A[2K
+📊 Error Summary for "Resume Test Failure":
+
+[1A[2K  Console messages: 372
+
+[1A[2K  By type: { warning: [33m4[39m, log: [33m363[39m, clear: [33m1[39m, error: [33m3[39m, debug: [33m1[39m }
+
+[1A[2K  Log file: /Users/seth/Library/Application Support/scorm-tester/errors.ndjson
+
+[1A[2K  ❌ Critical console errors found!
+
+[1A[2K    - Console error: [ConnectionManager] SetValue('cmi.exit') failed. Raw result: "false". Value length: 7
+
+[1A[2K    - Console error: [EventBus Error] scorm:error: {
+  "domain": "scorm",
+  "operation": "SetValue",
+  "message": "Failed to set value for \"cmi.exit\": General Exception (Adapter returned false)",
+  "context": {
+    "key": "cmi.exit",
+    "valuePreview": "suspend",
+    "error": {
+      "code": "101",
+      "message": "General Exception (Adapter returned false)",
+      "diagnostic": "The LMS API adapter returned \"false\" as the error code."
+    }
+  }
+}
+
+[1A[2K    - Console error: [AppUI] Critical SCORM Error detected: {
+  "domain": "scorm",
+  "operation": "SetValue",
+  "message": "Failed to set value for \"cmi.exit\": General Exception (Adapter returned false)",
+  "context": {
+    "key": "cmi.exit",
+    "valuePreview": "suspend",
+    "error": {
+      "code": "101",
+      "message": "General Exception (Adapter returned false)",
+      "diagnostic": "The LMS API adapter returned \"false\" as the error code."
+    }
+  }
+}
+
+[1A[2K  ❌ Log file errors found!
+
+[1A[2K    - Log [ERROR]: SNBridge: Failed to get sequencing state
+
+[1A[2K    - Log [ERROR]: [Browser Console] [ConnectionManager] SetValue('cmi.exit') failed. Raw result: "false". Value length: 7
+
+[1A[2K    - Log [ERROR]: [Browser Console] [EventBus Error] scorm:error: {
+  "domain": "scorm",
+  "operation": "SetValue",
+  "message": "Failed to set value for \"cmi.exit\": General Exception (Adapter returned false)",
+  "context": {
+    "key": "cmi.exit",
+    "valuePreview": "suspend",
+    "error": {
+      "code": "101",
+      "message": "General Exception (Adapter returned false)",
+      "diagnostic": "The LMS API adapter returned \"false\" as the error code."
+    }
+  }
+}
+
+[1A[2K    - Log [ERROR]: [Browser Console] [AppUI] Critical SCORM Error detected: {
+  "domain": "scorm",
+  "operation": "SetValue",
+  "message": "Failed to set value for \"cmi.exit\": General Exception (Adapter returned false)",
+  "context": {
+    "key": "cmi.exit",
+    "valuePreview": "suspend",
+    "error": {
+      "code": "101",
+      "message": "General Exception (Adapter returned false)",
+      "diagnostic": "The LMS API adapter returned \"false\" as the error code."
+    }
+  }
+}
+
+[1A[2K    - Log [ERROR]: AppManager: Renderer console error
+
+[1A[2K    - Log [ERROR]: AppManager: Renderer console error
+
+[1A[2K    - Log [ERROR]: AppManager: Renderer console error
+
+[1A[2K    - Log [ERROR]: AppManager: Renderer console error
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SCORM Error [data_model]: 404 - Undefined Data Model Element
+
+[1A[2K    - Log [ERROR]: SNBridge: Failed to get sequencing state
+
+[1A[2K  ⚠️  4 warning(s)
+
+[1A[2K  1) [chromium] › e2e/resume-workflow.spec.ts:28:7 › Resume Workflow E2E Test › navigate to slide 2, reload, and resume back to slide 2 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#content-frame').contentFrame().locator('#global-modal')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#content-frame').contentFrame().locator('#global-modal')[22m
+    [2m    7 × locator resolved to <div class="modal" role="dialog" id="global-modal" aria-hidden="true" data-testid="modal-global" aria-labelledby="global-modal-title" aria-describedby="global-modal-body">…</div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      94 |     const modal = iframe.locator('#global-modal');
+      95 |     try {
+    > 96 |       await expect(modal).toBeVisible({ timeout: 5000 });
+         |                           ^
+      97 |     } catch (e) {
+      98 |       console.log('Modal not visible. Dumping logs...');
+      99 |       consoleMonitor.printSummary('Resume Test Failure');
+        at /Users/seth/Documents/GitHub/scorm-tester/e2e/resume-workflow.spec.ts:96:27
+
+    Error Context: test-results/resume-workflow-Resume-Wor-51b03--and-resume-back-to-slide-2-chromium/error-context.md
+
+
+[1A[2K  1 failed
+    [chromium] › e2e/resume-workflow.spec.ts:28:7 › Resume Workflow E2E Test › navigate to slide 2, reload, and resume back to slide 2 

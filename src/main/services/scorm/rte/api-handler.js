@@ -248,40 +248,20 @@ class ScormApiHandler {
         return result;
       }
 
-      // Perform final commit (but don't count it as a regular commit)
-      try {
-        // Get all data for final persistence without incrementing commit count
-        const dataToCommit = {
+      // Browse mode cleanup
+      if (this.isBrowseMode() || this.options.memoryOnlyStorage) {
+        this.logger?.debug('Browse mode termination - cleaning up browse session data', {
           sessionId: this.sessionId,
-          timestamp: new Date().toISOString(),
-          data: this.dataModel.getAllData(),
-          errorState: this.errorHandler.getErrorState(),
-          launchMode: this.options.launchMode,
-          browseMode: this.isBrowseMode()
-        };
-
-        // Browse mode data isolation - no persistence to production data
-        if (this.isBrowseMode() || this.options.memoryOnlyStorage) {
-          this.logger?.debug('Browse mode termination - data not persisted to production storage', {
-            sessionId: this.sessionId,
-            launchMode: this.options.launchMode
-          });
-
-          // Clean up browse session data
+          launchMode: this.options.launchMode
+        });
+        // Clean up browse session data
+        try {
           this.dataModel.destroyBrowseSessionData();
-        } else {
-          // Normal mode - persist via session manager
-          if (this.sessionManager) {
-            const result = this.sessionManager.persistSessionData(this.sessionId, dataToCommit);
-            if (!result) {
-              this.logger?.warn('Final commit failed during termination');
-            }
-          }
+        } catch (error) {
+          this.logger?.warn('Failed to clean up browse session data:', error.message);
         }
-      } catch (error) {
-        this.logger?.warn('Final commit failed during termination:', error.message);
-        // Continue with termination even if commit fails
       }
+      // Note: Persistence is now handled by ScormService.terminate() after RTE termination completes
 
       // Calculate session time
       this.calculateSessionTime();

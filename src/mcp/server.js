@@ -8,7 +8,7 @@
 const { mapError } = require("./errors");
 const ToolRouter = require("./router");
 const { scorm_echo } = require("./tools/echo");
-const { scorm_session_open, scorm_session_status, scorm_session_events, scorm_session_close } = require("./tools/session");
+const { scorm_open_course, scorm_close_course, scorm_reload_course, scorm_clear_saved_data, scorm_course_status, scorm_session_open, scorm_session_close } = require("./tools/session");
 const { scorm_lint_manifest, scorm_lint_api_usage, scorm_lint_parent_dom_access, scorm_validate_workspace, scorm_lint_sequencing, scorm_validate_compliance, scorm_report } = require("./tools/validate");
 const { scorm_runtime_open, scorm_runtime_status, scorm_api_call, scorm_data_model_get, scorm_nav_get_state, scorm_nav_next, scorm_nav_previous, scorm_nav_choice, scorm_sn_init, scorm_sn_reset, scorm_capture_screenshot, scorm_trace_sequencing, scorm_get_data_model_history, scorm_get_network_requests, scorm_assessment_interaction_trace, scorm_validate_data_model_state, scorm_get_console_errors, scorm_compare_data_model_snapshots, scorm_wait_for_api_call, scorm_get_current_page_context, scorm_replay_api_calls, scorm_get_page_state, scorm_get_slide_map, scorm_navigate_to_slide, scorm_set_viewport_size } = require("./tools/runtime");
 const { scorm_dom_click, scorm_dom_fill, scorm_dom_query, scorm_dom_evaluate, scorm_dom_wait_for, scorm_keyboard_type, scorm_dom_find_interactive_elements, scorm_dom_fill_form_batch, scorm_dom_click_by_text } = require("./tools/dom");
@@ -40,12 +40,19 @@ const router = new ToolRouter();
 
 // Helpful metadata for MCP clients (tools/list)
 const TOOL_META = new Map([
-  // Connectivity & Session Management
+  // Connectivity
   ["scorm_echo", { description: "Echo utility for connectivity tests", inputSchema: { type: "object" } }],
-  ["scorm_session_open", { description: "Open a session for a SCORM package - creates isolated workspace and optional offscreen execution context", inputSchema: { type: "object", properties: { package_path: { type: "string" }, execution: { type: "object" }, timeout_ms: { type: "number" } }, required: ["package_path"] } }],
-  ["scorm_session_status", { description: "Get session status (state, timestamps, artifact count)", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
-  ["scorm_session_events", { description: "Poll event stream for a session - retrieve events captured during background operations using since_event_id for incremental polling", inputSchema: { type: "object", properties: { session_id: { type: "string" }, since_event_id: { type: "number" }, max_events: { type: "number" } }, required: ["session_id"] } }],
-  ["scorm_session_close", { description: "Close a session and finalize artifacts", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  
+  // Unified Course Management
+  ["scorm_open_course", { description: "Open a SCORM course: Creates workspace, opens runtime, loads content, and auto-initializes (combines session_open + runtime_open)", inputSchema: { type: "object", properties: { package_path: { type: "string" }, viewport: { type: "object", properties: { width: { type: "number" }, height: { type: "number" } } }, timeout_ms: { type: "number" } }, required: ["package_path"] } }],
+  ["scorm_close_course", { description: "Close course: Sets cmi.exit='suspend', calls Terminate() to save data, closes runtime, and cleans up", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  ["scorm_reload_course", { description: "Reload course: Atomic close + re-open operation (terminates existing, then creates fresh session with same package)", inputSchema: { type: "object", properties: { session_id: { type: "string" }, package_path: { type: "string" }, viewport: { type: "object" } }, required: ["session_id", "package_path"] } }],
+  ["scorm_clear_saved_data", { description: "Clear saved session data for a course (deletes persisted JSON file for hard reset)", inputSchema: { type: "object", properties: { package_path: { type: "string" } }, required: ["package_path"] } }],
+  ["scorm_course_status", { description: "Get course status (state, timestamps, artifact count)", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
+  
+  // Legacy (deprecated - use scorm_open_course/scorm_close_course instead)
+  ["scorm_session_open", { description: "[DEPRECATED] Use scorm_open_course instead - creates workspace only, requires separate runtime_open", inputSchema: { type: "object", properties: { package_path: { type: "string" } }, required: ["package_path"] } }],
+  ["scorm_session_close", { description: "[DEPRECATED] Use scorm_close_course instead", inputSchema: { type: "object", properties: { session_id: { type: "string" } }, required: ["session_id"] } }],
 
   // Static Validation (no runtime execution)
   ["scorm_lint_manifest", { description: "Parse and validate imsmanifest.xml structure and schema compliance", inputSchema: { type: "object", properties: { workspace_path: { type: "string" } }, required: ["workspace_path"] } }],
@@ -138,9 +145,16 @@ const TOOL_META = new Map([
       ["system_set_log_level", { description: "Set application log level (debug|info|warn|error)", inputSchema: { type: "object", properties: { level: { type: "string", enum: ["debug", "info", "warn", "error"] } }, required: ["level"] } }],
     ]);  
   router.register("scorm_echo", scorm_echo);
+  
+  // New unified course management
+  router.register("scorm_open_course", scorm_open_course);
+  router.register("scorm_close_course", scorm_close_course);
+  router.register("scorm_reload_course", scorm_reload_course);
+  router.register("scorm_clear_saved_data", scorm_clear_saved_data);
+  router.register("scorm_course_status", scorm_course_status);
+  
+  // Legacy (deprecated)
   router.register("scorm_session_open", scorm_session_open);
-  router.register("scorm_session_status", scorm_session_status);
-  router.register("scorm_session_events", scorm_session_events);
   router.register("scorm_session_close", scorm_session_close);
   router.register("scorm_lint_manifest", scorm_lint_manifest);
   router.register("scorm_lint_api_usage", scorm_lint_api_usage);

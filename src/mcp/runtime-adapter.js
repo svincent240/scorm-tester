@@ -202,16 +202,13 @@ async function installRealAdapterForWindow(win, options = {}) {
     // Minimal telemetry store (no window broadcast in MCP runtime)
     const telemetryStore = new ScormInspectorTelemetryStore({ enableBroadcast: false, logger: mcpLogger });
     
-    // Session manager with persistence
+    // Session manager - persistence now handled after Terminate completes
     const sessionManager = {
       registerSession: () => true,
       unregisterSession: () => { /* no-op in MCP runtime */ },
       persistSessionData: async (id, data) => {
-          let cmiData = {};
-          if (data && data.data && data.data.coreData) {
-              cmiData = data.data.coreData;
-          }
-          return await sessionStore.saveSession(courseId, cmiData, namespace);
+          // No-op: persistence is now handled by checking exit type after Terminate
+          return true;
       },
       getLearnerInfo: () => ({ id: 'mcp-learner', name: 'MCP Learner' })
     };

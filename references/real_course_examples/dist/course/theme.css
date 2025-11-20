@@ -1,0 +1,39 @@
+/* ============================================================================
+   Course Theme Token Overrides — Safe to Customize
+   ============================================================================
+
+   Override any global design tokens for this course by redefining variables
+   inside the :root selector below. Only include the tokens you want to change;
+   all other values continue to use the defaults from framework/css/design-tokens.css.
+
+   Example:
+   :root {
+     --color-primary: #0057b7;
+     --color-secondary: #ffd700;
+   }
+
+   ============================================================================ */
+    /* stylelint-disable block-no-empty */
+    :root {
+
+    /* Add course-specific token overrides here */
+    
+    }
+    /* stylelint-enable block-no-empty */
+
+/* ============================================================================
+   END COURSE THEME TOKEN OVERRIDES
+   ============================================================================ */
+
+/* ============================================================================
+   Custom Course Styles
+   ============================================================================ */
+
+/*
+  Add any course-specific custom styles here. For example:
+
+  .my-custom-class {
+    font-family: 'Comic Sans MS', cursive;
+    color: pink;
+  }
+*/

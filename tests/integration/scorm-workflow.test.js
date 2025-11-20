@@ -124,15 +124,14 @@ describe('SCORM Workflow Integration Tests', () => {
       
       // Verify session was properly managed
       expect(mockSessionManager.registerSession).toHaveBeenCalled();
-      expect(mockSessionManager.persistSessionData).toHaveBeenCalledTimes(3); // Two explicit commits + final commit during terminate
+      // Note: persistSessionData is no longer called - persistence happens in ScormService after terminate
       expect(mockSessionManager.unregisterSession).toHaveBeenCalled();
       
-      // Verify final state
-      const sessionData = mockSessionManager.persistedData.get(apiHandler.sessionId);
-      expect(sessionData).toBeDefined();
-      expect(sessionData.data.coreData['cmi.completion_status']).toBe('completed');
-      expect(sessionData.data.coreData['cmi.success_status']).toBe('passed');
-      expect(sessionData.data.interactions).toHaveLength(2);
+      // Verify final state by reading from data model
+      expect(apiHandler.dataModel.getValue('cmi.completion_status')).toBe('completed');
+      expect(apiHandler.dataModel.getValue('cmi.success_status')).toBe('passed');
+      const allData = apiHandler.dataModel.getAllData();
+      expect(allData.interactions).toHaveLength(2);
     });
 
     test('should handle suspend and resume workflow', async () => {
@@ -224,11 +223,10 @@ describe('SCORM Workflow Integration Tests', () => {
       // 6. Terminate
       expect(apiHandler.Terminate('')).toBe('true');
       
-      // Verify final state shows failure
-      const sessionData = mockSessionManager.persistedData.get(apiHandler.sessionId);
-      expect(sessionData.data.coreData['cmi.success_status']).toBe('failed');
-      expect(sessionData.data.coreData['cmi.completion_status']).toBe('completed');
-      expect(parseFloat(sessionData.data.coreData['cmi.score.scaled'])).toBeLessThan(0.7); // Assuming 70% pass
+      // Verify final state shows failure - read directly from data model
+      expect(apiHandler.dataModel.getValue('cmi.success_status')).toBe('failed');
+      expect(apiHandler.dataModel.getValue('cmi.completion_status')).toBe('completed');
+      expect(parseFloat(apiHandler.dataModel.getValue('cmi.score.scaled'))).toBeLessThan(0.7); // Assuming 70% pass
     });
   });
 

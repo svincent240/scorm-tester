@@ -277,7 +277,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-commit', this.handleScormCommit.bind(this));
       this.registerHandler('scorm-terminate', this.handleScormTerminate.bind(this));
       // scorm:resume-session removed - resume is now handled via initializeSession
-      this.registerHandler('scorm:cleanup-terminated-session', this.handleScormCleanupTerminatedSession.bind(this));
+
       this.registerHandler('scorm-get-progress-snapshot', this.handleScormGetProgressSnapshot.bind(this));
       this.registerHandler('ui-settings:get', this.handleUIGetSettings.bind(this));
       this.registerHandler('ui-settings:set', this.handleUISetSettings.bind(this));
@@ -657,37 +657,7 @@ class IpcHandler extends BaseService {
   // handleScormResumeSession removed - resume is now handled via initializeSession
 
 
-  async handleScormCleanupTerminatedSession(event, { sessionId }) {
-    try {
-      this.logger?.info(`IpcHandler: Cleanup terminated session requested for ${sessionId}`);
 
-      const scormService = this.getDependency('scormService');
-      if (!scormService) {
-        return {
-          success: false,
-          error: 'SCORM service not available'
-        };
-      }
-
-      // Delete the terminated session from memory
-      const session = scormService.getSessionData(sessionId);
-      if (session && session.state === 'terminated') {
-        scormService.resetSession(sessionId);
-        this.logger?.info(`IpcHandler: Terminated session ${sessionId} cleaned up`);
-      }
-
-      return {
-        success: true
-      };
-
-    } catch (error) {
-      this.logger?.error('IpcHandler: Cleanup terminated session failed:', error);
-      return {
-        success: false,
-        error: error.message || 'Cleanup failed'
-      };
-    }
-  }
 
   // UI Settings (AppState) handlers
   async handleUIGetSettings(_event) {
