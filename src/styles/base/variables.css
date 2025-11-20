@@ -29,6 +29,7 @@
   --success-active: #047857;
   --success-light: #d1fae5;
   --success-dark: #064e3b;
+  --success-text: #ffffff;
   --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
   
   --danger-color: #ef4444;
@@ -36,6 +37,7 @@
   --danger-active: #b91c1c;
   --danger-light: #fee2e2;
   --danger-dark: #7f1d1d;
+  --danger-text: #ffffff;
   --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   
   --warning-color: #f59e0b;
@@ -43,6 +45,7 @@
   --warning-active: #b45309;
   --warning-light: #fef3c7;
   --warning-dark: #78350f;
+  --warning-text: #000000;
   --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   
   --info-color: #06b6d4;
@@ -117,16 +120,24 @@
   --spacing-16: 4rem;     /* 64px */
   --spacing-20: 5rem;     /* 80px */
   --spacing-24: 6rem;     /* 96px */
+
+  /* Semantic spacing aliases for consistency */
+  --spacing-xs: var(--spacing-2);   /* 8px */
+  --spacing-sm: var(--spacing-3);   /* 12px */
+  --spacing-md: var(--spacing-4);   /* 16px */
+  --spacing-lg: var(--spacing-6);   /* 24px */
+  --spacing-xl: var(--spacing-8);   /* 32px */
   
-  /* Border Radius */
+  /* Border Radius - Simplified and consistent scale */
   --border-radius-none: 0;
-  --border-radius-sm: 0.125rem;   /* 2px */
-  --border-radius-base: 0.25rem;  /* 4px */
-  --border-radius-md: 0.375rem;   /* 6px */
-  --border-radius-lg: 0.5rem;     /* 8px */
-  --border-radius-xl: 0.75rem;    /* 12px */
-  --border-radius-2xl: 1rem;      /* 16px */
-  --border-radius-full: 9999px;
+  --border-radius-sm: 0.25rem;    /* 4px - small elements */
+  --border-radius-base: 0.25rem;  /* 4px - default */
+  --border-radius-md: 0.375rem;   /* 6px - cards, panels */
+  --border-radius-lg: 0.5rem;     /* 8px - large panels */
+  --border-radius-xl: 0.75rem;    /* 12px - modals */
+  --border-radius-2xl: 1rem;      /* 16px - special cases */
+  --border-radius-full: 9999px;   /* pills, circular */
+  --border-radius: var(--border-radius-md); /* Default */
   
   /* Border Width */
   --border-width-0: 0;
@@ -135,34 +146,35 @@
   --border-width-4: 4px;
   --border-width-8: 8px;
   
-  /* Modern Shadows with Depth */
+  /* Modern Shadows with Depth - Refined for consistency */
   --shadow-xs: 0 0 0 1px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+  --shadow-base: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
-  
+
   /* Enhanced Shadows for Modern Design */
-  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.12);
-  --shadow-floating: 0 12px 40px rgba(0, 0, 0, 0.15);
-  --shadow-glow: 0 0 20px rgba(102, 102, 255, 0.3);
-  --shadow-colored: 0 8px 25px rgba(102, 102, 255, 0.15);
-  --shadow-success: 0 8px 25px rgba(16, 185, 129, 0.15);
-  --shadow-danger: 0 8px 25px rgba(239, 68, 68, 0.15);
-  --shadow-glass: 0 8px 32px rgba(31, 38, 135, 0.37);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(0, 102, 255, 0.15);
+  --shadow-glow: 0 0 20px rgba(0, 102, 255, 0.25);
+  --shadow-colored: 0 4px 12px rgba(0, 102, 255, 0.15);
+  --shadow-success: 0 4px 12px rgba(16, 185, 129, 0.15);
+  --shadow-danger: 0 4px 12px rgba(239, 68, 68, 0.15);
   
-  /* Transitions */
-  --transition-fast: 0.15s ease-in-out;
-  --transition-base: 0.3s ease-in-out;
-  --transition-slow: 0.5s ease-in-out;
-  
-  --transition-colors: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base);
-  --transition-opacity: opacity var(--transition-base);
-  --transition-transform: transform var(--transition-base);
-  --transition-all: all var(--transition-base);
+  /* Transitions - Refined for smoother feel */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --transition-colors: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+  --transition-opacity: opacity var(--transition-fast);
+  --transition-transform: transform var(--transition-fast);
+  --transition-shadow: box-shadow var(--transition-fast);
+  --transition-all: all var(--transition-fast);
   
   /* Breakpoints */
   --breakpoint-xs: 0;
@@ -312,10 +324,10 @@
   --z-index-tooltip: 1070;
   --z-index-toast: 1080;
 
-  --header-height: 42px;   /* compact header */
-  --footer-height: 42px;   /* match header */
-  --navigation-controls-height: 36px;  /* compact nav */
-  --progress-tracking-height: 24px;    /* compact progress row */
+  --header-height: 48px;   /* comfortable header */
+  --footer-height: 48px;   /* match header */
+  --navigation-controls-height: 44px;  /* comfortable nav */
+  --progress-tracking-height: 28px;    /* comfortable progress row */
   --transition-normal: var(--transition-base);
   --transition-fast: 0.15s ease-in-out;
 

@@ -22,17 +22,18 @@
 }
 
 .course-outline__header {
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-sm) 0;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  margin-bottom: var(--spacing-2);
 }
 
 .course-outline__header h3 {
   margin: 0;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-color);
 }
@@ -43,26 +44,29 @@
 }
 
 .outline-btn {
-  background: none;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
-  padding: var(--spacing-xs);
-  border-radius: var(--border-radius);
+  padding: var(--spacing-1);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   font-size: var(--font-size-sm);
   line-height: 1;
-  transition: all var(--transition-fast) ease;
-  width: 24px;
-  height: 24px;
+  transition: var(--transition-all);
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--shadow-xs);
 }
 
 .outline-btn:hover {
   background: var(--bg-hover);
   border-color: var(--primary-color);
   color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .outline-btn:focus {
@@ -151,16 +155,17 @@
 .outline-item__content {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-xs);
-  border-radius: var(--border-radius);
-  transition: all var(--transition-fast) ease;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-2);
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-all);
   cursor: pointer;
   position: relative;
 }
 
 .outline-item__content:hover {
   background: var(--bg-hover);
+  box-shadow: var(--shadow-xs);
 }
 
 .outline-item__content:focus-within {
@@ -173,10 +178,11 @@
 .outline-item--current .outline-item__content {
   background: var(--primary-color-alpha);
   border: 1px solid var(--primary-color);
+  box-shadow: var(--shadow-sm);
 }
 
 .outline-item--current .outline-item__title {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--primary-color);
 }
 

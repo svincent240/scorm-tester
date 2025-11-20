@@ -56,7 +56,7 @@
   background: var(--notification-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--notification-border-radius);
-  box-shadow: var(--notification-shadow);
+  box-shadow: var(--shadow-elevated);
   padding: var(--spacing-md);
   pointer-events: auto;
   display: flex;
@@ -64,7 +64,7 @@
   gap: var(--spacing-sm);
   min-width: 300px;
   max-width: var(--notification-width);
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .notification--dismissing {
@@ -473,16 +473,16 @@
 .error-badge {
   display: none;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-3);
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid var(--warning-color);
   border-radius: var(--border-radius-full);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: var(--transition-all);
   user-select: none;
-  height: 26px;
-  min-height: 26px;
+  min-height: 28px;
+  height: auto;
 }
 
 .error-badge:hover {
@@ -526,14 +526,14 @@
 
 .error-list-panel {
   position: fixed;
-  top: 60px;
+  top: 64px;
   right: var(--spacing-md);
   width: 450px;
   max-height: calc(100vh - 80px);
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-floating);
   display: flex;
   flex-direction: column;
   z-index: var(--z-index-dropdown);
