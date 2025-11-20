@@ -63,15 +63,7 @@ module.exports = [
       validateArgs: true
     }
   },
-  {
-    channel: 'scorm:resume-session',
-    handlerName: 'handleScormResumeSession',
-    options: {
-      rateLimitProfile: 'default',
-      useIpcResult: true,
-      validateArgs: true
-    }
-  },
+
   {
     channel: 'scorm:cleanup-terminated-session',
     handlerName: 'handleScormCleanupTerminatedSession',

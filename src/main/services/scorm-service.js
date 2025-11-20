@@ -13,6 +13,7 @@
 const EventEmitter = require('events');
 const BaseService = require('./base-service');
 const ScormErrorHandler = require('./scorm/rte/error-handler');
+const SessionStore = require('./session-store');
 const { ScormSNService } = require('./scorm/sn/index');
 const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
 const BrowseModeService = require('./browse-mode-service');
@@ -231,6 +232,53 @@ class ScormService extends BaseService {
         };
 
         const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
+
+        // --- HYDRATION LOGIC START ---
+        // Attempt to restore session data from SessionStore
+        const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+        
+        if (options.forceNew) {
+            await this.sessionStore.deleteSession(courseId);
+            this.logger?.info(`ScormService: Forced new session, deleted storage for ${courseId}`);
+        }
+
+        const storedData = await this.sessionStore.loadSession(courseId);
+        let entryMode = 'ab-initio';
+        let dataToRestore = null;
+
+        if (storedData) {
+            // Check exit status (SCORM 2004: cmi.exit, SCORM 1.2: cmi.core.exit)
+            const exit = storedData['cmi.exit'] || storedData['cmi.core.exit'];
+            if (exit === 'suspend') {
+                entryMode = 'resume';
+                dataToRestore = storedData;
+                this.logger?.info(`ScormService: Resuming session for ${courseId}`);
+            } else {
+                this.logger?.info(`ScormService: stored session found but exit='${exit}', starting new`);
+            }
+        }
+
+        if (entryMode === 'resume' && dataToRestore) {
+             // Inject stored data into RTE before Initialize
+             for (const [key, value] of Object.entries(dataToRestore)) {
+                 if (rte.dataModel && typeof rte.dataModel._setInternalValue === 'function') {
+                     rte.dataModel._setInternalValue(key, value);
+                 }
+             }
+             // Set entry mode to resume
+             if (rte.dataModel) {
+                 rte.dataModel._setInternalValue('cmi.entry', 'resume');
+                 rte.dataModel._setInternalValue('cmi.core.entry', 'resume');
+             }
+        } else {
+             // Ensure entry mode is ab-initio
+             if (rte.dataModel) {
+                 rte.dataModel._setInternalValue('cmi.entry', 'ab-initio');
+                 rte.dataModel._setInternalValue('cmi.core.entry', 'ab-initio');
+             }
+        }
+        // --- HYDRATION LOGIC END ---
+
         // Initialize RTE session and then bind its internal session id to our session id for mapping
         try { rte.Initialize(''); } catch (_) { /* intentionally empty */ }
         // Override generated sessionId with our provided sessionId for consistency
@@ -463,6 +511,23 @@ class ScormService extends BaseService {
       
       // Log API call with authoritative error
       this.logApiCall(session, 'Commit', '', '', errorCode);
+
+      // --- PERSISTENCE LOGIC START ---
+      if (success) {
+          const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+          let data = {};
+          if (rte && rte.dataModel && typeof rte.dataModel.getAllData === 'function') {
+              const allData = rte.dataModel.getAllData();
+              if (allData.coreData) {
+                  data = allData.coreData;
+              }
+          }
+          // Save session data asynchronously
+          this.sessionStore.saveSession(courseId, data).catch(err => {
+              this.logger?.error(`ScormService: Failed to persist session data for ${courseId}:`, err);
+          });
+      }
+      // --- PERSISTENCE LOGIC END ---
       
       this.recordOperation('commit', success);
       return { success, errorCode };
@@ -726,204 +791,11 @@ class ScormService extends BaseService {
   }
  
    /**
-    * Resume a terminated session for testing
-    * Creates a new session with the same data but sets cmi.entry='resume'
-    * @param {string} oldSessionId - The terminated session to resume from
-    * @param {Object} options - Resume options (coursePath, launchUrl, etc.)
-    * @returns {Promise<Object>} Resume result with new sessionId
+    * @deprecated Resume logic is now handled automatically in initializeSession via SessionStore.
     */
    async resumeSession(oldSessionId, options = {}) {
-     try {
-       // Get the terminated session data
-       const oldSession = this.sessions.get(oldSessionId);
-       if (!oldSession) {
-         return {
-           success: false,
-           errorCode: '301',
-           reason: 'Original session not found (may have been cleaned up)'
-         };
-       }
-
-       if (oldSession.state !== 'terminated') {
-         return {
-           success: false,
-           errorCode: '103',
-           reason: 'Can only resume from terminated sessions'
-         };
-       }
-
-       // Create a new session ID for the resumed session
-       const newSessionId = `session_${++this.sessionCounter}`;
-       this.logger?.info(`ScormService: Resuming session ${oldSessionId} as ${newSessionId}`);
-
-       // Create new session with same structure
-       const newSession = {
-         id: newSessionId,
-         state: 'initialized',
-         startTime: new Date(),
-         lastActivity: Date.now(),
-         launchMode: options.launchMode || 'normal',
-         browseMode: false,
-         memoryOnlyStorage: true,
-         isResumed: true,
-         resumedFrom: oldSessionId
-       };
-
-       this.sessions.set(newSessionId, newSession);
-
-       // Create new RTE instance (match initializeSession pattern)
-       const ScormApiHandler = require('./scorm/rte/api-handler');
-       const telemetryStore = this.getDependency && this.getDependency('telemetryStore');
-       const sessionManager = {
-         registerSession: (id, handler) => { try { this.rteInstances.set(id, handler); } catch (_) { /* intentionally empty */ } return true; },
-         unregisterSession: (id) => { try { this.rteInstances.delete(id); } catch (_) { /* intentionally empty */ } },
-         persistSessionData: (id, data) => {
-           try {
-             const telemetry = this.getDependency && this.getDependency('telemetryStore');
-             if (telemetry && typeof telemetry.storeApiCall === 'function') {
-               telemetry.storeApiCall({ type: 'rte:commit', sessionId: id, data, timestamp: Date.now() });
-               return true;
-             }
-           } catch (e) {
-             this.logger?.warn('ScormService: telemetry store persist failed', e?.message || e);
-           }
-           this.logger?.info('ScormService: Persist session data (no telemetry store):', id);
-           return true;
-         },
-         getLearnerInfo: () => {
-           return { id: oldSession?.lmsProfile?.learnerId || 'unknown', name: oldSession?.lmsProfile?.learnerName || 'Learner' };
-         }
-       };
-       const rteOptions = {
-         launchMode: newSession.launchMode,
-         memoryOnlyStorage: true,
-         browseModeService: this.browseModeService
-       };
-       const rte = new ScormApiHandler(sessionManager, this.logger, rteOptions, telemetryStore, this);
-
-       // Get old RTE data - try RTE instance first, then fall back to stored exitData
-       const oldRte = this.rteInstances.get(oldSessionId);
-       let dataToRestore = null;
-
-       if (oldRte && typeof oldRte.dataModel?.getAllData === 'function') {
-         // RTE instance still exists - get full data model
-         dataToRestore = oldRte.dataModel.getAllData();
-         this.logger?.info(`ScormService: Resume using RTE instance data for ${oldSessionId}`);
-       } else if (oldSession?.exitData) {
-         // RTE was deleted, but we have exitData from termination
-         this.logger?.info(`ScormService: Resume using stored exitData for ${oldSessionId}`);
-         // Convert exitData format to dataToRestore format
-         dataToRestore = {
-           coreData: new Map([
-             ['cmi.location', oldSession.exitData.location],
-             ['cmi.suspend_data', oldSession.exitData.suspendData],
-             ['cmi.completion_status', oldSession.exitData.completionStatus],
-             ['cmi.success_status', oldSession.exitData.successStatus],
-             ['cmi.score.scaled', oldSession.exitData.scoreScaled],
-             ['cmi.score.raw', oldSession.exitData.scoreRaw],
-             ['cmi.score.max', oldSession.exitData.scoreMax],
-             ['cmi.score.min', oldSession.exitData.scoreMin],
-             ['cmi.total_time', oldSession.exitData.totalTime]
-           ]),
-           objectives: oldSession.exitData.objectives || []
-         };
-       } else {
-         this.logger?.warn(`ScormService: No data available to restore for session ${oldSessionId}`);
-       }
-
-       // Restore data model values BEFORE Initialize so determineEntryMode can detect resume
-       if (dataToRestore && dataToRestore.coreData) {
-         this.logger?.info(`ScormService: Pre-populating data model for resume session ${newSessionId}`);
-
-         // Pre-populate key data elements using internal method (before Initialize)
-         const elementsToPrePopulate = [
-           'cmi.location',
-           'cmi.suspend_data',
-           'cmi.completion_status',
-           'cmi.success_status',
-           'cmi.score.scaled',
-           'cmi.score.raw',
-           'cmi.score.max',
-           'cmi.score.min',
-           'cmi.progress_measure',
-           'cmi.total_time'
-         ];
-
-         for (const element of elementsToPrePopulate) {
-           const value = dataToRestore.coreData.get(element);
-           if (value !== undefined && value !== null && value !== '') {
-             // Use internal method to bypass validation and state checks
-             if (rte.dataModel && typeof rte.dataModel._setInternalValue === 'function') {
-               rte.dataModel._setInternalValue(element, String(value));
-             }
-           }
-         }
-
-         // Pre-populate objectives if present
-         if (dataToRestore.objectives && dataToRestore.objectives.length > 0) {
-           dataToRestore.objectives.forEach((obj, index) => {
-             if (rte.dataModel && typeof rte.dataModel._setInternalValue === 'function') {
-               if (obj.id) rte.dataModel._setInternalValue(`cmi.objectives.${index}.id`, obj.id);
-               if (obj.success_status) rte.dataModel._setInternalValue(`cmi.objectives.${index}.success_status`, obj.success_status);
-               if (obj.completion_status) rte.dataModel._setInternalValue(`cmi.objectives.${index}.completion_status`, obj.completion_status);
-               if (obj.score_scaled !== undefined) rte.dataModel._setInternalValue(`cmi.objectives.${index}.score.scaled`, String(obj.score_scaled));
-             }
-           });
-         }
-       }
-
-       // Initialize the new RTE (this will detect resume mode based on pre-populated data)
-       const initResult = rte.Initialize('');
-       try {
-         this.logger?.info('ScormService: Resume Initialize result', {
-           initResult,
-           lastError: rte?.errorHandler?.getLastError ? rte.errorHandler.getLastError() : 'n/a',
-           lastErrorString: rte?.errorHandler?.getErrorString && rte?.errorHandler?.getLastError
-             ? rte.errorHandler.getErrorString(rte.errorHandler.getLastError())
-             : 'n/a',
-           entryMode: rte.dataModel ? rte.dataModel.getValue('cmi.entry') : 'unknown'
-         });
-       } catch (_) { /* intentionally empty */ }
-       if (initResult !== 'true') {
-         this.sessions.delete(newSessionId);
-         return {
-           success: false,
-           errorCode: '102',
-           reason: 'Failed to initialize resumed session'
-         };
-       }
-
-       if (dataToRestore && dataToRestore.coreData) {
-         this.logger?.info(`ScormService: Restored data model for resumed session ${newSessionId}`, {
-           location: dataToRestore.coreData.get('cmi.location'),
-           suspendData: dataToRestore.coreData.get('cmi.suspend_data') ? 'present' : 'empty',
-           completionStatus: dataToRestore.coreData.get('cmi.completion_status')
-         });
-       }
-
-       // Store the new RTE instance
-       this.rteInstances.set(newSessionId, rte);
-
-       // Update session state
-       newSession.state = 'active';
-
-       this.logger?.info(`ScormService: Session ${newSessionId} resumed from ${oldSessionId}`);
-
-       return {
-         success: true,
-         sessionId: newSessionId,
-         errorCode: '0',
-         resumedFrom: oldSessionId
-       };
-
-     } catch (error) {
-       this.logger?.error('ScormService: Resume session failed:', error);
-       return {
-         success: false,
-         errorCode: '101',
-         reason: error.message || 'Resume failed'
-       };
-     }
+       this.logger?.warn('ScormService: resumeSession is deprecated. Use initializeSession with auto-hydration.');
+       return { success: false, errorCode: '101', reason: 'Deprecated' };
    }
 
    /**
@@ -1073,6 +945,10 @@ class ScormService extends BaseService {
    * @private
    */
   async initializeScormServices() {
+    // Initialize SessionStore
+    this.sessionStore = new SessionStore(this.errorHandler, this.logger);
+    await this.sessionStore.initialize();
+
     // Initialize CAM service
     this.camService = new ScormCAMService(this.errorHandler, this.logger);
 

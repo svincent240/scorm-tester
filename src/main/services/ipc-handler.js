@@ -276,7 +276,7 @@ class IpcHandler extends BaseService {
       this.registerHandler('scorm-set-values-batch', this.handleScormSetValuesBatch.bind(this));
       this.registerHandler('scorm-commit', this.handleScormCommit.bind(this));
       this.registerHandler('scorm-terminate', this.handleScormTerminate.bind(this));
-      this.registerHandler('scorm:resume-session', this.handleScormResumeSession.bind(this));
+      // scorm:resume-session removed - resume is now handled via initializeSession
       this.registerHandler('scorm:cleanup-terminated-session', this.handleScormCleanupTerminatedSession.bind(this));
       this.registerHandler('scorm-get-progress-snapshot', this.handleScormGetProgressSnapshot.bind(this));
       this.registerHandler('ui-settings:get', this.handleUIGetSettings.bind(this));
@@ -654,111 +654,8 @@ class IpcHandler extends BaseService {
     return await scormService.commit(sessionId);
   }
 
-  async handleScormResumeSession(event, { coursePath, sessionId }) {
-    try {
-      this.logger?.info(`IpcHandler: Resume session requested for session ${sessionId}`);
+  // handleScormResumeSession removed - resume is now handled via initializeSession
 
-      const scormService = this.getDependency('scormService');
-      const fileManager = this.getDependency('fileManager');
-
-      if (!scormService || !fileManager) {
-        return {
-          success: false,
-          error: 'Required services not available'
-        };
-      }
-
-      // Resume the terminated session (creates new session with restored data)
-      const resumeResult = await scormService.resumeSession(sessionId);
-      if (!resumeResult.success) {
-        return {
-          success: false,
-          error: resumeResult.reason || 'Failed to resume session'
-        };
-      }
-
-      // Prepare the course source (same as initial load)
-      const prepareResult = await fileManager.prepareCourseSource({ type: 'folder', path: coursePath });
-      if (!prepareResult.success) {
-        return {
-          success: false,
-          error: prepareResult.error || 'Failed to prepare course source'
-        };
-      }
-
-      // Get manifest and process it to get launch URL
-      const manifestResult = await fileManager.getCourseManifest(prepareResult.unifiedPath);
-      if (!manifestResult.success) {
-        return {
-          success: false,
-          error: manifestResult.error || 'Failed to get course manifest'
-        };
-      }
-
-      // Process manifest through CAM service to get launch URL
-      const processResult = await scormService.processScormManifest(prepareResult.unifiedPath, manifestResult.manifestContent);
-      if (!processResult.success) {
-        return {
-          success: false,
-          error: processResult.error || 'Failed to process manifest'
-        };
-      }
-
-      const { manifest, analysis } = processResult;
-
-      // Get launch URL from analysis
-      const launchUrl = Array.isArray(analysis?.launchSequence) && analysis.launchSequence.length > 0
-        ? analysis.launchSequence[0].href
-        : null;
-
-      if (!launchUrl) {
-        return {
-          success: false,
-          error: 'No launch URL found in course'
-        };
-      }
-
-      const courseInfo = {
-        title: (manifest?.organizations?.organizations?.[0]?.title)
-               || manifest?.organizations?.organization?.title
-               || manifest?.identifier
-               || 'Course',
-        version: manifest?.version,
-        scormVersion: manifest?.metadata?.schemaversion || 'Unknown',
-        hasManifest: true
-      };
-
-      // Broadcast course loaded event with the NEW session ID
-      const windowManager = this.getDependency('windowManager');
-      if (windowManager?.broadcastToAllWindows) {
-        windowManager.broadcastToAllWindows('course-loaded', {
-          path: prepareResult.unifiedPath,
-          info: courseInfo,
-          launchUrl: launchUrl,
-          sessionId: resumeResult.sessionId,
-          isResume: true,
-          resumedFrom: sessionId
-        });
-      }
-
-      return {
-        success: true,
-        sessionId: resumeResult.sessionId,
-        path: prepareResult.unifiedPath,
-        info: courseInfo,
-        launchUrl: launchUrl,
-        isResume: true,
-        resumedFrom: sessionId
-      };
-
-    } catch (error) {
-      this.logger?.error('IpcHandler: Resume session failed:', error);
-      return {
-        success: false,
-        error: error.message || 'Resume failed'
-      };
-    }
-  }
 
   async handleScormCleanupTerminatedSession(event, { sessionId }) {
     try {

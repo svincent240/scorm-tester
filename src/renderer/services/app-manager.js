@@ -1176,39 +1176,35 @@ class AppManager {
         sessionId: data.sessionId
       });
 
-      // Get current course path
-      const currentCoursePath = this.uiState.getState('currentCoursePath');
-      if (!currentCoursePath) {
-        this.showError('Resume Failed', 'No course path available for resume');
+      // Get current course data
+      const courseLoader = this.services.get('courseLoader');
+      if (!courseLoader) {
+        throw new Error('Course loader service not available');
+      }
+
+      const currentCourse = courseLoader.getCurrentCourse();
+      if (!currentCourse) {
+        this.showError('Resume Failed', 'No course currently loaded');
         return;
       }
 
-      this.logger.info('AppManager: Requesting resume from main process', {
-        coursePath: currentCoursePath,
-        sessionId: data.sessionId
-      });
-      try { rendererLogger.info('AppManager: [DIAG] invoking scorm:resume-session', { coursePath: currentCoursePath, sessionId: data?.sessionId }); } catch (_) { /* intentionally empty */ }
+      this.logger.info('AppManager: Reloading course to trigger auto-resume');
 
-      // Request resume from main process
-      const result = await ipcClient.invoke('scorm:resume-session', {
-        coursePath: currentCoursePath,
-        sessionId: data.sessionId
-      });
-      try { rendererLogger.info('AppManager: [DIAG] scorm:resume-session result', { success: !!result?.success }); } catch (_) { /* intentionally empty */ }
-
-      this.logger.info('AppManager: Resume result received', result);
-
-      if (result.success) {
-        this.logger.info('AppManager: Resume test successful');
-        this.showSuccess('Resume Test', 'Course resumed successfully with saved progress');
+      // Reload the course. The ScormService will handle hydration automatically based on stored session data.
+      if (currentCourse.originalFilePath) {
+        await courseLoader.loadCourseFromPath(currentCourse.originalFilePath);
+      } else if (currentCourse.path) {
+        await courseLoader.loadCourseFromFolder(currentCourse.path);
       } else {
-        this.logger.error('AppManager: Resume test failed', result.error);
-        this.showError('Resume Failed', result.error || 'Failed to resume course');
+        throw new Error('Unable to determine course source for resume');
       }
+
+      this.showSuccess('Resume Test', 'Course reloading...');
 
     } catch (error) {
       this.logger.error('AppManager: Error handling test resume', error);
-      this.showError('Resume Failed', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.showError('Resume Failed', errorMessage);
     }
   }
 
