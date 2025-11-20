@@ -96,6 +96,6 @@ describe('HeaderControls Component', () => {
     
     reloadBtn.click();
 
-    expect(eventBus.emit).toHaveBeenCalledWith('course:reload:request');
+    expect(eventBus.emit).toHaveBeenCalledWith('course:reload:request', { forceNew: false });
   });
 });

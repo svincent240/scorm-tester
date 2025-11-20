@@ -28,6 +28,9 @@ describe('SCORM Inspector Error Handling', () => {
       debug: jest.fn()
     };
 
+    // Mock window.alert
+    window.alert = jest.fn();
+
     // Set up minimal DOM
     const elements = [
       'api-timeline', 'error-list', 'data-model', 'clear-history-btn', 'refresh-btn',

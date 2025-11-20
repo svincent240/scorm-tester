@@ -426,7 +426,7 @@ class AppManager {
 
   // Bridge unified menu events to the same intent path as header buttons
   try {
-    ipcClient.onMenuEvent((payload) => {
+    ipcClient.onMenuEvent((/** @type {any} */ payload) => {
       const action = (payload && payload.action) || payload;
       if (action === 'menu-load-package') {
         eventBus.emit('course:open-zip:request');
@@ -461,13 +461,13 @@ class AppManager {
   } catch (_) { /* intentionally empty */ }
 
 
-    eventBus.on('course:loadError', (errorData) => {
+    eventBus.on('course:loadError', (/** @type {any} */ errorData) => {
       try { this.logger.error('AppManager: Course load error', (errorData && (errorData.error || errorData.message)) || errorData || 'unknown'); } catch (_) { /* intentionally empty */ }
 
       // Course load failures are catastrophic - they prevent core functionality
       const errorMessage = (errorData && (errorData.error || errorData.message)) || 'Unknown error';
       const error = new Error(errorMessage);
-      error.context = {
+      /** @type {any} */(error).context = {
         source: 'course-loader',
         errorData: errorData
       };
@@ -527,9 +527,12 @@ class AppManager {
       // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
 
-    eventBus.on('ui:scorm:error', (errorData) => {
+    eventBus.on('ui:scorm:error', (/** @type {any} */ errorData) => {
       try {
-        const safeMsg = (errorData && (errorData.message || errorData.error)) || 'Unknown SCORM error';
+        let safeMsg = (errorData && (errorData.message || errorData.error)) || 'Unknown SCORM error';
+        if (typeof safeMsg !== 'string') {
+          try { safeMsg = JSON.stringify(safeMsg); } catch (_) { safeMsg = String(safeMsg); }
+        }
         this.logger.error('AppManager: SCORM error', safeMsg);
         this.logger.error('AppManager: SCORM error details', {
           code: errorData && errorData.code,
@@ -539,12 +542,12 @@ class AppManager {
 
         // SCORM API errors are non-catastrophic - they don't block core app functionality
         const error = new Error(safeMsg);
-        error.context = {
+        /** @type {any} */(error).context = {
           code: errorData && errorData.code,
           source: errorData && errorData.source,
           timestamp: new Date().toISOString()
         };
-        error.component = 'scorm-api';
+        /** @type {any} */(error).component = 'scorm-api';
 
         if (this.uiState) {
           this.uiState.addNonCatastrophicError(error);
@@ -553,11 +556,14 @@ class AppManager {
     });
 
     // Renderer console errors from main process (captured via window.webContents.on('console-message'))
-    eventBus.on('renderer:console-error', (errorData) => {
+    eventBus.on('renderer:console-error', (/** @type {any} */ errorData) => {
       try {
         if (!errorData) return;
 
-        const message = errorData.message || 'Console error';
+        let message = errorData.message || 'Console error';
+        if (typeof message !== 'string') {
+          try { message = JSON.stringify(message); } catch (_) { message = String(message); }
+        }
         const source = errorData.source || 'unknown';
         const line = errorData.line || 0;
         const level = errorData.level || 'error';
@@ -583,13 +589,13 @@ class AppManager {
 
         // Add to error tracking UI (non-catastrophic)
         const error = new Error(message);
-        error.context = {
+        /** @type {any} */(error).context = {
           source: sourceLocation,
           level: level,
           timestamp: errorData.timestamp ? new Date(errorData.timestamp).toISOString() : new Date().toISOString(),
           errorCode: errorData.errorCode || null
         };
-        error.component = 'renderer-console';
+        /** @type {any} */(error).component = 'renderer-console';
 
         if (this.uiState) {
           this.uiState.addNonCatastrophicError(error);
@@ -1963,7 +1969,7 @@ class AppManager {
    */
   setupUnifiedNavigationPipeline(eventBus) {
     // Listen for unified navigation:request events (namespaced only)
-    eventBus.on('navigation:request', async (payload) => {
+    eventBus.on('navigation:request', async (/** @type {any} */ payload) => {
       await this.processNavigationRequest(payload);
     });
   }
