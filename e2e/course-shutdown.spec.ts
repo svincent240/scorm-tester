@@ -151,15 +151,15 @@ test.describe('Course Shutdown Tests', () => {
     const sessionPath = path.join(sessionsDir, modifiedFiles[0].name);
     const sessionData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
     
-    // Verify data was saved
-    expect(sessionData['cmi.exit']).toBe('suspend');
-    expect(sessionData['cmi.location']).toBe('page-5');
-    expect(sessionData['cmi.suspend_data']).toBe('test_shutdown_data');
+    // Verify data was saved (data is nested under coreData)
+    expect(sessionData.coreData['cmi.exit']).toBe('suspend');
+    expect(sessionData.coreData['cmi.location']).toBe('page-5');
+    expect(sessionData.coreData['cmi.suspend_data']).toBe('test_shutdown_data');
     
     console.log('✓ Session data verified:');
-    console.log('  - cmi.exit:', sessionData['cmi.exit']);
-    console.log('  - cmi.location:', sessionData['cmi.location']);
-    console.log('  - cmi.suspend_data:', sessionData['cmi.suspend_data']);
+    console.log('  - cmi.exit:', sessionData.coreData['cmi.exit']);
+    console.log('  - cmi.location:', sessionData.coreData['cmi.location']);
+    console.log('  - cmi.suspend_data:', sessionData.coreData['cmi.suspend_data']);
   });
 
   test('Menu close course triggers unified shutdown path and saves data', async () => {
@@ -240,9 +240,9 @@ test.describe('Course Shutdown Tests', () => {
     const sessionPath = path.join(sessionsDir, modifiedFiles[0].name);
     const sessionData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
     
-    expect(sessionData['cmi.exit']).toBe('suspend');
-    expect(sessionData['cmi.location']).toBe('menu-test-page');
-    expect(sessionData['cmi.score.raw']).toBe('85');
+    expect(sessionData.coreData['cmi.exit']).toBe('suspend');
+    expect(sessionData.coreData['cmi.location']).toBe('menu-test-page');
+    expect(sessionData.coreData['cmi.score.raw']).toBe('85');
     
     console.log('✓ Menu close saved data correctly');
   });
@@ -324,9 +324,9 @@ test.describe('Course Shutdown Tests', () => {
     const sessionPath = path.join(sessionsDir, modifiedFiles[0].name);
     const savedData = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
     
-    expect(savedData['cmi.location']).toBe(testLocation);
-    expect(savedData['cmi.suspend_data']).toBe(testSuspendData);
-    expect(savedData['cmi.score.scaled']).toBe('0.75');
+    expect(savedData.coreData['cmi.location']).toBe(testLocation);
+    expect(savedData.coreData['cmi.suspend_data']).toBe(testSuspendData);
+    expect(savedData.coreData['cmi.score.scaled']).toBe('0.75');
     console.log('✓ Data saved correctly');
 
     // Reload the course (this should trigger resume)

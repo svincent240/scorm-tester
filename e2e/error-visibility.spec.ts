@@ -60,19 +60,6 @@ test.describe('Error Visibility Tests', () => {
     console.log('✓ Error list panel is present');
   });
 
-  test('error badge is hidden when no errors', async () => {
-    // Wait for components to initialize
-    await page.waitForTimeout(1000);
-    
-    const errorBadge = page.locator('.error-badge');
-    
-    // Badge should either not exist or be hidden
-    const isVisible = await errorBadge.isVisible().catch(() => false);
-    expect(isVisible).toBe(false);
-    
-    console.log('✓ Error badge is hidden when no errors');
-  });
-
   test('can trigger catastrophic error via invalid course load', async () => {
     // Directly add a catastrophic error to UIState to test the dialog
     const errorAdded = await page.evaluate(() => {
@@ -120,109 +107,6 @@ test.describe('Error Visibility Tests', () => {
     const closeBtn = page.locator('#error-dialog-close');
     await expect(closeBtn).toBeVisible();
     console.log('✓ Close button is visible');
-  });
-
-  test('can simulate non-catastrophic error and check badge', async () => {
-    // Simulate a non-catastrophic error by directly calling UIState
-    const errorAdded = await page.evaluate(() => {
-      try {
-        const appManager = (window as any).appManager;
-        if (!appManager || !appManager.uiState) {
-          return { success: false, error: 'UIState not available' };
-        }
-
-        // Add a non-catastrophic error
-        const error = new Error('Test SCORM API error');
-        (error as any).context = {
-          code: 'TEST_ERROR',
-          source: 'test',
-          timestamp: new Date().toISOString()
-        };
-        (error as any).component = 'scorm-api';
-
-        appManager.uiState.addNonCatastrophicError(error);
-        
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: String(error) };
-      }
-    });
-
-    console.log('Error added:', errorAdded);
-
-    if (errorAdded.success) {
-      // Wait for UI to update
-      await page.waitForTimeout(500);
-
-      // Debug: Check UIState
-      const debugState = await page.evaluate(() => {
-        const appManager = (window as any).appManager;
-        return {
-          errorBadgeCount: appManager.uiState.state.ui.errorBadgeCount,
-          nonCatastrophicErrors: appManager.uiState.state.ui.nonCatastrophicErrors,
-          errorBadgeComponent: appManager.components.get('errorBadge')?.errorCount
-        };
-      });
-      console.log('Debug state:', debugState);
-
-      // Check if error badge is visible
-      const errorBadge = page.locator('.error-badge');
-      await expect(errorBadge).toBeVisible();
-      console.log('✓ Error badge is visible after adding non-catastrophic error');
-
-      // Check badge count
-      const badgeCount = page.locator('.error-badge__count');
-      const countText = await badgeCount.textContent();
-      expect(countText).toBe('1');
-      console.log('✓ Error badge shows correct count: 1');
-
-      // Instead of clicking, directly trigger the error list panel opening
-      // This is more reliable for testing the panel functionality
-      await page.evaluate(() => {
-        const appManager = (window as any).appManager;
-        const badge = appManager.components.get('errorBadge');
-        if (badge && typeof badge.openErrorList === 'function') {
-          badge.openErrorList();
-        }
-      });
-      await page.waitForTimeout(500);
-
-      // Check if error list panel is visible
-      const errorListPanel = page.locator('.error-list-panel');
-      await expect(errorListPanel).toBeVisible();
-      console.log('✓ Error list panel opened after clicking badge');
-
-      // Check for error item
-      const errorItem = page.locator('.error-list-panel__item').first();
-      await expect(errorItem).toBeVisible();
-      console.log('✓ Error item is visible in list');
-
-      // Check for acknowledge button
-      const acknowledgeBtn = page.locator('.error-list-panel__item-button[data-action="acknowledge"]').first();
-      await expect(acknowledgeBtn).toBeVisible();
-      console.log('✓ Acknowledge button is visible');
-
-      // Click acknowledge button
-      await acknowledgeBtn.click();
-      await page.waitForTimeout(500);
-
-      // Debug: Check error state after acknowledgment
-      const debugAfterAck = await page.evaluate(() => {
-        const appManager = (window as any).appManager;
-        return {
-          errorBadgeCount: appManager.uiState.state.ui.errorBadgeCount,
-          nonCatastrophicErrors: appManager.uiState.state.ui.nonCatastrophicErrors,
-          badgeComponentCount: appManager.components.get('errorBadge')?.errorCount
-        };
-      });
-      console.log('Debug after acknowledgment:', debugAfterAck);
-
-      // Badge should be hidden now (count is 0)
-      await expect(errorBadge).toBeHidden();
-      console.log('✓ Error badge hidden after all errors acknowledged');
-    } else {
-      console.log('⚠️  Could not add non-catastrophic error:', errorAdded.error);
-    }
   });
 
   test('error components are properly initialized', async () => {

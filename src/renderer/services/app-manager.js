@@ -929,6 +929,51 @@ class AppManager {
   }
 
   /**
+   * Shared shutdown logic used by both reload and close
+   * Sets cmi.exit='suspend', calls Terminate(), and waits for persistence
+   * @param {Object} options - Options for shutdown
+   * @param {number} options.waitMs - How long to wait after Terminate (default: 300ms)
+   * @returns {Promise<boolean>} - Returns true if API was called, false if IPC fallback was used
+   */
+  async shutdownCourse(options = {}) {
+    const waitMs = options.waitMs || 300;
+    
+    const contentViewer = this.components.get('contentViewer');
+    if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
+      this.logger.info('AppManager: Calling course API_1484_11.Terminate() for shutdown');
+      // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
+      try {
+        contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
+      } catch (_) { /* Course might not support this, that's ok */ }
+      contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
+      // The normal terminate flow will handle persistence
+      this.logger.info('AppManager: Terminate called, waiting for persistence to complete');
+      // Give terminate time to complete and persist data
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+      return true;
+    } else if (contentViewer?.iframe?.contentWindow?.API) {
+      // SCORM 1.2
+      this.logger.info('AppManager: Calling course API.LMSFinish() for shutdown');
+      // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
+      try {
+        contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
+      } catch (_) { /* Course might not support this, that's ok */ }
+      contentViewer.iframe.contentWindow.API.LMSFinish('');
+      this.logger.info('AppManager: LMSFinish called, waiting for persistence to complete');
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+      return true;
+    } else {
+      // No course API found - close via IPC
+      this.logger.info('AppManager: No course API found, calling close-course IPC for shutdown');
+      const result = await ipcClient.invoke('close-course');
+      if (result && !result.success) {
+        throw new Error(result.error || 'Failed to shutdown course');
+      }
+      return false;
+    }
+  }
+
+  /**
    * Handle course reload request
    * @param {Object} options - Reload options
    * @param {boolean} [options.forceNew] - Whether to force a new session (clear saved data)
@@ -982,41 +1027,9 @@ class AppManager {
         reloadBtn.title = 'Shutting down course...';
       }
 
-      // STEP 1: UNIFIED SHUTDOWN - Use the same clean shutdown process as Close button
-      // This ensures proper Terminate() call and data persistence
+      // STEP 1: UNIFIED SHUTDOWN - Use shared shutdown method (300ms wait for reload)
       this.logger.info('AppManager: Starting unified shutdown for reload');
-      
-      const contentViewer = this.components.get('contentViewer');
-      if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
-        this.logger.info('AppManager: Calling course API_1484_11.Terminate() for reload shutdown');
-        // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
-        try {
-          contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
-        } catch (_) { /* Course might not support this, that's ok */ }
-        contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
-        // The normal terminate flow will handle persistence
-        this.logger.info('AppManager: Terminate called, waiting for persistence to complete');
-        // Give terminate time to complete and persist data
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } else if (contentViewer?.iframe?.contentWindow?.API) {
-        // SCORM 1.2
-        this.logger.info('AppManager: Calling course API.LMSFinish() for reload shutdown');
-        // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
-        try {
-          contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
-        } catch (_) { /* Course might not support this, that's ok */ }
-        contentViewer.iframe.contentWindow.API.LMSFinish('');
-        this.logger.info('AppManager: LMSFinish called, waiting for persistence to complete');
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } else {
-        // No course API found - close via IPC
-        this.logger.info('AppManager: No course API found, calling close-course IPC for shutdown');
-        const result = await ipcClient.invoke('close-course');
-        if (result && !result.success) {
-          throw new Error(result.error || 'Failed to shutdown course');
-        }
-      }
-
+      await this.shutdownCourse({ waitMs: 300 });
       this.logger.info('AppManager: Unified shutdown complete, data persisted to disk');
 
       // STEP 2: Track reload flags
@@ -1067,13 +1080,24 @@ class AppManager {
 
   /**
    * Handle course close request
+   * Uses the same unified shutdown path as reload, but without the reload step
    */
   async handleCourseClose() {
     try {
       this.logger.info('AppManager: Course close requested');
 
-      // Use shared shutdown logic (waits 1000ms for close vs 300ms for reload)
+      // Close error list panel if it's open
+      this.eventBus.emit('error-list:close');
+
+      // UNIFIED SHUTDOWN - Use shared shutdown method (1000ms wait for close vs 300ms for reload)
+      this.logger.info('AppManager: Starting unified shutdown for close');
       const apiCalled = await this.shutdownCourse({ waitMs: 1000 });
+      this.logger.info('AppManager: Unified shutdown complete, data persisted to disk');
+
+      // If IPC fallback was used in shutdownCourse, it already closed the course
+      if (!apiCalled) {
+        return;
+      }
 
       // Always close the course via IPC to ensure UI cleanup and backend session closure
       this.logger.info('AppManager: Calling close-course IPC');
