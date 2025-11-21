@@ -6,183 +6,195 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const { parseMcpResponse } = require('../helpers/mcp-response-parser');
 
 describe('MCP Viewport Control', () => {
-  let mcpProcess;
-  let messageId = 1;
+  jest.setTimeout(30000);
 
-  beforeAll(() => {
-    // Start MCP server
-    const mcpPath = path.join(__dirname, '../src/mcp/node-bridge.js');
-    mcpProcess = spawn('node', [mcpPath], {
+  function rpcClient() {
+    const proc = spawn('node', [path.join(__dirname, '../../src/mcp/node-bridge.js')], {
+      cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, SCORM_TESTER_LOG_DIR: path.join(__dirname, '../logs/mcp') }
+      env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'false' }
     });
-  });
 
-  afterAll(async () => {
-    if (mcpProcess) {
-      mcpProcess.kill();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  });
+    let buf = '';
+    const pending = new Map();
 
-  function sendMCPRequest(method, params = {}) {
-    return new Promise((resolve, reject) => {
-      const id = messageId++;
-      const request = {
-        jsonrpc: '2.0',
-        id,
-        method,
-        params
-      };
-
-      let responseData = '';
-
-      const timeout = setTimeout(() => {
-        reject(new Error('Request timeout'));
-      }, 10000);
-
-      const onData = (data) => {
-        responseData += data.toString();
-        const lines = responseData.split('\n');
-        
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          try {
-            const response = JSON.parse(line);
-            if (response.id === id) {
-              clearTimeout(timeout);
-              mcpProcess.stdout.removeListener('data', onData);
-              
-              if (response.error) {
-                reject(new Error(response.error.message || 'MCP error'));
-              } else {
-                resolve(response.result);
-              }
-            }
-          } catch (e) {
-            // Not JSON, continue
+    proc.stdout.setEncoding('utf8');
+    proc.stdout.on('data', (chunk) => {
+      buf += chunk;
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx);
+        buf = buf.slice(idx + 1);
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          const id = obj && obj.id;
+          if (pending.has(id)) {
+            pending.get(id)(obj);
+            pending.delete(id);
           }
+        } catch (_) {
+          // ignore non-JSON
         }
-        
-        responseData = lines[lines.length - 1];
-      };
-
-      mcpProcess.stdout.on('data', onData);
-      mcpProcess.stdin.write(JSON.stringify(request) + '\n');
+      }
     });
+
+    function rpc(method, params, id) {
+      return new Promise((resolve) => {
+        pending.set(id, resolve);
+        const msg = { jsonrpc: '2.0', id, method, params };
+        proc.stdin.write(JSON.stringify(msg) + '\n');
+      });
+    }
+
+    return { proc, rpc };
   }
 
   test('scorm_set_viewport_size should set desktop size', async () => {
-    const result = await sendMCPRequest('tools/call', {
-      name: 'scorm_set_viewport_size',
-      arguments: {
-        width: 1366,
-        height: 768
-      }
-    });
+    const { proc, rpc } = rpcClient();
+    let id = 1;
 
-    expect(result.content).toBeDefined();
-    const content = JSON.parse(result.content[0].text);
-    expect(content.success).toBe(true);
-    expect(content.size.width).toBe(1366);
-    expect(content.size.height).toBe(768);
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 1366, height: 768 }
+    }, id++);
+
+    const data = parseMcpResponse(result);
+    expect(data.success).toBe(true);
+    expect(data.size.width).toBe(1366);
+    expect(data.size.height).toBe(768);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should set mobile size', async () => {
-    const result = await sendMCPRequest('tools/call', {
-      name: 'scorm_set_viewport_size',
-      arguments: {
-        width: 390,
-        height: 844
-      }
-    });
+    const { proc, rpc } = rpcClient();
+    let id = 1;
 
-    expect(result.content).toBeDefined();
-    const content = JSON.parse(result.content[0].text);
-    expect(content.success).toBe(true);
-    expect(content.size.width).toBe(390);
-    expect(content.size.height).toBe(844);
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 390, height: 844 }
+    }, id++);
+
+    const data = parseMcpResponse(result);
+    expect(data.success).toBe(true);
+    expect(data.size.width).toBe(390);
+    expect(data.size.height).toBe(844);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should set tablet size', async () => {
-    const result = await sendMCPRequest('tools/call', {
-      name: 'scorm_set_viewport_size',
-      arguments: {
-        width: 1024,
-        height: 1366
-      }
-    });
+    const { proc, rpc } = rpcClient();
+    let id = 1;
 
-    expect(result.content).toBeDefined();
-    const content = JSON.parse(result.content[0].text);
-    expect(content.success).toBe(true);
-    expect(content.size.width).toBe(1024);
-    expect(content.size.height).toBe(1366);
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 1024, height: 1366 }
+    }, id++);
+
+    const data = parseMcpResponse(result);
+    expect(data.success).toBe(true);
+    expect(data.size.width).toBe(1024);
+    expect(data.size.height).toBe(1366);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should reject too small viewport', async () => {
-    try {
-      await sendMCPRequest('tools/call', {
-        name: 'scorm_set_viewport_size',
-        arguments: {
-          width: 100,
-          height: 100
-        }
-      });
-      fail('Should have thrown error');
-    } catch (error) {
-      expect(error.message).toMatch(/Minimum viewport size/);
-    }
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 100, height: 100 }
+    }, id++);
+
+    expect(result.result.isError).toBe(true);
+    const errorText = result.result.content[0].text;
+    expect(errorText).toMatch(/Minimum viewport size/);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should reject too large viewport', async () => {
-    try {
-      await sendMCPRequest('tools/call', {
-        name: 'scorm_set_viewport_size',
-        arguments: {
-          width: 10000,
-          height: 10000
-        }
-      });
-      fail('Should have thrown error');
-    } catch (error) {
-      expect(error.message).toMatch(/Maximum viewport size/);
-    }
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 10000, height: 10000 }
+    }, id++);
+
+    expect(result.result.isError).toBe(true);
+    const errorText = result.result.content[0].text;
+    expect(errorText).toMatch(/Maximum viewport size/);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should require width parameter', async () => {
-    try {
-      await sendMCPRequest('tools/call', {
-        name: 'scorm_set_viewport_size',
-        arguments: {
-          height: 768
-        }
-      });
-      fail('Should have thrown error');
-    } catch (error) {
-      expect(error.message).toMatch(/width.*required/i);
-    }
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { height: 768 }
+    }, id++);
+
+    expect(result.result.isError).toBe(true);
+    const errorText = result.result.content[0].text;
+    expect(errorText).toMatch(/width.*required/i);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should require height parameter', async () => {
-    try {
-      await sendMCPRequest('tools/call', {
-        name: 'scorm_set_viewport_size',
-        arguments: {
-          width: 1366
-        }
-      });
-      fail('Should have thrown error');
-    } catch (error) {
-      expect(error.message).toMatch(/height.*required/i);
-    }
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/call', {
+      name: 'scorm_set_viewport_size',
+      arguments: { width: 1366 }
+    }, id++);
+
+    expect(result.result.isError).toBe(true);
+    const errorText = result.result.content[0].text;
+    expect(errorText).toMatch(/height.*required/i);
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size should accept custom sizes within bounds', async () => {
+    const { proc, rpc } = rpcClient();
+    let id = 1;
+
+    await rpc('initialize', {}, id++);
+
     const testCases = [
       { width: 320, height: 240 }, // minimum
       { width: 800, height: 600 }, // custom
@@ -192,28 +204,39 @@ describe('MCP Viewport Control', () => {
     ];
 
     for (const size of testCases) {
-      const result = await sendMCPRequest('tools/call', {
+      const result = await rpc('tools/call', {
         name: 'scorm_set_viewport_size',
         arguments: size
-      });
+      }, id++);
 
-      expect(result.content).toBeDefined();
-      const content = JSON.parse(result.content[0].text);
-      expect(content.success).toBe(true);
-      expect(content.size.width).toBe(size.width);
-      expect(content.size.height).toBe(size.height);
+      const data = parseMcpResponse(result);
+      expect(data.success).toBe(true);
+      expect(data.size.width).toBe(size.width);
+      expect(data.size.height).toBe(size.height);
     }
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 
   test('scorm_set_viewport_size tool should be listed in available tools', async () => {
-    const result = await sendMCPRequest('tools/list');
+    const { proc, rpc } = rpcClient();
+    let id = 1;
 
-    expect(result.tools).toBeDefined();
-    const viewportTool = result.tools.find(t => t.name === 'scorm_set_viewport_size');
+    await rpc('initialize', {}, id++);
+
+    const result = await rpc('tools/list', {}, id++);
+
+    expect(result.result).toBeDefined();
+    expect(result.result.tools).toBeDefined();
+    const viewportTool = result.result.tools.find(t => t.name === 'scorm_set_viewport_size');
     expect(viewportTool).toBeDefined();
     expect(viewportTool.description).toContain('viewport');
     expect(viewportTool.inputSchema).toBeDefined();
     expect(viewportTool.inputSchema.required).toContain('width');
     expect(viewportTool.inputSchema.required).toContain('height');
+
+    try { proc.stdin.end(); } catch (_) { /* intentionally empty */ }
+    try { proc.kill(); } catch (_) { /* intentionally empty */ }
   });
 });

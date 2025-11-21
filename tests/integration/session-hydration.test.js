@@ -434,33 +434,6 @@ describe('Session Hydration Integration Tests', () => {
 
       await scormService.terminate(sessionId);
     });
-
-    // Skip this test - the RTE currently only supports SCORM 2004, not SCORM 1.2
-    // The hydration logic DOES check for both cmi.exit and cmi.core.exit, but the RTE
-    // data model doesn't store SCORM 1.2 elements. This would need a SCORM 1.2-specific
-    // data model implementation to work.
-    it.skip('should handle SCORM 1.2 cmi.core.exit', async () => {
-      const sessionId1 = 'session-scorm12-1';
-
-      // Create SCORM 1.2 saved data
-      console.log('\n=== First session: SCORM 1.2 course ===');
-      await scormService.initializeSession(sessionId1);
-      await scormService.setValue(sessionId1, 'cmi.core.lesson_location', 'slide8');
-      await scormService.setValue(sessionId1, 'cmi.core.exit', 'suspend'); // SCORM 1.2 format
-      await scormService.terminate(sessionId1);
-      console.log('✓ Saved with cmi.core.exit=suspend');
-
-      // Resume - should detect SCORM 1.2 exit
-      const sessionId2 = 'session-scorm12-2';
-      await scormService.initializeSession(sessionId2);
-
-      const rte = scormService.rteInstances.get(sessionId2);
-      const entry = rte.dataModel.getValue('cmi.entry');
-      expect(entry).toBe('resume');
-      console.log('✓ Resumed from SCORM 1.2 data');
-
-      await scormService.terminate(sessionId2);
-    });
   });
 
   describe('Data Integrity', () => {

@@ -1005,22 +1005,18 @@ class RuntimeManager {
     }
 
     const bridge = global.__electronBridge;
-    if (!bridge || !bridge.ipcSend) {
+    if (!bridge || !bridge.sendMessage) {
       throw new Error('Electron bridge not available');
     }
 
-    // Send IPC message to main process
-    const message = {
+    // Send IPC message to Electron child via bridge
+    const result = await bridge.sendMessage({
+      id: ++_ipcMessageIdCounter,
       type: 'viewport_set_size',
       params: size
-    };
+    });
 
-    try {
-      const result = await bridge.ipcSend(message);
-      return result;
-    } catch (error) {
-      throw new Error(`Failed to set viewport size: ${error.message}`);
-    }
+    return result;
   }
 
 }
