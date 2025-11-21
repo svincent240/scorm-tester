@@ -5,8 +5,12 @@ import fs from 'fs';
 test.describe('Resume Course from JSON Test', () => {
   let electronApp: Awaited<ReturnType<typeof electron.launch>>;
   let page: Awaited<ReturnType<typeof electronApp.firstWindow>>;
+  let consoleErrors: string[] = [];
+  let pageErrors: Error[] = [];
 
   test.beforeEach(async () => {
+    consoleErrors = [];
+    pageErrors = [];
     electronApp = await electron.launch({ 
       executablePath: require('electron'), 
       args: ['.'],
@@ -54,7 +58,17 @@ test.describe('Resume Course from JSON Test', () => {
     console.log(`Injecting session file at: ${sessionJsonPath}`);
     fs.writeFileSync(sessionJsonPath, JSON.stringify(craftedSessionData, null, 2), 'utf-8');
     
-    page.on('console', msg => console.log(`[Browser Console] ${msg.text()}`));
+    page.on('console', msg => {
+      console.log(`[Browser Console] ${msg.text()}`);
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
+    page.on('pageerror', error => {
+      console.log(`[Browser Page Error] ${error.message}`);
+      pageErrors.push(error);
+    });
     
     await page.waitForLoadState('domcontentloaded');
   });
@@ -73,6 +87,15 @@ test.describe('Resume Course from JSON Test', () => {
     
     // Wait for AppManager to be initialized
     await page.waitForFunction(() => (window as any).appManager && (window as any).appManager.initialized);
+
+    // Attach SCORM error listener to capture errors like 122
+    await page.evaluate(() => {
+      (window as any).scormErrors = [];
+      (window as any).appManager.eventBus.on('ui:scorm:error', (error: any) => {
+        console.log(`[SCORM Error Event] Code: ${error.code}, Message: ${error.message}`);
+        (window as any).scormErrors.push(error);
+      });
+    });
 
     const loadResult = await page.evaluate(async ({ coursePath }) => {
       // @ts-ignore
@@ -105,20 +128,26 @@ test.describe('Resume Course from JSON Test', () => {
       const api = getApi();
       if (!api) return { error: 'No API found' };
 
-      // Wait for Initialize to be called (cmi.entry should be set)
-      attempts = 0;
-      while (api.GetValue('cmi.entry') === '' && attempts < 20) {
-         await new Promise(r => setTimeout(r, 200));
-         attempts++;
+      // Wait for SCORM initialization to avoid error 122 (Retrieve data before initialization)
+      // We can check the internal state via appManager if available, or just wait for the event
+      if ((window as any).appManager) {
+         const scormClient = (window as any).appManager.services.get('scormClient');
+         if (!scormClient.getInitialized()) {
+            await new Promise<void>(resolve => {
+               (window as any).appManager.eventBus.once('ui:scorm:initialized', () => resolve());
+            });
+         }
+      } else {
+         // Fallback: Wait for cmi.entry to be available, but this might cause error 122
+         // If we are here, we accept that we might trigger an error, but we should try to avoid it.
+         // Since we are in a test that has appManager, this branch shouldn't be taken.
       }
 
       return {
         entry: api.GetValue('cmi.entry'),
         location: api.GetValue('cmi.location'),
         suspendData: api.GetValue('cmi.suspend_data'),
-        exit: api.GetValue('cmi.exit') // Should be empty string initially after load, or what was in JSON? 
-        // Actually cmi.exit is write-only in some versions, but usually readable in RTE.
-        // But cmi.entry is the key indicator of resume.
+        exit: api.GetValue('cmi.exit') 
       };
     });
 
@@ -139,5 +168,16 @@ test.describe('Resume Course from JSON Test', () => {
     // We check if suspendData contains the key structure we injected
     expect(scormValues.suspendData).toContain('visitedSlides');
     expect(scormValues.suspendData).toContain('intro');
+
+    // Verify no errors occurred
+    const capturedConsoleErrors = consoleErrors;
+    const capturedPageErrors = pageErrors;
+
+    expect(capturedConsoleErrors, 'Should have no console errors').toEqual([]);
+    expect(capturedPageErrors, 'Should have no page errors').toEqual([]);
+
+    // Verify no SCORM errors occurred
+    const scormErrors = await page.evaluate(() => (window as any).scormErrors);
+    expect(scormErrors, 'Should have no SCORM errors').toEqual([]);
   });
 });

@@ -54,6 +54,19 @@ export async function initialize() {
       try { eventBus.emit('course:exited', data); } catch (_) { /* intentionally empty */ }
     });
 
+    // Forward diagnostic notifications to UI
+    ipcClient.onScormDiagnosticNotification(async (data) => {
+      try {
+        const { uiState: uiStatePromise } = await import('./ui-state.js');
+        const uiState = await uiStatePromise;
+        uiState.showNotification({
+          type: data.type || 'info',
+          message: data.message,
+          duration: data.duration || 5000
+        });
+      } catch (_) { /* intentionally empty */ }
+    });
+
     ipcClient.onScormApiCallLogged((data) => {
       try {
         if (data && data.event === 'sn:initialized') {

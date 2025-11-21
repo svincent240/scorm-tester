@@ -12,15 +12,13 @@
 
 const EventEmitter = require('events');
 const BaseService = require('./base-service');
-const ScormErrorHandler = require('./scorm/rte/error-handler');
 const SessionStore = require('./session-store');
 const { ScormSNService } = require('./scorm/sn/index');
 const { ScormCAMService } = require('./scorm/cam/index'); // Added ScormCAMService
 const BrowseModeService = require('./browse-mode-service');
 const ErrorHandler = require('../../shared/utils/error-handler');
 const {
-  SERVICE_DEFAULTS,
-  SERVICE_EVENTS
+  SERVICE_DEFAULTS
 } = require('../../shared/constants/main-process-constants');
 const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 
@@ -198,7 +196,7 @@ class ScormService extends BaseService {
           unregisterSession: (id) => {
             try { this.rteInstances.delete(id); } catch (_) { /* intentionally empty */ }
           },
-          persistSessionData: (id, data) => {
+          persistSessionData: (id, _data) => {
             // Called by RTE on Commit() - actual disk persistence happens in terminate()
             this.logger?.debug(`ScormService: RTE Commit called for session ${id}`);
             return true;
@@ -241,9 +239,32 @@ class ScormService extends BaseService {
             // Check exit status from saved data - only resume if suspended
             const exit = savedData.coreData['cmi.exit'] || savedData.coreData['cmi.core.exit'];
             if (exit === 'suspend') {
-              // Restore complete data snapshot - no manipulation, straight restore
-              rte.dataModel.restoreData(savedData);
-              this.logger?.info(`ScormService: Restored data model from saved session (courseId=${courseId})`);
+              // BUG FIX: Some courses crash if cmi.entry is 'resume' but cmi.location is empty.
+              // If location is missing, we downgrade to ab-initio (by not restoring) to prevent crash.
+              // This assumes that if a course suspended, it should have saved a location if it needs one.
+              const hasLocation = (savedData.coreData['cmi.location'] && savedData.coreData['cmi.location'] !== '') || 
+                                  (savedData.coreData['cmi.core.lesson_location'] && savedData.coreData['cmi.core.lesson_location'] !== '');
+              
+              // We also check suspend_data. If we have suspend_data but no location, it's ambiguous.
+              // However, to fix the reported crash, we prioritize safety. 
+              // We allow overriding this safety check via config if needed.
+              if (hasLocation || this.config.allowResumeWithoutLocation) {
+                 // Restore complete data snapshot - no manipulation, straight restore
+                 rte.dataModel.restoreData(savedData);
+                 this.logger?.info(`ScormService: Restored data model from saved session (courseId=${courseId})`);
+              } else {
+                 this.logger?.warn(`ScormService: Not resuming - exit was 'suspend' but cmi.location is empty (preventing course crash)`);
+                 
+                 // Notify the user via UI notification
+                 const windowManager = this.getDependency('windowManager');
+                 if (windowManager?.broadcastToAllWindows) {
+                   windowManager.broadcastToAllWindows('scorm:diagnostic-notification', {
+                     type: 'warning',
+                     message: 'Resume failed: cmi.location missing. Restarting course.',
+                     duration: 8000 // Show for longer than default
+                   });
+                 }
+              }
             } else {
               this.logger?.info(`ScormService: Not resuming - exit was '${exit}' not 'suspend'`);
             }
@@ -532,10 +553,10 @@ class ScormService extends BaseService {
   /**
    * Terminate SCORM session
    * @param {string} sessionId - Session identifier
-   * @param {string} exitValue - Optional exit value from renderer (cmi.exit)
+   * @param {string} _exitValue - Optional exit value from renderer (cmi.exit)
    * @returns {Promise<Object>} Termination result
    */
-  async terminate(sessionId, exitValue = '') {
+  async terminate(sessionId, _exitValue = '') {
     try {
       const session = this.sessions.get(sessionId);
       if (!session) {
@@ -1318,7 +1339,7 @@ class ScormService extends BaseService {
 
       // Process based on navigation request type
       switch (navRequest) {
-        case 'continue':
+        case 'continue': {
           // Check if continue is available
           if (!sequencingState.availableNavigation?.continue) {
             this.logger?.debug(`ScormService: Continue navigation not available for session ${sessionId}`);
@@ -1340,8 +1361,9 @@ class ScormService extends BaseService {
             }
           }
           return continueResult;
+        }
 
-        case 'previous':
+        case 'previous': {
           // Check if previous is available
           if (!sequencingState.availableNavigation?.previous) {
             this.logger?.debug(`ScormService: Previous navigation not available for session ${sessionId}`);
@@ -1363,6 +1385,7 @@ class ScormService extends BaseService {
             }
           }
           return previousResult;
+        }
 
         case 'exit':
           // Exit current activity (for single SCO, this is equivalent to exitAll)

@@ -244,6 +244,14 @@ class IpcClient {
     return api.onCourseExited(handler);
   }
 
+  onScormDiagnosticNotification(/** @type {any} */ handler) {
+    const api = this._ensureAPI();
+    if (typeof api.onScormDiagnosticNotification !== 'function') {
+      throw new Error('electronAPI.onScormDiagnosticNotification not available');
+    }
+    return api.onScormDiagnosticNotification(handler);
+  }
+
   // SCORM typed helpers (preserve positional arg shapes exposed by preload)
   async scormInitialize(/** @type {string} */ sessionId, /** @type {any} */ options = {}) {
     const api = this._ensureAPI();

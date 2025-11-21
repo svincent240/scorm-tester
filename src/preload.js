@@ -220,6 +220,9 @@ const electronAPI = {
   // Course Exit Event Listener
   onCourseExited: (callback) => safeOn('course:exited', callback),
 
+  // Diagnostic Notifications
+  onScormDiagnosticNotification: (callback) => safeOn('scorm:diagnostic-notification', callback),
+
   // App Info
   getAppVersion: () => safeInvoke('get-app-version'),
   getAppPath: () => safeInvoke('get-app-path'),
