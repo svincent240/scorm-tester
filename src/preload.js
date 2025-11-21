@@ -8,7 +8,7 @@
  * @fileoverview Preload script for secure IPC communication
  */
 
-// CRITICAL DEBUG: Log immediately when preload script loads
+// Initialize preload script and log to main process
 // Route to main logger via IPC rather than console in renderer; keep minimal safe console only if IPC not ready.
 try {
   const { ipcRenderer: __ipc } = require('electron');

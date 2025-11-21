@@ -34,19 +34,19 @@ class AppManager {
     // Allows multiple app instances to run same course without session conflicts
     this.instanceId = 'instance_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-    // BUG-003 FIX: Navigation state machine
+    // Navigation state machine
     this.navigationState = 'IDLE'; // IDLE, PROCESSING, LOADING
     this.navigationQueue = [];
     this.currentNavigationRequest = null;
 
-    // BUG-005 FIX: Centralized browse mode state
+    // Centralized browse mode state
     this.browseMode = {
       enabled: false,
       session: null,
       config: {}
     };
 
-    // BUG-004 FIX: SCORM lifecycle tracking integration
+    // SCORM lifecycle tracking integration
     this.currentActivity = null;
     this.previousActivity = null;
 
@@ -128,7 +128,7 @@ class AppManager {
       // Step 5: Setup centralized SN status polling
       this.setupSnPollingController();
 
-      // BUG-005 FIX: Setup centralized browse mode management
+      // Setup centralized browse mode management
       this.setupBrowseModeManagement(eventBus);
 
       this.initialized = true;
@@ -187,8 +187,6 @@ class AppManager {
    * Initialize all services
    */
   async initializeServices() {
-    // console.log('AppManager: Initializing services...'); // Removed debug log
-
     // Dynamically import services (eventBus already imported at top of initialize)
     const { scormClient } = await import('./scorm-client.js');
     const { scormAPIBridge } = await import('./scorm-api-bridge.js');
@@ -205,7 +203,6 @@ class AppManager {
     if (!scormClient.getInitialized()) {
       // Note: ScormClient doesn't have an initialize() method - it initializes via Initialize()
       // We'll skip this for now as SCORM initialization happens when content is loaded
-      // console.log('AppManager: SCORM client not initialized, will initialize when content loads'); // Removed debug log
     }
 
     // console.log('AppManager: Services initialized'); // Removed debug log
@@ -410,8 +407,6 @@ class AppManager {
    * Setup application event handlers
    */
   setupEventHandlers() {
-   // console.log('AppManager: Setting up event handlers...'); // Removed debug log
-
    // Idempotency guard to prevent duplicate registrations
    if (this._eventHandlersSetup) {
      try { this.logger.warn('AppManager: setupEventHandlers called again; skipping duplicate registration'); } catch (_) { /* intentionally empty */ }
@@ -520,7 +515,6 @@ class AppManager {
 
     // SCORM events
     eventBus.on('ui:scorm:dataChanged', (data) => {
-      // console.log('AppManager: SCORM data changed:', data); // Removed debug log
     });
 
     eventBus.on('ui:scorm:error', (/** @type {any} */ errorData) => {
@@ -601,10 +595,10 @@ class AppManager {
 
 
 
-    // BUG-003 FIX: Unified navigation pipeline with state machine
+    // Unified navigation pipeline with state machine
     this.setupUnifiedNavigationPipeline(eventBus);
 
-    // BUG-020 FIX: Removed legacy navigationRequest support - all events now use standardized navigation:request
+    // Removed legacy navigationRequest support - all events now use standardized navigation:request
 
     // Optional: reflect navigation launch to components that rely on centralized signal
     eventBus.on('navigation:launch', (data) => {
@@ -662,8 +656,6 @@ class AppManager {
         try { this.logger.error('AppManager: Viewport toggle error', error?.message || error); } catch (_) { /* intentionally empty */ }
       });
     });
-
-    // console.log('AppManager: Event handlers setup complete'); // Removed debug log
   }
 
   /**
@@ -1376,7 +1368,6 @@ class AppManager {
    * Show success message
    */
   showSuccess(title, message) {
-    // console.log(`AppManager: ${title}:`, message); // Removed debug log
     this.uiState.showNotification({
       message: `${title}: ${message}`,
       type: 'success',
@@ -1734,8 +1725,6 @@ class AppManager {
    * Shutdown the application
    */
   async shutdown() {
-    // console.log('AppManager: Shutting down application...'); // Removed debug log
-
     try {
       // Stop polling before tearing down
       if (typeof this.stopSnPolling === 'function') {
@@ -1754,14 +1743,13 @@ class AppManager {
       eventBus.destroy();
 
       this.initialized = false;
-      // console.log('AppManager: Application shutdown complete'); // Removed debug log
 
     } catch (error) {
       try { this.logger.error('AppManager: Error during shutdown', error?.message || error); } catch (_) { /* intentionally empty */ }
     }
   }
   /**
-   * BUG-005 FIX: Setup centralized browse mode management
+   * Setup centralized browse mode management
    */
   setupBrowseModeManagement(eventBus) {
     // Listen for browse mode toggle requests
@@ -1780,7 +1768,7 @@ class AppManager {
   }
 
   /**
-   * BUG-005 FIX: Initialize browse mode state from main process
+   * Initialize browse mode state from main process
    */
   async initializeBrowseModeFromMain() {
     try {
@@ -1809,7 +1797,7 @@ class AppManager {
   }
 
   /**
-   * BUG-005 FIX: Set browse mode (centralized state management)
+   * Set browse mode (centralized state management)
    */
   async setBrowseMode(enabled, config = {}) {
     try {
@@ -1901,21 +1889,21 @@ class AppManager {
   }
 
   /**
-   * BUG-005 FIX: Get current browse mode state
+   * Get current browse mode state
    */
   getBrowseMode() {
     return { ...this.browseMode };
   }
 
   /**
-   * BUG-005 FIX: Check if browse mode is enabled
+   * Check if browse mode is enabled
    */
   isBrowseModeEnabled() {
     return this.browseMode.enabled;
   }
 
   /**
-   * BUG-005 FIX: Refresh navigation state from SN service
+   * Refresh navigation state from SN service
    */
   async refreshNavigationFromSNService() {
     try {
@@ -1954,7 +1942,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Setup unified navigation pipeline with state machine
+   * Setup unified navigation pipeline with state machine
    */
   setupUnifiedNavigationPipeline(eventBus) {
     // Listen for unified navigation:request events (namespaced only)
@@ -1964,7 +1952,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Process navigation request with state machine and queuing
+   * Process navigation request with state machine and queuing
    */
   async processNavigationRequest(payload) {
     try {
@@ -1995,7 +1983,7 @@ class AppManager {
       this.setNavigationState('PROCESSING', payload);
 
       try {
-        // BUG-004 FIX: Handle activity exit before loading new activity
+        // Handle activity exit before loading new activity
         if (this.currentActivity && this.currentActivity.id !== activityId) {
           await this.handleActivityExit(this.currentActivity.id, 'navigation');
         }
@@ -2017,7 +2005,7 @@ class AppManager {
         if (result && result.success) {
           await this.handleSuccessfulNavigation(result, payload);
 
-          // BUG-004 FIX: Update activity location after successful navigation
+          // Update activity location after successful navigation
           if (activityId && activityId !== this.currentActivity?.id) {
             await this.updateActivityLocation(activityId, window.location.href);
 
@@ -2044,7 +2032,7 @@ class AppManager {
       this.logger.error('AppManager: Error processing navigation request', error);
       this.setNavigationState('IDLE');
 
-      // BUG-024 FIX: Emit navigation error event for error handling
+      // Emit navigation error event for error handling
       const eventBus = this.services.get('eventBus');
       if (eventBus) {
         eventBus.emit('navigation:error', {
@@ -2059,8 +2047,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Set navigation state with logging
-   * BUG-019 FIX: Add navigation state broadcasting
+   * Set navigation state with logging
    */
   setNavigationState(state, request = null) {
     const prevState = this.navigationState;
@@ -2074,7 +2061,7 @@ class AppManager {
         requestType: request?.requestType
       });
 
-      // BUG-019 FIX: Broadcast navigation state changes to other components
+      // Broadcast navigation state changes to other components
       const eventBus = this.services.get('eventBus');
       if (eventBus) {
         eventBus.emit('navigation:state:updated', {
@@ -2087,14 +2074,14 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Determine if request needs SN service processing
+   * Determine if request needs SN service processing
    */
   needsSNProcessing(requestType) {
     return ['previous', 'continue', 'choice'].includes(requestType);
   }
 
   /**
-   * BUG-003 FIX: Process navigation through SN service
+   * Process navigation through SN service
    */
   async processThroughSNService(requestType, activityId, activityObject) {
     try {
@@ -2127,7 +2114,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Process direct navigation without SN service
+   * Process direct navigation without SN service
    */
   async processDirectNavigation(requestType, activityId, activityObject, payload) {
     try {
@@ -2155,7 +2142,7 @@ class AppManager {
         };
       }
     } catch (error) {
-      // BUG-024 FIX: Emit navigation error event
+      // Emit navigation error event
       const eventBus = this.services.get('eventBus');
       if (eventBus) {
         eventBus.emit('navigationError', {
@@ -2181,7 +2168,7 @@ class AppManager {
 
 
   /**
-   * BUG-003 FIX: Update navigation state from result
+   * Update navigation state from result
    */
   async updateNavigationStateFromResult(result) {
     try {
@@ -2202,7 +2189,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Handle successful navigation
+   * Handle successful navigation
    */
   async handleSuccessfulNavigation(result, _originalPayload) {
     try {
@@ -2238,7 +2225,7 @@ class AppManager {
   }
 
   /**
-   * BUG-003 FIX: Process queued navigation requests
+   * Process queued navigation requests
    */
   async processNavigationQueue() {
     if (this.navigationQueue.length === 0) {
@@ -2260,7 +2247,7 @@ class AppManager {
   }
 
   /**
-   * BUG-004 FIX: Handle activity exit for SCORM lifecycle tracking
+   * Handle activity exit for SCORM lifecycle tracking
    */
   async handleActivityExit(activityId, exitType = 'navigation') {
     try {
@@ -2290,7 +2277,7 @@ class AppManager {
   }
 
   /**
-   * BUG-004 FIX: Update activity location for SCORM lifecycle tracking
+   * Update activity location for SCORM lifecycle tracking
    */
   async updateActivityLocation(activityId, location) {
     try {

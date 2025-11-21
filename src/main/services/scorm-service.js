@@ -128,7 +128,7 @@ class ScormService extends BaseService {
       this.snService.reset();
     }
 
-    // BUG-017 FIX: Clear session cleanup interval to prevent memory leak
+    // Clear session cleanup interval to prevent memory leak
     if (this.sessionCleanupInterval) {
       clearInterval(this.sessionCleanupInterval);
       this.sessionCleanupInterval = null;
@@ -1595,7 +1595,7 @@ class ScormService extends BaseService {
    */
   async createSessionWithBrowseMode(options = {}) {
     try {
-      // BUG-008 FIX: Use correct method name - initializeSession instead of createSession
+      // Use correct method name - initializeSession instead of createSession
       const sessionId = this.generateSessionId();
       const sessionResult = await this.initializeSession(sessionId, options);
 

@@ -662,8 +662,6 @@ class CourseLoader {
    * Load course from File object (drag and drop support)
    */
   async loadCourse(file) {
-    // console.log('CourseLoader: loadCourse called with file:', file.name); // Removed debug log
-
     try {
       this.setLoadingState(true);
       eventBus.emit('course:loadStart', { fileName: file.name });

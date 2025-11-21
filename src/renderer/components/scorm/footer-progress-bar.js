@@ -42,7 +42,7 @@ class FooterProgressBar extends BaseComponent {
   setupEventSubscriptions() {
     this.subscribe('progress:updated', this.handleProgressUpdated);
 
-    // BUG-022 FIX: Subscribe to navigation state updates
+    // Subscribe to navigation state updates
     this.subscribe('navigation:state:updated', this.handleNavigationStateUpdate);
   }
 
@@ -77,9 +77,9 @@ class FooterProgressBar extends BaseComponent {
   }
 
   /**
-   * BUG-022 FIX: Handle navigation state updates from AppManager
+   * Handle navigation state updates from AppManager
    */
-  handleNavigationStateUpdate(stateData) {
+  handleNavigationStateUpdate(data) {
     try {
       const { state } = stateData || {};
 

@@ -141,7 +141,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Setup event subscriptions (BUG-007 FIX)
+   * Setup event subscriptions
    */
   setupEventSubscriptions() {
     // Listen for course loading events
@@ -249,7 +249,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Load SCORM activity (BUG-001 FIX)
+   * Load SCORM activity
    * @param {Object} activityObject - SCORM activity object with identifier, launchUrl, etc.
    * @param {Object} options - Loading options
    */
@@ -1259,7 +1259,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Handle unified navigation request event (BUG-007 FIX)
+   * Handle unified navigation request event
    */
   async handleNavigationRequest(eventData) {
     try {
@@ -1322,7 +1322,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Handle content load request event (BUG-007 FIX)
+   * Handle content load request event
    */
   async handleContentLoadRequest(eventData) {
     try {
@@ -1339,7 +1339,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * Handle browse mode changed event (BUG-007 FIX)
+   * Handle browse mode changed event
    */
   handleBrowseModeChanged(eventData) {
     try {
@@ -1795,7 +1795,7 @@ class ContentViewer extends BaseComponent {
   }
 
   /**
-   * BUG-021 FIX: Simplified URL processing with better error messages
+   * Simplified URL processing with better error messages
    * @param {string} url - The URL to normalize
    * @returns {string} - The normalized URL
    */

@@ -241,7 +241,7 @@ class NavigationControls extends BaseComponent {
     // Listen for UI events
     this.subscribe('ui:updated', this.handleUIUpdated);
     
-    // BUG-022 FIX: Subscribe to navigation state updates
+    // Subscribe to navigation state updates
     this.subscribe('navigation:state:updated', this.handleNavigationStateUpdate);
 
     // NOTE: navigation:availability:updated is handled via UIState subscription in setup()
@@ -374,7 +374,7 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Handle learner mode button click (BUG-005 FIX)
+   * Handle learner mode button click
    */
   async handleLearnerModeClick() {
     // Use centralized browse mode management
@@ -387,7 +387,7 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * Handle browse mode button click (BUG-005 FIX)
+   * Handle browse mode button click
    */
   async handleBrowseModeClick() {
     // Use centralized browse mode management
@@ -487,7 +487,7 @@ class NavigationControls extends BaseComponent {
     if (result.targetActivity && result.action === 'launch') {
       this.logger?.info('NavigationControls: Launching activity', result.targetActivity);
 
-      // BUG-002 FIX: Use unified navigation:request event instead of activityLaunchRequested
+      // Use unified navigation:request event instead of activityLaunchRequested
       try {
         const { eventBus } = await import('../../services/event-bus.js');
         
@@ -824,7 +824,7 @@ class NavigationControls extends BaseComponent {
 
 
   /**
-   * BUG-005 FIX: Browse mode handling now centralized in AppManager
+   * Browse mode handling now centralized in AppManager
    * This method kept for backward compatibility but delegates to centralized system
    */
   async setBrowseMode(enabled) {
@@ -1117,7 +1117,7 @@ class NavigationControls extends BaseComponent {
   }
 
   /**
-   * BUG-022 FIX: Handle navigation state updates from AppManager
+   * Handle navigation state updates from AppManager
    */
   handleNavigationStateUpdate(stateData) {
     try {

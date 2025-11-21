@@ -1294,7 +1294,7 @@ class IpcHandler extends BaseService {
     return { success: true };
   }
 
-  // BUG-004 FIX: SN Activity Exit Handler
+  // SN Activity Exit Handler
   async handleSNActivityExit(event, { activityId, exitType } = {}) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();
@@ -1305,7 +1305,7 @@ class IpcHandler extends BaseService {
     return result;
   }
 
-  // BUG-004 FIX: SN Activity Location Update Handler
+  // SN Activity Location Update Handler
   async handleSNUpdateActivityLocation(event, { activityId, location } = {}) {
     const scormService = this.getDependency('scormService');
     const snService = scormService.getSNService();

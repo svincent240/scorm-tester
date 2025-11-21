@@ -100,7 +100,7 @@ class CourseOutline extends BaseComponent {
       this.showEmptyState();
     }
 
-    // DEBUG: Log initial state for investigation
+    // Log initial state for investigation
     rendererLogger.info('CourseOutline.setup: Initial component state', {
       hasScormStates: this.scormStates.size > 0,
       scormStatesLoaded: this.scormStatesLoaded,
@@ -195,7 +195,7 @@ class CourseOutline extends BaseComponent {
       this.handleNavigationLaunch(data);
     });
 
-    // BUG-022 FIX: Subscribe to navigation state updates
+    // Subscribe to navigation state updates
     this.subscribe('navigation:state:updated', (stateData) => {
       this.handleNavigationStateUpdate(stateData);
     });
@@ -982,7 +982,7 @@ class CourseOutline extends BaseComponent {
   }
 
   /**
-   * BUG-022 FIX: Handle navigation state updates from AppManager
+   * Handle navigation state updates from AppManager
    */
   handleNavigationStateUpdate(stateData) {
     try {
