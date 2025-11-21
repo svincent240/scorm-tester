@@ -92,6 +92,19 @@ class MenuBuilder {
               }
             ]
           },
+          {
+            label: 'Resume Data',
+            submenu: [
+              {
+                label: 'Open File Location',
+                click: () => this.sendMenuAction('menu-open-resume-folder')
+              },
+              {
+                label: 'Clear All Files',
+                click: () => this.sendMenuAction('menu-clear-resume-data')
+              }
+            ]
+          },
           // Removed legacy "Debug Console" menu item (was opening old debug window).
           // Use "SCORM Inspector" entry under View → SCORM Inspector (Ctrl/Cmd+Shift+S) instead.
         ]
@@ -183,6 +196,56 @@ class MenuBuilder {
         app.quit();
       } catch (e) {
         this.logger?.error('MenuBuilder: Failed to call app.quit()', e?.message || e);
+      }
+      return;
+    }
+
+    // Handle Resume Data actions locally
+    if (action === 'menu-open-resume-folder') {
+      try {
+        const store = this.windowManager.scormService?.sessionStore;
+        if (store) {
+          const path = store.getStorePath();
+          require('electron').shell.openPath(path);
+        } else {
+          this.logger?.warn('MenuBuilder: SessionStore not available for open-resume-folder');
+        }
+      } catch (e) {
+        this.logger?.error('MenuBuilder: Failed to open resume folder', e);
+      }
+      return;
+    }
+
+    if (action === 'menu-clear-resume-data') {
+      try {
+        const store = this.windowManager.scormService?.sessionStore;
+        if (store) {
+          const { dialog } = require('electron');
+          const win = this.windowManager.getWindow('main');
+          
+          dialog.showMessageBox(win, {
+            type: 'question',
+            buttons: ['Cancel', 'Clear All'],
+            defaultId: 1,
+            title: 'Clear Resume Data',
+            message: 'Are you sure you want to delete all saved resume data?',
+            detail: 'This action cannot be undone.'
+          }).then(({ response }) => {
+            if (response === 1) {
+              store.clearAllSessions().then(count => {
+                dialog.showMessageBox(win, {
+                  type: 'info',
+                  title: 'Resume Data Cleared',
+                  message: `Cleared ${count} resume data files.`
+                });
+              });
+            }
+          });
+        } else {
+          this.logger?.warn('MenuBuilder: SessionStore not available for clear-resume-data');
+        }
+      } catch (e) {
+        this.logger?.error('MenuBuilder: Failed to clear resume data', e);
       }
       return;
     }

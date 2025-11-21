@@ -123,6 +123,44 @@ class SessionStore extends BaseService {
     }
   }
 
+  /**
+   * Clear all session files (manual cleanup)
+   * @returns {Promise<number>} Number of files deleted
+   */
+  async clearAllSessions() {
+    try {
+      const files = await fs.promises.readdir(this.storePath);
+      const sessionFiles = files.filter(f => f.endsWith('.json'));
+      
+      let deletedCount = 0;
+      for (const file of sessionFiles) {
+        const filePath = path.join(this.storePath, file);
+        try {
+          await fs.promises.unlink(filePath);
+          deletedCount++;
+        } catch (err) {
+          this.logger?.warn(`Failed to delete session file ${file}:`, err.message);
+        }
+      }
+      
+      if (deletedCount > 0) {
+        this.logger?.info(`SessionStore: Cleared ${deletedCount} session files`);
+      }
+      return deletedCount;
+    } catch (error) {
+      this.logger?.error('SessionStore: Failed to clear all sessions:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get the storage directory path
+   * @returns {string} Absolute path to session storage directory
+   */
+  getStorePath() {
+    return this.storePath;
+  }
+
   async doShutdown() {
     // Rotate old sessions at shutdown as well (cleanup only)
     await this.rotateOldSessions();

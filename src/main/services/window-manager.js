@@ -409,7 +409,10 @@ class WindowManager extends BaseService {
           consoleMsg.message.includes("can remove its sandboxing")
         );
 
-        const shouldBroadcastToUI = (consoleMsg.level === 'error' || consoleMsg.level === 'warn') && !isBenignWarning;
+        // Filter out ERR_ABORTED (-3) which happens during navigation cancellations/reloads
+        const isAbortedLoad = consoleMsg.errorCode === -3;
+
+        const shouldBroadcastToUI = (consoleMsg.level === 'error' || consoleMsg.level === 'warn') && !isBenignWarning && !isAbortedLoad;
 
         // Forward console errors/warnings to renderer for UI display
         if (shouldBroadcastToUI && window && !window.isDestroyed()) {
@@ -592,6 +595,16 @@ class WindowManager extends BaseService {
 WindowManager.prototype.setTelemetryStore = function(telemetryStore) {
   this.telemetryStore = telemetryStore;
   this.logger?.debug('WindowManager: TelemetryStore instance set.');
+};
+
+/**
+ * Set the SCORM service instance.
+ * This is called after the SCORM service is initialized in the main process.
+ * @param {ScormService} scormService - The SCORM service instance.
+ */
+WindowManager.prototype.setScormService = function(scormService) {
+  this.scormService = scormService;
+  this.logger?.debug('WindowManager: ScormService instance set.');
 };
 
 module.exports = WindowManager;

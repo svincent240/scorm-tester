@@ -6,8 +6,12 @@ test.describe('Simple Course Reload Test', () => {
   let electronApp: Awaited<ReturnType<typeof electron.launch>>;
   let page: Awaited<ReturnType<typeof electronApp.firstWindow>>;
   let userDataPath: string;
+  let consoleErrors: string[] = [];
+  let pageErrors: Error[] = [];
 
   test.beforeEach(async () => {
+    consoleErrors = [];
+    pageErrors = [];
     electronApp = await electron.launch({ 
       executablePath: require('electron'), 
       args: ['.'],
@@ -27,7 +31,17 @@ test.describe('Simple Course Reload Test', () => {
     // Recreate to ensure it exists
     fs.mkdirSync(sessionDir, { recursive: true });
     
-    page.on('console', msg => console.log(`[Browser Console] ${msg.text()}`));
+    page.on('console', msg => {
+      console.log(`[Browser Console] ${msg.text()}`);
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
+    page.on('pageerror', error => {
+      console.log(`[Browser Page Error] ${error.message}`);
+      pageErrors.push(error);
+    });
     
     await page.waitForLoadState('domcontentloaded');
   });
@@ -44,6 +58,15 @@ test.describe('Simple Course Reload Test', () => {
     // Wait for the helper to be available
     await page.waitForFunction(() => typeof (window as any).testLoadCourse === 'function');
     await page.waitForFunction(() => (window as any).appManager && (window as any).appManager.initialized);
+
+    // Attach SCORM error listener to capture errors like 122
+    await page.evaluate(() => {
+      (window as any).scormErrors = [];
+      (window as any).appManager.eventBus.on('ui:scorm:error', (error: any) => {
+        console.log(`[SCORM Error Event] Code: ${error.code}, Message: ${error.message}`);
+        (window as any).scormErrors.push(error);
+      });
+    });
 
     const loadResult = await page.evaluate(async ({ coursePath }) => {
       // @ts-ignore
@@ -131,5 +154,13 @@ test.describe('Simple Course Reload Test', () => {
     const isPrevEnabled = await prevBtn.evaluate((btn: HTMLButtonElement) => !btn.disabled);
     console.log(`Is Previous button enabled? ${isPrevEnabled}`);
     expect(isPrevEnabled).toBe(true);
+
+    // Verify no errors occurred
+    expect(consoleErrors, 'Should have no console errors').toEqual([]);
+    expect(pageErrors, 'Should have no page errors').toEqual([]);
+
+    // Verify no SCORM errors occurred
+    const scormErrors = await page.evaluate(() => (window as any).scormErrors);
+    expect(scormErrors, 'Should have no SCORM errors').toEqual([]);
   });
 });

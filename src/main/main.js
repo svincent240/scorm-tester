@@ -154,6 +154,9 @@ class MainProcess {
       throw new Error('ScormService initialization failed');
     }
     this.services.set('scormService', scormService);
+    
+    // Wire scormService into WindowManager for menu actions
+    windowManager.setScormService(scormService);
 
     // Wire scormService into SNSnapshotService now that scormService is available.
     try {

@@ -1953,6 +1953,16 @@ class AppManager {
       const snBridgeModule = await import('./sn-bridge.js');
       const snBridge = snBridgeModule.snBridge;
 
+      // Ensure SN bridge is connected before querying
+      if (!snBridge.isServiceConnected()) {
+        await snBridge.initialize().catch(() => {});
+      }
+
+      // If still not connected, skip to avoid error log
+      if (!snBridge.isServiceConnected()) {
+        return;
+      }
+
       const state = await snBridge.getSequencingState();
       if (state && state.success && Array.isArray(state.availableNavigation)) {
         const normalized = this.normalizeAvailableNavigation(state.availableNavigation);

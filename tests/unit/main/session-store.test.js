@@ -16,7 +16,9 @@ jest.mock('fs', () => ({
   promises: {
     writeFile: jest.fn(),
     readFile: jest.fn(),
-    unlink: jest.fn()
+    unlink: jest.fn(),
+    readdir: jest.fn().mockResolvedValue([]),
+    stat: jest.fn().mockResolvedValue({ mtime: new Date() })
   }
 }));
 
@@ -29,7 +31,8 @@ describe('SessionStore', () => {
     mockLogger = {
       info: jest.fn(),
       error: jest.fn(),
-      debug: jest.fn()
+      debug: jest.fn(),
+      warn: jest.fn()
     };
     sessionStore = new SessionStore(null, mockLogger);
   });
@@ -134,6 +137,33 @@ describe('SessionStore', () => {
       expect(fs.existsSync).toHaveBeenCalledWith(
         expect.stringContaining('mcp_course_1.json')
       );
+    });
+  });
+
+  describe('clearAllSessions', () => {
+    it('should delete all json files in store path', async () => {
+      fs.promises.readdir.mockResolvedValue(['session1.json', 'session2.json', 'other.txt']);
+      
+      const count = await sessionStore.clearAllSessions();
+      
+      expect(fs.promises.unlink).toHaveBeenCalledTimes(2);
+      expect(fs.promises.unlink).toHaveBeenCalledWith(expect.stringContaining('session1.json'));
+      expect(fs.promises.unlink).toHaveBeenCalledWith(expect.stringContaining('session2.json'));
+      expect(count).toBe(2);
+    });
+
+    it('should handle errors gracefully', async () => {
+      fs.promises.readdir.mockRejectedValue(new Error('Read error'));
+      const count = await sessionStore.clearAllSessions();
+      expect(count).toBe(0);
+      expect(mockLogger.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('getStorePath', () => {
+    it('should return the store path', () => {
+      const storePath = sessionStore.getStorePath();
+      expect(storePath).toContain('scorm-sessions');
     });
   });
 });
