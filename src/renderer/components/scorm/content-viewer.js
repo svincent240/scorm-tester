@@ -355,13 +355,24 @@ class ContentViewer extends BaseComponent {
       const instanceId = appManager?.instanceId || 'default';
       sessionId = 'session_' + instanceId;
       
+      // Check for pendingForceNew flag from AppManager (for reload scenarios)
+      // This ensures ALL loadContent calls during a hard reload use forceNew
+      const forceNewFlag = appManager.pendingForceNew || /** @type {any} */(options).forceNew || false;
+      this.logger?.info('ContentViewer: Initializing session', { sessionId, forceNew: forceNewFlag, fromPendingFlag: appManager.pendingForceNew });
+      
       const sessionResult = await ipcClient.invoke('scorm-initialize', {
         sessionId: sessionId,
-        forceNew: /** @type {any} */(options).forceNew || false
+        forceNew: forceNewFlag
       });
       
       if (!sessionResult || !sessionResult.success) {
         throw new Error(sessionResult?.reason || 'Failed to initialize session');
+      }
+
+      // Clear pendingForceNew flag after successful initialization with forceNew=true
+      if (forceNewFlag && appManager.pendingForceNew) {
+        appManager.pendingForceNew = false;
+        this.logger?.info('ContentViewer: Cleared pendingForceNew flag after successful hard reload initialization');
       }
 
       // Prime the SCORM client cache with initial data to prevent race conditions

@@ -1028,12 +1028,12 @@ class AppManager {
       this.logger.info('AppManager: Unified shutdown complete, data persisted to disk');
 
       // STEP 2: Track reload flags
-      // forceNew flag will be passed to content viewer to skip JSON loading
-      // No need to delete JSON - we just skip the load step
-
-      // Track that we're reloading so we can pass proper flags to content viewer
-      this._isReloading = true;
-      this._reloadOptions = options || {};
+      // Store forceNew flag so ContentViewer can check it on any loadContent() call
+      // This handles the case where multiple loadContent calls happen during reload
+      this.pendingForceNew = options?.forceNew || false;
+      if (this.pendingForceNew) {
+        this.logger.info('AppManager: Hard reload requested - pendingForceNew flag set');
+      }
 
       // Update button text
       if (reloadBtn) {
