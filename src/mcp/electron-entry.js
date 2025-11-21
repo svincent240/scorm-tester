@@ -6,6 +6,71 @@
 
 const { app } = require("electron");
 const { getConsoleMessages } = require('../shared/utils/console-capture');
+const ScormService = require('../main/services/scorm-service');
+const ScormErrorHandler = require('../main/services/scorm/rte/error-handler');
+const getLogger = require('../shared/utils/logger');
+
+// Singleton ScormService instance for MCP
+let mcpScormService = null;
+let mcpScormServiceInitPromise = null;
+
+/**
+ * Get or create the MCP ScormService instance
+ */
+async function getMcpScormService() {
+  if (mcpScormService) {
+    return mcpScormService;
+  }
+  
+  if (mcpScormServiceInitPromise) {
+    await mcpScormServiceInitPromise;
+    return mcpScormService;
+  }
+  
+  mcpScormServiceInitPromise = (async () => {
+    // Wait for Electron app to be ready before initializing ScormService
+    // SessionStore needs app.getPath('userData') which requires app to be ready
+    if (app && app.whenReady && !app.isReady()) {
+      await app.whenReady();
+    }
+    
+    const logger = getLogger('MCP');
+    const errorHandler = new ScormErrorHandler(logger);
+    const ScormInspectorTelemetryStore = require('../main/services/scorm-inspector/scorm-inspector-telemetry-store');
+    
+    // Create telemetry store
+    const telemetryStore = new ScormInspectorTelemetryStore({ enableBroadcast: false, logger });
+    
+    mcpScormService = new ScormService(errorHandler, logger, { sessionNamespace: 'mcp' });
+    
+    // Create a minimal WindowManager stub for MCP (ScormService requires it for validation)
+    const minimalWindowManager = {
+      broadcastToAllWindows: () => {} // No-op for headless MCP
+    };
+    
+    // Initialize with minimal dependencies
+    // ScormService will create its own SessionStore during initialization
+    const deps = new Map([
+      ['windowManager', minimalWindowManager],
+      ['telemetryStore', telemetryStore]
+    ]);
+    
+    try {
+      const initSuccess = await mcpScormService.initialize(deps);
+      if (!initSuccess) {
+        logger?.error('MCP: ScormService initialization returned false');
+        throw new Error('ScormService initialization failed');
+      }
+      logger?.info('MCP: ScormService initialized successfully');
+    } catch (err) {
+      logger?.error('MCP: ScormService initialization threw error:', err.message || err);
+      throw err;
+    }
+  })();
+  
+  await mcpScormServiceInitPromise;
+  return mcpScormService;
+}
 
 /**
  * Gets console message counts (without full messages to avoid token bloat).
@@ -30,6 +95,10 @@ function getConsolePayload(session_id, since_ts) {
 
 async function childMode() {
   // Child mode: Electron provides runtime services via IPC, no stdio MCP server
+  
+  // Set app name BEFORE app.whenReady() so userData path is correct
+  app.setName('scorm-tester');
+  
   app.on("window-all-closed", (e) => {
     try { e.preventDefault(); } catch (_) { /* intentionally empty */ }
   });
@@ -95,5 +164,5 @@ if (require.main === module) {
   childMode();
 }
 
-module.exports = { childMode };
+module.exports = { childMode, getMcpScormService };
 

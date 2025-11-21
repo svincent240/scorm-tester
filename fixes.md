@@ -17,8 +17,3 @@ The startup process is always the same. Load the json if it is there. Only skip 
 The MCP needs to behave exaclty the same. Converge the processes as much as possible. MCP has open, close, and reload. There is a seperate tool to delete json data model to do hard reset.
 
 Sessions don't really matter. We have a new session every time even on reload. The json data model is all that is retained
-
-We changed json naming in case there are multiple app instances running at once
-
-There are major issues with redundent / dead / non-functional code
-

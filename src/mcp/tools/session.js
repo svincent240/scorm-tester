@@ -4,12 +4,22 @@ const sessions = require("../session");
 
 /**
  * Unified course open: Creates workspace + opens runtime + auto-initializes
+ * @param {Object} params - Open parameters
+ * @param {string} params.package_path - Path to SCORM package
+ * @param {Object} params.viewport - Viewport dimensions (width, height)
+ * @param {number} params.timeout_ms - Optional timeout in milliseconds
+ * @param {boolean} params.new_attempt - If true, skip JSON loading (hard reset)
  */
 async function scorm_open_course(params) {
-  const { package_path, viewport, timeout_ms } = params || {};
+  const { package_path, viewport, timeout_ms, new_attempt } = params || {};
   
   // Step 1: Create workspace
-  const sessionResult = await sessions.open({ package_path, timeout_ms });
+  // Pass new_attempt flag to session manager so it can be retrieved later
+  const sessionResult = await sessions.open({ 
+    package_path, 
+    timeout_ms,
+    new_attempt: !!new_attempt // Store flag for startup phase
+  });
   const { session_id } = sessionResult;
   
   // Step 2: Resolve entry path and course ID from manifest
@@ -29,16 +39,17 @@ async function scorm_open_course(params) {
   }
   
   const courseId = await getManifestIdentifier(s.package_path) || 'unknown_course';
-  const forceNew = !!s.new_attempt;
+  const forceNew = !!s.new_attempt; // Retrieved from session created in Step 1
   
   // Step 3: Open runtime (loads course and auto-initializes)
+  // forceNew flag skips JSON loading in ScormService.initializeSession()
   await RuntimeManager.openPersistent({ 
     session_id, 
     entryPath,
     viewport: viewport || { width: 1024, height: 768 },
     adapterOptions: {
       courseId,
-      forceNew
+      forceNew // This flag causes ScormService to skip JSON loading (hard reset)
     }
   });
   
@@ -57,8 +68,25 @@ async function scorm_close_course(params) {
 }
 
 /**
- * Reload course: Unified shutdown then startup (matches GUI reload pattern)
- * Uses same Terminate-based shutdown as close, then re-opens automatically
+ * Reload course: Two-phase operation (matches GUI reload pattern exactly)
+ * 
+ * PHASE 1 (Shutdown): Complete course shutdown
+ *   - Set cmi.exit='suspend' (allows resume)
+ *   - Call Terminate() API
+ *   - Save complete data model to JSON (via ScormService.terminate)
+ *   - Close runtime window
+ * 
+ * PHASE 2 (Startup): Fresh course start
+ *   - Create new session (new session ID)
+ *   - Load JSON if exists AND cmi.exit was 'suspend' (unless force_new=true)
+ *   - Initialize SCORM API
+ *   - Open content
+ * 
+ * @param {Object} params - Reload parameters
+ * @param {string} params.session_id - Current session ID to close
+ * @param {string} params.package_path - Path to SCORM package (for restart)
+ * @param {Object} params.viewport - Viewport dimensions (optional)
+ * @param {boolean} params.force_new - If true, skip JSON loading (hard reset without deletion)
  */
 async function scorm_reload_course(params) {
   const { session_id, package_path, viewport, force_new } = params || {};
@@ -69,28 +97,46 @@ async function scorm_reload_course(params) {
     throw e;
   }
   
-  // PHASE 1: Unified shutdown (same as close - calls Terminate, saves JSON)
-  await scorm_close_course({ session_id });
-  
-  // PHASE 2: Startup (exactly like initial open)
-  // Re-open with same package - forceNew flag skips JSON loading if set
   if (!package_path) {
     const e = new Error('package_path required for reload');
     e.code = 'MCP_INVALID_PARAMS';
     throw e;
   }
   
+  // PHASE 1: Unified shutdown
+  // This is IDENTICAL to close - uses ScormService.terminate() path
+  // Saves data model to JSON for resume (unless force_new is set in Phase 2)
+  await scorm_close_course({ session_id });
+  
+  // PHASE 2: Startup (exactly like initial open)
+  // New session created with new ID
+  // If force_new=false (default): JSON loaded and restored if cmi.exit='suspend'
+  // If force_new=true: JSON loading skipped entirely (hard reset without deletion)
   return scorm_open_course({ 
     package_path, 
     viewport,
-    new_attempt: force_new // Hard reset flag - skips JSON loading without deletion
+    new_attempt: !!force_new
   });
 }
 
 /**
- * Clear saved session data (manual cleanup tool only)
- * Note: This is for manual cleanup/testing. Normal hard reset should use
- * forceNew flag in scorm_open_course which skips JSON loading without deletion.
+ * Clear saved session data (MANUAL CLEANUP TOOL ONLY)
+ * 
+ * WARNING: This tool is for manual cleanup/testing ONLY. It physically deletes the JSON file.
+ * 
+ * For normal hard reset (starting fresh without old data), use the force_new flag:
+ *   - scorm_open_course({ package_path, new_attempt: true })
+ *   - scorm_reload_course({ session_id, package_path, force_new: true })
+ * 
+ * The force_new flag skips JSON loading WITHOUT deletion, which is safer and faster.
+ * 
+ * Use this tool ONLY for:
+ *   - Manual cleanup between test runs
+ *   - Debugging data persistence issues
+ *   - Removing corrupted session data
+ * 
+ * @param {Object} params - Clear parameters
+ * @param {string} params.package_path - Path to SCORM package (used to identify course)
  */
 async function scorm_clear_saved_data(params) {
   const { package_path } = params || {};
@@ -101,8 +147,6 @@ async function scorm_clear_saved_data(params) {
     throw e;
   }
   
-  // Use SessionStore to delete the saved JSON file
-  const SessionStore = require('../../main/services/session-store');
   const path = require('path');
   const ManifestParser = require('../../main/services/scorm/cam/manifest-parser');
   const fs = require('fs');
@@ -119,10 +163,25 @@ async function scorm_clear_saved_data(params) {
   const parsed = await parser.parseManifestFile(manifestPath);
   const courseId = parsed?.identifier || 'unknown_course';
   
-  const sessionStore = new SessionStore({ namespace: 'mcp' });
-  await sessionStore.deleteSession(courseId, 'mcp');
+  // This tool runs in Node.js context (server.js), but SessionStore lives in Electron child
+  // Send IPC message to Electron child to perform the deletion
+  if (!global.__electronBridge) {
+    const e = new Error('Electron bridge not available');
+    e.code = 'MCP_RUNTIME_NOT_AVAILABLE';
+    throw e;
+  }
   
-  return { success: true, course_id: courseId, note: 'Manual deletion only - prefer forceNew flag for hard reset' };
+  const result = await global.__electronBridge.sendMessage({
+    id: Date.now(),
+    type: 'session_clear_saved_data',
+    params: { course_id: courseId, namespace: 'mcp' }
+  });
+  
+  return { 
+    success: true, 
+    course_id: courseId,
+    note: 'JSON file physically deleted. For normal hard reset, use force_new flag instead.'
+  };
 }
 
 /**

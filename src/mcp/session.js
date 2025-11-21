@@ -214,33 +214,30 @@ class SessionManager {
     s.last_activity_at = this.getNow();
     this._emit(s, "session:close", {});
 
-    // Like the GUI: Set exit to suspend and call Terminate before closing
-    // This ensures data is saved if the course is incomplete
+    // Close runtime window (this will trigger ScormService.terminate() automatically)
     try {
       const { RuntimeManager } = require('./runtime-manager');
-      // Check if runtime is open
       const status = await RuntimeManager.getRuntimeStatus(session_id);
-      if (status && status.open && status.initialize_state === 'running') {
-        // Set exit to suspend (standard LMS behavior when closing mid-course)
+      
+      if (status && status.open) {
+        // Set exit to suspend for resume capability
         try {
-          await RuntimeManager.callAPI(null, 'SetValue', ['cmi.exit', 'suspend'], session_id);
-        } catch (_) { /* Course might not support this */ }
-        // Call Terminate - this triggers persistence logic in scorm_api_call
-        await RuntimeManager.callAPI(null, 'Terminate', [''], session_id);
+          const currentExit = await RuntimeManager.callAPI(null, 'GetValue', ['cmi.exit'], session_id);
+          if (!currentExit || currentExit === '') {
+            await RuntimeManager.callAPI(null, 'SetValue', ['cmi.exit', 'suspend'], session_id);
+          }
+        } catch (err) { /* Best effort */ }
+        
+        // DON'T call Terminate here - ScormService.terminate() will do it
+        // Calling it twice destroys the session before we can save
       }
-      // Now close the runtime window
+      
+      // Close window (saves data via ScormService.terminate in _closePersistentImpl)
       await RuntimeManager.closePersistent(session_id);
     } catch (err) {
-      // Best-effort cleanup - don't fail session close if runtime cleanup fails
-      // But log it for debugging
-      try {
-        const { getLogger } = require('../shared/utils/logger');
-        const logger = getLogger('MCP');
-        logger?.warn(`MCP: Session close cleanup failed for ${session_id}: ${err.message}`);
-      } catch (_) { /* intentionally empty */ }
+      // Best-effort cleanup
     }
 
-    // We leave artifacts on disk for caller to collect; no deletion here.
     this.sessions.delete(session_id);
     return { success: true, artifacts_manifest_path: s.artifacts_manifest_path };
   }

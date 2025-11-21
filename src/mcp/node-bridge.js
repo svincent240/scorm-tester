@@ -53,10 +53,17 @@ async function ensureElectronChild() {
 
   const electronPath = require('electron');
   const entryPoint = path.join(__dirname, 'electron-entry.js');
+  
+  // Ensure Electron child uses same log directory as parent
+  const logDir = process.env.SCORM_TESTER_LOG_DIR || path.join(process.cwd(), 'logs');
 
   electronChild = spawn(electronPath, [entryPoint, '--child-mode'], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'], // stdin ignored, stdout/stderr piped, IPC enabled
-    env: { ...process.env, ELECTRON_CHILD_MODE: '1' }
+    env: { 
+      ...process.env, 
+      ELECTRON_CHILD_MODE: '1',
+      SCORM_TESTER_LOG_DIR: logDir
+    }
   });
 
   // Suppress Electron output to avoid polluting MCP protocol

@@ -177,7 +177,8 @@ class ScormService extends BaseService {
         state: 'initialized',
         lmsProfile: null,
         lastActivity: Date.now(),
-        launchMode: options.launchMode || 'normal'
+        launchMode: options.launchMode || 'normal',
+        courseId: options.courseId || null // Store courseId for JSON persistence
       };
       
       this.sessions.set(sessionId, session);
@@ -222,7 +223,8 @@ class ScormService extends BaseService {
         rte.sessionId = sessionId;
 
         // --- HYDRATION: Load JSON if exists, restore only if exit=suspend ---
-        const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+        // Priority: options.courseId (from MCP) > SN manifest > unknown_course
+        const courseId = options.courseId || this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
         const namespace = this.config.sessionNamespace;
 
         // Skip loading entirely if forceNew flag is set (hard reset)
@@ -265,12 +267,8 @@ class ScormService extends BaseService {
                    });
                  }
               }
-            } else {
-              this.logger?.info(`ScormService: Not resuming - exit was '${exit}' not 'suspend'`);
             }
           }
-        } else {
-          this.logger?.info(`ScormService: Hard reset - skipping JSON load for ${courseId}`);
         }
         // --- END HYDRATION ---
 
@@ -592,7 +590,8 @@ class ScormService extends BaseService {
       }
 
       // Always save complete data model state to disk (resume logic checks cmi.exit on next init)
-      const courseId = this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
+      // Priority: session.courseId (from MCP) > SN manifest > unknown_course
+      const courseId = session.courseId || this.snService?.sequencingSession?.manifest?.identifier || 'unknown_course';
       const namespace = this.config.sessionNamespace;
       
       if (rte?.dataModel) {

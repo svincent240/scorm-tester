@@ -393,6 +393,28 @@ class RuntimeManager {
         return { success: true, closed_count: sessionIds.length };
       }
 
+      case 'session_clear_saved_data': {
+        // Delete saved session data via ScormService
+        const { course_id, namespace } = message.params || {};
+        if (!course_id) {
+          const err = new Error('course_id required');
+          err.code = 'MCP_INVALID_PARAMS';
+          throw err;
+        }
+        
+        const { getMcpScormService } = require('./electron-entry');
+        const scormService = await getMcpScormService();
+        
+        if (!scormService?.sessionStore) {
+          const err = new Error('ScormService not properly initialized');
+          err.code = 'MCP_SERVICE_NOT_READY';
+          throw err;
+        }
+        
+        await scormService.sessionStore.deleteSession(course_id, namespace || 'mcp');
+        return { success: true, course_id };
+      }
+
       default:
         throw new Error(`Unknown IPC message type: ${message.type}`);
     }
@@ -575,6 +597,19 @@ class RuntimeManager {
   static async _closePersistentImpl(session_id) {
     const win = _persistentBySession.get(session_id);
     if (win) {
+      // Save session data before closing window
+      try {
+        const { getMcpScormService } = require('./electron-entry');
+        const scormService = await getMcpScormService();
+        
+        if (scormService) {
+          await scormService.terminate(session_id);
+        }
+      } catch (err) {
+        // Best effort - don't fail close if save fails
+        logger?.warn(`MCP: Failed to terminate session ${session_id}:`, err?.message);
+      }
+      
       try { win.destroy(); } catch (_) { /* intentionally empty */ }
       _persistentBySession.delete(session_id);
       _telemetryStoreBySession.delete(session_id);
