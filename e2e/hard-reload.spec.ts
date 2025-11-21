@@ -98,13 +98,18 @@ test.describe('Hard Reload Test (Force New Session)', () => {
     // NOTE: Playwright's { modifiers: ['Shift'] } doesn't set event.shiftKey for click events,
     // so we programmatically emit the event with forceNew: true instead
     const emitResult = await page.evaluate(() => {
-      const eventBus = (window as any).eventBus;
+      // Try multiple paths to get eventBus
+      let eventBus = (window as any).eventBus;
+      if (!eventBus && (window as any).appManager) {
+        eventBus = (window as any).appManager.eventBus;
+      }
+      
       if (eventBus) {
         console.log('[TEST] Emitting course:reload:request with forceNew: true');
         eventBus.emit('course:reload:request', { forceNew: true });
         return { emitted: true, forceNew: true };
       }
-      return { emitted: false };
+      return { emitted: false, reason: 'eventBus not found' };
     });
     console.log('Emitted reload event:', JSON.stringify(emitResult));
 
