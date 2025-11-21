@@ -200,6 +200,14 @@ async function scorm_session_close(params) {
   return sessions.close(params || {});
 }
 
+async function scorm_session_status(params) {
+  return sessions.status(params || {});
+}
+
+async function scorm_session_events(params) {
+  return sessions.events(params || {});
+}
+
 module.exports = {
   // New unified API
   scorm_open_course,
@@ -211,5 +219,7 @@ module.exports = {
   // Legacy (deprecated but kept for compatibility)
   scorm_session_open,
   scorm_session_close,
+  scorm_session_status,
+  scorm_session_events,
 };
 
