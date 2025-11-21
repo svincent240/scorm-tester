@@ -726,8 +726,18 @@ class ContentViewer extends BaseComponent {
               rendererLogger.info('[ContentViewer] Ignored SCORM call during teardown', { method: methodName, argsCount: args?.length || 0 });
             }).catch(() => { /* intentionally empty */ });
           } catch (_) { /* intentionally empty */ }
-          // SCORM API returns string values; return "false" to indicate failure without surfacing an error
-          return 'false';
+          
+          // Return success codes to prevent content from logging errors during teardown
+          // This ensures unload handlers don't panic when the session is closed
+          if (['Initialize', 'Terminate', 'SetValue', 'Commit', 
+               'LMSInitialize', 'LMSFinish', 'LMSSetValue', 'LMSCommit'].includes(methodName)) {
+            return 'true';
+          }
+          if (['GetLastError', 'LMSGetLastError'].includes(methodName)) {
+            return '0';
+          }
+          // Default for GetValue, GetErrorString, GetDiagnostic
+          return '';
         };
       };
 
@@ -1532,6 +1542,10 @@ class ContentViewer extends BaseComponent {
    */
   clearContent() {
     // No scaling cleanup needed - we respect content as-is
+
+    // Prevent stray API calls during unload by tearing down APIs first
+    // This avoids "Store data before initialization" errors when the session is already closed
+    try { this.teardownScormAPIs(); } catch (_) { /* intentionally empty */ }
 
     this.currentUrl = null;
     this.contentWindow = null;
