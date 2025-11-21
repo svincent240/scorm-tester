@@ -5,6 +5,7 @@ const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
 const PathUtils = require("../shared/utils/path-utils");
+const getLogger = require("../shared/utils/logger");
 
 // Maximum number of sessions to keep per course (configurable via env)
 const MAX_SESSIONS_PER_COURSE = parseInt(process.env.SCORM_TESTER_MAX_SESSIONS_PER_COURSE || "10", 10);
@@ -12,6 +13,7 @@ const MAX_SESSIONS_PER_COURSE = parseInt(process.env.SCORM_TESTER_MAX_SESSIONS_P
 class SessionManager {
   constructor() {
     this.sessions = new Map();
+    this.logger = getLogger().child({ component: 'SessionManager' });
   }
 
   static ensureDir(p) {
@@ -82,13 +84,13 @@ class SessionManager {
             fs.unlinkSync(file.path);
           } catch (err) {
             // Best-effort cleanup - don't fail if we can't delete
-            console.warn(`Failed to delete old screenshot ${file.name}: ${err.message}`);
+            this.logger?.warn('Failed to delete old screenshot', { fileName: file.name, error: err.message });
           }
         }
       }
     } catch (err) {
       // Best-effort rotation - don't fail screenshot capture if rotation fails
-      console.warn(`Screenshot rotation failed: ${err.message}`);
+      this.logger?.warn('Screenshot rotation failed', { error: err.message });
     }
   }
 

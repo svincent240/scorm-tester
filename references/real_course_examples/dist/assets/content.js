@@ -2,7 +2,7 @@ import{l as a,m as r,n as c}from"./main.js";const l={render:t=>{const e=document
       <div class="content-wide stack-lg">
         
         <div class="stack-sm">
-          <h1>🔧 Engineering Problem-Solving Workshop</h1>
+          <h1>🔧 Engineering Problem-Solving Workshop!!!</h1>
           <p class="font-size-lg">Apply your knowledge in these interactive scenarios.</p>
         </div>
 

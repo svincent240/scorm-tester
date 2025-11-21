@@ -24,8 +24,8 @@ let electronChild = null;
 // Atomic counter for IPC message IDs to avoid collisions with concurrent calls
 let _ipcMessageIdCounter = 0;
 
-// Initialize logger directory before starting server
-// This ensures logs are written to a consistent location for this MCP session
+// Initialize logger directory and prefix before starting server
+// This ensures logs are written to a consistent location with MCP prefix
 // Logs are cleared on startup and overwrite previous session (no timestamps in path)
 if (!process.env.SCORM_TESTER_LOG_DIR) {
   // Find project root
@@ -36,9 +36,13 @@ if (!process.env.SCORM_TESTER_LOG_DIR) {
     }
     projectRoot = path.dirname(projectRoot);
   }
-  const logDir = path.join(projectRoot, 'logs', 'mcp');
+  const logDir = path.join(projectRoot, 'logs');
   fs.mkdirSync(logDir, { recursive: true });
   process.env.SCORM_TESTER_LOG_DIR = logDir;
+}
+// Set MCP prefix for log filenames (mcp.log, mcp.ndjson, mcp-errors.ndjson)
+if (!process.env.SCORM_TESTER_LOG_PREFIX) {
+  process.env.SCORM_TESTER_LOG_PREFIX = 'mcp';
 }
 
 // Start the MCP stdio server
@@ -62,23 +66,33 @@ async function ensureElectronChild() {
     env: { 
       ...process.env, 
       ELECTRON_CHILD_MODE: '1',
-      SCORM_TESTER_LOG_DIR: logDir
+      SCORM_TESTER_LOG_DIR: logDir,
+      SCORM_TESTER_LOG_PREFIX: 'mcp'
     }
   });
 
-  // Suppress Electron output to avoid polluting MCP protocol
-  // Only log if there's an actual error
-  electronChild.stdout.on('data', (_data) => {
-    // Silently consume stdout
+  // Capture Electron output to log files without polluting MCP protocol
+  const getLogger = require('../shared/utils/logger');
+  const bridgeLogger = getLogger().child({ component: 'ElectronBridge' });
+
+  electronChild.stdout.on('data', (data) => {
+    // Log stdout to file for debugging (won't pollute MCP stdio)
+    const output = data.toString().trim();
+    if (output) {
+      bridgeLogger.debug('Electron stdout', { output });
+    }
   });
 
-  electronChild.stderr.on('data', (_data) => {
-    // Silently consume stderr to avoid polluting MCP protocol channel
-    // All diagnostic info is logged to files via system_get_logs tool
+  electronChild.stderr.on('data', (data) => {
+    // Log stderr to file for debugging (won't pollute MCP stdio)
+    const output = data.toString().trim();
+    if (output) {
+      bridgeLogger.warn('Electron stderr', { output });
+    }
   });
 
-  electronChild.on('exit', (_code) => {
-    // Silently handle exit - diagnostic info available via system_get_logs
+  electronChild.on('exit', (code) => {
+    bridgeLogger.info('Electron child process exited', { code });
     electronChild = null;
   });
 

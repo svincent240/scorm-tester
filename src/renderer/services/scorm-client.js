@@ -118,7 +118,8 @@ class ScormClient {
         }
       }
     } catch (e) {
-      console.warn('[ScormClient] Failed to prime cache:', e);
+      // Failed to prime cache - this is expected during startup before SCORM session exists
+      // Silently continue - cache will be primed on first successful IPC call
     }
   }
 

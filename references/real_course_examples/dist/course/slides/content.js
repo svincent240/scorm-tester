@@ -9,7 +9,7 @@ export const slide = {
       <div class="content-wide stack-lg">
         
         <div class="stack-sm">
-          <h1>🔧 Engineering Problem-Solving Workshop</h1>
+          <h1>🔧 Engineering Problem-Solving Workshop!!!</h1>
           <p class="font-size-lg">Apply your knowledge in these interactive scenarios.</p>
         </div>
 

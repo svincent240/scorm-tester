@@ -9,7 +9,7 @@ const ManifestParser = require("../main/services/scorm/cam/manifest-parser");
 
 // Use the shared logger to write to log files (not stderr, to avoid polluting MCP protocol)
 const getLogger = require('../shared/utils/logger');
-const mcpLogger = getLogger();
+const mcpLogger = getLogger().child({ component: 'RuntimeAdapter' });
 
 
 function getPreloadPath() {

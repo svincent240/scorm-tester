@@ -23,18 +23,20 @@ function ensureSizeLimit(filePath, headerLine) {
 }
 
 class Logger {
-    constructor(logDir) {
+    constructor(logDir, prefix = 'gui') {
         if (Logger.instance) {
             return Logger.instance;
         }
 
         const baseDir = logDir || getDefaultLogDir();
-        this.logFile = path.join(baseDir, 'app.log');
-        this.ndjsonFile = path.join(baseDir, 'app.ndjson');
-        this.errorsFile = path.join(baseDir, 'errors.ndjson');
+        // Use prefix in filename instead of subdirectory: gui.log, mcp.log, etc.
+        this.logFile = path.join(baseDir, `${prefix}.log`);
+        this.ndjsonFile = path.join(baseDir, `${prefix}.ndjson`);
+        this.errorsFile = path.join(baseDir, `${prefix}-errors.ndjson`);
         this.logLevel = process.env.LOG_LEVEL || 'info';
         this.defaultContext = {};
         this.processType = (typeof process !== 'undefined' && process.type) ? process.type : 'node';
+        this.prefix = prefix;
         this.initLogFile();
 
         Logger.instance = this;
@@ -161,9 +163,15 @@ class Logger {
       if (process.env.NODE_ENV === 'development') {
         try {
           // Direct dev console output to STDERR to avoid polluting STDOUT (e.g., MCP JSON-RPC channel)
-          // Only log WARN and ERROR to console to prevent spam from thousands of INFO/DEBUG entries
-          // when SCORM courses make hundreds of API calls per second. All logs are still written to files.
-          if (level === 'warn' || level === 'error') {
+          // Control console verbosity with SCORM_TESTER_CONSOLE_LEVEL (default: warn)
+          // Options: debug, info, warn, error, none
+          // All logs are still written to files regardless of console level.
+          const consoleLevel = process.env.SCORM_TESTER_CONSOLE_LEVEL || 'warn';
+          const consoleLevels = { debug: 0, info: 1, warn: 2, error: 3, none: 999 };
+          const currentConsoleLevel = consoleLevels[consoleLevel] || consoleLevels.warn;
+          const messageLevelValue = consoleLevels[level] || consoleLevels.info;
+          
+          if (messageLevelValue >= currentConsoleLevel) {
             console.error(`[${level.toUpperCase()}]`, message, ...args);
           }
         } catch (_) {
@@ -243,13 +251,15 @@ function getDefaultLogDir() {
   return require('os').tmpdir();
 }
 
-// Export a singleton getter with optional first-init override for log directory.
+// Export a singleton getter with optional first-init override for log directory and prefix.
 // This maintains a single shared logger instance and allows main to specify app.getPath('userData').
+// Prefix parameter determines log filename: 'gui' → gui.log, 'mcp' → mcp.log
 let singleton = null;
-function getLogger(logDirOverride) {
+function getLogger(logDirOverride, prefixOverride) {
   if (singleton) return singleton;
   const dir = logDirOverride || process.env.SCORM_TESTER_LOG_DIR;
-  singleton = new Logger(dir);
+  const prefix = prefixOverride || process.env.SCORM_TESTER_LOG_PREFIX || 'gui';
+  singleton = new Logger(dir, prefix);
   return singleton;
 }
 

@@ -82,32 +82,22 @@ class NavigationHandler {
             if (!ta && this.activityTreeManager?.findActivity) {
               ta = this.activityTreeManager.findActivity(targetActivityId);
             }
-            if (process?.env?.JEST_WORKER_ID) {
-              // Test diagnostics
-              // eslint-disable-next-line no-console
-              console.log('[NAV DIAG] attach-after-browse CHOICE', {
-                targetActivityId,
-                foundVia: ta ? (this.activityTreeManager?.getActivity ? 'getActivity' : 'findActivity') : 'none',
-                hadTargetBefore: !!bmResult.targetActivity,
-                success: bmResult.success
-              });
-            }
+            this.logger?.debug('[NAV DIAG] attach-after-browse CHOICE', {
+              targetActivityId,
+              foundVia: ta ? (this.activityTreeManager?.getActivity ? 'getActivity' : 'findActivity') : 'none',
+              hadTargetBefore: !!bmResult.targetActivity,
+              success: bmResult.success
+            });
             if (ta) bmResult.targetActivity = ta;
           } catch (e) {
-            if (process?.env?.JEST_WORKER_ID) {
-              // eslint-disable-next-line no-console
-              console.log('[NAV DIAG] attach-after-browse error', e?.message || e);
-            }
+            this.logger?.debug('[NAV DIAG] attach-after-browse error', { error: e?.message || e });
           }
         }
-        if (process?.env?.JEST_WORKER_ID) {
-          // eslint-disable-next-line no-console
-          console.log('[NAV DIAG] return bmResult', {
-            navigationRequest,
-            targetActivityId,
-            hasTarget: !!bmResult?.targetActivity
-          });
-        }
+        this.logger?.debug('[NAV DIAG] return bmResult', {
+          navigationRequest,
+          targetActivityId,
+          hasTarget: !!bmResult?.targetActivity
+        });
         return bmResult;
       }
 
@@ -568,7 +558,7 @@ class NavigationHandler {
     try {
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM NAV enter', { navigationRequest, targetActivityId });
+        this.logger?.debug('[NAV DIAG] BM NAV enter', { navigationRequest, targetActivityId });
       }
       this.logger?.debug('Browse mode navigation: Starting request processing', {
         navigationRequest,
@@ -601,7 +591,7 @@ class NavigationHandler {
       const sessionInit = this.initializeBrowseModeSession();
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM NAV sessionInit', sessionInit);
+        this.logger?.debug('[NAV DIAG] BM NAV sessionInit', { sessionInit });
       }
       if (!sessionInit.success) {
         this.logger?.error('Browse mode navigation: Session initialization failed', {
@@ -617,14 +607,11 @@ class NavigationHandler {
 
       // Validate activity tree state
       const treeValidation = this.validateActivityTreeState();
-      if (process?.env?.JEST_WORKER_ID) {
-        // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM NAV treeValidation', {
-          hasRoot: treeValidation.hasRoot,
-          isValid: treeValidation.isValid,
-          issues: treeValidation.issues
-        });
-      }
+      this.logger?.debug('[NAV DIAG] BM NAV treeValidation', {
+        hasRoot: treeValidation.hasRoot,
+        isValid: treeValidation.isValid,
+        issues: treeValidation.issues
+      });
       this.logger?.debug('Browse mode navigation: Activity tree validation', treeValidation);
 
       if (!treeValidation.hasRoot) {
@@ -699,7 +686,7 @@ class NavigationHandler {
       let result;
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM NAV request', { navigationRequest, targetActivityId });
+        this.logger?.debug('[NAV DIAG] BM NAV request', { navigationRequest, targetActivityId });
       }
       switch (navigationRequest) {
         case NAVIGATION_REQUESTS.START:
@@ -727,7 +714,7 @@ class NavigationHandler {
 
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM NAV raw result', { success: !!result?.success, action: result?.action });
+        this.logger?.debug('[NAV DIAG] BM NAV raw result', { success: !!result?.success, action: result?.action });
       }
       // Enhance result with browse mode information
       const enhanced = {
@@ -743,19 +730,16 @@ class NavigationHandler {
           let ta = null;
           if (this.activityTreeManager?.getActivity) ta = this.activityTreeManager.getActivity(targetActivityId);
           if (!ta && this.activityTreeManager?.findActivity) ta = this.activityTreeManager.findActivity(targetActivityId);
-          if (process?.env?.JEST_WORKER_ID) {
-            // eslint-disable-next-line no-console
-            console.log('[NAV DIAG] attach-in-enhanced CHOICE', {
-              targetActivityId,
-              found: !!ta,
-              success: enhanced.success
-            });
-          }
+          this.logger?.debug('[NAV DIAG] attach-in-enhanced CHOICE', {
+            targetActivityId,
+            found: !!ta,
+            success: enhanced.success
+          });
           if (ta) enhanced.targetActivity = ta;
         } catch (e) {
           if (process?.env?.JEST_WORKER_ID) {
             // eslint-disable-next-line no-console
-            console.log('[NAV DIAG] attach-in-enhanced error', e?.message || e);
+            this.logger?.debug('[NAV DIAG] attach-in-enhanced error', { error: e?.message || e });
           }
         }
       }
@@ -921,7 +905,7 @@ class NavigationHandler {
       this.logger?.debug('Browse mode start: Beginning navigation processing');
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM START: entered');
+        this.logger?.debug('[NAV DIAG] BM START: entered');
       }
 
       // Validate activity tree state first
@@ -985,20 +969,14 @@ class NavigationHandler {
 
       // No saved location or invalid, start from first activity
       this.logger?.debug('Browse mode start: Finding first launchable activity');
-      if (process?.env?.JEST_WORKER_ID) {
-        // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM START: validation + root', {
-          hasRoot: !!this.activityTreeManager.root
-        });
-      }
+      this.logger?.debug('[NAV DIAG] BM START: validation + root', {
+        hasRoot: !!this.activityTreeManager.root
+      });
       const firstActivity = this.findFirstLaunchableActivity(this.activityTreeManager.root);
-      if (process?.env?.JEST_WORKER_ID) {
-        // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM START: firstActivity', {
-          found: !!firstActivity,
-          id: firstActivity?.identifier
-        });
-      }
+      this.logger?.debug('[NAV DIAG] BM START: firstActivity', {
+        found: !!firstActivity,
+        id: firstActivity?.identifier
+      });
 
       if (firstActivity) {
         this.logger?.debug('Browse mode start: First activity found', {
@@ -1029,7 +1007,7 @@ class NavigationHandler {
       this.logger?.error('Browse mode start: No launchable activities found');
       if (process?.env?.JEST_WORKER_ID) {
         // eslint-disable-next-line no-console
-        console.log('[NAV DIAG] BM START: no launchable activities');
+        this.logger?.debug('[NAV DIAG] BM START: no launchable activities');
       }
       return {
         success: false,

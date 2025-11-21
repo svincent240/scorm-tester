@@ -20,14 +20,19 @@ describe('MCP system_get_logs', () => {
       
       // Mock the logger
       jest.doMock('../../../src/shared/utils/logger.js', () => {
-        return jest.fn(() => ({
+        const mockLoggerInstance = {
           ndjsonFile: mockLogFile,
           logFile: mockLogFile,
+          errorsFile: mockLogFile.replace('.ndjson', '-errors.ndjson'),
           info: jest.fn(),
           warn: jest.fn(),
           error: jest.fn(),
-          debug: jest.fn()
-        }));
+          debug: jest.fn(),
+          child: jest.fn(function(ctx) {
+            return { ...this, defaultContext: ctx };
+          })
+        };
+        return jest.fn(() => mockLoggerInstance);
       });
       
       // Import server after mocking

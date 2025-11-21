@@ -49,9 +49,80 @@ Before writing new code, check `src/shared/` for existing solutions.
 ## 4. System-Wide Contracts
 
 ### 4.1. Logging
-- All logging **MUST** use the shared logger from `src/shared/utils/logger.js`.
-- `console.*` is **FORBIDDEN**.
-- Log files are generated in the Electron `userData` directory (for GUI) or `./logs/mcp/` (for MCP).
+
+**CRITICAL: Centralized logging is MANDATORY. NO EXCEPTIONS.**
+
+#### Core Rules (Violations are Architecture Violations)
+
+1. **MUST use shared logger**: All code **MUST** import and use `src/shared/utils/logger.js`. NO direct `console.*` calls.
+2. **FORBIDDEN operations**: `console.log()`, `console.warn()`, `console.error()`, `console.info()`, `console.debug()` are **BANNED** in production code.
+3. **NO silent failures**: Every error, warning, or diagnostic message **MUST** be logged. Silent failures mask bugs and make debugging impossible.
+4. **Tests MUST log**: Test code **MUST** use the logger or test logger sink from `tests/setup.js`. Do NOT bypass logging in tests.
+
+#### Logger Usage
+
+```javascript
+// Import the logger factory
+const getLogger = require('../shared/utils/logger');
+
+// Initialize (first call sets directory and prefix)
+const logger = getLogger();  // Uses defaults
+// OR with custom settings:
+const logger = getLogger('/path/to/logs', 'mcp');  // Custom dir + prefix
+
+// Use child loggers for context
+const componentLogger = logger.child({ component: 'ServiceName' });
+
+// Log at appropriate levels
+logger.debug('Detailed diagnostic info', { data });  // Development only
+logger.info('Normal operation', { context });         // General flow
+logger.warn('Recoverable issue', { details });        // Warnings
+logger.error('Operation failed', error);              // Errors
+```
+
+#### Log File Structure
+
+All logs written to `./logs/` directory with process-specific prefixes:
+- **GUI Process**: `gui.log`, `gui.ndjson`, `gui-errors.ndjson`
+- **MCP Process**: `mcp.log`, `mcp.ndjson`, `mcp-errors.ndjson`
+
+**File Formats**:
+- `.log`: Human-readable timestamps and messages
+- `.ndjson`: Structured newline-delimited JSON for parsing
+- `-errors.ndjson`: Error-level logs only for quick debugging
+
+#### Console Output Control
+
+Console output (stderr) is controlled independently from file logging:
+- `SCORM_TESTER_CONSOLE_LEVEL=debug` - Show all logs in console
+- `SCORM_TESTER_CONSOLE_LEVEL=info` - Show info and above
+- `SCORM_TESTER_CONSOLE_LEVEL=warn` - Show warnings and errors only (default)
+- `SCORM_TESTER_CONSOLE_LEVEL=error` - Show errors only
+- `SCORM_TESTER_CONSOLE_LEVEL=none` - No console output (files only)
+
+**Note**: All logs are **always** written to files regardless of console level.
+
+#### Process-Specific Initialization
+
+**Main Process (GUI)**:
+```javascript
+const getLogger = require('../shared/utils/logger');
+const logger = getLogger(app.getPath('userData'), 'gui');
+```
+
+**MCP Process**:
+```javascript
+// node-bridge.js sets SCORM_TESTER_LOG_PREFIX=mcp
+const getLogger = require('../shared/utils/logger');
+const logger = getLogger();  // Uses env vars
+```
+
+**Tests**:
+```javascript
+const { createLoggerSink } = require('../tests/setup');
+const logger = createLoggerSink();
+// logger.entries contains all logged messages for assertions
+```
 
 ### 4.2. Error Handling
 - All significant errors **MUST** be routed through the shared `ErrorHandler`.
