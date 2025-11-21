@@ -997,12 +997,10 @@ class AppManager {
       const contentViewer = this.components.get('contentViewer');
       if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
         this.logger.info('AppManager: Calling course API_1484_11.Terminate() for reload shutdown');
-        // Set exit to suspend so user can resume (unless forceNew is specified)
-        if (!options.forceNew) {
-          try {
-            contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
-          } catch (_) { /* Course might not support this, that's ok */ }
-        }
+        // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
+        try {
+          contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
+        } catch (_) { /* Course might not support this, that's ok */ }
         contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
         // The normal terminate flow will handle persistence
         this.logger.info('AppManager: Terminate called, waiting for persistence to complete');
@@ -1011,11 +1009,10 @@ class AppManager {
       } else if (contentViewer?.iframe?.contentWindow?.API) {
         // SCORM 1.2
         this.logger.info('AppManager: Calling course API.LMSFinish() for reload shutdown');
-        if (!options.forceNew) {
-          try {
-            contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
-          } catch (_) { /* Course might not support this, that's ok */ }
-        }
+        // Always set exit to suspend so data is saved (forceNew only affects loading, not saving)
+        try {
+          contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
+        } catch (_) { /* Course might not support this, that's ok */ }
         contentViewer.iframe.contentWindow.API.LMSFinish('');
         this.logger.info('AppManager: LMSFinish called, waiting for persistence to complete');
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -1083,36 +1080,8 @@ class AppManager {
     try {
       this.logger.info('AppManager: Course close requested');
 
-      // Like a real LMS: Tell the course to terminate itself via its SCORM API
-      // The course iframe has the API injected, so we just call it
-      const contentViewer = this.components.get('contentViewer');
-      let apiCalled = false;
-
-      if (contentViewer?.iframe?.contentWindow?.API_1484_11) {
-        this.logger.info('AppManager: Calling course API_1484_11.Terminate()');
-        // Set exit to suspend so user can resume where they left off (standard LMS behavior)
-        try {
-          contentViewer.iframe.contentWindow.API_1484_11.SetValue('cmi.exit', 'suspend');
-        } catch (_) { /* Course might not support this, that's ok */ }
-        contentViewer.iframe.contentWindow.API_1484_11.Terminate('');
-        apiCalled = true;
-      } else if (contentViewer?.iframe?.contentWindow?.API) {
-        // SCORM 1.2
-        this.logger.info('AppManager: Calling course API.LMSFinish()');
-        try {
-          contentViewer.iframe.contentWindow.API.LMSSetValue('cmi.core.exit', 'suspend');
-        } catch (_) { /* Course might not support this, that's ok */ }
-        contentViewer.iframe.contentWindow.API.LMSFinish('');
-        apiCalled = true;
-      }
-
-      if (apiCalled) {
-        // If we called the API, give it time to process the async termination (persistence)
-        // ScormClient uses a 200ms delay before sending asyncTerminate
-        // We wait 1000ms to be safe, then force close the course
-        this.logger.info('AppManager: Waiting for termination persistence before closing...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      // Use shared shutdown logic (waits 1000ms for close vs 300ms for reload)
+      const apiCalled = await this.shutdownCourse({ waitMs: 1000 });
 
       // Always close the course via IPC to ensure UI cleanup and backend session closure
       this.logger.info('AppManager: Calling close-course IPC');
