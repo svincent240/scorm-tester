@@ -134,7 +134,7 @@ test.describe('Resume Course from JSON Test', () => {
     
     // Note: cmi.location might be reset by the course content if it detects a mismatch or race condition,
     // but the presence of correct suspend_data and entry='resume' confirms the platform loaded the JSON.
-    // expect(scormValues.location).toBe('ui-demo'); 
+    expect(scormValues.location).toBe('ui-demo'); 
 
     // We check if suspendData contains the key structure we injected
     expect(scormValues.suspendData).toContain('visitedSlides');
