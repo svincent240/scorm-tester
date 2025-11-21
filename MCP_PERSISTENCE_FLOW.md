@@ -418,3 +418,4 @@ const { session_id } = await scorm_open_course({
 5. **Namespace Isolation** - MCP and GUI sessions don't interfere
 6. **No Manipulation** - Data model saved and restored as-is
 7. **Proper Lifecycle** - Close always: set exit → terminate → save → destroy window
+
