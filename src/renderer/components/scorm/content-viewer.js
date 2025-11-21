@@ -29,6 +29,7 @@ class ContentViewer extends BaseComponent {
     // Initialize logger immediately
     this.logger = rendererLogger;
 
+    /** @type {HTMLIFrameElement|null} */
     this.iframe = null;
     this.currentUrl = null;
     this.loadingTimeout = null;
@@ -75,12 +76,13 @@ class ContentViewer extends BaseComponent {
    */
   renderContent() {
     // Find existing iframe first to preserve existing HTML
-    this.iframe = this.find('.content-viewer__frame') || this.find('#content-frame');
+    this.iframe = /** @type {HTMLIFrameElement} */ (this.find('.content-viewer__frame') || this.find('#content-frame'));
 
     // If no iframe exists, create minimal structure
     if (!this.iframe) {
       // NOTE: Per dev_docs, avoid console.* in renderer. Route via UI notification only if needed.
-      this.element.innerHTML = `
+      if (this.element) {
+        this.element.innerHTML = `
         <div class="content-viewer__container">
           <div class="content-viewer__welcome">
             <div class="welcome-screen">
@@ -93,7 +95,7 @@ class ContentViewer extends BaseComponent {
           <iframe
             id="content-frame"
             class="content-viewer__frame hidden"
-            sandbox="${this.options.sandbox}"
+            sandbox="${/** @type {any} */(this.options).sandbox}"
             style="width: 100%; height: 100%; border: none;"
           ></iframe>
 
@@ -120,14 +122,15 @@ class ContentViewer extends BaseComponent {
             </div>
           </div>
 
-          ${this.options.enableFullscreen ? `
+          ${/** @type {any} */(this.options).enableFullscreen ? `
             <button class="content-viewer__fullscreen-btn" title="Fullscreen">⛶</button>
           ` : ''}
         </div>
       `;
+      }
 
       // Update references after creating structure
-      this.iframe = this.find('#content-frame');
+      this.iframe = /** @type {HTMLIFrameElement} */ (this.find('#content-frame'));
     }
 
     // Get references to elements (existing or newly created)
@@ -144,6 +147,7 @@ class ContentViewer extends BaseComponent {
     // Listen for course loading events
     this.subscribe('course:loaded', this.handleCourseLoaded);
     this.subscribe('course:error', this.handleCourseError);
+    this.subscribe('course:cleared', this.handleCourseCleared);
 
     // Listen for UI state changes
     this.subscribe('ui:updated', this.handleUIUpdate);
@@ -353,7 +357,7 @@ class ContentViewer extends BaseComponent {
       
       const sessionResult = await ipcClient.invoke('scorm-initialize', {
         sessionId: sessionId,
-        forceNew: options.forceNew || false
+        forceNew: /** @type {any} */(options).forceNew || false
       });
       
       if (!sessionResult || !sessionResult.success) {
@@ -369,8 +373,9 @@ class ContentViewer extends BaseComponent {
       
       this.logger?.info('ContentViewer: Session initialized by main process', { sessionId });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger?.error('ContentViewer: Failed to initialize session', error);
-      this.showError('Failed to initialize session', error.message);
+      this.showError('Failed to initialize session', errorMessage);
       return;
     }    try {
       this.showLoading();
@@ -388,7 +393,7 @@ class ContentViewer extends BaseComponent {
 
       this.loadingTimeout = setTimeout(() => {
         this.handleLoadTimeout();
-      }, this.options.loadingTimeout);
+      }, /** @type {any} */(this.options).loadingTimeout);
 
       // CRITICAL FIX: Clear old content BEFORE tearing down APIs
       //
@@ -401,7 +406,7 @@ class ContentViewer extends BaseComponent {
       // then wait briefly for unload handlers to complete before stubifying the APIs.
       // This ensures a clean transition with no lingering content trying to use stubbed APIs.
       //
-      // Timing: The 50ms delay allows the browser to:
+      // Timing: The 200ms delay allows the browser to:
       // 1. Trigger the old content's beforeunload/unload events
       // 2. Stop executing the old content's JavaScript
       // 3. Clear the old content's window object
@@ -409,7 +414,8 @@ class ContentViewer extends BaseComponent {
         this.iframe.src = 'about:blank';
         this.contentWindow = null;
         // Small delay to allow old content's unload handlers to complete
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Increased to 200ms to ensure complex courses have time to save state during unload
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       // Detach any previous SCORM API bindings to avoid stray calls from the old content
@@ -459,6 +465,11 @@ class ContentViewer extends BaseComponent {
    * Handle iframe load event
    */
   handleIframeLoad() {
+    // Ignore load events for about:blank (clearing content)
+    if (this.iframe && (this.iframe.src === 'about:blank' || this.iframe.src.endsWith('about:blank'))) {
+      return;
+    }
+
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
       this.loadingTimeout = null;
@@ -1112,6 +1123,13 @@ class ContentViewer extends BaseComponent {
   handleCourseError(data) {
     const msg = typeof data === 'string' ? data : (data?.message || 'Unknown error');
     this.showError('Course loading failed', msg);
+  }
+
+  /**
+   * Handle course cleared event
+   */
+  handleCourseCleared() {
+    this.clearContent();
   }
 
   /**

@@ -164,7 +164,10 @@ class UIStateManager {
       entryPoint: courseData.entryPoint
     });
 
-    this.eventBus?.emit('course:loaded', courseData);
+    // Only emit course:loaded if we actually have a course
+    if (courseData.info || courseData.path) {
+      this.eventBus?.emit('course:loaded', courseData);
+    }
   }
 
   /**
