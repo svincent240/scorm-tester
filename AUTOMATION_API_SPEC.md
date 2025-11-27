@@ -149,7 +149,75 @@ setScrollDepth(percentage)  // 0-100
 resetEngagement()  // Reset current slide
 ```
 
-### 5. Observability
+### 5. Audio Control
+
+**Get audio state:**
+```javascript
+getAudioState()
+// Returns: {
+//   currentSrc: 'audio/intro.mp3',
+//   contextId: 'slide-01',
+//   contextType: 'slide',  // 'slide' | 'modal' | 'tab'
+//   position: 45.2,
+//   duration: 120.5,
+//   isPlaying: true,
+//   isMuted: false,
+//   volume: 1,
+//   required: true,
+//   completionThreshold: 0.95,
+//   isCompleted: false
+// }
+```
+
+**Check audio availability:**
+```javascript
+hasAudio()
+// Returns: true/false - whether audio is currently loaded
+```
+
+**Playback control:**
+```javascript
+playAudio()      // Start/resume playback
+pauseAudio()     // Pause playback
+toggleAudio()    // Toggle play/pause
+restartAudio()   // Restart from beginning
+```
+
+**Seek:**
+```javascript
+seekAudio(45)           // Seek to 45 seconds
+seekAudioToPercentage(50)  // Seek to 50% of track
+```
+
+**Mute control:**
+```javascript
+toggleAudioMute()       // Toggle mute state
+setAudioMuted(true)     // Set mute explicitly
+```
+
+**Progress & completion:**
+```javascript
+getAudioProgress()
+// Returns: 75.5 (percentage 0-100)
+
+isAudioCompleted()
+// Returns: true/false - whether current audio reached completion threshold
+
+isAudioCompletedForContext('slide-01')
+// Returns: true/false - check completion for specific context
+
+isAudioRequired()
+// Returns: true/false - whether current audio is required for gating
+```
+
+**Simulate completion (testing):**
+```javascript
+simulateAudioComplete()
+// Seeks audio to completion threshold, triggering completion tracking
+// Useful for testing without waiting for audio to play
+```
+
+### 6. Observability
 
 **Get trace log:**
 ```javascript
@@ -165,7 +233,7 @@ clearAutomationTrace()
 **API version:**
 ```javascript
 getVersion()
-// Returns: {api: '5.0', phase: 5, features: [...]}
+// Returns: {api: '1.6.0', phase: 6, features: [...]}
 ```
 
 ## Common Workflows
@@ -205,6 +273,22 @@ const flow = getLayoutFlow();
 if (!flow.analysis.readingOrderMatchesTabOrder) {
   console.warn('Tab order does not match visual reading order');
 }
+```
+
+### Test audio gating
+
+```javascript
+// Check if slide has required audio
+if (hasAudio() && isAudioRequired()) {
+  // For testing, skip waiting for audio
+  simulateAudioComplete();
+  
+  // Verify completion was tracked
+  console.log('Audio completed:', isAudioCompleted());
+}
+
+// Check audio state for specific context
+const completed = isAudioCompletedForContext('slide-01');
 ```
 
 ## data-testid Attributes
