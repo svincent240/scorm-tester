@@ -1130,6 +1130,264 @@ async function scorm_automation_clear_trace(params = {}) {
 }
 
 // ============================================================================
+// AUDIO CONTROL TOOLS (Consolidated)
+// ============================================================================
+
+/**
+ * Get comprehensive audio state including availability, playback status, and completion
+ * This single tool replaces: hasAudio, getAudioState, getAudioProgress, isAudioCompleted, isAudioRequired
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Complete audio state
+ */
+async function scorm_automation_get_audio_state({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_get_audio_state');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:get_audio_state', 
+      payload: {} 
+    });
+
+    // Get hasAudio first
+    const hasAudio = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.hasAudio()',
+      session_id
+    );
+
+    if (!hasAudio) {
+      return {
+        available: true,
+        hasAudio: false,
+        audioState: null
+      };
+    }
+
+    // Get full audio state
+    const audioState = await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.getAudioState()',
+      session_id
+    );
+
+    return {
+      available: true,
+      hasAudio: true,
+      audioState
+    };
+  } catch (err) {
+    logger.error('Error getting audio state', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to get audio state: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Control audio playback with a single unified tool
+ * Actions: play, pause, toggle, restart, seek, seek_percentage, mute, unmute, toggle_mute
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {string} params.action - Action to perform
+ * @param {number} [params.seconds] - Time in seconds (for seek action)
+ * @param {number} [params.percentage] - Percentage 0-100 (for seek_percentage action)
+ * @returns {Promise<Object>} - Success indicator and new state
+ */
+async function scorm_automation_audio_control({ session_id, action, seconds, percentage }) {
+  await validateRuntimeSession(session_id);
+
+  const validActions = ['play', 'pause', 'toggle', 'restart', 'seek', 'seek_percentage', 'mute', 'unmute', 'toggle_mute'];
+  if (!action || !validActions.includes(action)) {
+    const e = new Error(`action must be one of: ${validActions.join(', ')}`);
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  // Validate action-specific parameters
+  if (action === 'seek') {
+    if (typeof seconds !== 'number' || seconds < 0) {
+      const e = new Error('seconds must be a non-negative number for seek action');
+      e.code = 'MCP_INVALID_PARAMS';
+      throw e;
+    }
+  }
+  if (action === 'seek_percentage') {
+    if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+      const e = new Error('percentage must be a number between 0 and 100 for seek_percentage action');
+      e.code = 'MCP_INVALID_PARAMS';
+      throw e;
+    }
+  }
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_audio_control');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:audio_control', 
+      payload: { action, seconds, percentage } 
+    });
+
+    // Map actions to API calls
+    const actionMap = {
+      'play': 'window.SCORMAutomation.playAudio()',
+      'pause': 'window.SCORMAutomation.pauseAudio()',
+      'toggle': 'window.SCORMAutomation.toggleAudio()',
+      'restart': 'window.SCORMAutomation.restartAudio()',
+      'seek': `window.SCORMAutomation.seekAudio(${seconds})`,
+      'seek_percentage': `window.SCORMAutomation.seekAudioToPercentage(${percentage})`,
+      'mute': 'window.SCORMAutomation.setAudioMuted(true)',
+      'unmute': 'window.SCORMAutomation.setAudioMuted(false)',
+      'toggle_mute': 'window.SCORMAutomation.toggleAudioMute()'
+    };
+
+    await RuntimeManager.executeJS(null, actionMap[action], session_id);
+
+    const result = {
+      available: true,
+      success: true,
+      action
+    };
+
+    // Include relevant parameters in response
+    if (action === 'seek') result.seconds = seconds;
+    if (action === 'seek_percentage') result.percentage = percentage;
+
+    return result;
+  } catch (err) {
+    logger.error('Error controlling audio', { 
+      session_id, 
+      action,
+      seconds,
+      percentage,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to ${action} audio: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Check if audio for a specific context has reached completion
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @param {string} params.context_id - Context ID to check completion for (e.g., 'slide-01')
+ * @returns {Promise<Object>} - Whether audio for context is completed
+ */
+async function scorm_automation_is_audio_completed_for_context({ session_id, context_id }) {
+  await validateRuntimeSession(session_id);
+
+  if (!context_id || typeof context_id !== 'string') {
+    const e = new Error('context_id is required and must be a string');
+    e.code = 'MCP_INVALID_PARAMS';
+    throw e;
+  }
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_is_audio_completed_for_context');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:is_audio_completed_for_context', 
+      payload: { context_id } 
+    });
+
+    const expression = `window.SCORMAutomation.isAudioCompletedForContext('${context_id.replace(/'/g, "\\'")}')`;
+    const result = await RuntimeManager.executeJS(null, expression, session_id);
+
+    return {
+      available: true,
+      isCompleted: result,
+      context_id
+    };
+  } catch (err) {
+    logger.error('Error checking audio completion for context', { 
+      session_id, 
+      context_id,
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to check audio completion for context '${context_id}': ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+/**
+ * Simulate audio completion for testing (seeks to completion threshold)
+ * @param {Object} params - Parameters object
+ * @param {string} params.session_id - Session ID
+ * @returns {Promise<Object>} - Success indicator
+ */
+async function scorm_automation_simulate_audio_complete({ session_id }) {
+  await validateRuntimeSession(session_id);
+
+  const available = await checkAutomationAPI(session_id);
+  if (!available) {
+    throw createAPINotAvailableError('scorm_automation_simulate_audio_complete');
+  }
+
+  try {
+    sessions.emit && sessions.emit({ 
+      session_id, 
+      type: 'automation:simulate_audio_complete', 
+      payload: {} 
+    });
+
+    await RuntimeManager.executeJS(
+      null,
+      'window.SCORMAutomation.simulateAudioComplete()',
+      session_id
+    );
+
+    return {
+      available: true,
+      success: true
+    };
+  } catch (err) {
+    logger.error('Error simulating audio completion', { 
+      session_id, 
+      error: err.message,
+      stack: err.stack 
+    });
+    
+    const e = new Error(`Failed to simulate audio completion: ${err.message}`);
+    e.code = 'AUTOMATION_API_ERROR';
+    e.name = 'AutomationAPIError';
+    e.originalError = err;
+    throw e;
+  }
+}
+
+// ============================================================================
 // ENGAGEMENT TRACKING TOOLS
 // ============================================================================
 
@@ -1745,6 +2003,10 @@ module.exports = {
   scorm_automation_get_layout_tree,
   scorm_automation_get_element_details,
   scorm_automation_validate_page_layout,
+  scorm_automation_get_audio_state,
+  scorm_automation_audio_control,
+  scorm_automation_is_audio_completed_for_context,
+  scorm_automation_simulate_audio_complete,
   scorm_engagement_get_state,
   scorm_engagement_get_progress,
   scorm_engagement_mark_tab_viewed,
