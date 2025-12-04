@@ -15,7 +15,7 @@ const { MAIN_PROCESS_ERRORS } = require('../../shared/constants/error-codes');
 const PathUtils = require('../../shared/utils/path-utils');
 
 const RECENT_FILE_NAME = 'recents.json';
-const MAX_RECENT_ITEMS = 5; // User-defined limit
+const MAX_RECENT_ITEMS = 4; // User-defined limit
 
 class RecentCoursesService extends BaseService {
   constructor(errorHandler, logger, options = {}) {

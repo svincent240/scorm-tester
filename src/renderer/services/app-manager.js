@@ -2390,10 +2390,21 @@ class AppManager {
         li.dataset.type = rc.type;
         li.dataset.path = rc.path;
 
-        const title = rc.meta?.title || rc.displayName || rc.path.split(/[\\/]/).pop();
+        const titleText = rc.meta?.title || rc.displayName || rc.path.split(/[\\/]/).pop();
         const kind = rc.type === 'zip' ? 'ZIP' : 'Folder';
 
-        li.textContent = `${title} (${kind})`;
+        // Create title element
+        const titleEl = document.createElement('div');
+        titleEl.className = 'recent-item__title';
+        titleEl.textContent = `${titleText} (${kind})`;
+        li.appendChild(titleEl);
+
+        // Create path element
+        const pathEl = document.createElement('div');
+        pathEl.className = 'recent-item__path';
+        pathEl.textContent = rc.path;
+        li.appendChild(pathEl);
+
         li.title = rc.path;
 
         li.addEventListener('click', async () => {
