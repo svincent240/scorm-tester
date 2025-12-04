@@ -163,7 +163,6 @@ getAudioState()
 //   isPlaying: true,
 //   isMuted: false,
 //   volume: 1,
-//   required: true,
 //   completionThreshold: 0.95,
 //   isCompleted: false
 // }
@@ -175,46 +174,23 @@ hasAudio()
 // Returns: true/false - whether audio is currently loaded
 ```
 
-**Playback control:**
-```javascript
-playAudio()      // Start/resume playback
-pauseAudio()     // Pause playback
-toggleAudio()    // Toggle play/pause
-restartAudio()   // Restart from beginning
-```
-
-**Seek:**
-```javascript
-seekAudio(45)           // Seek to 45 seconds
-seekAudioToPercentage(50)  // Seek to 50% of track
-```
-
-**Mute control:**
-```javascript
-toggleAudioMute()       // Toggle mute state
-setAudioMuted(true)     // Set mute explicitly
-```
-
-**Progress & completion:**
+**Progress:**
 ```javascript
 getAudioProgress()
 // Returns: 75.5 (percentage 0-100)
 
-isAudioCompleted()
-// Returns: true/false - whether current audio reached completion threshold
-
-isAudioCompletedForContext('slide-01')
-// Returns: true/false - check completion for specific context
-
-isAudioRequired()
-// Returns: true/false - whether current audio is required for gating
+isAudioCompletedForContext('intro')
+// Returns: true/false - check completion for specific context (slideId, modal-xxx, etc.)
 ```
 
-**Simulate completion (testing):**
+**Simulate completion (primary testing method):**
 ```javascript
 simulateAudioComplete()
-// Seeks audio to completion threshold, triggering completion tracking
-// Useful for testing without waiting for audio to play
+// Seeks to completion threshold AND triggers appropriate engagement tracking
+// Automatically handles all three audio context types:
+//   - 'slide' → triggers slideAudioComplete requirement
+//   - 'modal' → triggers modalAudioComplete requirement
+//   - 'standalone' → triggers audioComplete requirement
 ```
 
 ### 6. Observability
@@ -278,17 +254,23 @@ if (!flow.analysis.readingOrderMatchesTabOrder) {
 ### Test audio gating
 
 ```javascript
-// Check if slide has required audio
-if (hasAudio() && isAudioRequired()) {
-  // For testing, skip waiting for audio
+// Check if slide has audio loaded
+if (hasAudio()) {
+  // Get audio state to understand context
+  const state = getAudioState();
+  console.log('Audio type:', state.contextType); // 'slide', 'modal', or 'standalone'
+  
+  // For testing, simulate completion (no need to wait for audio)
   simulateAudioComplete();
   
-  // Verify completion was tracked
-  console.log('Audio completed:', isAudioCompleted());
+  // This triggers the appropriate engagement tracking:
+  // - slide audio → slideAudioComplete requirement
+  // - modal audio → modalAudioComplete requirement  
+  // - standalone audio → audioComplete requirement
 }
 
-// Check audio state for specific context
-const completed = isAudioCompletedForContext('slide-01');
+// Check audio completion for specific context
+const completed = isAudioCompletedForContext('intro');
 ```
 
 ## data-testid Attributes

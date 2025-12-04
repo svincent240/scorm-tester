@@ -309,6 +309,12 @@ This section provides a complete, categorized list of all available MCP tools.
 *   `scorm_engagement_set_scroll_depth`
 *   `scorm_engagement_reset`
 
+**Audio Control (requires compatible SCORM template with audio support):**
+
+*   `scorm_automation_get_audio_state` - Get hasAudio, audioState (source, position, duration, contextType, isCompleted), and progress
+*   `scorm_automation_is_audio_completed_for_context` - Check completion for specific context (slideId, modal-xxx, etc.)
+*   `scorm_automation_simulate_audio_complete` - Simulate completion for testing (triggers appropriate engagement tracking)
+
 **Reporting:**
 *   `scorm_report`
 
