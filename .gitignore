@@ -21,6 +21,9 @@ dev-startup.bat
 /coverage
 /artifacts/perf
 
+# Build outputs
+/dist
+
 # Playwright
 node_modules/
 /test-results/

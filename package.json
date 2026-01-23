@@ -39,6 +39,7 @@
     "build:validate": "npm run validate:all",
     "build": "npm run build:validate && electron-builder",
     "build:win": "npm run build:validate && electron-builder --win",
+    "build:portable": "electron-builder --win portable",
     "build:mac": "npm run build:validate && electron-builder --mac",
     "build:linux": "npm run build:validate && electron-builder --linux",
     "build:dev": "electron-builder --dir",
@@ -152,13 +153,20 @@
       "output": "dist"
     },
     "files": [
+      "index.html",
       "src/**/*",
       "node_modules/**/*",
       "package.json"
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "ScormTester-Portable-${version}.exe"
     },
     "mac": {
       "target": "dmg",

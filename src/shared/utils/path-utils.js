@@ -381,7 +381,24 @@ class PathUtils {
    * @returns {string} Normalized application root path
    */
   static getAppRoot(currentDir) {
-    // Navigate up from main/services to app root
+    // Check if running in packaged Electron app
+    // In packaged apps, app.getAppPath() returns path to app.asar or unpacked resources
+    // The __dirname in a packaged app is inside app.asar (e.g., /resources/app.asar/src/main/services)
+    
+    // Detect if we're inside an ASAR archive
+    const isPackaged = currentDir.includes('app.asar');
+    
+    if (isPackaged) {
+      // In packaged app: find the asar root
+      // currentDir is something like: /path/to/resources/app.asar/src/main/services
+      // We need: /path/to/resources/app.asar
+      const asarIndex = currentDir.indexOf('app.asar');
+      if (asarIndex !== -1) {
+        return this.normalize(currentDir.substring(0, asarIndex + 'app.asar'.length));
+      }
+    }
+    
+    // Development mode: navigate up from main/services to app root
     return this.join(currentDir, '../../../');
   }
 
